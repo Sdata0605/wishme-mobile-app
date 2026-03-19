@@ -1,0 +1,425 @@
+Build a React Native Expo app called "WishMe" — a celebrity video wish platform for Indian users. 
+Use Expo SDK 54, Expo Router (file-based routing), TypeScript, and design it as a complete 
+UI-only app (no real backend — mock all data locally).
+
+The app must run cleanly on Expo Go (Android/iOS) via expo.dev. Do NOT use a monorepo or pnpm 
+workspace. Use a single standalone Expo project with npm.
+
+─────────────────────────────────────
+BRAND & THEME
+─────────────────────────────────────
+Primary gradient: #FF6B33 → #E8527A → #B44CFF (orange to pink to purple)
+Primary color: #FF6B33 (orange)
+Secondary color: #B44CFF (purple)
+
+Light mode colors:
+  background: #FFFFFF, backgroundSecondary: #F5F6F8
+  foreground: #151921, card: #FFFFFF
+  primary: #FF6B33, secondary: #B44CFF
+  muted: #EDEEF1, mutedForeground: #6B7085
+  border: #DCDFE5, input: #E6E8EC, destructive: #EF4444
+  sidebarBackground: #F5F6F8, sidebarPrimary: #FF6B33, sidebarAccent: #EDEEF1
+
+Dark mode colors:
+  background: #1E283E, backgroundSecondary: #253049
+  foreground: #F0F1F4, card: #1A2035
+  primary: #FF7F4D, secondary: #C266FF
+  muted: #1F2940, mutedForeground: #919199
+  border: #252F47, input: #1A2035
+  sidebarBackground: #171E30, sidebarPrimary: #FF7F4D
+
+Fonts: Inter (400, 500, 600, 700) + PlayfairDisplay_700Bold from Google Fonts via expo-google-fonts.
+Use PlayfairDisplay for all big hero/section titles. Use Inter for everything else.
+
+Shadows: sm (elevation 2), md (elevation 4), lg (elevation 8).
+Border radius: full=9999, base=12, lg=12, md=10, sm=8, xs=6.
+
+─────────────────────────────────────
+NAVIGATION STRUCTURE
+─────────────────────────────────────
+Use Expo Router with these route groups:
+
+app/
+  _layout.tsx          — root layout, wraps everything in DrawerMenu + ThemeProvider + AuthProvider + DrawerProvider
+  index.tsx            — redirect: if not onboarded → OnboardingSplash; if not logged in → (auth); else → (tabs)
+  (auth)/
+    _layout.tsx        — Stack layout, no header
+    index.tsx          — Sign In / Sign Up / Celebrity Sign Up tabs (single screen with tab switcher)
+    verify-otp.tsx     — 6-digit OTP verification screen
+    complete-profile.tsx — Complete your profile form
+    select-plan.tsx    — Subscription plan picker (Free / Pro / Celebrity)
+    celebrity-signup.tsx — Celebrity registration form
+    signup.tsx         — Alternative signup screen
+    login.tsx          — Alternative login screen
+  (tabs)/
+    _layout.tsx        — Bottom tab bar with 5 tabs
+    index.tsx          — HOME screen (main dashboard)
+    celebrities.tsx    — Browse Celebrities screen
+    music.tsx          — AI Music Studio screen
+    voice-call.tsx     — Voice Call / Celebrity Call screen
+    profile.tsx        — User Profile screen
+  celebrity/
+    [id].tsx           — Celebrity detail page
+  booking/
+    [id].tsx           — Booking detail page
+  chat/
+    [id].tsx           — Chat / Message thread
+  bookings.tsx         — My Bookings list
+  favorites.tsx        — Favorites / Wishlist
+  wallet.tsx           — Wallet & Transactions
+  wish-orders.tsx      — My Wish Orders list
+  messages.tsx         — Messages / Inbox
+  loved-ones.tsx       — Manage Loved Ones (birthdays, anniversaries)
+  photo-wish.tsx       — Photo Wish creation screen
+  wish-celebrity.tsx   — Request a wish from a celebrity
+  for-business.tsx     — Business / Brand promotion page
+  greeting-cards.tsx   — Greeting Cards creation
+  image-promotions.tsx — Image-based promotions
+  referrals.tsx        — Referral program screen
+  commission.tsx       — Earn commission / affiliate screen
+  occasions.tsx        — Occasions manager (birthday, anniversary etc)
+  occasion-alerts.tsx  — Occasion reminder alerts
+  settings.tsx         — App settings (theme, notifications, account)
+  celebrity-dashboard.tsx — Celebrity's own dashboard
+  +not-found.tsx       — 404 screen
+
+─────────────────────────────────────
+SIDEBAR DRAWER (DrawerMenu component)
+─────────────────────────────────────
+The drawer is a custom animated side drawer (NOT React Navigation drawer).
+Width = 78% of screen width.
+
+Animation: When opened, the main content slides RIGHT by 80% of drawer width and SCALES DOWN 
+to 0.88, with borderRadius animating to 20. The drawer slides in from the LEFT simultaneously.
+All animations use Animated.timing with useNativeDriver: true.
+
+Drawer has three sections:
+1. Header: circular avatar (initial letter) + user name + email + X close button
+2. Scrollable nav list with these items (icon, label, route):
+   - home → Dashboard → /(tabs)
+   - phone → Celebrity Call → /(tabs)/voice-call
+   - credit-card → Wallet → /wallet
+   - calendar → Bookings → /bookings
+   - heart → Favorites → /favorites
+   - shopping-bag → Wish Orders → /wish-orders
+   - message-circle → Messages → /messages
+   - users → Loved Ones → /loved-ones
+   - music-2 → AI Music → /(tabs)/music
+   - image → Photo Wish → /photo-wish
+   - star → Wish a Celebrity → /wish-celebrity
+   - video → Wish a Friend → /(tabs)/celebrities
+   - briefcase → For Business → /for-business
+   - mail → Greeting Cards → /greeting-cards
+   - zap → Image Promotions → /image-promotions
+   - search → Browse Celebrities → /(tabs)/celebrities
+   - share-2 → Referrals → /referrals
+   - trending-up → Commission → /commission
+   - gift → Occasions → /occasions
+   - bell → Occasion Alerts → /occasion-alerts
+   If user role is 'celebrity': sparkles → Celebrity Dashboard → /celebrity-dashboard (highlighted in primary color)
+3. Footer: Settings + Logout (red icon, calls logout then navigates to /(auth))
+
+Each nav item: row layout, 36x36 rounded icon container (backgroundColor = sidebarAccent), 
+icon (18px), label in Inter_500Medium. Press → close drawer + navigate.
+
+Use lucide-react-native for all icons. Create an Icon wrapper component that maps icon name 
+strings to lucide components.
+
+Use DrawerContext (React Context) to expose: isOpen, open(), close(), toggle(), animValue (Animated.Value 0→1).
+The open/close animations use Animated.timing duration 280ms with useNativeDriver.
+
+─────────────────────────────────────
+ONBOARDING SPLASH SEQUENCE
+─────────────────────────────────────
+Show this sequence the very first time the app is opened (use AsyncStorage to track).
+
+Screen 0 — Intro Video:
+  - Full-screen video using expo-video (VideoView + useVideoPlayer)
+  - Video plays automatically, muted, no native controls
+  - "Skip" button top-right (semi-transparent pill)
+  - After video ends OR after 5-second timer → advance to slide 1
+  - 8-second hard fallback timer in case video never plays
+  - On web: skip video, go straight to slide 1
+
+Screens 1–4 — Image Slides (use any placeholder images with picsum.photos):
+  Slide 1: title="Wish a Friend", desc="Send personalized video wishes to your loved ones"
+  Slide 2: title="Wish a Celebrity", desc="Get personalized video messages from your favorite celebrities"
+  Slide 3: title="Make Promotion Ads", desc="Create professional promotion videos with celebrity endorsements"
+  Slide 4: title="UGC Videos", desc="User-generated content videos with celebrity collaborations"
+
+Each slide layout:
+  - Full-screen background image (resizeMode cover), scale-animated in (0.95 → 1.0)
+  - Top-left: WishMe logo in semi-transparent background pill
+  - Top-right: "1/4" progress pill + "Skip" button (semi-transparent)
+  - Bottom overlay: LinearGradient from transparent → background color (bottom-to-top)
+  - Animated title in PlayfairDisplay_700Bold, fontSize 36
+  - Animated description in Inter_500Medium, fontSize 18, opacity 0.9
+  - "Continue" button (last slide: "Get Started") — gradient #FF6B33 → #B44CFF, pill-shaped, height 52
+
+Entry animations per slide (Animated.parallel):
+  - screenOpacity: 0 → 1, 700ms
+  - imageScale: 0.95 → 1.0, 1000ms
+  - contentOpacity + contentSlide (translateY 32→0): after 300ms delay, 700ms
+  - btnOpacity: after 700ms delay, 700ms
+
+Loading gate: while assets load, show centered logo + ActivityIndicator + "Loading…" text on black background. Fade out when ready.
+
+─────────────────────────────────────
+AUTH SCREENS — app/(auth)/index.tsx
+─────────────────────────────────────
+Single screen with 3 tabs at top: "Sign In" | "Sign Up" | "Celebrity"
+
+Sign In tab:
+  - Email field (icon: mail), Password field (icon: lock, show/hide toggle)
+  - "Forgot Password?" link → inline forgot password view (same screen)
+  - Orange→purple gradient "Sign In" button
+  - Error banner if login fails
+
+Forgot Password inline view:
+  - Back arrow link
+  - Key icon in circle
+  - Toggle: Email | Phone (pill toggles with active border/bg)
+  - Input field, "Send Reset Link" gradient button
+  - Success state: green check circle + "Reset Link Sent!" text
+
+Sign Up tab:
+  - First Name + Last Name in a row
+  - Email field (validates format)
+  - Phone field (validates 10-digit Indian number)
+  - Password field with:
+    - "Generate Strong Password" button (sparkles icon)
+    - 5-bar strength meter (colors: red→yellow→green)
+    - Strength label (Weak/Fair/Good/Strong/Very Strong)
+    - Checklist: 12+ chars, Uppercase, Lowercase, Number, Special char
+  - Optional Referral Code field
+  - After form submit → OTP verification screen (6 individual digit boxes)
+    - Each box: 44x44, rounded, border highlights when filled
+    - Auto-advance focus on digit entry, backspace goes to previous
+    - Auto-verify when all 6 digits entered
+    - "Resend OTP" with 30-second countdown
+    - On success → navigate to /(tabs)
+
+Celebrity tab:
+  - Name, Category (dropdown: Actor/Singer/Athlete/Comedian etc)
+  - Bio textarea, Social media links
+  - "Apply to Join" gradient button
+
+All inputs: 48px height, left icon, border highlights on error (red), 
+Inter_400Regular text, floating label above.
+
+─────────────────────────────────────
+HOME SCREEN — app/(tabs)/index.tsx
+─────────────────────────────────────
+Header (LinearGradient background, heroLight/heroDark):
+  - Left: hamburger menu button (opens drawer) + greeting ("Welcome back, [Name] 👋" or "Welcome to WishMe")
+  - Right: wallet balance pill (₹0, tappable → /wallet) + messages icon button
+  - Below: search bar (Pressable, navigates to /celebrities) with search icon + "Search celebrities…" + filter icon
+
+Scrollable content sections:
+
+1. BANNER CAROUSEL — horizontal FlatList, pagingEnabled:
+   3 cards, each width=screenWidth-48, height≥160, rounded 20, LinearGradient backgrounds:
+   - "Get a Birthday Wish from Your Idol" — gradient #FF6B33→#E8527A→#B44CFF — "Starting from ₹999"
+   - "AI Music Studio Now Live!" — gradient #B44CFF→#7B2FFF→#4B0082 — "Generate songs in seconds"
+   - "Book a Voice Call with Celebrities" — gradient #FF6B33→#FF8C42→#FFB347 — "Live 1-on-1 sessions"
+   Each card: title in PlayfairDisplay_700Bold 22px, subtitle, white "Book Now →" pill button
+   Dot indicator below (6px dots, active = primary color)
+
+2. QUICK ACTIONS — 3-column grid, each item: card with colored icon circle + label below:
+   - video (orange) → "Wish a\nFriend" → /celebrities
+   - heart (pink) → "Wish a\nCelebrity" → /wish-celebrity
+   - music (purple) → "AI Music\nStudio" → /(tabs)/music
+   - image (orange2) → "Photo\nWish" → /photo-wish
+   - mail (purple2) → "Greeting\nCards" → /greeting-cards
+   - phone (orange) → "Voice\nCall" → /(tabs)/voice-call
+   Icon circle: 52x52, borderRadius 16, backgroundColor = actionColor + '20'
+
+3. FEATURED CELEBRITIES — horizontal scroll, "See all" link:
+   Cards (130px wide): square image top, verified badge (primary color circle with check), 
+   name, category, ⭐ rating, price in ₹, tap → /celebrity/[id]
+   Mock data: Ranveer Singh (Actor, ₹2499, ⭐4.9), Shreya Ghoshal (Singer, ₹1999, ⭐4.8),
+   Virat Kohli (Athlete, ₹4999, ⭐4.9), Alia Bhatt (Actor, ₹3499, ⭐4.7)
+
+4. PERSONALIZED VIDEO WISHES — horizontal scroll cards, each width=screenWidth-60:
+   Use expo-video with local placeholder MP4 videos (or use a sample video URL).
+   Each card: video thumbnail (188px height) with play/pause button (centered), 
+   mute/unmute button (bottom-right), tag badge (bottom-left).
+   Below video: PlayfairDisplay title (18px), description (4 lines max), 
+   "Create Your Wish" gradient button with video icon.
+   3 cards: Graduation (blue gradient), Birthday (orange-pink), Anniversary (purple-pink)
+   Only play video when card is >50% visible (use onViewableItemsChanged).
+
+5. HOW IT WORKS — rounded card section (backgroundSecondary), 3 equal columns:
+   Each step: numbered gradient circle (1/2/3), icon, bold title, caption description
+   Steps: 1. Find Your Star (search icon) → 2. Share Details (edit-2) → 3. Get Your Wish (video)
+
+6. REFERRAL BANNER — purple gradient card: "Earn with WishMe" + "Refer friends & earn up to 10% commission" + white "Refer Now" button → /referrals
+
+Floating Action Button (zap icon, primary color) bottom-right → /messages
+
+─────────────────────────────────────
+CELEBRITIES SCREEN — app/(tabs)/celebrities.tsx
+─────────────────────────────────────
+- Search bar at top (live filter)
+- Horizontal category filter chips: All, Actors, Singers, Athletes, Comedians, Influencers, TV Stars
+- Grid of celebrity cards (2 columns), each showing: image, name, category, rating, price ₹
+- Mock at least 12 celebrities with varied categories
+- Tap → /celebrity/[id]
+
+─────────────────────────────────────
+CELEBRITY DETAIL — app/celebrity/[id].tsx
+─────────────────────────────────────
+- Full-width image header with back button overlay
+- Celebrity name (PlayfairDisplay), category badge, verified badge
+- Star rating + review count
+- Price per wish (₹), per voice call (₹)
+- Bio paragraph
+- "What I can do for you" tags (Birthday, Anniversary, Motivation, etc.)
+- "Book a Wish" gradient button → /booking/[id]
+- "Voice Call" button
+- Reviews section with 3 mock reviews
+
+─────────────────────────────────────
+AI MUSIC STUDIO — app/(tabs)/music.tsx
+─────────────────────────────────────
+- Header: "AI Music Studio" title
+- Genre selector: Bollywood / Pop / Classical / Hip-Hop / Devotional (chip selectors)
+- Mood selector: Happy / Romantic / Energetic / Calm / Celebratory
+- Text input: "Describe your song…" (multiline)
+- "Occasion" selector: Birthday / Anniversary / Wedding / Graduation
+- "Generate Song" gradient button
+- Mock generated song card: waveform visualization (animated bars), title, play/pause, duration
+- Previously generated songs list
+
+─────────────────────────────────────
+VOICE CALL SCREEN — app/(tabs)/voice-call.tsx
+─────────────────────────────────────
+- Header: "Celebrity Voice Calls"
+- Available now / Scheduled tabs
+- Celebrity cards showing: avatar, name, category, per-minute rate (₹/min), 
+  availability status (green dot = live), "Call Now" or "Schedule" button
+- Featured: "Book a 1-on-1 live call with your favorite celebrity"
+- Filter by category
+
+─────────────────────────────────────
+PROFILE SCREEN — app/(tabs)/profile.tsx
+─────────────────────────────────────
+- Avatar with initials (large circle, primary color)
+- Name, email, phone, member since date
+- Wallet balance with "Add Money" button
+- Stats row: Bookings, Favorites, Referrals (3 columns)
+- Action list items: Edit Profile, My Orders, Saved Celebrities, Notifications, Theme (toggle dark/light), Help & Support, Logout
+- Celebrity mode toggle (for testing, allows switching to celebrity role)
+
+─────────────────────────────────────
+REMAINING SCREENS (all UI-only, reasonable mock content)
+─────────────────────────────────────
+/bookings — My Bookings: list with status chips (Pending/Completed/Cancelled), thumbnail, celebrity name, date, price
+/booking/[id] — Booking detail: all info + video player if completed + rating/review form
+/favorites — Grid of saved celebrities with remove button
+/wallet — Balance display (big number), Add Money button, transaction history list (credit/debit rows with icons)
+/wish-orders — List of placed wish orders: celebrity name, occasion, status, date
+/messages — Chat list (inbox), each row: avatar, name, last message, time, unread badge
+/chat/[id] — Chat thread: message bubbles (left/right), text input + send button
+/loved-ones — List of loved ones with birthday/anniversary dates, "Add Person" FAB
+/photo-wish — Upload photo area, text overlay input, font/sticker picker, celebrity selection
+/wish-celebrity — Form: select celebrity, occasion, recipient name, personal message, delivery date
+/for-business — Marketing page: brand testimonials, pricing for bulk bookings, "Get Quote" form
+/greeting-cards — Card template gallery (grid), customize message, preview
+/image-promotions — Create promotional image with celebrity, upload brand assets
+/referrals — Referral code display (copy button), earnings history, referred users list
+/commission — Affiliate dashboard: total earned, pending, withdrawal button, earnings chart (simple bars)
+/occasions — Calendar-style upcoming occasions list + add occasion form (name, type, date)
+/occasion-alerts — Toggle notifications per occasion type, advance reminder settings (1 day, 3 days, 1 week)
+/settings — Dark/light toggle, notification settings, language (English/Hindi), account actions (Change Password, Delete Account)
+/celebrity-dashboard — Only visible for celebrity role: pending requests, completed wishes count, earnings, upload response form
++not-found — "Oops! Page not found" with back button
+
+─────────────────────────────────────
+CONTEXTS & STATE
+─────────────────────────────────────
+ThemeContext: isDark (useState, persisted in AsyncStorage), colors (lightColors/darkColors), gradients, toggle()
+AuthContext: user object {id, firstName, lastName, email, phone, role ('user'|'celebrity'), walletBalance}, 
+  login(email, password) mock (any credentials work → sets user), 
+  signup(email, password, firstName, lastName, phone, referral?) mock,
+  logout() clears user. Persist to AsyncStorage.
+DrawerContext: isOpen, animValue (Animated.Value), open(), close(), toggle()
+
+─────────────────────────────────────
+PACKAGES TO INSTALL
+─────────────────────────────────────
+expo (SDK 54)
+expo-router
+expo-video
+expo-linear-gradient
+expo-font
+expo-haptics
+expo-web-browser
+expo-image-picker
+react-native-safe-area-context
+react-native-screens
+react-native-reanimated (v3)
+react-native-gesture-handler
+@expo-google-fonts/inter
+@expo-google-fonts/playfair-display
+lucide-react-native
+react-native-svg (required by lucide)
+@react-native-async-storage/async-storage
+
+─────────────────────────────────────
+ICON COMPONENT
+─────────────────────────────────────
+Create components/Icon.tsx that imports specific icons from lucide-react-native and exports 
+an <Icon name="..." size={} color={} /> component. Support these icon names at minimum:
+home, phone, credit-card, calendar, heart, shopping-bag, message-circle, users, music, music-2,
+image, star, video, briefcase, mail, zap, search, share-2, trending-up, gift, bell, sparkles,
+settings, log-out, x, check, check-circle, circle, alert-circle, arrow-left, arrow-right, 
+eye, eye-off, lock, menu, sliders, play-circle, pause, volume-x, volume-2, edit-2, key,
+mail-check, phone-call, mic, camera, upload, plus, minus, trash-2, info, shield, award,
+bar-chart-2, wallet, copy, send
+
+─────────────────────────────────────
+FONTS SETUP in app/_layout.tsx
+─────────────────────────────────────
+Load fonts with useFonts:
+Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, PlayfairDisplay_700Bold
+Show SplashScreen (expo-splash-screen) until fonts loaded.
+
+─────────────────────────────────────
+app.json REQUIRED FIELDS
+─────────────────────────────────────
+name: "WishMe", slug: "wishme", version: "1.0.0"
+icon: "./assets/images/icon.png"
+scheme: "wishme"
+plugins: ["expo-router", "expo-font", "expo-video", "expo-web-browser"]
+android: { package: "com.wishme.app", adaptiveIcon: { backgroundColor: "#FF6B33" } }
+ios: { bundleIdentifier: "com.wishme.app" }
+experiments: { typedRoutes: true }
+
+─────────────────────────────────────
+DESIGN DETAILS
+─────────────────────────────────────
+- All screens have proper safe area insets (useSafeAreaInsets)
+- All list screens have pull-to-refresh (RefreshControl, mock 1.5s delay)
+- All form screens handle keyboard with KeyboardAvoidingView
+- All buttons have press opacity feedback (0.65 on pressed)
+- Gradient buttons always use LinearGradient colors={['#FF6B33','#B44CFF']} horizontal
+- Section headers: PlayfairDisplay_700Bold for titles, "See all" in primary color
+- Empty states: centered icon + title + subtitle on each list screen
+- All prices in Indian Rupees (₹), numbers formatted with toLocaleString('en-IN')
+- Loading states: ActivityIndicator in primary color
+- Bottom tab bar: icons only (no labels) OR icon + short label, height 60, safe area aware
+- All images use picsum.photos seeds for consistent placeholder images
+
+─────────────────────────────────────
+QUALITY REQUIREMENTS
+─────────────────────────────────────
+- TypeScript throughout, no `any` types where avoidable
+- No backend calls — all data is hardcoded mock arrays
+- App must run on expo.dev (Expo Go compatible — no bare workflow)
+- Dark mode works on every single screen
+- Drawer animation must be smooth (useNativeDriver: true for all animated values)
+- Video cards on home screen only play when visible
+- OTP screen: 6 individual TextInput boxes with auto-focus chain
+- Password strength meter: real-time color feedback
+- All navigation uses expo-router push/replace/navigate

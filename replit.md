@@ -91,6 +91,32 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+### `artifacts/mobile` (`@workspace/mobile`)
+
+Expo React Native app — **WishMe**, a celebrity video wish platform for Indian users.
+
+- **Tech**: Expo SDK 53, Expo Router v6, React Native, TypeScript
+- **Design**: Orange-to-purple gradient branding (#FF6B33 → #B44CFF), PlayfairDisplay_700Bold for headings, Inter for body
+- **Theme**: Dark/light mode via ThemeContext + AsyncStorage persistence
+- **Auth**: Mock auth via AuthContext (login/signup/logout), AsyncStorage user persistence
+- **Navigation**: File-based Expo Router, 5-tab layout (Home, Stars, Music, Calls, Profile) + Drawer sidebar
+- **Drawer**: Slide-and-scale animated sidebar (DrawerContext) with 20+ nav items
+- **Fonts**: `@expo-google-fonts/inter`, `@expo-google-fonts/playfair-display`
+- **Indian Rupees** (₹) throughout, 12 mock celebrities with picsum.photos images
+
+Key screens:
+- `app/onboarding.tsx` — 4-slide animated onboarding
+- `app/(auth)/index.tsx` — Sign In / Sign Up / Celebrity tabs + password strength meter
+- `app/(auth)/verify-otp.tsx` — 6-digit OTP verification
+- `app/(tabs)/index.tsx` — Home (banners, quick actions, celebrity grid, video cards, how-it-works)
+- `app/(tabs)/celebrities.tsx` — Browse/search/filter celebrity grid
+- `app/(tabs)/music.tsx` — AI Music Studio with waveform animation
+- `app/(tabs)/voice-call.tsx` — Live celebrity voice calls
+- `app/(tabs)/profile.tsx` — User profile, wallet, stats, settings
+- `app/celebrity/[id].tsx` — Celebrity detail with reviews + booking
+- `app/booking/[id].tsx` — Booking detail with rating form
+- Plus: bookings, wallet, messages, chat, favorites, wish-orders, loved-ones, wish-celebrity, photo-wish, for-business, greeting-cards, image-promotions, referrals, commission, occasions, occasion-alerts, settings, celebrity-dashboard
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
