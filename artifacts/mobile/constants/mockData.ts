@@ -316,6 +316,22 @@ export const FEATURED_OCCASIONS = [
   { id: 'fo4', name: 'Weddings', description: 'Bless the couple with a special shout-out from their idol', date: 'Nov – Feb', gradient: ['#B44CFF', '#4B83FF'] as [string, string] },
 ];
 
+export const MOCK_CELEBRITY_COMMISSIONS = [
+  { id: 'cc1', description: 'Booking: Ranveer Singh', grossAmount: 2499, tdsPercent: 10, tdsAmount: 250, netAmount: 2249, date: '2024-12-15' },
+  { id: 'cc2', description: 'Booking: Shreya Ghoshal', grossAmount: 1999, tdsPercent: 10, tdsAmount: 200, netAmount: 1799, date: '2024-11-28' },
+  { id: 'cc3', description: 'Booking: Kapil Sharma', grossAmount: 1499, tdsPercent: 10, tdsAmount: 150, netAmount: 1349, date: '2024-11-20' },
+  { id: 'cc4', description: 'Booking: MS Dhoni', grossAmount: 5499, tdsPercent: 10, tdsAmount: 550, netAmount: 4949, date: '2024-10-05' },
+];
+
+export const MOCK_REFERRAL_TABLE = [
+  { id: 'rt1', referredUser: 'Priya S.', level: 'L1', amount: 249, status: 'Completed', date: '2025-01-08' },
+  { id: 'rt2', referredUser: 'Rahul K.', level: 'L1', amount: 149, status: 'Completed', date: '2024-12-20' },
+  { id: 'rt3', referredUser: 'Ankit M.', level: 'L2', amount: 74, status: 'Pending', date: '2024-12-15' },
+  { id: 'rt4', referredUser: 'Neha R.', level: 'L1', amount: 349, status: 'Completed', date: '2024-11-30' },
+  { id: 'rt5', referredUser: 'Deepak V.', level: 'L2', amount: 99, status: 'Completed', date: '2024-11-18' },
+  { id: 'rt6', referredUser: 'Sunita P.', level: 'L1', amount: 199, status: 'Failed', date: '2024-11-05' },
+];
+
 export const MOCK_REVIEWS = [
   {
     id: 'r1',
