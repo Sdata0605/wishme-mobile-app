@@ -149,10 +149,7 @@ function CallDetailsForm({
   const mockDates = ['Today, 6:00 PM', 'Tomorrow, 10:00 AM', 'Tomorrow, 4:00 PM', 'Mar 22, 9:00 AM'];
 
   return (
-    <ScrollView
-      contentContainerStyle={[styles.formContent, { paddingBottom: bottomPad }]}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={[styles.formContent, { paddingBottom: bottomPad }]}>
       <TouchableOpacity onPress={onBack} style={styles.backBtn}>
         <Icon name="arrow-left" size={18} color={colors.primary} />
         <Text style={[styles.backText, { color: colors.primary }]}>Change Celebrity</Text>
@@ -298,7 +295,7 @@ function CallDetailsForm({
           <Text style={styles.callCTAText}>Make Call</Text>
         </LinearGradient>
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -315,6 +312,7 @@ function CallModal({
   const [callState, setCallState] = useState<'connecting' | 'in-progress'>('connecting');
   const [seconds, setSeconds] = useState(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const phoneAnim = useRef(new Animated.Value(1)).current;
   const pulseRef = useRef<Animated.CompositeAnimation | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -328,15 +326,22 @@ function CallModal({
   const startPulse = useCallback(() => {
     stopPulse();
     pulseAnim.setValue(1);
+    phoneAnim.setValue(1);
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.25, duration: 600, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 600, useNativeDriver: true }),
+        Animated.parallel([
+          Animated.timing(pulseAnim, { toValue: 1.3, duration: 700, useNativeDriver: true }),
+          Animated.timing(phoneAnim, { toValue: 1.15, duration: 700, useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+          Animated.timing(phoneAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ]),
       ]),
     );
     pulseRef.current = loop;
     loop.start();
-  }, [pulseAnim, stopPulse]);
+  }, [pulseAnim, phoneAnim, stopPulse]);
 
   useEffect(() => {
     if (visible) {
@@ -382,13 +387,18 @@ function CallModal({
             {callState === 'connecting' ? 'Connecting...' : 'Call in Progress'}
           </Text>
 
-          <View style={styles.modalAvatarWrap}>
-            <Animated.View style={[styles.pulseBg, {
-              transform: [{ scale: pulseAnim }],
-              opacity: callState === 'connecting' ? 0.5 : 0,
-            }]} />
-            <Image source={{ uri: celeb.imageUrl }} style={styles.modalAvatar} />
-          </View>
+          {callState === 'connecting' ? (
+            <View style={styles.modalAvatarWrap}>
+              <Animated.View style={[styles.pulseBg, { transform: [{ scale: pulseAnim }] }]} />
+              <Animated.View style={[styles.phoneIconCircle, { transform: [{ scale: phoneAnim }] }]}>
+                <Icon name="phone-call" size={40} color="#fff" />
+              </Animated.View>
+            </View>
+          ) : (
+            <View style={styles.modalAvatarWrap}>
+              <Image source={{ uri: celeb.imageUrl }} style={styles.modalAvatar} />
+            </View>
+          )}
 
           <Text style={styles.modalCelebName}>{celeb.name}</Text>
           <Text style={styles.modalCelebCat}>{celeb.category}</Text>
@@ -601,7 +611,8 @@ const styles = StyleSheet.create({
   modalContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 16 },
   modalStatus: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontFamily: 'Inter_500Medium' },
   modalAvatarWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center', width: 140, height: 140 },
-  pulseBg: { position: 'absolute', width: 130, height: 130, borderRadius: 65, backgroundColor: '#FF6B33' },
+  pulseBg: { position: 'absolute', width: 130, height: 130, borderRadius: 65, backgroundColor: '#FF6B33', opacity: 0.5 },
+  phoneIconCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#FF6B33', alignItems: 'center', justifyContent: 'center' },
   modalAvatar: { width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: '#fff' },
   modalCelebName: { color: '#fff', fontSize: 24, fontFamily: 'Inter_700Bold', textAlign: 'center' },
   modalCelebCat: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontFamily: 'Inter_400Regular' },
