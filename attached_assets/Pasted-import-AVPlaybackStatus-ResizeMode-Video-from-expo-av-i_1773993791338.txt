@@ -1,0 +1,499 @@
+import { AVPlaybackStatus, ResizeMode, Video } from 'expo-av';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
+  Image,
+  Platform,
+  Pressable,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { fontSize } from '@/constants/fonts';
+import { radius, shadows } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
+
+const SCREEN_W = Dimensions.get('window').width;
+const SCREEN_H = Dimensions.get('window').height;
+
+const LOGO = require('../assets/images/wishme-logo.png');
+const INTRO_VIDEO = require('../assets/videos/intro-wish.mp4');
+
+const SLIDES = [
+  {
+    id: '1',
+    title: 'Wish a Friend',
+    description: 'Send personalized video wishes to your loved ones',
+    image: require('../assets/splash/splash1.png'),
+  },
+  {
+    id: '2',
+    title: 'Wish a Celebrity',
+    description: 'Get personalized video messages from your favorite celebrities',
+    image: require('../assets/splash/splash2.jpeg'),
+  },
+  {
+    id: '3',
+    title: 'Make Promotion Ads',
+    description: 'Create professional promotion videos with celebrity endorsements',
+    image: require('../assets/splash/splash3.jpeg'),
+  },
+  {
+    id: '4',
+    title: 'UGC Videos',
+    description: 'User-generated content videos with celebrity collaborations',
+    image: require('../assets/splash/splash4.jpeg'),
+  },
+];
+
+interface Props {
+  onComplete: () => void;
+}
+
+export default function OnboardingSplash({ onComplete }: Props) {
+  const { colors } = useTheme();
+  const insets = useSafeAreaInsets();
+
+  const initialIndex = Platform.OS === 'web' ? 1 : 0;
+  const [isReady, setIsReady] = useState(false);
+  const [screenIndex, setScreenIndex] = useState(initialIndex);
+
+  const screenOpacity = useRef(new Animated.Value(0)).current;
+  const imageScale = useRef(new Animated.Value(0.95)).current;
+  const contentOpacity = useRef(new Animated.Value(0)).current;
+  const contentSlide = useRef(new Animated.Value(32)).current;
+  const btnOpacity = useRef(new Animated.Value(0)).current;
+  const gateOpacity = useRef(new Animated.Value(1)).current;
+
+  const videoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const advanceRef = useRef<() => void>(() => undefined);
+  const hasAdvancedFromVideo = useRef(false);
+
+  const fadeGateAndReady = useCallback(
+    (source: string, cancelled: { value: boolean }) => {
+      console.log(`[Splash] isReady=true (${source})`);
+      Animated.timing(gateOpacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }).start(() => {
+        if (!cancelled.value) setIsReady(true);
+      });
+    },
+    [],
+  );
+
+  const runEntryAnimations = useCallback(
+    (index: number) => {
+      console.log(`[Splash] slide ${index} entry animations`);
+      screenOpacity.setValue(0);
+      imageScale.setValue(0.95);
+      contentOpacity.setValue(0);
+      contentSlide.setValue(32);
+      btnOpacity.setValue(0);
+
+      Animated.parallel([
+        Animated.timing(screenOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(imageScale, { toValue: 1, duration: 1000, useNativeDriver: true }),
+        Animated.sequence([
+          Animated.delay(300),
+          Animated.parallel([
+            Animated.timing(contentOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+            Animated.timing(contentSlide, { toValue: 0, duration: 700, useNativeDriver: true }),
+          ]),
+        ]),
+        Animated.sequence([
+          Animated.delay(700),
+          Animated.timing(btnOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ]),
+      ]).start();
+    },
+    [],
+  );
+
+  const dismiss = useCallback(() => {
+    console.log('[Splash] dismiss → onComplete');
+    onComplete();
+  }, [onComplete]);
+
+  const advance = useCallback(() => {
+    setScreenIndex((prev) => {
+      const next = prev >= SLIDES.length ? prev : prev + 1;
+      console.log(`[Splash] advance prev=${prev} next=${next}`);
+      if (prev >= SLIDES.length) {
+        dismiss();
+      }
+      return next;
+    });
+  }, [dismiss]);
+
+  advanceRef.current = advance;
+
+  const advanceFromVideo = useCallback(() => {
+    if (hasAdvancedFromVideo.current) return;
+    hasAdvancedFromVideo.current = true;
+    console.log(`[Splash] advanceFromVideo prev=${screenIndex}`);
+    if (videoTimeoutRef.current) {
+      clearTimeout(videoTimeoutRef.current);
+      videoTimeoutRef.current = null;
+    }
+    advanceRef.current();
+  }, [screenIndex]);
+
+  useEffect(() => {
+    const cancelled = { value: false };
+    console.log('[Splash] ready — images served via HTTPS');
+    fadeGateAndReady('init', cancelled);
+    return () => {
+      cancelled.value = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (videoTimeoutRef.current) {
+        clearTimeout(videoTimeoutRef.current);
+        videoTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isReady || screenIndex !== 0 || Platform.OS === 'web') return;
+    console.log('[Splash] 8s fallback timer armed');
+    const fallback = setTimeout(() => {
+      console.log('[Splash] 8s fallback fired');
+      advanceFromVideo();
+    }, 8000);
+    return () => clearTimeout(fallback);
+  }, [isReady, screenIndex]);
+
+  useEffect(() => {
+    if (!isReady || screenIndex === 0) return;
+    runEntryAnimations(screenIndex);
+  }, [screenIndex, isReady]);
+
+  const slide = screenIndex > 0 ? SLIDES[screenIndex - 1] : null;
+  const isLastSlide = screenIndex === SLIDES.length;
+  const topPad = insets.top + 16;
+  const btmPad = insets.bottom + 32;
+  const bg = colors.background;
+
+  return (
+    <View style={[StyleSheet.absoluteFillObject, styles.container]}>
+      <StatusBar hidden />
+
+      {isReady && (
+        <>
+          {screenIndex === 0 ? (
+            /* ── Video Intro Screen ───────────────────────── */
+            <View style={StyleSheet.absoluteFillObject}>
+              <Video
+                source={INTRO_VIDEO}
+                style={StyleSheet.absoluteFillObject}
+                resizeMode={ResizeMode.COVER}
+                shouldPlay
+                isMuted
+                isLooping={false}
+                onReadyForDisplay={() => {
+                  console.log('[Splash] video onReadyForDisplay — starting 5s timer');
+                  if (videoTimeoutRef.current) clearTimeout(videoTimeoutRef.current);
+                  videoTimeoutRef.current = setTimeout(() => {
+                    console.log('[Splash] 5s video timer fired');
+                    advanceFromVideo();
+                  }, 5000);
+                }}
+                onError={() => {
+                  console.log('[Splash] video onError — skipping');
+                  advanceFromVideo();
+                }}
+                onPlaybackStatusUpdate={(status: AVPlaybackStatus) => {
+                  if (status.isLoaded && status.didJustFinish) {
+                    console.log('[Splash] video finished naturally');
+                    advanceFromVideo();
+                  }
+                  if (!status.isLoaded && status.error) {
+                    console.log('[Splash] video playback error:', status.error);
+                    advanceFromVideo();
+                  }
+                }}
+              />
+              <Pressable
+                onPress={() => {
+                  console.log('[Splash] video Skip pressed');
+                  advanceFromVideo();
+                }}
+                style={[
+                  styles.videoSkip,
+                  { top: topPad, backgroundColor: bg + '4D' },
+                ]}
+              >
+                <Text style={[styles.skipText, { color: colors.secondaryForeground }]}>Skip</Text>
+              </Pressable>
+            </View>
+          ) : (
+            /* ── Image Slide Screen ───────────────────────── */
+            <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: screenOpacity }]}>
+              {/* Full-screen background image — scale on View, not Image */}
+              <Animated.View
+                style={[
+                  { position: 'absolute', top: 0, left: 0, right: 0, height: SCREEN_H, backgroundColor: '#000' },
+                  { transform: [{ scale: imageScale }] },
+                ]}
+              >
+                <Image
+                  source={slide!.image}
+                  style={{ position: 'absolute', top: 0, left: 0, width: SCREEN_W, height: SCREEN_H }}
+                  resizeMode="cover"
+                  onLoad={() => console.log(`[Splash] image ${screenIndex} loaded`)}
+                  onError={(e) => console.log(`[Splash] image ${screenIndex} error:`, e.nativeEvent.error)}
+                />
+              </Animated.View>
+
+              {/* Bottom-to-top gradient overlay */}
+              <LinearGradient
+                colors={[bg + 'FA', bg + '20', bg + '00']}
+                start={{ x: 0, y: 1 }}
+                end={{ x: 0, y: 0 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+
+              {/* Top bar */}
+              <View style={[styles.topBar, { paddingTop: topPad }]}>
+                <View style={[styles.logoBg, { backgroundColor: bg + '59' }]}>
+                  <Image source={LOGO} style={styles.logo} resizeMode="contain" />
+                </View>
+                <View style={styles.topRight}>
+                  <View
+                    style={[
+                      styles.progressPill,
+                      { backgroundColor: bg + '66', borderColor: colors.border + '40' },
+                    ]}
+                  >
+                    <Text style={[styles.progressText, { color: colors.secondaryForeground }]}>
+                      {screenIndex} / {SLIDES.length}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      console.log('[Splash] slide Skip pressed');
+                      dismiss();
+                    }}
+                    style={[styles.skipBtn, { backgroundColor: bg + '4D' }]}
+                  >
+                    <Text style={[styles.skipText, { color: colors.secondaryForeground }]}>Skip</Text>
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Bottom content area */}
+              <View style={[styles.bottomContent, { paddingBottom: btmPad }]}>
+                <LinearGradient
+                  colors={['transparent', bg + 'D9', bg + 'FA']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={styles.bottomGradient}
+                  pointerEvents="none"
+                />
+
+                <Animated.Text
+                  style={[
+                    styles.title,
+                    {
+                      color: colors.secondaryForeground,
+                      opacity: contentOpacity,
+                      transform: [{ translateY: contentSlide }],
+                    },
+                  ]}
+                >
+                  {slide!.title}
+                </Animated.Text>
+
+                <Animated.Text
+                  style={[
+                    styles.description,
+                    {
+                      color: colors.secondaryForeground,
+                      opacity: contentOpacity,
+                      transform: [{ translateY: contentSlide }],
+                    },
+                  ]}
+                >
+                  {slide!.description}
+                </Animated.Text>
+
+                <Animated.View style={{ opacity: btnOpacity }}>
+                  <Pressable
+                    onPress={() => {
+                      console.log(`[Splash] ${isLastSlide ? 'GetStarted' : 'Continue'} pressed at index ${screenIndex}`);
+                      if (isLastSlide) dismiss();
+                      else advance();
+                    }}
+                  >
+                    <LinearGradient
+                      colors={['#FF6B33', '#B44CFF']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={[styles.continueBtn, shadows.lg]}
+                    >
+                      <Text style={styles.continueBtnText}>
+                        {isLastSlide ? 'Get Started' : 'Continue'}
+                      </Text>
+                    </LinearGradient>
+                  </Pressable>
+                </Animated.View>
+              </View>
+            </Animated.View>
+          )}
+        </>
+      )}
+
+      {/* ── Loading Gate ─────────────────────────────── */}
+      {!isReady && (
+        <Animated.View
+          style={[StyleSheet.absoluteFillObject, styles.gate, { opacity: gateOpacity }]}
+          pointerEvents="none"
+        >
+          <Image source={LOGO} style={styles.gateLogo} resizeMode="contain" />
+          <ActivityIndicator
+            size="large"
+            color={colors.primary}
+            style={styles.gateSpinner}
+          />
+          <Text style={[styles.gateLabel, { color: colors.mutedForeground }]}>Loading…</Text>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    zIndex: 9999,
+    backgroundColor: '#000',
+  },
+  /* Loading gate */
+  gate: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000',
+  },
+  gateLogo: {
+    width: 160,
+    height: 52,
+  },
+  gateSpinner: {
+    marginTop: 28,
+  },
+  gateLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: fontSize.sm,
+    marginTop: 14,
+    letterSpacing: 0.4,
+  },
+  /* Video screen */
+  videoSkip: {
+    position: 'absolute',
+    right: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: radius.full,
+  },
+  /* Top bar */
+  topBar: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  logoBg: {
+    borderRadius: radius.md,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  logo: {
+    height: 40,
+    width: 110,
+  },
+  topRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  progressPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: radius.full,
+    borderWidth: 1,
+  },
+  progressText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.sm,
+    letterSpacing: 0.3,
+  },
+  skipBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.full,
+  },
+  skipText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.sm,
+  },
+  /* Bottom content */
+  bottomContent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+  },
+  bottomGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 340,
+  },
+  title: {
+    fontFamily: 'PlayfairDisplay_700Bold',
+    fontSize: fontSize.xl4,
+    lineHeight: fontSize.xl4 * 1.15,
+    letterSpacing: -0.5,
+    marginBottom: 12,
+    textShadowColor: 'rgba(0,0,0,0.8)',
+    textShadowOffset: { width: 0, height: 4 },
+    textShadowRadius: 12,
+  },
+  description: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: fontSize.lg,
+    lineHeight: fontSize.lg * 1.55,
+    marginBottom: 28,
+    opacity: 0.9,
+    textShadowColor: 'rgba(0,0,0,0.7)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 8,
+  },
+  continueBtn: {
+    height: 52,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  continueBtnText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: fontSize.base,
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
+  },
+});
