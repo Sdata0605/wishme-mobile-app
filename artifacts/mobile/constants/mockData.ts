@@ -1,3 +1,8 @@
+export const COMMISSION_RATES = {
+  L1: { pct: 10, label: 'Direct referral' },
+  L2: { pct: 5, label: '2nd level referral' },
+} as const;
+
 export interface Celebrity {
   id: string;
   name: string;

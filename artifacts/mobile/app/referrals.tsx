@@ -1,11 +1,11 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
-import { Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Clipboard, Platform, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/Icon';
-import { MOCK_REFERRAL_TABLE } from '@/constants/mockData';
+import { COMMISSION_RATES, MOCK_REFERRAL_TABLE } from '@/constants/mockData';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -24,7 +24,11 @@ export default function ReferralsScreen() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const code = user?.referralCode ?? 'WISHME2025';
 
-  const copy = () => { setCopied(true); setTimeout(() => setCopied(false), 2000); };
+  const copy = () => {
+    Clipboard.setString(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const share = async () => {
     try {
@@ -97,14 +101,14 @@ export default function ReferralsScreen() {
           <View style={s.commRates}>
             <View style={s.commRate}>
               <Text style={[s.commLevel, { color: '#FF6B33' }]}>L1</Text>
-              <Text style={[s.commPct, { color: colors.foreground }]}>10%</Text>
-              <Text style={[s.commDesc, { color: colors.mutedForeground }]}>Direct referral</Text>
+              <Text style={[s.commPct, { color: colors.foreground }]}>{COMMISSION_RATES.L1.pct}%</Text>
+              <Text style={[s.commDesc, { color: colors.mutedForeground }]}>{COMMISSION_RATES.L1.label}</Text>
             </View>
             <View style={[s.commSep, { backgroundColor: colors.border }]} />
             <View style={s.commRate}>
               <Text style={[s.commLevel, { color: '#B44CFF' }]}>L2</Text>
-              <Text style={[s.commPct, { color: colors.foreground }]}>5%</Text>
-              <Text style={[s.commDesc, { color: colors.mutedForeground }]}>2nd level referral</Text>
+              <Text style={[s.commPct, { color: colors.foreground }]}>{COMMISSION_RATES.L2.pct}%</Text>
+              <Text style={[s.commDesc, { color: colors.mutedForeground }]}>{COMMISSION_RATES.L2.label}</Text>
             </View>
           </View>
         </View>
@@ -134,7 +138,7 @@ export default function ReferralsScreen() {
                 <Text style={[s.tdCell, s.colAmt, { color: '#22C55E' }]}>₹{row.amount}</Text>
                 <View style={s.colStatus}>
                   <View style={[s.statusBadge, { backgroundColor: sc + '20' }]}>
-                    <Text style={[s.statusText, { color: sc }]}>{row.status.slice(0, 4)}</Text>
+                    <Text style={[s.statusText, { color: sc }]} numberOfLines={1}>{row.status}</Text>
                   </View>
                 </View>
                 <Text style={[s.tdCell, s.colDate, { color: colors.mutedForeground }]} numberOfLines={1}>{row.date.slice(5)}</Text>
