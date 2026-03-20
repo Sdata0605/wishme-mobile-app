@@ -20,6 +20,16 @@ const { width: W } = Dimensions.get('window');
 const CARD_WIDTH = (W - 52) / 2;
 const PAGE_SIZE = 6;
 
+const CATEGORY_MAP: Record<string, string> = {
+  'All': '',
+  'Actors': 'Actor',
+  'Singers': 'Singer',
+  'Athletes': 'Athlete',
+  'Comedians': 'Comedian',
+  'Influencers': 'Influencer',
+  'TV Stars': 'TV Stars',
+};
+
 const DELIVERY_TIMES = [
   { label: 'All', maxPrice: Infinity },
   { label: 'Under 24h', maxPrice: 1500 },
@@ -44,10 +54,7 @@ export default function CelebritiesScreen() {
       const matchSearch =
         c.name.toLowerCase().includes(search.toLowerCase()) ||
         c.category.toLowerCase().includes(search.toLowerCase());
-      const matchCat =
-        activeCategory === 'All' ||
-        c.category.toLowerCase() === activeCategory.toLowerCase().replace(/s$/, '');
-      const deliveryOption = DELIVERY_TIMES.find((d) => d.label === activeDelivery);
+      const matchCat = activeCategory === 'All' || c.category === CATEGORY_MAP[activeCategory];
       const matchDelivery =
         activeDelivery === 'All' ||
         (activeDelivery === 'Under 24h' && c.pricePerWish < 1500) ||

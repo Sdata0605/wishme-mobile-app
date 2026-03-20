@@ -45,6 +45,16 @@ const BANNERS = [
   },
 ];
 
+const CATEGORY_MAP: Record<string, string> = {
+  'All': '',
+  'Actors': 'Actor',
+  'Singers': 'Singer',
+  'Athletes': 'Athlete',
+  'Comedians': 'Comedian',
+  'Influencers': 'Influencer',
+  'TV Stars': 'TV Stars',
+};
+
 const PRICE_RANGES = [
   { label: 'All', min: 0, max: Infinity },
   { label: 'Under ₹1K', min: 0, max: 1000 },
@@ -101,8 +111,7 @@ export default function HomeScreen() {
   const priceRange = PRICE_RANGES.find((p) => p.label === activePriceRange) ?? PRICE_RANGES[0];
 
   const filteredCelebs = CELEBRITIES.filter((c) => {
-    const matchCat = activeCategory === 'All' ||
-      c.category.toLowerCase() === activeCategory.toLowerCase().replace(/s$/, '');
+    const matchCat = activeCategory === 'All' || c.category === CATEGORY_MAP[activeCategory];
     const matchPrice = c.pricePerWish >= priceRange.min && c.pricePerWish < priceRange.max;
     return matchCat && matchPrice;
   });
