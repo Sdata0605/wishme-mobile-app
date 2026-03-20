@@ -239,12 +239,23 @@ export const MOCK_BOOKINGS = [
 ];
 
 export const MOCK_TRANSACTIONS = [
-  { id: 't1', type: 'credit', amount: 500, desc: 'Referral Bonus', date: '2025-01-10' },
-  { id: 't2', type: 'debit', amount: 2499, desc: 'Booking: Ranveer Singh', date: '2024-12-15' },
-  { id: 't3', type: 'credit', amount: 2499, desc: 'Wallet Top Up', date: '2024-12-10' },
-  { id: 't4', type: 'debit', amount: 1999, desc: 'Booking: Shreya Ghoshal', date: '2024-11-28' },
-  { id: 't5', type: 'credit', amount: 5000, desc: 'Wallet Top Up', date: '2024-11-25' },
-  { id: 't6', type: 'debit', amount: 1499, desc: 'Booking: Kapil Sharma', date: '2024-11-20' },
+  { id: 't1', type: 'credit', amount: 500, desc: 'Referral Bonus', date: '2025-01-10', status: 'Completed' },
+  { id: 't2', type: 'debit', amount: 2499, desc: 'Booking: Ranveer Singh', date: '2024-12-15', status: 'Completed' },
+  { id: 't3', type: 'credit', amount: 2499, desc: 'Wallet Top Up', date: '2024-12-10', status: 'Completed' },
+  { id: 't4', type: 'debit', amount: 1999, desc: 'Booking: Shreya Ghoshal', date: '2024-11-28', status: 'Pending' },
+  { id: 't5', type: 'credit', amount: 5000, desc: 'Wallet Top Up', date: '2024-11-25', status: 'Completed' },
+  { id: 't6', type: 'debit', amount: 1499, desc: 'Booking: Kapil Sharma', date: '2024-11-20', status: 'Failed' },
+  { id: 't7', type: 'credit', amount: 300, desc: 'Cashback Reward', date: '2024-11-10', status: 'Completed' },
+  { id: 't8', type: 'debit', amount: 4999, desc: 'Booking: Virat Kohli', date: '2024-10-05', status: 'Completed' },
+];
+
+export const MOCK_REFERRAL_EARNINGS = [
+  { id: 're1', bookingId: 'BK-9012', level: 'L1', amount: 249, status: 'Completed', date: '2025-01-08' },
+  { id: 're2', bookingId: 'BK-8876', level: 'L1', amount: 149, status: 'Completed', date: '2024-12-20' },
+  { id: 're3', bookingId: 'BK-7701', level: 'L2', amount: 74, status: 'Pending', date: '2024-12-15' },
+  { id: 're4', bookingId: 'BK-6543', level: 'L1', amount: 349, status: 'Completed', date: '2024-11-30' },
+  { id: 're5', bookingId: 'BK-5512', level: 'L2', amount: 99, status: 'Completed', date: '2024-11-18' },
+  { id: 're6', bookingId: 'BK-4390', level: 'L1', amount: 199, status: 'Failed', date: '2024-11-05' },
 ];
 
 export const MOCK_MESSAGES = [
