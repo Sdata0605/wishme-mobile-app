@@ -65,7 +65,7 @@ export default function VoiceCallScreen() {
       <FlatList
         data={activeTab === 'available' ? available : scheduled}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: insets.bottom + 20 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         renderItem={({ item }) => (

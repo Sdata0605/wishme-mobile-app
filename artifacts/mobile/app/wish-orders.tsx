@@ -25,7 +25,7 @@ export default function WishOrdersScreen() {
       <FlatList
         data={MOCK_BOOKINGS}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: insets.bottom + 20 }}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.occasionIcon, { backgroundColor: colors.primary + '20' }]}>

@@ -33,7 +33,7 @@ export default function ReferralsScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
         <LinearGradient colors={['#7B2FFF', '#B44CFF']} style={styles.topCard}>
           <Text style={styles.topTitle}>Invite & Earn</Text>
           <Text style={styles.topSub}>Earn 10% commission on every booking made by your referrals</Text>

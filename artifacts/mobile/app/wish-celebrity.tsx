@@ -57,7 +57,7 @@ export default function WishCelebrityScreen() {
           <View style={{ width: 22 }} />
         </View>
 
-        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 20 }} keyboardShouldPersistTaps="handled">
           <Text style={[styles.label, { color: colors.foreground }]}>Select Celebrity</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, marginBottom: 20 }}>
             {CELEBRITIES.slice(0, 6).map((c) => (

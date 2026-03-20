@@ -86,7 +86,7 @@ export default function CelebritiesScreen() {
         data={filtered}
         numColumns={2}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.grid}
+        contentContainerStyle={[styles.grid, { paddingBottom: insets.bottom + 20 }]}
         columnWrapperStyle={{ gap: 12 }}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   categories: { gap: 8, paddingBottom: 4 },
   chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 9999, borderWidth: 1.5 },
   chipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  grid: { padding: 20, paddingBottom: 100, gap: 12 },
+  grid: { padding: 20, gap: 12 },
   empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 8 },
   emptyTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   emptyText: { fontSize: 14, fontFamily: 'Inter_400Regular' },

@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { Platform, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/Icon';
@@ -50,37 +50,39 @@ export default function SettingsScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>APPEARANCE</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SettingsRow
-          icon="moon"
-          label="Dark Mode"
-          onPress={toggle}
-          right={<Switch value={isDark} onValueChange={toggle} trackColor={{ false: '#ccc', true: colors.primary }} thumbColor="#fff" />}
-        />
-        <SettingsRow icon="globe" label="Language" right={<Text style={[styles.valueText, { color: colors.mutedForeground }]}>English</Text>} />
-      </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>APPEARANCE</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SettingsRow
+            icon="moon"
+            label="Dark Mode"
+            onPress={toggle}
+            right={<Switch value={isDark} onValueChange={toggle} trackColor={{ false: '#ccc', true: colors.primary }} thumbColor="#fff" />}
+          />
+          <SettingsRow icon="globe" label="Language" right={<Text style={[styles.valueText, { color: colors.mutedForeground }]}>English</Text>} />
+        </View>
 
-      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>NOTIFICATIONS</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SettingsRow icon="bell" label="Push Notifications" right={<Switch value={true} trackColor={{ false: '#ccc', true: colors.primary }} thumbColor="#fff" />} />
-        <SettingsRow icon="mail" label="Email Notifications" right={<Switch value={false} trackColor={{ false: '#ccc', true: colors.primary }} thumbColor="#fff" />} />
-      </View>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>NOTIFICATIONS</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SettingsRow icon="bell" label="Push Notifications" right={<Switch value={true} trackColor={{ false: '#ccc', true: colors.primary }} thumbColor="#fff" />} />
+          <SettingsRow icon="mail" label="Email Notifications" right={<Switch value={false} trackColor={{ false: '#ccc', true: colors.primary }} thumbColor="#fff" />} />
+        </View>
 
-      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>ACCOUNT</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SettingsRow icon="lock" label="Change Password" onPress={() => {}} />
-        <SettingsRow icon="shield" label="Privacy Policy" onPress={() => {}} />
-        <SettingsRow icon="info" label="Terms of Service" onPress={() => {}} />
-        <SettingsRow icon="help-circle" label="Help & Support" onPress={() => {}} />
-      </View>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>ACCOUNT</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SettingsRow icon="lock" label="Change Password" onPress={() => {}} />
+          <SettingsRow icon="shield" label="Privacy Policy" onPress={() => {}} />
+          <SettingsRow icon="info" label="Terms of Service" onPress={() => {}} />
+          <SettingsRow icon="help-circle" label="Help & Support" onPress={() => {}} />
+        </View>
 
-      <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>DANGER ZONE</Text>
-      <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <SettingsRow icon="trash-2" label="Delete Account" onPress={() => {}} destructive />
-      </View>
+        <Text style={[styles.sectionLabel, { color: colors.mutedForeground }]}>DANGER ZONE</Text>
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <SettingsRow icon="trash-2" label="Delete Account" onPress={() => {}} destructive />
+        </View>
 
-      <Text style={[styles.version, { color: colors.mutedForeground }]}>WishMe v1.0.0</Text>
+        <Text style={[styles.version, { color: colors.mutedForeground }]}>WishMe v1.0.0</Text>
+      </ScrollView>
     </View>
   );
 }

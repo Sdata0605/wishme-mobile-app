@@ -31,7 +31,7 @@ export default function CommissionScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
         <LinearGradient colors={['#FF6B33', '#B44CFF']} style={styles.topCard}>
           <Text style={styles.earningsLabel}>Total Earned</Text>
           <Text style={styles.earnings}>₹8,450</Text>

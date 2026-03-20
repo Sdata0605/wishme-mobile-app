@@ -40,7 +40,7 @@ export default function OccasionsScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: insets.bottom + 20 }}
         renderItem={({ item }) => (
           <LinearGradient
             colors={(OCCASION_COLORS[item.type] ?? ['#FF6B33', '#B44CFF']) as [string, string]}

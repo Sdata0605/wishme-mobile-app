@@ -53,7 +53,7 @@ export default function WalletScreen() {
         )}
         data={MOCK_TRANSACTIONS}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
         showsVerticalScrollIndicator={false}
         renderItem={({ item }) => (
           <View style={[styles.txRow, { borderBottomColor: colors.border }]}>

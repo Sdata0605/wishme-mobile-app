@@ -44,7 +44,7 @@ export default function PhotoWishScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 20 }}>
         <View style={[styles.uploadArea, { backgroundColor: colors.muted, borderColor: colors.border }]}>
           <Icon name="upload" size={40} color={colors.mutedForeground} />
           <Text style={[styles.uploadTitle, { color: colors.foreground }]}>Upload Your Photo</Text>

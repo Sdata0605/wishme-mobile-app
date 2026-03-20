@@ -25,7 +25,7 @@ export default function OccasionAlertsScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 20 }}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Occasion Types</Text>
         <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {OCCASION_TYPES.map((type, i) => (

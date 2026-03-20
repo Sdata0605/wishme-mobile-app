@@ -24,7 +24,7 @@ export default function LovedOnesScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 100 }}
+        contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: insets.bottom + 20 }}
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.avatar, { backgroundColor: colors.primary }]}>

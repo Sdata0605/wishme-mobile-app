@@ -29,7 +29,7 @@ export default function FavoritesScreen() {
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={{ gap: 12 }}
-        contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: insets.bottom + 20 }}
         renderItem={({ item }) => (
           <View style={{ position: 'relative' }}>
             <CelebCard celebrity={item} width={(W - 52) / 2} />

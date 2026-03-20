@@ -59,7 +59,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingBottom: 100 }}
+      contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}

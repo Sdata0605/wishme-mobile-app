@@ -43,7 +43,7 @@ export default function ForBusinessScreen() {
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
           <LinearGradient colors={['#4B83FF', '#7B2FFF']} style={styles.heroCard}>
             <Text style={styles.heroTitle}>Elevate Your Business</Text>
             <Text style={styles.heroSub}>Partner with celebrities to grow your brand</Text>

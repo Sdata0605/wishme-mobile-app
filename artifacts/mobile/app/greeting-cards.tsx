@@ -36,7 +36,7 @@ export default function GreetingCardsScreen() {
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={{ gap: 12 }}
-        contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: insets.bottom + 20 }}
         renderItem={({ item }) => (
           <Pressable
             onPress={() => setSelected(item.id)}

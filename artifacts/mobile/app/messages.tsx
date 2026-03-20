@@ -23,7 +23,7 @@ export default function MessagesScreen() {
       <FlatList
         data={MOCK_MESSAGES}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ paddingBottom: 40 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
         renderItem={({ item }) => (
           <TouchableOpacity
             onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id } })}

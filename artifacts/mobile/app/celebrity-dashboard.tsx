@@ -28,7 +28,7 @@ export default function CelebrityDashboardScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
         <LinearGradient colors={['#FF6B33', '#E8527A', '#B44CFF']} style={styles.topCard}>
           <Text style={styles.welcome}>Welcome, {user?.firstName}</Text>
           <View style={styles.statsRow}>

@@ -39,7 +39,7 @@ export default function BookingsScreen() {
       <FlatList
         data={MOCK_BOOKINGS}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: 40 }}
+        contentContainerStyle={{ padding: 20, gap: 14, paddingBottom: insets.bottom + 20 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); setTimeout(() => setRefreshing(false), 1500); }} tintColor={colors.primary} />}
         renderItem={({ item }) => (
           <TouchableOpacity

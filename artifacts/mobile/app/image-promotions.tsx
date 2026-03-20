@@ -33,7 +33,7 @@ export default function ImagePromotionsScreen() {
         <View style={{ width: 22 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: insets.bottom + 20 }}>
         <LinearGradient colors={['#FF6B33', '#B44CFF']} style={styles.hero}>
           <Icon name="zap" size={32} color="#fff" />
           <Text style={styles.heroTitle}>AI-Powered Celebrity Promotions</Text>
