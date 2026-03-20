@@ -97,11 +97,18 @@ function SlideScreen({
 
   return (
     <Animated.View style={[styles.slide, { opacity }]}>
-      <Animated.Image
-        source={slide.image}
-        style={[StyleSheet.absoluteFill, { transform: [{ scale: imageScale }] }]}
-        resizeMode="cover"
-      />
+      <Animated.View
+        style={[
+          { position: 'absolute', top: 0, left: 0, right: 0, height: H, backgroundColor: '#000' },
+          { transform: [{ scale: imageScale }] },
+        ]}
+      >
+        <Image
+          source={slide.image}
+          style={{ position: 'absolute', top: 0, left: 0, width: W, height: H }}
+          resizeMode="cover"
+        />
+      </Animated.View>
       <LinearGradient
         colors={slide.gradient as unknown as [string, string]}
         locations={[0.3, 1]}
