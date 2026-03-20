@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   browseCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden' },
-  browseImage: { width: '100%', height: 96 },
+  browseImage: { width: 96, height: 96, alignSelf: 'center' },
   browseInfo: { padding: 10, gap: 3 },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   browseName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', flex: 1 },

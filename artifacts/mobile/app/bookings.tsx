@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Image,
   Platform,
@@ -165,7 +165,6 @@ export default function BookingsScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const [activeTab, setActiveTab] = useState<BookingTab>('Video Bookings');
-  const tabScrollRef = useRef<ScrollView>(null);
 
   const items = MOCK_BY_TAB[activeTab];
 
@@ -180,7 +179,6 @@ export default function BookingsScreen() {
       </View>
 
       <ScrollView
-        ref={tabScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         style={[styles.tabBar, { borderBottomColor: colors.border }]}
