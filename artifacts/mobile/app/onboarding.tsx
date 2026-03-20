@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -217,8 +216,7 @@ export default function OnboardingScreen() {
   const [phase, setPhase] = useState<'video' | 'slides'>('video');
   const [current, setCurrent] = useState(0);
 
-  const finish = async () => {
-    await AsyncStorage.setItem('onboarded', 'true');
+  const finish = () => {
     router.replace('/(auth)');
   };
 
