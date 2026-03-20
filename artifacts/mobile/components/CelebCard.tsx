@@ -1,9 +1,9 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useTheme } from '@/context/ThemeContext';
+import { Icon } from '@/components/Icon';
 import type { Celebrity } from '@/constants/mockData';
+import { useTheme } from '@/context/ThemeContext';
 
 interface CelebCardProps {
   celebrity: Celebrity;
@@ -29,7 +29,7 @@ export function CelebCard({ celebrity, width = 130, compact = false }: CelebCard
         />
         {celebrity.isVerified && (
           <View style={[styles.verifiedBadge, { backgroundColor: colors.primary }]}>
-            <Feather name="check" size={8} color="#fff" />
+            <Icon name="check" size={8} color="#fff" />
           </View>
         )}
         {celebrity.isAvailable && (
@@ -40,7 +40,7 @@ export function CelebCard({ celebrity, width = 130, compact = false }: CelebCard
         <Text style={[styles.name, { color: colors.foreground }]} numberOfLines={1}>{celebrity.name}</Text>
         <Text style={[styles.category, { color: colors.mutedForeground }]}>{celebrity.category}</Text>
         <View style={styles.ratingRow}>
-          <Ionicons name="star" size={10} color="#FFB347" />
+          <Icon name="star" size={10} color="#FFB347" />
           <Text style={[styles.rating, { color: colors.mutedForeground }]}>{celebrity.rating}</Text>
         </View>
         <Text style={[styles.price, { color: colors.primary }]}>₹{celebrity.pricePerWish.toLocaleString('en-IN')}</Text>

@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 
 const GENRES = ['Bollywood', 'Pop', 'Classical', 'Hip-Hop', 'Devotional'];
@@ -150,7 +150,7 @@ export default function MusicScreen() {
             style={{ marginTop: 8, opacity: generating ? 0.7 : 1 }}
           >
             <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.generateBtn}>
-              <Feather name="music" size={18} color="#fff" />
+              <Icon name="music" size={18} color="#fff" />
               <Text style={styles.generateBtnText}>{generating ? 'Generating...' : 'Generate Song'}</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -167,7 +167,7 @@ export default function MusicScreen() {
                 </View>
                 <View style={styles.songControls}>
                   <TouchableOpacity onPress={() => setIsPlaying(!isPlaying)} style={styles.playBtn}>
-                    <Feather name={isPlaying ? 'pause' : 'play'} size={22} color="#fff" />
+                    <Icon name={isPlaying ? 'pause' : 'play'} size={22} color="#fff" />
                   </TouchableOpacity>
                   <Text style={styles.duration}>2:34</Text>
                 </View>
@@ -182,7 +182,7 @@ export default function MusicScreen() {
               {PREV_SONGS.map((song) => (
                 <View key={song.id} style={[styles.prevSong, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   <View style={[styles.prevSongIcon, { backgroundColor: '#B44CFF20' }]}>
-                    <Feather name="music" size={18} color="#B44CFF" />
+                    <Icon name="music" size={18} color="#B44CFF" />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.prevSongTitle, { color: colors.foreground }]}>{song.title}</Text>
@@ -190,7 +190,7 @@ export default function MusicScreen() {
                   </View>
                   <Text style={[styles.prevSongDur, { color: colors.mutedForeground }]}>{song.duration}</Text>
                   <TouchableOpacity>
-                    <Feather name="play-circle" size={28} color={colors.primary} />
+                    <Icon name="play-circle" size={28} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
               ))}

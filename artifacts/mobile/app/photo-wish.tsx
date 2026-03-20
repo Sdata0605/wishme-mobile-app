@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 
 const TEMPLATES = [
@@ -38,7 +38,7 @@ export default function PhotoWishScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Photo Wish</Text>
         <View style={{ width: 22 }} />
@@ -46,11 +46,11 @@ export default function PhotoWishScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         <View style={[styles.uploadArea, { backgroundColor: colors.muted, borderColor: colors.border }]}>
-          <Feather name="upload" size={40} color={colors.mutedForeground} />
+          <Icon name="upload" size={40} color={colors.mutedForeground} />
           <Text style={[styles.uploadTitle, { color: colors.foreground }]}>Upload Your Photo</Text>
           <Text style={[styles.uploadSub, { color: colors.mutedForeground }]}>Upload a photo to customize your wish</Text>
           <TouchableOpacity style={[styles.uploadBtn, { backgroundColor: colors.primary }]}>
-            <Feather name="camera" size={16} color="#fff" />
+            <Icon name="camera" size={16} color="#fff" />
             <Text style={styles.uploadBtnText}>Choose Photo</Text>
           </TouchableOpacity>
         </View>
@@ -78,11 +78,11 @@ export default function PhotoWishScreen() {
             </LinearGradient>
             <View style={styles.previewActions}>
               <TouchableOpacity style={[styles.previewBtn, { backgroundColor: colors.muted }]}>
-                <Feather name="download" size={16} color={colors.foreground} />
+                <Icon name="download" size={16} color={colors.foreground} />
                 <Text style={[styles.previewBtnText, { color: colors.foreground }]}>Save</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.previewBtn, { backgroundColor: colors.muted }]}>
-                <Feather name="share-2" size={16} color={colors.foreground} />
+                <Icon name="share-2" size={16} color={colors.foreground} />
                 <Text style={[styles.previewBtnText, { color: colors.foreground }]}>Share</Text>
               </TouchableOpacity>
             </View>
@@ -91,7 +91,7 @@ export default function PhotoWishScreen() {
 
         <Pressable onPress={generate} disabled={loading} style={({ pressed }) => [{ opacity: pressed || loading ? 0.7 : 1 }]}>
           <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.generateBtn}>
-            <Feather name="image" size={18} color="#fff" />
+            <Icon name="image" size={18} color="#fff" />
             <Text style={styles.generateBtnText}>{loading ? 'Generating...' : 'Generate Photo Wish'}</Text>
           </LinearGradient>
         </Pressable>

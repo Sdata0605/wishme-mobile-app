@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React from 'react';
@@ -11,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { MOCK_TRANSACTIONS } from '@/constants/mockData';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -25,7 +25,7 @@ export default function WalletScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Wallet</Text>
         <View style={{ width: 22 }} />
@@ -58,7 +58,7 @@ export default function WalletScreen() {
         renderItem={({ item }) => (
           <View style={[styles.txRow, { borderBottomColor: colors.border }]}>
             <View style={[styles.txIcon, { backgroundColor: item.type === 'credit' ? '#22C55E20' : '#EF444420' }]}>
-              <Feather
+              <Icon
                 name={item.type === 'credit' ? 'arrow-down-left' : 'arrow-up-right'}
                 size={18}
                 color={item.type === 'credit' ? '#22C55E' : '#EF4444'}

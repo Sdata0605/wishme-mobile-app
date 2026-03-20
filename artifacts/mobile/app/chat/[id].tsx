@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { MOCK_MESSAGES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -26,7 +26,7 @@ const INITIAL_MESSAGES: Message[] = [
   { id: '1', text: 'Hi! Your birthday wish video is ready!', isMe: false, time: '10:30 AM' },
   { id: '2', text: 'Oh wow, really? That was so fast!', isMe: true, time: '10:32 AM' },
   { id: '3', text: 'Yes! I recorded a special personalized message. Hope you love it!', isMe: false, time: '10:33 AM' },
-  { id: '4', text: 'Thank you so much! I can\'t wait to see it', isMe: true, time: '10:34 AM' },
+  { id: '4', text: "Thank you so much! I can't wait to see it", isMe: true, time: '10:34 AM' },
 ];
 
 export default function ChatScreen() {
@@ -50,13 +50,13 @@ export default function ChatScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
+            <Icon name="arrow-left" size={22} color={colors.foreground} />
           </TouchableOpacity>
           <View style={{ flex: 1, paddingHorizontal: 12 }}>
             <Text style={[styles.headerName, { color: colors.foreground }]}>{contact.name}</Text>
             <Text style={[styles.headerStatus, { color: '#22C55E' }]}>{contact.isOnline ? 'Online' : 'Offline'}</Text>
           </View>
-          <Feather name="phone" size={22} color={colors.primary} />
+          <Icon name="phone" size={22} color={colors.primary} />
         </View>
 
         <FlatList
@@ -93,7 +93,7 @@ export default function ChatScreen() {
             onSubmitEditing={send}
           />
           <TouchableOpacity onPress={send} style={[styles.sendBtn, { backgroundColor: colors.primary }]}>
-            <Feather name="send" size={18} color="#fff" />
+            <Icon name="send" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
       </View>

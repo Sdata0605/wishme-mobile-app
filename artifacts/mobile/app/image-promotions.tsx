@@ -1,9 +1,9 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { CELEBRITIES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -27,7 +27,7 @@ export default function ImagePromotionsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Image Promotions</Text>
         <View style={{ width: 22 }} />
@@ -35,7 +35,7 @@ export default function ImagePromotionsScreen() {
 
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }}>
         <LinearGradient colors={['#FF6B33', '#B44CFF']} style={styles.hero}>
-          <Feather name="zap" size={32} color="#fff" />
+          <Icon name="zap" size={32} color="#fff" />
           <Text style={styles.heroTitle}>AI-Powered Celebrity Promotions</Text>
           <Text style={styles.heroSub}>Generate stunning promotional visuals with celebrity power</Text>
         </LinearGradient>
@@ -74,7 +74,7 @@ export default function ImagePromotionsScreen() {
             <Text style={styles.previewTitle}>✨ Your Promo Visual</Text>
             <Text style={styles.previewSub}>Generated successfully! Download & share.</Text>
             <TouchableOpacity style={styles.downloadBtn}>
-              <Feather name="download" size={16} color="#FF6B33" />
+              <Icon name="download" size={16} color="#FF6B33" />
               <Text style={styles.downloadBtnText}>Download</Text>
             </TouchableOpacity>
           </LinearGradient>
@@ -82,7 +82,7 @@ export default function ImagePromotionsScreen() {
 
         <Pressable onPress={generate} disabled={loading} style={({ pressed }) => [{ opacity: pressed || loading ? 0.7 : 1, marginTop: 8 }]}>
           <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.generateBtn}>
-            <Feather name="image" size={18} color="#fff" />
+            <Icon name="image" size={18} color="#fff" />
             <Text style={styles.generateBtnText}>{loading ? 'Generating...' : 'Generate Promotion'}</Text>
           </LinearGradient>
         </Pressable>

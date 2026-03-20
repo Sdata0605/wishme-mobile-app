@@ -1,4 +1,3 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { CELEBRITIES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -27,7 +27,7 @@ export default function BookingDetailScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Booking Details</Text>
         <View style={{ width: 22 }} />
@@ -36,7 +36,7 @@ export default function BookingDetailScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
         {/* Status */}
         <View style={[styles.statusCard, { backgroundColor: '#22C55E20', borderColor: '#22C55E' }]}>
-          <Feather name="check-circle" size={20} color="#22C55E" />
+          <Icon name="check-circle" size={20} color="#22C55E" />
           <Text style={[styles.statusText, { color: '#22C55E' }]}>Booking Confirmed</Text>
         </View>
 
@@ -68,7 +68,7 @@ export default function BookingDetailScreen() {
         <View style={[styles.videoCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <LinearGradient colors={['#FF6B33', '#B44CFF']} style={styles.videoThumb}>
             <TouchableOpacity style={styles.playBtn}>
-              <Feather name="play" size={28} color="#fff" />
+              <Icon name="play" size={28} color="#fff" />
             </TouchableOpacity>
             <Text style={styles.videoLabel}>Your Wish Video</Text>
           </LinearGradient>
@@ -80,7 +80,7 @@ export default function BookingDetailScreen() {
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((s) => (
               <TouchableOpacity key={s} onPress={() => setRating(s)}>
-                <Ionicons name={rating >= s ? 'star' : 'star-outline'} size={36} color="#FFB347" />
+                <Icon name={rating >= s ? 'star' : 'star-outline'} size={36} color="#FFB347" />
               </TouchableOpacity>
             ))}
           </View>

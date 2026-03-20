@@ -1,8 +1,8 @@
-import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { MOCK_BOOKINGS } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -17,7 +17,7 @@ export default function WishOrdersScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Wish Orders</Text>
         <View style={{ width: 22 }} />
@@ -29,7 +29,7 @@ export default function WishOrdersScreen() {
         renderItem={({ item }) => (
           <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={[styles.occasionIcon, { backgroundColor: colors.primary + '20' }]}>
-              <Feather name="gift" size={20} color={colors.primary} />
+              <Icon name="gift" size={20} color={colors.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[styles.celeb, { color: colors.foreground }]}>{item.celebrityName}</Text>

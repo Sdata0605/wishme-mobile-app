@@ -1,9 +1,8 @@
-import { Feather } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { MOCK_LOVED_ONES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -17,7 +16,7 @@ export default function LovedOnesScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Loved Ones</Text>
         <View style={{ width: 22 }} />
@@ -36,25 +35,25 @@ export default function LovedOnesScreen() {
               <Text style={[styles.relation, { color: colors.mutedForeground }]}>{item.relation}</Text>
               {item.birthday && (
                 <View style={styles.dateRow}>
-                  <Feather name="gift" size={12} color={colors.primary} />
+                  <Icon name="gift" size={12} color={colors.primary} />
                   <Text style={[styles.dateText, { color: colors.mutedForeground }]}>Birthday: {item.birthday}</Text>
                 </View>
               )}
               {item.anniversary && (
                 <View style={styles.dateRow}>
-                  <Feather name="heart" size={12} color="#E8527A" />
+                  <Icon name="heart" size={12} color="#E8527A" />
                   <Text style={[styles.dateText, { color: colors.mutedForeground }]}>Anniversary: {item.anniversary}</Text>
                 </View>
               )}
             </View>
             <TouchableOpacity onPress={() => setItems((prev) => prev.filter((i) => i.id !== item.id))}>
-              <Feather name="trash-2" size={18} color="#EF4444" />
+              <Icon name="trash-2" size={18} color="#EF4444" />
             </TouchableOpacity>
           </View>
         )}
       />
       <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={() => {}}>
-        <Feather name="plus" size={24} color="#fff" />
+        <Icon name="plus" size={24} color="#fff" />
       </TouchableOpacity>
     </View>
   );

@@ -1,8 +1,8 @@
-import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React from 'react';
 import { FlatList, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { MOCK_MESSAGES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -15,10 +15,10 @@ export default function MessagesScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Messages</Text>
-        <Feather name="edit" size={22} color={colors.primary} />
+        <Icon name="edit" size={22} color={colors.primary} />
       </View>
       <FlatList
         data={MOCK_MESSAGES}

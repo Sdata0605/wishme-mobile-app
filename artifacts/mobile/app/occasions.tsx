@@ -1,13 +1,14 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
+import type { IconName } from '@/components/Icon';
 import { MOCK_OCCASIONS } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
-const OCCASION_ICONS: Record<string, string> = {
+const OCCASION_ICONS: Record<string, IconName> = {
   Birthday: 'gift',
   Anniversary: 'heart',
   Wedding: 'star',
@@ -30,7 +31,7 @@ export default function OccasionsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Occasions</Text>
         <View style={{ width: 22 }} />
@@ -49,7 +50,7 @@ export default function OccasionsScreen() {
           >
             <View style={styles.cardLeft}>
               <View style={styles.iconCircle}>
-                <Feather name={(OCCASION_ICONS[item.type] ?? 'calendar') as any} size={22} color="#fff" />
+                <Icon name={OCCASION_ICONS[item.type] ?? 'calendar'} size={22} color="#fff" />
               </View>
               <View>
                 <Text style={styles.cardTitle}>{item.name}</Text>
@@ -66,7 +67,7 @@ export default function OccasionsScreen() {
       />
 
       <TouchableOpacity style={[styles.fab, { backgroundColor: colors.primary }]} onPress={() => {}}>
-        <Feather name="plus" size={24} color="#fff" />
+        <Icon name="plus" size={24} color="#fff" />
       </TouchableOpacity>
     </View>
   );

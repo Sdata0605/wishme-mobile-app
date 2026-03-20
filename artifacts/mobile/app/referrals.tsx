@@ -1,9 +1,10 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
+import type { IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -16,11 +17,17 @@ export default function ReferralsScreen() {
 
   const copy = () => { setCopied(true); setTimeout(() => setCopied(false), 2000); };
 
+  const stats: { label: string; value: string; icon: IconName; color: string }[] = [
+    { label: 'Total Referred', value: '12', icon: 'users', color: '#FF6B33' },
+    { label: 'Active Users', value: '8', icon: 'check-circle', color: '#22C55E' },
+    { label: 'Total Earned', value: '₹2,400', icon: 'trending-up', color: '#B44CFF' },
+  ];
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Referrals</Text>
         <View style={{ width: 22 }} />
@@ -33,20 +40,16 @@ export default function ReferralsScreen() {
           <View style={styles.codeBox}>
             <Text style={styles.codeText}>{user?.referralCode ?? 'WISHME2025'}</Text>
             <TouchableOpacity onPress={copy} style={styles.copyBtn}>
-              <Feather name="copy" size={16} color="#7B2FFF" />
+              <Icon name="copy" size={16} color="#7B2FFF" />
               <Text style={styles.copyBtnText}>{copied ? 'Copied!' : 'Copy'}</Text>
             </TouchableOpacity>
           </View>
         </LinearGradient>
 
         <View style={styles.statsRow}>
-          {[
-            { label: 'Total Referred', value: '12', icon: 'users', color: '#FF6B33' },
-            { label: 'Active Users', value: '8', icon: 'check-circle', color: '#22C55E' },
-            { label: 'Total Earned', value: '₹2,400', icon: 'trending-up', color: '#B44CFF' },
-          ].map((s) => (
+          {stats.map((s) => (
             <View key={s.label} style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Feather name={s.icon as any} size={20} color={s.color} />
+              <Icon name={s.icon} size={20} color={s.color} />
               <Text style={[styles.statVal, { color: colors.foreground }]}>{s.value}</Text>
               <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
             </View>

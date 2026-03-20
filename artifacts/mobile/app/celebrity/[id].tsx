@@ -1,4 +1,3 @@
-import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { CELEBRITIES, MOCK_REVIEWS } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -41,7 +41,7 @@ export default function CelebrityDetailScreen() {
                   </View>
                   {celebrity.isVerified && (
                     <View style={[styles.verifiedBadge, { backgroundColor: '#22C55E' }]}>
-                      <Feather name="check" size={10} color="#fff" />
+                      <Icon name="check" size={10} color="#fff" />
                       <Text style={styles.verifiedText}>Verified</Text>
                     </View>
                   )}
@@ -54,14 +54,14 @@ export default function CelebrityDetailScreen() {
             onPress={() => router.back()}
             style={[styles.backBtn, { top: insets.top + 12 }]}
           >
-            <Feather name="arrow-left" size={22} color="#fff" />
+            <Icon name="arrow-left" size={22} color="#fff" />
           </TouchableOpacity>
           {/* Fav btn */}
           <TouchableOpacity
             onPress={() => setIsFav(!isFav)}
             style={[styles.favBtn, { top: insets.top + 12 }]}
           >
-            <Feather name="heart" size={22} color={isFav ? '#EF4444' : '#fff'} />
+            <Icon name="heart" size={22} color={isFav ? '#EF4444' : '#fff'} />
           </TouchableOpacity>
         </View>
 
@@ -69,7 +69,7 @@ export default function CelebrityDetailScreen() {
         <View style={styles.infoSection}>
           {/* Rating + reviews */}
           <View style={styles.ratingRow}>
-            <Ionicons name="star" size={16} color="#FFB347" />
+            <Icon name="star" size={16} color="#FFB347" />
             <Text style={[styles.rating, { color: colors.foreground }]}>{celebrity.rating}</Text>
             <Text style={[styles.reviews, { color: colors.mutedForeground }]}>({celebrity.reviewCount.toLocaleString('en-IN')} reviews)</Text>
           </View>
@@ -115,7 +115,7 @@ export default function CelebrityDetailScreen() {
                 </View>
                 <View style={styles.starRow}>
                   {Array.from({ length: review.rating }).map((_, i) => (
-                    <Ionicons key={i} name="star" size={12} color="#FFB347" />
+                    <Icon key={i} name="star" size={12} color="#FFB347" />
                   ))}
                 </View>
               </View>
@@ -131,7 +131,7 @@ export default function CelebrityDetailScreen() {
           style={[styles.voiceCallBtn, { borderColor: colors.primary }]}
           onPress={() => router.push('/(tabs)/voice-call')}
         >
-          <Feather name="phone" size={18} color={colors.primary} />
+          <Icon name="phone" size={18} color={colors.primary} />
           <Text style={[styles.voiceCallText, { color: colors.primary }]}>Voice Call</Text>
         </TouchableOpacity>
         <Pressable

@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
@@ -6,13 +5,13 @@ import {
   Image,
   Platform,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { CELEBRITIES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -40,7 +39,7 @@ export default function VoiceCallScreen() {
         <Text style={styles.headerTitle}>Celebrity Voice Calls</Text>
         <Text style={styles.headerSub}>Live 1-on-1 calls with your favorite stars</Text>
         <View style={[styles.featuredBanner, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-          <Feather name="phone-call" size={18} color="#fff" />
+          <Icon name="phone-call" size={18} color="#fff" />
           <Text style={styles.featuredText}>Book a 1-on-1 live call with your favorite celebrity</Text>
         </View>
       </LinearGradient>
@@ -80,7 +79,7 @@ export default function VoiceCallScreen() {
                 <Text style={[styles.name, { color: colors.foreground }]}>{item.name}</Text>
                 <Text style={[styles.category, { color: colors.mutedForeground }]}>{item.category}</Text>
                 <View style={styles.rateRow}>
-                  <Feather name="clock" size={12} color={colors.primary} />
+                  <Icon name="clock" size={12} color={colors.primary} />
                   <Text style={[styles.rate, { color: colors.primary }]}>₹{item.ratePerMinute}/min</Text>
                 </View>
               </View>
@@ -94,7 +93,7 @@ export default function VoiceCallScreen() {
               </View>
               <TouchableOpacity activeOpacity={0.8}>
                 <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callBtn}>
-                  <Feather name="phone" size={14} color="#fff" />
+                  <Icon name="phone" size={14} color="#fff" />
                   <Text style={styles.callBtnText}>{item.isAvailable ? 'Call Now' : 'Schedule'}</Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -103,7 +102,7 @@ export default function VoiceCallScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Feather name="phone-off" size={48} color={colors.mutedForeground} />
+            <Icon name="phone-off" size={48} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No calls available</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Check back soon</Text>
           </View>

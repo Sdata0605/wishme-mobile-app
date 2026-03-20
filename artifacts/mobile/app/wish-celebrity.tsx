@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -14,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { CELEBRITIES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -33,7 +33,7 @@ export default function WishCelebrityScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', padding: 32 }]}>
         <View style={[styles.successCircle, { backgroundColor: '#22C55E20' }]}>
-          <Feather name="check-circle" size={64} color="#22C55E" />
+          <Icon name="check-circle" size={64} color="#22C55E" />
         </View>
         <Text style={[styles.successTitle, { color: colors.foreground }]}>Wish Request Sent!</Text>
         <Text style={[styles.successSub, { color: colors.mutedForeground }]}>Your celebrity will respond within 7 days. We'll notify you when it's ready!</Text>
@@ -51,7 +51,7 @@ export default function WishCelebrityScreen() {
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
-            <Feather name="arrow-left" size={22} color={colors.foreground} />
+            <Icon name="arrow-left" size={22} color={colors.foreground} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>Wish a Celebrity</Text>
           <View style={{ width: 22 }} />
@@ -93,7 +93,7 @@ export default function WishCelebrityScreen() {
 
           <Text style={[styles.label, { color: colors.foreground }]}>Recipient Name</Text>
           <View style={[styles.inputRow, { backgroundColor: colors.input, borderColor: colors.border }]}>
-            <Feather name="user" size={18} color={colors.mutedForeground} />
+            <Icon name="user" size={18} color={colors.mutedForeground} />
             <TextInput
               style={[styles.input, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
               placeholder="Who is the wish for?"
@@ -119,7 +119,7 @@ export default function WishCelebrityScreen() {
             style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, marginTop: 8 }]}
           >
             <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.submitBtn}>
-              <Feather name="send" size={18} color="#fff" />
+              <Icon name="send" size={18} color="#fff" />
               <Text style={styles.submitBtnText}>Send Wish Request</Text>
             </LinearGradient>
           </Pressable>

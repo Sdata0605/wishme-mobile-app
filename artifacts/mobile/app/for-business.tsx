@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
@@ -14,9 +13,11 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
+import type { IconName } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 
-const SERVICES = [
+const SERVICES: { id: string; icon: IconName; title: string; desc: string; price: string }[] = [
   { id: '1', icon: 'video', title: 'Corporate Wishes', desc: 'Personalized videos for employees & clients', price: '₹4,999+' },
   { id: '2', icon: 'star', title: 'Brand Endorsements', desc: 'Celebrity-driven campaigns', price: '₹24,999+' },
   { id: '3', icon: 'trending-up', title: 'Product Launch', desc: 'Hype your launch with celebrity power', price: '₹14,999+' },
@@ -35,7 +36,7 @@ export default function ForBusinessScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>For Business</Text>
         <View style={{ width: 22 }} />
@@ -53,7 +54,7 @@ export default function ForBusinessScreen() {
             {SERVICES.map((s) => (
               <View key={s.id} style={[styles.serviceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <View style={[styles.serviceIcon, { backgroundColor: colors.primary + '20' }]}>
-                  <Feather name={s.icon as any} size={22} color={colors.primary} />
+                  <Icon name={s.icon} size={22} color={colors.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={[styles.serviceTitle, { color: colors.foreground }]}>{s.title}</Text>
@@ -67,11 +68,11 @@ export default function ForBusinessScreen() {
               <>
                 <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Get a Quote</Text>
                 <View style={[styles.inputRow, { backgroundColor: colors.input, borderColor: colors.border }]}>
-                  <Feather name="user" size={18} color={colors.mutedForeground} />
+                  <Icon name="user" size={18} color={colors.mutedForeground} />
                   <TextInput style={[styles.input, { color: colors.foreground }]} placeholder="Your Name" placeholderTextColor={colors.mutedForeground} value={name} onChangeText={setName} />
                 </View>
                 <View style={[styles.inputRow, { backgroundColor: colors.input, borderColor: colors.border }]}>
-                  <Feather name="briefcase" size={18} color={colors.mutedForeground} />
+                  <Icon name="briefcase" size={18} color={colors.mutedForeground} />
                   <TextInput style={[styles.input, { color: colors.foreground }]} placeholder="Company Name" placeholderTextColor={colors.mutedForeground} value={company} onChangeText={setCompany} />
                 </View>
                 <Pressable onPress={() => setSubmitted(true)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
@@ -82,7 +83,7 @@ export default function ForBusinessScreen() {
               </>
             ) : (
               <View style={[styles.successCard, { backgroundColor: '#22C55E20' }]}>
-                <Feather name="check-circle" size={28} color="#22C55E" />
+                <Icon name="check-circle" size={28} color="#22C55E" />
                 <Text style={[styles.successText, { color: '#22C55E' }]}>Request Submitted! Our team will contact you within 24 hours.</Text>
               </View>
             )}

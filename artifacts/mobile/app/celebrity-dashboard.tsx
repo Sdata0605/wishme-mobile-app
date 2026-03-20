@@ -1,15 +1,15 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React from 'react';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 
 const PENDING = [
-  { id: '1', from: 'Rahul Sharma', occasion: 'Birthday', message: 'Please wish my sister Priya on her 25th birthday...', price: 2499 },
-  { id: '2', from: 'Anita Menon', occasion: 'Anniversary', message: 'My parents\' 30th wedding anniversary is next week...', price: 2499 },
+  { id: '1', from: 'Rahul Sharma', occasion: 'Birthday', message: "Please wish my sister Priya on her 25th birthday...", price: 2499 },
+  { id: '2', from: 'Anita Menon', occasion: 'Anniversary', message: "My parents' 30th wedding anniversary is next week...", price: 2499 },
 ];
 
 export default function CelebrityDashboardScreen() {
@@ -22,7 +22,7 @@ export default function CelebrityDashboardScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Celebrity Dashboard</Text>
         <View style={{ width: 22 }} />

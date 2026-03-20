@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { MOCK_BOOKINGS } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -31,7 +31,7 @@ export default function BookingsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>My Bookings</Text>
         <View style={{ width: 22 }} />
@@ -61,7 +61,7 @@ export default function BookingsScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Feather name="calendar" size={48} color={colors.mutedForeground} />
+            <Icon name="calendar" size={48} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No bookings yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Book your first celebrity wish</Text>
           </View>

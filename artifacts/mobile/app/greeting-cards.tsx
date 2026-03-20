@@ -1,9 +1,9 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { FlatList, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 
 const CARDS = [
@@ -25,7 +25,7 @@ export default function GreetingCardsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Greeting Cards</Text>
         <View style={{ width: 22 }} />
@@ -47,7 +47,7 @@ export default function GreetingCardsScreen() {
               <Text style={styles.cardTitle}>{item.title}</Text>
               {selected === item.id && (
                 <View style={styles.checkCircle}>
-                  <Feather name="check" size={14} color="#fff" />
+                  <Icon name="check" size={14} color="#fff" />
                 </View>
               )}
             </LinearGradient>

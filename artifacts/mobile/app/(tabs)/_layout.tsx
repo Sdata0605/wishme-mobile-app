@@ -1,10 +1,10 @@
 import { BlurView } from 'expo-blur';
 import { Tabs } from 'expo-router';
-import { Feather } from '@expo/vector-icons';
 import { SymbolView } from 'expo-symbols';
 import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { DrawerMenu } from '@/components/DrawerMenu';
+import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 
 export default function TabLayout() {
@@ -45,7 +45,7 @@ export default function TabLayout() {
               isIOS ? (
                 <SymbolView name="house" tintColor={color} size={size} />
               ) : (
-                <Feather name="home" size={size} color={color} />
+                <Icon name="home" size={size} color={color} />
               ),
           }}
         />
@@ -57,7 +57,7 @@ export default function TabLayout() {
               isIOS ? (
                 <SymbolView name="star" tintColor={color} size={size} />
               ) : (
-                <Feather name="star" size={size} color={color} />
+                <Icon name="star" size={size} color={color} />
               ),
           }}
         />
@@ -69,7 +69,7 @@ export default function TabLayout() {
               isIOS ? (
                 <SymbolView name="music.note" tintColor={color} size={size} />
               ) : (
-                <Feather name="music" size={size} color={color} />
+                <Icon name="music" size={size} color={color} />
               ),
           }}
         />
@@ -81,7 +81,7 @@ export default function TabLayout() {
               isIOS ? (
                 <SymbolView name="phone" tintColor={color} size={size} />
               ) : (
-                <Feather name="phone" size={size} color={color} />
+                <Icon name="phone" size={size} color={color} />
               ),
           }}
         />
@@ -93,7 +93,7 @@ export default function TabLayout() {
               isIOS ? (
                 <SymbolView name="person" tintColor={color} size={size} />
               ) : (
-                <Feather name="user" size={size} color={color} />
+                <Icon name="user" size={size} color={color} />
               ),
           }}
         />

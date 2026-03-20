@@ -1,9 +1,9 @@
-import { Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import { Dimensions, FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CelebCard } from '@/components/CelebCard';
+import { Icon } from '@/components/Icon';
 import { CELEBRITIES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -19,7 +19,7 @@ export default function FavoritesScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.foreground} />
+          <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Favorites</Text>
         <View style={{ width: 22 }} />
@@ -37,13 +37,13 @@ export default function FavoritesScreen() {
               onPress={() => setFavs((prev) => prev.filter((f) => f.id !== item.id))}
               style={[styles.removeBtn, { backgroundColor: '#EF4444' }]}
             >
-              <Feather name="x" size={12} color="#fff" />
+              <Icon name="x" size={12} color="#fff" />
             </TouchableOpacity>
           </View>
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Feather name="heart" size={48} color={colors.mutedForeground} />
+            <Icon name="heart" size={48} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No favorites yet</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Save your favorite celebrities here</Text>
           </View>

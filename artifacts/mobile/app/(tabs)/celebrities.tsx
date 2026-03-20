@@ -1,10 +1,8 @@
-import { Feather } from '@expo/vector-icons';
 import React, { useState } from 'react';
 import {
   Dimensions,
   FlatList,
   Platform,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -15,6 +13,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CelebCard } from '@/components/CelebCard';
+import { Icon } from '@/components/Icon';
 import { CATEGORIES, CELEBRITIES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -45,11 +44,10 @@ export default function CelebritiesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.background }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Browse Celebrities</Text>
         <View style={[styles.searchBar, { backgroundColor: colors.input, borderColor: colors.border }]}>
-          <Feather name="search" size={18} color={colors.mutedForeground} />
+          <Icon name="search" size={18} color={colors.mutedForeground} />
           <TextInput
             style={[styles.searchInput, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
             placeholder="Search celebrities..."
@@ -59,7 +57,7 @@ export default function CelebritiesScreen() {
           />
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch('')}>
-              <Feather name="x" size={16} color={colors.mutedForeground} />
+              <Icon name="x" size={16} color={colors.mutedForeground} />
             </TouchableOpacity>
           )}
         </View>
@@ -95,7 +93,7 @@ export default function CelebritiesScreen() {
         renderItem={({ item }) => <CelebCard celebrity={item} width={CARD_WIDTH} />}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Feather name="search" size={48} color={colors.mutedForeground} />
+            <Icon name="search" size={48} color={colors.mutedForeground} />
             <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No celebrities found</Text>
             <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Try a different search or category</Text>
           </View>

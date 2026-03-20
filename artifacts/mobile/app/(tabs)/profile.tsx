@@ -1,4 +1,3 @@
-import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React from 'react';
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -23,7 +23,7 @@ function ProfileItem({
   right,
   destructive,
 }: {
-  icon: string;
+  icon: IconName;
   label: string;
   onPress: () => void;
   right?: React.ReactNode;
@@ -33,12 +33,12 @@ function ProfileItem({
   return (
     <TouchableOpacity style={[styles.profileItem, { borderBottomColor: colors.border }]} onPress={onPress} activeOpacity={0.7}>
       <View style={[styles.profileItemIcon, { backgroundColor: destructive ? '#EF444420' : colors.muted }]}>
-        <Feather name={icon as any} size={18} color={destructive ? '#EF4444' : colors.primary} />
+        <Icon name={icon} size={18} color={destructive ? '#EF4444' : colors.primary} />
       </View>
       <Text style={[styles.profileItemLabel, { color: destructive ? '#EF4444' : colors.foreground, fontFamily: 'Inter_500Medium' }]}>
         {label}
       </Text>
-      {right ?? <Feather name="chevron-right" size={18} color={colors.mutedForeground} />}
+      {right ?? <Icon name="chevron-right" size={18} color={colors.mutedForeground} />}
     </TouchableOpacity>
   );
 }
@@ -86,7 +86,7 @@ export default function ProfileScreen() {
         </View>
         <TouchableOpacity onPress={() => router.push('/wallet')}>
           <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.addMoneyBtn}>
-            <Feather name="plus" size={14} color="#fff" />
+            <Icon name="plus" size={14} color="#fff" />
             <Text style={styles.addMoneyText}>Add Money</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -94,13 +94,13 @@ export default function ProfileScreen() {
 
       {/* Stats */}
       <View style={[styles.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        {[
+        {([
           { label: 'Bookings', value: '12', icon: 'calendar' },
           { label: 'Favorites', value: '8', icon: 'heart' },
           { label: 'Referrals', value: '5', icon: 'users' },
-        ].map((stat) => (
+        ] as Array<{ label: string; value: string; icon: IconName }>).map((stat) => (
           <View key={stat.label} style={styles.statItem}>
-            <Feather name={stat.icon as any} size={20} color={colors.primary} />
+            <Icon name={stat.icon} size={20} color={colors.primary} />
             <Text style={[styles.statValue, { color: colors.foreground }]}>{stat.value}</Text>
             <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{stat.label}</Text>
           </View>
@@ -135,7 +135,7 @@ export default function ProfileScreen() {
           style={[styles.celebModeBtn, { borderColor: colors.primary }]}
           onPress={() => updateUser({ role: 'celebrity' })}
         >
-          <Feather name="star" size={18} color={colors.primary} />
+          <Icon name="star" size={18} color={colors.primary} />
           <Text style={[styles.celebModeTxt, { color: colors.primary }]}>Switch to Celebrity Mode</Text>
         </TouchableOpacity>
       )}
@@ -146,7 +146,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/celebrity-dashboard')}
           >
             <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.dashboardBtnGrad}>
-              <Feather name="star" size={18} color="#fff" />
+              <Icon name="star" size={18} color="#fff" />
               <Text style={styles.dashboardBtnText}>Celebrity Dashboard</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -154,7 +154,7 @@ export default function ProfileScreen() {
       )}
 
       <TouchableOpacity onPress={handleLogout} style={[styles.logoutBtn, { borderColor: '#EF4444' }]}>
-        <Feather name="log-out" size={18} color="#EF4444" />
+        <Icon name="log-out" size={18} color="#EF4444" />
         <Text style={[styles.logoutText, { color: '#EF4444' }]}>Logout</Text>
       </TouchableOpacity>
     </ScrollView>
