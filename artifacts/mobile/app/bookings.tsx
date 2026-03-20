@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999,
     backgroundColor: 'transparent',
   },
-  tabPillText: { fontSize: 13, fontFamily: 'Inter_500Medium', whiteSpace: 'nowrap' } as never,
+  tabPillText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   tabPillTextActive: { fontFamily: 'Inter_700Bold' },
   listContent: { padding: 16, gap: 14 },
   card: {
