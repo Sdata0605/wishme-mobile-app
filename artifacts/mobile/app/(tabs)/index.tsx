@@ -1,6 +1,6 @@
 import { Feather, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import React, { useState } from 'react';
 import {
   Dimensions,
@@ -44,14 +44,16 @@ const BANNERS = [
   },
 ];
 
-const QUICK_ACTIONS = [
+type FeatherIconName = React.ComponentProps<typeof Feather>['name'];
+
+const QUICK_ACTIONS: Array<{ icon: FeatherIconName; label: string; route: Href; color: string }> = [
   { icon: 'video', label: 'Wish a\nFriend', route: '/(tabs)/celebrities', color: '#FF6B33' },
   { icon: 'heart', label: 'Wish a\nCelebrity', route: '/wish-celebrity', color: '#E8527A' },
   { icon: 'music', label: 'AI Music\nStudio', route: '/(tabs)/music', color: '#B44CFF' },
   { icon: 'image', label: 'Photo\nWish', route: '/photo-wish', color: '#FF8C42' },
   { icon: 'mail', label: 'Greeting\nCards', route: '/greeting-cards', color: '#7B2FFF' },
   { icon: 'phone', label: 'Voice\nCall', route: '/(tabs)/voice-call', color: '#FF6B33' },
-] as const;
+];
 
 const VIDEO_CARDS = [
   { id: 'v1', title: 'Graduation Wishes', desc: 'Send a heartfelt congratulations video to your graduate', tag: 'Graduation', gradient: ['#4B83FF', '#7B2FFF'] as const },
@@ -171,11 +173,11 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     key={action.label}
                     style={[styles.quickItem, { backgroundColor: colors.card }]}
-                    onPress={() => router.push(action.route as any)}
+                    onPress={() => router.push(action.route)}
                     activeOpacity={0.7}
                   >
                     <View style={[styles.quickIcon, { backgroundColor: action.color + '20' }]}>
-                      <Feather name={action.icon as any} size={24} color={action.color} />
+                      <Feather name={action.icon} size={24} color={action.color} />
                     </View>
                     <Text style={[styles.quickLabel, { color: colors.foreground }]}>{action.label}</Text>
                   </TouchableOpacity>

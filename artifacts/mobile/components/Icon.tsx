@@ -1,6 +1,8 @@
 import { Feather } from '@expo/vector-icons';
 import React from 'react';
 
+type FeatherName = React.ComponentProps<typeof Feather>['name'];
+
 const iconMap = {
   home: 'home',
   phone: 'phone',
@@ -59,7 +61,7 @@ const iconMap = {
   wallet: 'credit-card',
   copy: 'copy',
   send: 'send',
-} as const;
+} as const satisfies Record<string, FeatherName>;
 
 export type IconName = keyof typeof iconMap;
 
@@ -72,5 +74,5 @@ interface IconProps {
 export function Icon({ name, size = 20, color = '#000' }: IconProps) {
   const featherName = iconMap[name];
   if (!featherName) return null;
-  return <Feather name={featherName as any} size={size} color={color} />;
+  return <Feather name={featherName} size={size} color={color} />;
 }
