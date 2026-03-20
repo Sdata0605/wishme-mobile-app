@@ -106,7 +106,7 @@ export default function WishCelebrityScreen() {
                     {subscribed ? (
                       <TouchableOpacity
                         style={s.sendWishBtn}
-                        onPress={() => router.push({ pathname: '/wish-booking', params: { id: celeb.id } } as never)}
+                        onPress={() => router.push({ pathname: '/booking/[id]', params: { id: celeb.id } } as never)}
                         activeOpacity={0.85}
                       >
                         <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.sendWishGrad}>

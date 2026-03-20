@@ -289,9 +289,9 @@ export const MOCK_MESSAGES = [
 ];
 
 export const MOCK_LOVED_ONES = [
-  { id: 'lo1', name: 'Rahul Kumar', relation: 'Brother', birthday: '1998-03-15', anniversary: null },
-  { id: 'lo2', name: 'Priya Sharma', relation: 'Wife', birthday: '1995-07-22', anniversary: '2020-02-14' },
-  { id: 'lo3', name: 'Mom', relation: 'Mother', birthday: '1965-11-08', anniversary: null },
+  { id: 'lo1', name: 'Rahul Kumar', relation: 'Brother', birthday: '1998-03-15', anniversary: null, email: 'rahul.kumar@gmail.com', phone: '+91 98765 43210', notes: '' },
+  { id: 'lo2', name: 'Priya Sharma', relation: 'Wife', birthday: '1995-07-22', anniversary: '2020-02-14', email: 'priya.sharma@gmail.com', phone: '+91 91234 56789', notes: 'Loves surprises' },
+  { id: 'lo3', name: 'Mom', relation: 'Mother', birthday: '1965-11-08', anniversary: null, email: 'mom@family.com', phone: '+91 99887 76655', notes: '' },
 ];
 
 export const MOCK_OCCASIONS = [

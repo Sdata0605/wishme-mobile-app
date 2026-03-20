@@ -74,7 +74,12 @@ function getRelColor(rel: string) {
 export default function LovedOnesScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [items, setItems] = useState<LovedOne[]>(MOCK_LOVED_ONES.map(lo => ({ ...lo, email: '', phone: '', notes: '' })));
+  const [items, setItems] = useState<LovedOne[]>(MOCK_LOVED_ONES.map(lo => ({
+    ...lo,
+    email: (lo as LovedOne).email ?? '',
+    phone: (lo as LovedOne).phone ?? '',
+    notes: (lo as LovedOne).notes ?? '',
+  })));
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [editModal, setEditModal] = useState(false);
