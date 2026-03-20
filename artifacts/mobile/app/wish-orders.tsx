@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React from 'react';
+import React, { useState } from 'react';
 import { FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
@@ -17,6 +17,12 @@ export default function WishOrdersScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const [toast, setToast] = useState('');
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 2500);
+  };
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
@@ -55,7 +61,7 @@ export default function WishOrdersScreen() {
               {/* Action buttons */}
               <View style={s.actions}>
                 {item.status === 'Completed' && (
-                  <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]}>
+                  <TouchableOpacity style={[s.actionBtn, { backgroundColor: '#22C55E15', borderColor: '#22C55E30' }]} onPress={() => showToast('Downloading your wish video...')}>
                     <Icon name="download" size={14} color="#22C55E" />
                     <Text style={[s.actionBtnText, { color: '#22C55E' }]}>Download</Text>
                   </TouchableOpacity>
@@ -72,6 +78,11 @@ export default function WishOrdersScreen() {
           );
         }}
       />
+      {toast.length > 0 && (
+        <View style={s.toast} pointerEvents="none">
+          <Text style={s.toastText}>{toast}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -91,4 +102,6 @@ const s = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10 },
   actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 10, borderWidth: 1, paddingVertical: 10 },
   actionBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  toast: { position: 'absolute', bottom: 80, left: 24, right: 24, backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' },
+  toastText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_500Medium', textAlign: 'center' },
 });

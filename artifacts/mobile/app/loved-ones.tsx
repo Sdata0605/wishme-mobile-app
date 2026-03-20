@@ -100,6 +100,16 @@ export default function LovedOnesScreen() {
     setEditModal(true);
   };
 
+  const normalizeRelation = (rel: string): string => {
+    const map: Record<string, string> = {
+      Brother: 'Sibling', Sister: 'Sibling',
+      Wife: 'Spouse', Husband: 'Spouse',
+      Mother: 'Parent', Father: 'Parent',
+      Son: 'Child', Daughter: 'Child',
+    };
+    return RELATIONS.includes(rel) ? rel : (map[rel] ?? 'Other');
+  };
+
   const openEdit = (item: LovedOne) => {
     setEditTarget(item);
     const parts = item.name.split(' ');
@@ -109,7 +119,7 @@ export default function LovedOnesScreen() {
       email: item.email ?? '',
       phone: item.phone ?? '',
       dob: item.birthday ?? '',
-      relation: RELATIONS.includes(item.relation) ? item.relation : 'Other',
+      relation: normalizeRelation(item.relation),
       notes: item.notes ?? '',
     });
     setEditModal(true);
