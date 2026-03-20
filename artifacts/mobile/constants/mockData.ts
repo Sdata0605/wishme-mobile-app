@@ -300,6 +300,22 @@ export const MOCK_OCCASIONS = [
   { id: 'oc3', name: 'Priya\'s Birthday', type: 'Birthday', date: '2025-07-22', person: 'Priya Sharma', daysLeft: 125 },
 ];
 
+export const MOCK_OCCASION_ALERTS = [
+  { id: 'al1', name: "Rahul's Birthday", type: 'Birthday', date: '2025-03-15', lovedOne: 'Rahul Kumar', daysBefore: 3, alertEnabled: true, autoSend: false, upcoming: true },
+  { id: 'al2', name: "Parents' Anniversary", type: 'Anniversary', date: '2025-04-20', lovedOne: 'Parents', daysBefore: 7, alertEnabled: true, autoSend: true, upcoming: true },
+  { id: 'al3', name: "Priya's Birthday", type: 'Birthday', date: '2025-07-22', lovedOne: 'Priya Sharma', daysBefore: 3, alertEnabled: false, autoSend: false, upcoming: true },
+  { id: 'al4', name: "Mom's Birthday", type: 'Birthday', date: '2025-11-08', lovedOne: 'Mom', daysBefore: 7, alertEnabled: true, autoSend: false, upcoming: true },
+  { id: 'al5', name: "Rahul's Graduation", type: 'Custom', date: '2024-06-20', lovedOne: 'Rahul Kumar', daysBefore: 1, alertEnabled: false, autoSend: false, upcoming: false },
+  { id: 'al6', name: 'Wedding Anniversary', type: 'Anniversary', date: '2024-02-14', lovedOne: 'Priya Sharma', daysBefore: 3, alertEnabled: true, autoSend: true, upcoming: false },
+];
+
+export const FEATURED_OCCASIONS = [
+  { id: 'fo1', name: 'Birthdays', description: 'Make their day unforgettable with a personal celeb wish', date: 'Year-round', gradient: ['#FF6B33', '#E8527A'] as [string, string] },
+  { id: 'fo2', name: 'Anniversaries', description: 'Celebrate love with a heartfelt message from a favourite star', date: 'All months', gradient: ['#E8527A', '#B44CFF'] as [string, string] },
+  { id: 'fo3', name: 'Graduations', description: 'Honour the achievement with an inspiring celebrity message', date: 'May – July', gradient: ['#4B83FF', '#7B2FFF'] as [string, string] },
+  { id: 'fo4', name: 'Weddings', description: 'Bless the couple with a special shout-out from their idol', date: 'Nov – Feb', gradient: ['#B44CFF', '#4B83FF'] as [string, string] },
+];
+
 export const MOCK_REVIEWS = [
   {
     id: 'r1',

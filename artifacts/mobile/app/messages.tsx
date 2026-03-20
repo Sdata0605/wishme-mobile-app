@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
-import React from 'react';
-import { FlatList, Image, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import { FlatList, Image, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { MOCK_MESSAGES } from '@/constants/mockData';
@@ -10,6 +10,13 @@ export default function MessagesScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const [search, setSearch] = useState('');
+
+  const filtered = MOCK_MESSAGES.filter(
+    (m) =>
+      m.name.toLowerCase().includes(search.toLowerCase()) ||
+      m.lastMessage.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -20,10 +27,35 @@ export default function MessagesScreen() {
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Messages</Text>
         <Icon name="edit" size={22} color={colors.primary} />
       </View>
+
+      {/* Search bar */}
+      <View style={[styles.searchWrap, { backgroundColor: colors.input, borderColor: colors.border }]}>
+        <Icon name="search" size={18} color={colors.mutedForeground} />
+        <TextInput
+          style={[styles.searchInput, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
+          placeholder="Search conversations..."
+          placeholderTextColor={colors.mutedForeground}
+          value={search}
+          onChangeText={setSearch}
+          returnKeyType="search"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')}>
+            <Icon name="x" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        )}
+      </View>
+
       <FlatList
-        data={MOCK_MESSAGES}
+        data={filtered}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Icon name="search" size={40} color={colors.mutedForeground} />
+            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No conversations found</Text>
+          </View>
+        }
         renderItem={({ item }) => (
           <TouchableOpacity
             onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id } })}
@@ -57,6 +89,8 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1 },
   headerTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, height: 46, margin: 14, marginBottom: 4 },
+  searchInput: { flex: 1, fontSize: 14, height: 46 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1 },
   avatarWrap: { position: 'relative' },
   avatar: { width: 52, height: 52, borderRadius: 26 },
@@ -66,4 +100,6 @@ const styles = StyleSheet.create({
   time: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   badge: { width: 20, height: 20, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold' },
+  empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
+  emptyText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
 });
