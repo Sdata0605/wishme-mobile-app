@@ -1,103 +1,285 @@
 import { BlurView } from 'expo-blur';
-import { Tabs } from 'expo-router';
+import { router, Tabs } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import React from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import React, { useState } from 'react';
+import {
+  Dimensions,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DrawerMenu } from '@/components/DrawerMenu';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
+
+const { width: W } = Dimensions.get('window');
+
+interface QuickItem {
+  icon: IconName;
+  label: string;
+  route: string;
+  color: string;
+}
+
+const QUICK_ITEMS: QuickItem[] = [
+  { icon: 'home', label: 'Dashboard', route: '/(tabs)/', color: '#FF6B33' },
+  { icon: 'user', label: 'Profile', route: '/(tabs)/profile', color: '#E8527A' },
+  { icon: 'briefcase', label: 'For Business', route: '/for-business', color: '#7B2FFF' },
+  { icon: 'mail', label: 'Greeting Cards', route: '/greeting-cards', color: '#B44CFF' },
+  { icon: 'star', label: 'Browse Celebrities', route: '/(tabs)/celebrities', color: '#FF8C42' },
+  { icon: 'message-circle', label: 'DMs', route: '/messages', color: '#22C55E' },
+  { icon: 'share-2', label: 'Referrals', route: '/referrals', color: '#4B83FF' },
+  { icon: 'trending-up', label: 'Commission', route: '/commission', color: '#FF6B33' },
+  { icon: 'credit-card', label: 'Wallet', route: '/wallet', color: '#7B2FFF' },
+  { icon: 'image', label: 'Photo Wish', route: '/photo-wish', color: '#E8527A' },
+  { icon: 'calendar', label: 'Bookings', route: '/bookings', color: '#B44CFF' },
+];
 
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
+  const insets = useSafeAreaInsets();
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
+  const [quickMenuVisible, setQuickMenuVisible] = useState(false);
+
+  const tabBarH = isWeb ? 84 : 60;
+  const moreBtnBottom = tabBarH + insets.bottom + 10;
+
+  const navigateQuick = (route: string) => {
+    setQuickMenuVisible(false);
+    setTimeout(() => router.push(route as any), 80);
+  };
 
   return (
-    <DrawerMenu>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: colors.primary,
-          tabBarInactiveTintColor: colors.mutedForeground,
-          tabBarStyle: {
-            position: 'absolute',
-            backgroundColor: isIOS ? 'transparent' : isDark ? colors.card : '#fff',
-            borderTopWidth: isWeb ? 1 : 0,
-            borderTopColor: colors.border,
-            elevation: 0,
-            height: isWeb ? 84 : 60,
-          },
-          tabBarBackground: () =>
-            isIOS ? (
-              <BlurView intensity={100} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
-            ) : (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? colors.card : '#fff' }]} />
-            ),
-          tabBarShowLabel: true,
-          tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 2 },
-        }}
+    <View style={styles.root}>
+      <DrawerMenu>
+        <Tabs
+          screenOptions={{
+            headerShown: false,
+            tabBarActiveTintColor: colors.primary,
+            tabBarInactiveTintColor: colors.mutedForeground,
+            tabBarStyle: {
+              position: 'absolute',
+              backgroundColor: isIOS ? 'transparent' : isDark ? colors.card : '#fff',
+              borderTopWidth: isWeb ? 1 : 0,
+              borderTopColor: colors.border,
+              elevation: 0,
+              height: isWeb ? 84 : 60,
+            },
+            tabBarBackground: () =>
+              isIOS ? (
+                <BlurView intensity={100} tint={isDark ? 'dark' : 'light'} style={StyleSheet.absoluteFill} />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? colors.card : '#fff' }]} />
+              ),
+            tabBarShowLabel: true,
+            tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 2 },
+          }}
+        >
+          <Tabs.Screen
+            name="index"
+            options={{
+              title: 'Home',
+              tabBarIcon: ({ color, size }) =>
+                isIOS ? (
+                  <SymbolView name="house" tintColor={color} size={size} />
+                ) : (
+                  <Icon name="home" size={size} color={color} />
+                ),
+            }}
+          />
+          <Tabs.Screen
+            name="celebrities"
+            options={{
+              title: 'Stars',
+              tabBarIcon: ({ color, size }) =>
+                isIOS ? (
+                  <SymbolView name="star" tintColor={color} size={size} />
+                ) : (
+                  <Icon name="star" size={size} color={color} />
+                ),
+            }}
+          />
+          <Tabs.Screen
+            name="music"
+            options={{
+              title: 'Music',
+              tabBarIcon: ({ color, size }) =>
+                isIOS ? (
+                  <SymbolView name="music.note" tintColor={color} size={size} />
+                ) : (
+                  <Icon name="music" size={size} color={color} />
+                ),
+            }}
+          />
+          <Tabs.Screen
+            name="voice-call"
+            options={{
+              title: 'Calls',
+              tabBarIcon: ({ color, size }) =>
+                isIOS ? (
+                  <SymbolView name="phone" tintColor={color} size={size} />
+                ) : (
+                  <Icon name="phone" size={size} color={color} />
+                ),
+            }}
+          />
+          <Tabs.Screen
+            name="profile"
+            options={{
+              title: 'Profile',
+              tabBarIcon: ({ color, size }) =>
+                isIOS ? (
+                  <SymbolView name="person" tintColor={color} size={size} />
+                ) : (
+                  <Icon name="user" size={size} color={color} />
+                ),
+            }}
+          />
+        </Tabs>
+      </DrawerMenu>
+
+      {/* Floating "More" button — sits above the tab bar */}
+      <TouchableOpacity
+        style={[styles.moreBtn, { bottom: moreBtnBottom, backgroundColor: colors.card, borderColor: colors.border, shadowColor: isDark ? '#000' : '#666' }]}
+        onPress={() => setQuickMenuVisible(true)}
+        activeOpacity={0.85}
       >
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Home',
-            tabBarIcon: ({ color, size }) =>
-              isIOS ? (
-                <SymbolView name="house" tintColor={color} size={size} />
-              ) : (
-                <Icon name="home" size={size} color={color} />
-              ),
-          }}
-        />
-        <Tabs.Screen
-          name="celebrities"
-          options={{
-            title: 'Stars',
-            tabBarIcon: ({ color, size }) =>
-              isIOS ? (
-                <SymbolView name="star" tintColor={color} size={size} />
-              ) : (
-                <Icon name="star" size={size} color={color} />
-              ),
-          }}
-        />
-        <Tabs.Screen
-          name="music"
-          options={{
-            title: 'Music',
-            tabBarIcon: ({ color, size }) =>
-              isIOS ? (
-                <SymbolView name="music.note" tintColor={color} size={size} />
-              ) : (
-                <Icon name="music" size={size} color={color} />
-              ),
-          }}
-        />
-        <Tabs.Screen
-          name="voice-call"
-          options={{
-            title: 'Calls',
-            tabBarIcon: ({ color, size }) =>
-              isIOS ? (
-                <SymbolView name="phone" tintColor={color} size={size} />
-              ) : (
-                <Icon name="phone" size={size} color={color} />
-              ),
-          }}
-        />
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarIcon: ({ color, size }) =>
-              isIOS ? (
-                <SymbolView name="person" tintColor={color} size={size} />
-              ) : (
-                <Icon name="user" size={size} color={color} />
-              ),
-          }}
-        />
-      </Tabs>
-    </DrawerMenu>
+        <Icon name="more-horizontal" size={20} color={colors.foreground} />
+      </TouchableOpacity>
+
+      {/* Quick Menu Overlay */}
+      <Modal
+        visible={quickMenuVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setQuickMenuVisible(false)}
+        statusBarTranslucent
+      >
+        <View style={styles.overlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setQuickMenuVisible(false)} />
+          <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 20 }]}>
+            {/* Handle */}
+            <View style={[styles.handle, { backgroundColor: colors.border }]} />
+            <View style={styles.sheetHeader}>
+              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Quick Menu</Text>
+              <TouchableOpacity onPress={() => setQuickMenuVisible(false)} style={styles.closeBtn}>
+                <Icon name="x" size={20} color={colors.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.menuGrid}>
+              {QUICK_ITEMS.map((item) => (
+                <TouchableOpacity
+                  key={item.label}
+                  style={[styles.menuItem, { backgroundColor: colors.background }]}
+                  onPress={() => navigateQuick(item.route)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.menuIcon, { backgroundColor: item.color + '20' }]}>
+                    <Icon name={item.icon} size={22} color={item.color} />
+                  </View>
+                  <Text style={[styles.menuLabel, { color: colors.foreground }]} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1 },
+  moreBtn: {
+    position: 'absolute',
+    right: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 50,
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  sheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 12,
+    maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 16,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 16,
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontFamily: 'PlayfairDisplay_700Bold',
+  },
+  closeBtn: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 16,
+    gap: 12,
+    paddingBottom: 8,
+  },
+  menuItem: {
+    width: (W - 56) / 3,
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderRadius: 16,
+  },
+  menuIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  menuLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter_500Medium',
+    textAlign: 'center',
+    lineHeight: 16,
+  },
+});

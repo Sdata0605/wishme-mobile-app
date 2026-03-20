@@ -19,9 +19,10 @@ import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useDrawer } from '@/context/DrawerContext';
 import { useTheme } from '@/context/ThemeContext';
-import { CELEBRITIES } from '@/constants/mockData';
+import { CATEGORIES, CELEBRITIES } from '@/constants/mockData';
 
 const { width: W } = Dimensions.get('window');
+const DASH_PAGE_SIZE = 4;
 
 const BANNERS = [
   {
@@ -44,13 +45,31 @@ const BANNERS = [
   },
 ];
 
-const QUICK_ACTIONS: Array<{ icon: IconName; label: string; route: Href; color: string }> = [
+const PRICE_RANGES = [
+  { label: 'All', min: 0, max: Infinity },
+  { label: 'Under ₹1K', min: 0, max: 1000 },
+  { label: '₹1K–₹3K', min: 1000, max: 3000 },
+  { label: '₹3K–₹6K', min: 3000, max: 6000 },
+  { label: 'Above ₹6K', min: 6000, max: Infinity },
+];
+
+interface QuickAction {
+  icon: IconName;
+  label: string;
+  route: Href;
+  color: string;
+  badge?: number;
+}
+
+const QUICK_ACTIONS: QuickAction[] = [
   { icon: 'video', label: 'Wish a\nFriend', route: '/(tabs)/celebrities', color: '#FF6B33' },
   { icon: 'heart', label: 'Wish a\nCelebrity', route: '/wish-celebrity', color: '#E8527A' },
   { icon: 'music', label: 'AI Music\nStudio', route: '/(tabs)/music', color: '#B44CFF' },
   { icon: 'image', label: 'Photo\nWish', route: '/photo-wish', color: '#FF8C42' },
   { icon: 'mail', label: 'Greeting\nCards', route: '/greeting-cards', color: '#7B2FFF' },
   { icon: 'phone', label: 'Voice\nCall', route: '/(tabs)/voice-call', color: '#FF6B33' },
+  { icon: 'message-circle', label: 'Messages', route: '/messages', color: '#22C55E', badge: 3 },
+  { icon: 'zap', label: 'Upgrade\nPlan', route: '/settings', color: '#FFB347' },
 ];
 
 const VIDEO_CARDS = [
@@ -66,6 +85,10 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [activeBanner, setActiveBanner] = useState(0);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [activePriceRange, setActivePriceRange] = useState('All');
+  const [dashPage, setDashPage] = useState(1);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -74,6 +97,30 @@ export default function HomeScreen() {
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = Platform.OS === 'web' ? 34 : insets.bottom;
+
+  const priceRange = PRICE_RANGES.find((p) => p.label === activePriceRange) ?? PRICE_RANGES[0];
+
+  const filteredCelebs = CELEBRITIES.filter((c) => {
+    const matchCat = activeCategory === 'All' ||
+      c.category.toLowerCase() === activeCategory.toLowerCase().replace(/s$/, '');
+    const matchPrice = c.pricePerWish >= priceRange.min && c.pricePerWish < priceRange.max;
+    return matchCat && matchPrice;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredCelebs.length / DASH_PAGE_SIZE));
+  const pagedCelebs = filteredCelebs.slice((dashPage - 1) * DASH_PAGE_SIZE, dashPage * DASH_PAGE_SIZE);
+
+  const onFilterCategoryChange = (cat: string) => {
+    setActiveCategory(cat);
+    setDashPage(1);
+  };
+
+  const onFilterPriceChange = (label: string) => {
+    setActivePriceRange(label);
+    setDashPage(1);
+  };
+
+  const ITEM_W = (W - 52) / 4;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -161,21 +208,28 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Quick Actions */}
+        {/* Quick Actions — 2 rows × 4 */}
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
           <View style={styles.quickGrid}>
             {[0, 1].map((row) => (
               <View key={row} style={styles.quickRow}>
-                {QUICK_ACTIONS.slice(row * 3, row * 3 + 3).map((action) => (
+                {QUICK_ACTIONS.slice(row * 4, row * 4 + 4).map((action) => (
                   <TouchableOpacity
                     key={action.label}
-                    style={[styles.quickItem, { backgroundColor: colors.card }]}
+                    style={[styles.quickItem, { width: ITEM_W, backgroundColor: colors.card }]}
                     onPress={() => router.push(action.route)}
                     activeOpacity={0.7}
                   >
-                    <View style={[styles.quickIcon, { backgroundColor: action.color + '20' }]}>
-                      <Icon name={action.icon} size={24} color={action.color} />
+                    <View style={{ position: 'relative' }}>
+                      <View style={[styles.quickIcon, { backgroundColor: action.color + '20' }]}>
+                        <Icon name={action.icon} size={20} color={action.color} />
+                      </View>
+                      {action.badge != null && action.badge > 0 && (
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeText}>{action.badge}</Text>
+                        </View>
+                      )}
                     </View>
                     <Text style={[styles.quickLabel, { color: colors.foreground }]}>{action.label}</Text>
                   </TouchableOpacity>
@@ -201,6 +255,93 @@ export default function HomeScreen() {
             renderItem={({ item }) => <CelebCard celebrity={item} />}
             keyExtractor={(item) => item.id}
           />
+        </View>
+
+        {/* Browse with Filters + Pagination */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.filterToggleRow}
+            onPress={() => setFiltersExpanded((v) => !v)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.sectionTitle, { color: colors.foreground, paddingHorizontal: 0, marginBottom: 0 }]}>
+              Browse Celebrities
+            </Text>
+            <View style={[styles.filterToggleChip, { backgroundColor: colors.muted }]}>
+              <Icon name="sliders" size={14} color={colors.primary} />
+              <Text style={[styles.filterToggleText, { color: colors.primary }]}>
+                {filtersExpanded ? 'Hide Filters' : 'Show Filters'}
+              </Text>
+              <Icon name={filtersExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={colors.primary} />
+            </View>
+          </TouchableOpacity>
+
+          {filtersExpanded && (
+            <View style={styles.filterBlock}>
+              <Text style={[styles.filterLabel, { color: colors.mutedForeground }]}>Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                {CATEGORIES.map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.chip, { backgroundColor: activeCategory === cat ? colors.primary : colors.muted, borderColor: activeCategory === cat ? colors.primary : colors.border }]}
+                    onPress={() => onFilterCategoryChange(cat)}
+                  >
+                    <Text style={[styles.chipText, { color: activeCategory === cat ? '#fff' : colors.foreground }]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              <Text style={[styles.filterLabel, { color: colors.mutedForeground, marginTop: 10 }]}>Price Range</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+                {PRICE_RANGES.map((pr) => (
+                  <TouchableOpacity
+                    key={pr.label}
+                    style={[styles.chip, { backgroundColor: activePriceRange === pr.label ? colors.primary : colors.muted, borderColor: activePriceRange === pr.label ? colors.primary : colors.border }]}
+                    onPress={() => onFilterPriceChange(pr.label)}
+                  >
+                    <Text style={[styles.chipText, { color: activePriceRange === pr.label ? '#fff' : colors.foreground }]}>{pr.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Paginated Celebrity Grid */}
+          <View style={styles.celebGrid}>
+            {pagedCelebs.map((celeb, i) => (
+              <CelebCard key={celeb.id} celebrity={celeb} width={(W - 52) / 2} />
+            ))}
+            {pagedCelebs.length === 0 && (
+              <View style={styles.emptyState}>
+                <Icon name="search" size={36} color={colors.mutedForeground} />
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No celebrities found</Text>
+              </View>
+            )}
+          </View>
+
+          {/* Pagination Controls */}
+          {filteredCelebs.length > DASH_PAGE_SIZE && (
+            <View style={styles.paginationRow}>
+              <TouchableOpacity
+                style={[styles.pageBtn, { backgroundColor: colors.card, opacity: dashPage <= 1 ? 0.4 : 1 }]}
+                onPress={() => setDashPage((p) => Math.max(1, p - 1))}
+                disabled={dashPage <= 1}
+              >
+                <Icon name="chevron-left" size={16} color={colors.foreground} />
+                <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Previous</Text>
+              </TouchableOpacity>
+              <Text style={[styles.pageLabel, { color: colors.mutedForeground }]}>
+                Page {dashPage} of {totalPages}
+              </Text>
+              <TouchableOpacity
+                style={[styles.pageBtn, { backgroundColor: colors.card, opacity: dashPage >= totalPages ? 0.4 : 1 }]}
+                onPress={() => setDashPage((p) => Math.min(totalPages, p + 1))}
+                disabled={dashPage >= totalPages}
+              >
+                <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Next</Text>
+                <Icon name="chevron-right" size={16} color={colors.foreground} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Video Wish Cards */}
@@ -315,9 +456,26 @@ const styles = StyleSheet.create({
   dotActive: { backgroundColor: '#FF6B33', width: 16 },
   quickGrid: { paddingHorizontal: 16 },
   quickRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  quickItem: { width: (W - 52) / 3, alignItems: 'center', padding: 14, borderRadius: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
-  quickIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
-  quickLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center', lineHeight: 16 },
+  quickItem: { alignItems: 'center', padding: 10, borderRadius: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
+  quickIcon: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  quickLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textAlign: 'center', lineHeight: 15 },
+  badge: { position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center' },
+  badgeText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' },
+  filterToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 },
+  filterToggleChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9999 },
+  filterToggleText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  filterBlock: { paddingHorizontal: 20, marginBottom: 14 },
+  filterLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginBottom: 8 },
+  chipRow: { gap: 8, paddingBottom: 2 },
+  chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999, borderWidth: 1.5 },
+  chipText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+  celebGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 20, gap: 12 },
+  emptyState: { flex: 1, alignItems: 'center', paddingVertical: 32, gap: 8 },
+  emptyText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  paginationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginTop: 16 },
+  pageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  pageBtnText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  pageLabel: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   videoCard: { borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
   videoThumb: { height: 160, alignItems: 'center', justifyContent: 'center' },
   playBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
