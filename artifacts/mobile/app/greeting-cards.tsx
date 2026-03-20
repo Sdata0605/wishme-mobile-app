@@ -208,7 +208,7 @@ export default function GreetingCardsScreen() {
             {/* CTA */}
             <TouchableOpacity onPress={generate} disabled={generating} activeOpacity={0.85} style={{ opacity: generating ? 0.7 : 1 }}>
               <LinearGradient colors={['#E8527A', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.genBtn}>
-                <Icon name="zap" size={18} color="#fff" />
+                <Icon name="sparkles" size={18} color="#fff" />
                 <Text style={s.genBtnText}>{generating ? 'Generating...' : 'Generate Card'}</Text>
               </LinearGradient>
             </TouchableOpacity>

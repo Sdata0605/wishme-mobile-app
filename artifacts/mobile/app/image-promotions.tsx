@@ -15,7 +15,7 @@ import { Icon } from '@/components/Icon';
 import { CELEBRITIES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
 
-const MOCK_SUBSCRIBED = ['1', '2', '4'];
+const MOCK_SUBSCRIBED_IDS = ['1', '2', '4'];
 
 const MOCK_PROMOS = [
   { id: 'pr1', celeb: 'Ranveer Singh', date: '2025-01-18', status: 'Completed' },
@@ -47,9 +47,10 @@ export default function ImagePromotionsScreen() {
   const [hasRefUpload, setHasRefUpload] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [generated, setGenerated] = useState(false);
+  const [showEmpty, setShowEmpty] = useState(false);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
-  const subscribedCelebs = CELEBRITIES.filter(c => MOCK_SUBSCRIBED.includes(c.id));
+  const subscribedCelebs = showEmpty ? [] : CELEBRITIES.filter(c => MOCK_SUBSCRIBED_IDS.includes(c.id));
   const noSubscriptions = subscribedCelebs.length === 0;
 
   const generate = () => {
@@ -70,7 +71,9 @@ export default function ImagePromotionsScreen() {
           <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[s.headerTitle, { color: colors.foreground }]}>Image Promotions</Text>
-        <View style={{ width: 22 }} />
+        <TouchableOpacity onPress={() => { setShowEmpty(e => !e); setSelectedCeleb(''); }}>
+          <Icon name="sliders" size={20} color={colors.mutedForeground} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>

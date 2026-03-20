@@ -84,7 +84,7 @@ export default function PhotoWishScreen() {
         <View style={s.statsRow}>
           {[
             { label: 'Wallet Balance', value: '₹2,450', icon: 'credit-card' as const, color: '#4B83FF' },
-            { label: "Today's", value: '3', icon: 'zap' as const, color: '#FF6B33' },
+            { label: "Today's Generations", value: '3', icon: 'zap' as const, color: '#FF6B33' },
             { label: 'Total Created', value: '47', icon: 'image' as const, color: '#B44CFF' },
           ].map(st => (
             <View key={st.label} style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
