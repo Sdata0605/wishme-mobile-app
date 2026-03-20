@@ -61,7 +61,6 @@ function VideoIntroScreen({ onDone }: { onDone: () => void }) {
 
   const player = useVideoPlayer(INTRO_VIDEO, (p) => {
     p.loop = false;
-    p.muted = false;
     p.play();
   });
 
