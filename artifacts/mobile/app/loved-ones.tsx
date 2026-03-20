@@ -88,7 +88,7 @@ export default function LovedOnesScreen() {
 
   const [occasionModal, setOccasionModal] = useState(false);
   const [occasionTarget, setOccasionTarget] = useState<LovedOne | null>(null);
-  const [personOccasions, setPersonOccasions] = useState<PersonOccasion[]>([]);
+  const [occasionsMap, setOccasionsMap] = useState<Record<string, PersonOccasion[]>>(MOCK_OCCASIONS_MAP);
   const [addOccName, setAddOccName] = useState('');
   const [addOccDate, setAddOccDate] = useState('');
   const [addOccType, setAddOccType] = useState('Birthday');
@@ -139,14 +139,14 @@ export default function LovedOnesScreen() {
 
   const openOccasions = (item: LovedOne) => {
     setOccasionTarget(item);
-    setPersonOccasions(MOCK_OCCASIONS_MAP[item.id] ?? []);
     setAddOccName(''); setAddOccDate(''); setAddOccType('Birthday'); setShowAddOcc(false);
     setOccasionModal(true);
   };
 
   const addOccasion = () => {
-    if (!addOccName.trim()) return;
-    setPersonOccasions(prev => [...prev, { id: `occ${Date.now()}`, name: addOccName, date: addOccDate, type: addOccType }]);
+    if (!occasionTarget || !addOccName.trim()) return;
+    const newOcc: PersonOccasion = { id: `occ${Date.now()}`, name: addOccName, date: addOccDate, type: addOccType };
+    setOccasionsMap(prev => ({ ...prev, [occasionTarget.id]: [...(prev[occasionTarget.id] ?? []), newOcc] }));
     setAddOccName(''); setAddOccDate(''); setAddOccType('Birthday'); setShowAddOcc(false);
   };
 
@@ -286,10 +286,10 @@ export default function LovedOnesScreen() {
               </TouchableOpacity>
             </View>
             <ScrollView contentContainerStyle={s.modalBody} keyboardShouldPersistTaps="handled">
-              {personOccasions.length === 0 ? (
+              {(occasionsMap[occasionTarget?.id ?? ''] ?? []).length === 0 ? (
                 <Text style={[s.emptyText, { color: colors.mutedForeground }]}>No occasions yet. Add one below.</Text>
               ) : (
-                personOccasions.map(occ => {
+                (occasionsMap[occasionTarget?.id ?? ''] ?? []).map(occ => {
                   const tc = typeColor(occ.type);
                   return (
                     <View key={occ.id} style={[s.occRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
