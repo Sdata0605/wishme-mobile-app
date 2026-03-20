@@ -58,6 +58,6 @@
   "dependencies": {
     "@expo-google-fonts/playfair-display": "^0.4.2",
     "expo-screen-capture": "^8.0.9",
-    "expo-video": "^55.0.11"
+    "expo-video": "~3.0.16"
   }
 }
