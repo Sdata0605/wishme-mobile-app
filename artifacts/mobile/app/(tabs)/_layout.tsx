@@ -27,7 +27,7 @@ interface QuickItem {
 }
 
 const QUICK_ITEMS: QuickItem[] = [
-  { icon: 'home', label: 'Dashboard', route: '/(tabs)/', color: '#FF6B33' },
+  { icon: 'home', label: 'Dashboard', route: '/(tabs)', color: '#FF6B33' },
   { icon: 'user', label: 'Profile', route: '/(tabs)/profile', color: '#E8527A' },
   { icon: 'briefcase', label: 'For Business', route: '/for-business', color: '#7B2FFF' },
   { icon: 'mail', label: 'Greeting Cards', route: '/greeting-cards', color: '#B44CFF' },

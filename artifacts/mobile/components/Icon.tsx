@@ -445,6 +445,28 @@ const ICONS = {
       <Polyline points="12,6 12,12 16,14" {...p(c)} />
     </Svg>
   ),
+  'more-horizontal': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={1} fill={c} stroke={c} strokeWidth={sw} />
+      <Circle cx={19} cy={12} r={1} fill={c} stroke={c} strokeWidth={sw} />
+      <Circle cx={5} cy={12} r={1} fill={c} stroke={c} strokeWidth={sw} />
+    </Svg>
+  ),
+  'chevron-left': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Polyline points="15,18 9,12 15,6" {...p(c)} />
+    </Svg>
+  ),
+  'chevron-up': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Polyline points="18,15 12,9 6,15" {...p(c)} />
+    </Svg>
+  ),
+  'chevron-down': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Polyline points="6,9 12,15 18,9" {...p(c)} />
+    </Svg>
+  ),
 } satisfies Record<string, RenderFn>;
 
 const ALIASES = {

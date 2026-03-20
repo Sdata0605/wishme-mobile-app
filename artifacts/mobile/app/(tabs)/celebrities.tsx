@@ -121,7 +121,9 @@ export default function CelebritiesScreen() {
 
         {/* Delivery Time chips */}
         <View style={styles.deliveryRow}>
-          <Icon name="clock" size={13} color={colors.mutedForeground} style={{ marginRight: 4 }} />
+          <View style={{ marginRight: 4 }}>
+            <Icon name="clock" size={13} color={colors.mutedForeground} />
+          </View>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
             {DELIVERY_TIMES.map((dt) => (
               <TouchableOpacity
