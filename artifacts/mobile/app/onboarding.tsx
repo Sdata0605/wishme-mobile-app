@@ -58,10 +58,12 @@ function VideoIntroScreen({ onDone }: { onDone: () => void }) {
     onDone();
   }, [onDone]);
 
-  const player = useVideoPlayer(INTRO_VIDEO, (p) => {
-    p.loop = false;
-    p.play();
-  });
+  const player = useVideoPlayer(INTRO_VIDEO);
+
+  useEffect(() => {
+    player.loop = false;
+    player.play();
+  }, [player]);
 
   useEffect(() => {
     const sub = player.addListener('playToEnd', () => {
