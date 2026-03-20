@@ -160,7 +160,7 @@ function AudioRecorder({ label = 'Record Audio', onPreview }: { label?: string; 
   );
 }
 
-function UploadOrRecord({ onPreview, onUpload }: { onPreview?: () => void; onUpload?: () => void }) {
+function UploadOrRecord({ onPreview, onUpload, onClear }: { onPreview?: () => void; onUpload?: () => void; onClear?: () => void }) {
   const { colors } = useTheme();
   const [uploaded, setUploaded] = useState<string | null>(null);
 
@@ -169,13 +169,18 @@ function UploadOrRecord({ onPreview, onUpload }: { onPreview?: () => void; onUpl
     onUpload?.();
   };
 
+  const handleClear = () => {
+    setUploaded(null);
+    onClear?.();
+  };
+
   return (
     <View style={s.uploadOrRec}>
       {uploaded ? (
         <View style={[s.recorderPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Icon name="music" size={18} color="#B44CFF" />
           <Text style={[s.uploadText, { color: colors.foreground, flex: 1 }]}>{uploaded}</Text>
-          <TouchableOpacity onPress={() => setUploaded(null)}>
+          <TouchableOpacity onPress={handleClear}>
             <Icon name="x" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         </View>
@@ -309,7 +314,7 @@ function VoiceConversionTab() {
   return (
     <View style={s.tabContent}>
       <SectionLabel text="Upload or Record Audio" />
-      <UploadOrRecord onPreview={() => setHasAudio(true)} onUpload={() => setHasAudio(true)} />
+      <UploadOrRecord onPreview={() => setHasAudio(true)} onUpload={() => setHasAudio(true)} onClear={() => setHasAudio(false)} />
       <SectionLabel text="Target Voice" />
       <VoiceSelect value={voice} onChange={setVoice} />
       <GenBtn label="Convert Voice (₹75)" onPress={generate} generating={gen} />
@@ -358,7 +363,7 @@ function AudioIsolationTab() {
   return (
     <View style={s.tabContent}>
       <SectionLabel text="Upload or Record Audio" />
-      <UploadOrRecord onPreview={() => setHasAudio(true)} onUpload={() => setHasAudio(true)} />
+      <UploadOrRecord onPreview={() => setHasAudio(true)} onUpload={() => setHasAudio(true)} onClear={() => setHasAudio(false)} />
       <View style={[s.infoBox, { backgroundColor: '#B44CFF15', borderColor: '#B44CFF40' }]}>
         <Icon name="info" size={14} color="#B44CFF" />
         <Text style={s.infoText}>AI will separate vocals and background music from your audio</Text>
