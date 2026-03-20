@@ -160,14 +160,31 @@ function AudioRecorder({ label = 'Record Audio', onPreview }: { label?: string; 
   );
 }
 
-function UploadOrRecord({ onPreview }: { onPreview?: () => void }) {
+function UploadOrRecord({ onPreview, onUpload }: { onPreview?: () => void; onUpload?: () => void }) {
   const { colors } = useTheme();
+  const [uploaded, setUploaded] = useState<string | null>(null);
+
+  const handleUpload = () => {
+    setUploaded('audio_upload.mp3');
+    onUpload?.();
+  };
+
   return (
     <View style={s.uploadOrRec}>
-      <TouchableOpacity style={[s.uploadBtn, { borderColor: colors.border, backgroundColor: colors.card }]} activeOpacity={0.8}>
-        <Icon name="upload" size={18} color="#B44CFF" />
-        <Text style={[s.uploadText, { color: colors.foreground }]}>Upload Audio</Text>
-      </TouchableOpacity>
+      {uploaded ? (
+        <View style={[s.recorderPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Icon name="music" size={18} color="#B44CFF" />
+          <Text style={[s.uploadText, { color: colors.foreground, flex: 1 }]}>{uploaded}</Text>
+          <TouchableOpacity onPress={() => setUploaded(null)}>
+            <Icon name="x" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={[s.uploadBtn, { borderColor: colors.border, backgroundColor: colors.card }]} activeOpacity={0.8} onPress={handleUpload}>
+          <Icon name="upload" size={18} color="#B44CFF" />
+          <Text style={[s.uploadText, { color: colors.foreground }]}>Upload Audio</Text>
+        </TouchableOpacity>
+      )}
       <View style={s.orDivider}>
         <View style={[s.divLine, { backgroundColor: colors.border }]} />
         <Text style={[s.orText, { color: colors.mutedForeground }]}>or</Text>
@@ -292,7 +309,7 @@ function VoiceConversionTab() {
   return (
     <View style={s.tabContent}>
       <SectionLabel text="Upload or Record Audio" />
-      <UploadOrRecord onPreview={() => setHasAudio(true)} />
+      <UploadOrRecord onPreview={() => setHasAudio(true)} onUpload={() => setHasAudio(true)} />
       <SectionLabel text="Target Voice" />
       <VoiceSelect value={voice} onChange={setVoice} />
       <GenBtn label="Convert Voice (₹75)" onPress={generate} generating={gen} />
@@ -324,7 +341,7 @@ function SoundEffectsTab() {
       />
       <SectionLabel text="Duration" />
       <DurationSlider value={duration} onChange={setDuration} />
-      <GenBtn label="Generate Effect (₹60)" onPress={generate} generating={gen} />
+      <GenBtn label="Generate (₹60)" onPress={generate} generating={gen} />
       {done && <AudioPlayerCard title="Sound Effect" duration={`0:${duration.toString().padStart(2, '0')}`} />}
     </View>
   );
@@ -341,7 +358,7 @@ function AudioIsolationTab() {
   return (
     <View style={s.tabContent}>
       <SectionLabel text="Upload or Record Audio" />
-      <UploadOrRecord onPreview={() => setHasAudio(true)} />
+      <UploadOrRecord onPreview={() => setHasAudio(true)} onUpload={() => setHasAudio(true)} />
       <View style={[s.infoBox, { backgroundColor: '#B44CFF15', borderColor: '#B44CFF40' }]}>
         <Icon name="info" size={14} color="#B44CFF" />
         <Text style={s.infoText}>AI will separate vocals and background music from your audio</Text>
