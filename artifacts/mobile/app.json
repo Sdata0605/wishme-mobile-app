@@ -2,6 +2,7 @@
   "expo": {
     "name": "WishMe",
     "slug": "mobile",
+    "owner": "prashantuser1",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -14,9 +15,12 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.prashantuser1.wishme"
     },
-    "android": {},
+    "android": {
+      "package": "com.prashantuser1.wishme"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
