@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  KeyboardTypeOptions,
   Platform,
   Pressable,
   ScrollView,
@@ -15,7 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
 
 type Tab = 'signin' | 'signup' | 'celebrity';
 
@@ -29,12 +30,12 @@ function InputField({
   error,
   rightElement,
 }: {
-  icon: string;
+  icon: IconName;
   placeholder: string;
   value: string;
   onChangeText: (t: string) => void;
   secureTextEntry?: boolean;
-  keyboardType?: any;
+  keyboardType?: KeyboardTypeOptions;
   error?: string;
   rightElement?: React.ReactNode;
 }) {
@@ -46,7 +47,7 @@ function InputField({
         borderColor: error ? colors.destructive : colors.border,
         borderWidth: 1.5,
       }]}>
-        <Icon name={icon as any} size={18} color={colors.mutedForeground} />
+        <Icon name={icon} size={18} color={colors.mutedForeground} />
         <TextInput
           style={[styles.input, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
           placeholder={placeholder}

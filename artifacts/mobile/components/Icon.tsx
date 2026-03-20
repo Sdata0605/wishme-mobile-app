@@ -17,7 +17,7 @@ function p(color: string) {
   return { stroke: color, strokeWidth: sw, strokeLinecap: lc, strokeLinejoin: lj, fill: 'none' } as const;
 }
 
-const ICONS: Record<string, RenderFn> = {
+const ICONS = {
   home: (c, sz) => (
     <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
       <Path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" {...p(c)} />
@@ -445,20 +445,22 @@ const ICONS: Record<string, RenderFn> = {
       <Polyline points="12,6 12,12 16,14" {...p(c)} />
     </Svg>
   ),
-};
+} satisfies Record<string, RenderFn>;
 
-const ALIASES: Record<string, string> = {
+const ALIASES = {
   'music-2': 'music',
   'sparkles': 'zap',
   'wallet': 'credit-card',
   'mail-check': 'check-circle',
-};
+} as const satisfies Record<string, keyof typeof ICONS>;
 
 export type IconName = keyof typeof ICONS | keyof typeof ALIASES;
 
 export function Icon({ name, size = 20, color = '#000' }: IconProps) {
-  const resolved = ALIASES[name as string] ?? name;
-  const render = ICONS[resolved as string];
+  const resolved: keyof typeof ICONS =
+    (ALIASES as Record<string, keyof typeof ICONS>)[name as string] ??
+    (name as keyof typeof ICONS);
+  const render = ICONS[resolved];
   if (!render) return null;
   return render(color, size);
 }
