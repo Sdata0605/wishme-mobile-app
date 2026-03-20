@@ -23,8 +23,8 @@ const PAGE_SIZE = 6;
 const DELIVERY_TIMES = [
   { label: 'All', maxPrice: Infinity },
   { label: 'Under 24h', maxPrice: 1500 },
-  { label: '24–48h', maxPrice: 3000 },
-  { label: '48–72h', maxPrice: 5000 },
+  { label: '24-48h', maxPrice: 3000 },
+  { label: '48-72h', maxPrice: 5000 },
   { label: '1 week+', maxPrice: Infinity },
 ];
 
@@ -51,8 +51,8 @@ export default function CelebritiesScreen() {
       const matchDelivery =
         activeDelivery === 'All' ||
         (activeDelivery === 'Under 24h' && c.pricePerWish < 1500) ||
-        (activeDelivery === '24–48h' && c.pricePerWish >= 1500 && c.pricePerWish < 3000) ||
-        (activeDelivery === '48–72h' && c.pricePerWish >= 3000 && c.pricePerWish < 5000) ||
+        (activeDelivery === '24-48h' && c.pricePerWish >= 1500 && c.pricePerWish < 3000) ||
+        (activeDelivery === '48-72h' && c.pricePerWish >= 3000 && c.pricePerWish < 5000) ||
         (activeDelivery === '1 week+' && c.pricePerWish >= 5000);
       return matchSearch && matchCat && matchDelivery;
     });

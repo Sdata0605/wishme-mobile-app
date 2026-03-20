@@ -1,12 +1,11 @@
 import { BlurView } from 'expo-blur';
-import { router, Tabs } from 'expo-router';
+import { router, Tabs, type Href } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import React, { useState } from 'react';
 import {
   Dimensions,
   Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -23,7 +22,7 @@ const { width: W } = Dimensions.get('window');
 interface QuickItem {
   icon: IconName;
   label: string;
-  route: string;
+  route: Href;
   color: string;
 }
 
@@ -51,9 +50,9 @@ export default function TabLayout() {
   const tabBarH = isWeb ? 84 : 60;
   const moreBtnBottom = tabBarH + insets.bottom + 10;
 
-  const navigateQuick = (route: string) => {
+  const navigateQuick = (route: Href) => {
     setQuickMenuVisible(false);
-    setTimeout(() => router.push(route as any), 80);
+    setTimeout(() => router.push(route), 80);
   };
 
   return (
@@ -145,52 +144,66 @@ export default function TabLayout() {
         </Tabs>
       </DrawerMenu>
 
-      {/* Floating "More" button — sits above the tab bar */}
+      {/* Floating "More" button — sits just above the tab bar */}
       <TouchableOpacity
-        style={[styles.moreBtn, { bottom: moreBtnBottom, backgroundColor: colors.card, borderColor: colors.border, shadowColor: isDark ? '#000' : '#666' }]}
+        style={[
+          styles.moreBtn,
+          {
+            bottom: moreBtnBottom,
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            shadowColor: isDark ? '#000' : '#666',
+          },
+        ]}
         onPress={() => setQuickMenuVisible(true)}
         activeOpacity={0.85}
       >
         <Icon name="more-horizontal" size={20} color={colors.foreground} />
       </TouchableOpacity>
 
-      {/* Quick Menu Overlay */}
+      {/* Quick Menu — full-screen overlay */}
       <Modal
         visible={quickMenuVisible}
         animationType="slide"
-        transparent
+        transparent={false}
         onRequestClose={() => setQuickMenuVisible(false)}
         statusBarTranslucent
       >
-        <View style={styles.overlay}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setQuickMenuVisible(false)} />
-          <View style={[styles.sheet, { backgroundColor: colors.card, paddingBottom: insets.bottom + 20 }]}>
-            {/* Handle */}
-            <View style={[styles.handle, { backgroundColor: colors.border }]} />
-            <View style={styles.sheetHeader}>
-              <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Quick Menu</Text>
-              <TouchableOpacity onPress={() => setQuickMenuVisible(false)} style={styles.closeBtn}>
-                <Icon name="x" size={20} color={colors.mutedForeground} />
-              </TouchableOpacity>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.menuGrid}>
-              {QUICK_ITEMS.map((item) => (
-                <TouchableOpacity
-                  key={item.label}
-                  style={[styles.menuItem, { backgroundColor: colors.background }]}
-                  onPress={() => navigateQuick(item.route)}
-                  activeOpacity={0.75}
-                >
-                  <View style={[styles.menuIcon, { backgroundColor: item.color + '20' }]}>
-                    <Icon name={item.icon} size={22} color={item.color} />
-                  </View>
-                  <Text style={[styles.menuLabel, { color: colors.foreground }]} numberOfLines={2}>
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+        <View style={[styles.menuScreen, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+          {/* Header */}
+          <View style={[styles.menuHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.menuTitle, { color: colors.foreground }]}>Quick Menu</Text>
+            <TouchableOpacity onPress={() => setQuickMenuVisible(false)} style={styles.closeBtn}>
+              <Icon name="x" size={22} color={colors.mutedForeground} />
+            </TouchableOpacity>
           </View>
+
+          {/* Sub-title */}
+          <Text style={[styles.menuSubtitle, { color: colors.mutedForeground }]}>
+            Jump to any feature instantly
+          </Text>
+
+          {/* 3-column icon grid */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.menuGrid}
+          >
+            {QUICK_ITEMS.map((item) => (
+              <TouchableOpacity
+                key={item.label}
+                style={[styles.menuItem, { backgroundColor: colors.card }]}
+                onPress={() => navigateQuick(item.route)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.menuIcon, { backgroundColor: item.color + '22' }]}>
+                  <Icon name={item.icon} size={26} color={item.color} />
+                </View>
+                <Text style={[styles.menuLabel, { color: colors.foreground }]} numberOfLines={2}>
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -214,67 +227,61 @@ const styles = StyleSheet.create({
     elevation: 4,
     zIndex: 50,
   },
-  overlay: {
+  menuScreen: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: 12,
-    maxHeight: '80%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 16,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  sheetHeader: {
+  menuHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    marginBottom: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
   },
-  sheetTitle: {
-    fontSize: 20,
+  menuTitle: {
+    fontSize: 22,
     fontFamily: 'PlayfairDisplay_700Bold',
   },
   closeBtn: {
-    width: 32,
-    height: 32,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  menuSubtitle: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 4,
   },
   menuGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: 16,
+    paddingTop: 16,
     gap: 12,
-    paddingBottom: 8,
+    paddingBottom: 24,
   },
   menuItem: {
     width: (W - 56) / 3,
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: 18,
     paddingHorizontal: 8,
-    borderRadius: 16,
+    borderRadius: 18,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
   },
   menuIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   menuLabel: {
     fontSize: 12,
