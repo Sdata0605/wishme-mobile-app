@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useEffect, useRef, useState } from 'react';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
@@ -12,9 +13,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '@/context/ThemeContext';
 
 const { width: W, height: H } = Dimensions.get('window');
+
+const INTRO_VIDEO = require('@/assets/videos/intro.mp4');
 
 const SLIDES = [
   {
@@ -46,6 +48,47 @@ const SLIDES = [
     gradient: ['transparent', 'rgba(75,0,130,0.95)'] as const,
   },
 ];
+
+function VideoIntroScreen({ onDone }: { onDone: () => void }) {
+  const insets = useSafeAreaInsets();
+  const doneCalledRef = useRef(false);
+
+  const done = useCallback(() => {
+    if (doneCalledRef.current) return;
+    doneCalledRef.current = true;
+    onDone();
+  }, [onDone]);
+
+  const player = useVideoPlayer(INTRO_VIDEO, (p) => {
+    p.loop = false;
+    p.muted = false;
+    p.play();
+  });
+
+  useEffect(() => {
+    const sub = player.addListener('playToEnd', () => {
+      done();
+    });
+    return () => sub.remove();
+  }, [player, done]);
+
+  return (
+    <View style={StyleSheet.absoluteFillObject}>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+        nativeControls={false}
+      />
+      <Pressable
+        onPress={done}
+        style={[styles.videoSkip, { top: insets.top + 12 }]}
+      >
+        <Text style={styles.skipText}>Skip</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 function SlideScreen({
   slide,
@@ -96,7 +139,10 @@ function SlideScreen({
   }, [active]);
 
   return (
-    <Animated.View style={[styles.slide, { opacity }]}>
+    <Animated.View
+      pointerEvents={active ? 'auto' : 'none'}
+      style={[styles.slide, { opacity }]}
+    >
       <Animated.View
         style={[
           { position: 'absolute', top: 0, left: 0, right: 0, height: H, backgroundColor: '#000' },
@@ -169,8 +215,8 @@ function SlideScreen({
 }
 
 export default function OnboardingScreen() {
+  const [phase, setPhase] = useState<'video' | 'slides'>('video');
   const [current, setCurrent] = useState(0);
-  const { colors } = useTheme();
 
   const finish = async () => {
     await AsyncStorage.setItem('onboarded', 'true');
@@ -187,17 +233,21 @@ export default function OnboardingScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: '#000' }]}>
-      {SLIDES.map((slide, index) => (
-        <SlideScreen
-          key={slide.key}
-          slide={slide}
-          index={index}
-          total={SLIDES.length}
-          active={index === current}
-          onNext={next}
-          onSkip={finish}
-        />
-      ))}
+      {phase === 'video' ? (
+        <VideoIntroScreen onDone={() => setPhase('slides')} />
+      ) : (
+        SLIDES.map((slide, index) => (
+          <SlideScreen
+            key={slide.key}
+            slide={slide}
+            index={index}
+            total={SLIDES.length}
+            active={index === current}
+            onNext={next}
+            onSkip={finish}
+          />
+        ))
+      )}
     </View>
   );
 }
@@ -241,6 +291,14 @@ const styles = StyleSheet.create({
   progressText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_500Medium' },
   skipPill: {
     backgroundColor: 'rgba(0,0,0,0.4)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 9999,
+  },
+  videoSkip: {
+    position: 'absolute',
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 9999,
