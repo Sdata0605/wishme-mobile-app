@@ -1,0 +1,282 @@
+
+
+# Complete UI Documentation for Replit Mobile App Development
+
+This document describes every sidebar navigation page, its UI components, layout, and user-facing elements. No backend/API details included.
+
+---
+
+## Global Layout Structure
+
+### AuthenticatedLayout (wraps most pages)
+- **Mobile**: Header at top, content area, Footer, MobileBottomNav fixed at bottom
+- **Desktop**: SidebarProvider wrapping UserSidebar (left) + SidebarInset (Header + main content + Footer)
+
+### MobileBottomNav (fixed bottom bar, 5 icons)
+| Icon | Label (signed in) | Route |
+|------|-------------------|-------|
+| Home/LayoutDashboard | Dashboard | /dashboard |
+| Phone | Voice Call | /celebrity-voice-call |
+| Users | Celebrities | /celebrities |
+| Music | AI Music | /ai-music |
+| User | Profile | /profile |
+
+Plus a "..." (MoreVertical) button top-right that opens a full-screen overlay "Quick Menu" with 11 items: Dashboard, Profile, For Business, Greeting Cards, Browse Celebrities, DM's, Referrals, Commission, Wallet, Photo Wish, Bookings.
+
+### UserSidebar (desktop collapsible sidebar)
+- Header: Logo image (`/wish-me-logo.png`), brand text "Wish Me / Dashboard", ChevronLeft collapse toggle
+- 20 NavLink items (details below)
+- Footer: Settings link, Logout button (red/destructive)
+- Conditional: "Celebrity Dashboard" link (Crown icon) if user is a celebrity
+
+---
+
+## Page-by-Page UI Breakdown
+
+### 1. Dashboard (`/dashboard`)
+**Components**: Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Link, ProfileAlert, DashboardSwitcher, MessageAlert
+
+**Layout**:
+- **Wallet Card**: Gradient card showing "Wallet Balance" (₹ amount), Wallet icon, "Add Money" button linking to /wallet
+- **Action Buttons Grid** (2x4 mobile, 4-col desktop): 8 cards each with gradient-colored icon box, title, subtitle. Items: Wish a Celebrity, Wish Loved Ones, Celebrity Call, Messages (with unread badge), Greeting Cards, Image Promotion, AI Music, Upgrade Plan
+- **Search Bar**: Input with Search icon, placeholder "Search celebrities..."
+- **Filter Section**: Collapsible. Category Select (All/Actors/Musicians/Influencers/Athletes/Politicians), Price Range Select (All/Under ₹8,000/₹8,000-₹16,000/₹16,000-₹40,000/Over ₹40,000)
+- **Celebrity List**: Cards with 64x64 rounded image, name, category, star rating, verified Badge, delivery time. Paginated (Previous/Next buttons, "Page X of Y")
+- **Desktop extras**: Grid/List view toggle, DashboardSidebar filter panel on right
+
+### 2. Celebrity Call (`/celebrity-voice-call`)
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input, Label, Select, Textarea, Avatar, AvatarFallback, AvatarImage, Badge, Calendar (date picker), Popover, RadioGroup, RadioGroupItem, DiscountBadge, CelebrityCallModal
+
+**Layout**:
+- Header: "Celebrity Voice Call Wishes" title
+- **Step 1 - Celebrity Selection**: Search input, celebrity cards grid with avatar (48x48), name, category, rating stars, verified badge, voice call price
+- **Step 2 - Call Details**: Occasion Select (18 options: Birthday, Anniversary, etc.), Recipient Name input, Special Message textarea, Tone RadioGroup (Warm & Loving, Funny, Motivational, etc.), Schedule Date calendar popover, Language select
+- **Pricing Card**: Base price, discount badge, final price, wallet balance
+- **CTA**: "Make Call" button
+- **CelebrityCallModal**: Dialog showing call progress, animated phone icon
+
+### 3. Wallet (`/wallet`)
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input, Label, Textarea, Tabs, TabsContent, TabsList, TabsTrigger, Badge
+
+**Layout**:
+- **Balance Card**: Large wallet balance display (₹ amount), WalletIcon
+- **Tabs**: "Add Money" | "Transactions" | "Referral Earnings"
+- **Add Money Tab**: Amount Input, quick amount buttons (₹100, ₹500, ₹1000, ₹2000), "Add via Razorpay" button
+- **Transactions Tab**: List of transactions each showing: type badge (credit/debit), description, amount (green +/red -), date, status badge (completed/pending/failed)
+- **Referral Earnings Tab**: Table with referral commission transactions, booking details
+
+### 4. Bookings (`/bookings`)
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Tabs (12 tabs), B2VideoPlayer, ImagePreviewModal
+
+**Tabs**: Video Bookings | Greeting Cards | Music | Image+Music | Occasions | Wishes | Photo Wishes | Calls | Text-to-Speech | Sound Effects | Voice Conversion | Audio Isolation
+
+Each tab shows a list of cards with:
+- Status Badge (pending/processing/completed/failed)
+- Celebrity name + image (where applicable)
+- Date created
+- Type-specific content: video player, image preview (max-h-400px object-contain), audio player, download button
+- Real-time updates via Supabase subscriptions
+
+### 5. Favorites (`/following`)
+**Components**: Card, CardContent, CardTitle, CardDescription, CardHeader, Heart, Search, Star, CheckCircle, IndianRupee, Sparkles, Input, Button, Badge, Tabs, PaymentMethodSelector
+
+**Layout**:
+- **Tabs**: "Browse Celebrities" | "My Favorites"
+- **Browse Tab**: Search input, celebrity grid cards with image (96x96 rounded), name, category, rating, verified badge, subscription price, "Subscribe" button
+- **My Favorites Tab**: List of subscribed celebrities with image, name, category, date subscribed, "Unsubscribe" option
+- **PaymentMethodSelector**: Modal to choose Wallet or Razorpay payment
+
+### 6. Wish Orders (`/wish-orders`)
+**Components**: Card, CardContent, CardHeader, CardTitle, Button, Badge, Loader2
+
+**Layout**:
+- Header: "My Wish Orders"
+- List of order cards each showing:
+  - Celebrity image + name
+  - Occasion name
+  - Status Badge (pending/processing/completed)
+  - Generated card image preview (if completed)
+  - "Download" button, "View" button (Eye icon)
+  - Date created
+
+### 7. Messages (`/messages`)
+**Components**: Card, Input, ScrollArea, ConversationList, ChatView, Button
+
+**Layout**:
+- **Mobile**: Either conversation list OR chat view (not both)
+- **Desktop**: Two-column split — conversation list (left, ~1/3) + chat view (right, ~2/3)
+- **Conversation List**: Search input with Search icon, list of conversation items with celebrity avatar, name, last message preview, unread count badge, timestamp
+- **Chat View**: Header with celebrity name + avatar, ScrollArea of message bubbles (user = right-aligned, celebrity = left-aligned), input bar with text input + send button, "Back" button on mobile
+- **Empty State**: MessageCircle icon, "No conversations yet", "Explore Celebrities" button
+
+### 8. Loved Ones (`/loved-ones`)
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input, Label, Textarea, Select, Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Badge
+
+**Layout**:
+- Header: "My Loved Ones" + "Add Loved One" button (Plus icon)
+- **List**: Cards for each person showing name, relationship badge, email, phone, date of birth, "Manage Occasions" button, Edit/Delete icons
+- **Add/Edit Dialog**: Form with inputs: First Name, Last Name, Email, Phone, Date of Birth (date input), Relationship select (Parent/Sibling/Friend/Spouse/Child/Colleague/Other), Notes textarea
+- **Occasions Dialog**: List of occasions per person (name, date, type badge), "Add Occasion" form with name input, date input, type select (Birthday/Anniversary/Wedding/Graduation/Custom)
+
+### 9. AI Music (`/music-studio`)
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input, Label, Textarea, Select, Tabs (7 tabs), Slider, AudioRecorderButton
+
+**7 Tabs**:
+1. **Text to Speech**: Voice Select dropdown, Text textarea, "Generate Speech" button (₹50). Output: audio player + download
+2. **Voice Conversion**: Upload audio OR Record audio (AudioRecorderButton), Voice Select, "Convert Voice" button (₹75). Output: audio player + download
+3. **Sound Effects**: Description textarea, Duration Slider (1-30s), "Generate" button (₹60). Output: audio player + download
+4. **Audio Isolation**: Upload audio OR Record audio, "Isolate Vocals" button (₹40). Output: audio player + download
+5. **Music Generation**: Title input, Genre select (pop/rock/jazz/classical/electronic/ambient/hip-hop/r&b), Mood select (happy/sad/energetic/calm/romantic/epic), Description textarea, Lyrics textarea with "AI Generate Lyrics" button, Voice Type radio (Instrumental/AI Voice/Cloned Voice), "Generate Music" button (₹100-150). Output: audio player + download
+6. **Clone Voice**: Upload audio OR Record audio, Voice Name input, Description input, "Clone Voice" button (₹150). Output: success message + voice appears in selects
+7. **Image + Music**: Image upload with preview, Description input, Genre/Mood selects, Lyrics textarea, Duration slider, Audio source toggle (Generate/Upload), "Create" button (₹120). Output: image with audio, optional video creation
+
+**AudioRecorderButton** (shared component):
+- Idle: Mic icon button "Start Recording"
+- Recording: Red pulsing dot, timer (0:00), "Stop Recording" button
+- Preview: HTML5 audio player, duration, "Use This Recording" + "Re-record" buttons
+- Max 5 minutes, auto-stop with toast
+
+### 10. Photo Wish (`/photo-wish`)
+**Components**: Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label, Textarea, Select, Tabs, Badge, PricingDisplay
+
+**Layout**:
+- **Stats Row**: 3 cards — Wallet Balance, Today's Generations, Total Created
+- **Tabs**: "Create" | "History"
+- **Create Tab**: Image upload area (click-to-upload, drag zone), Occasion Select (15 options), Recipient Name input, Sender Name input, Wish Message textarea, Text Style select (Elegant/Playful/Modern/Classic/Festive with descriptions), Pricing display with discount, "Generate Photo Wish" button
+- **History Tab**: Grid of generated photo wish cards with image preview, occasion badge, status badge, date, download button
+
+### 11. Wish a Celebrity (`/wish-a-celebrity`)
+**Components**: Card, CardContent, Button, Input, Badge, Heart, Search, Star, CheckCircle, Lock
+
+**Layout**:
+- Header: "Wish Your Favorite Celebrity"
+- Search input
+- Celebrity grid: Cards with image (96x96), name, category, rating, verified badge
+- Subscribed celebrities: "Send Wish" button → navigates to `/wish-booking/:celebrityId`
+- Unsubscribed: Lock icon overlay, "Subscribe First" message
+
+### 12. Wish a Friend (`/celebrities` — same as Browse Celebrities)
+See #16 below.
+
+### 13. For Business (`/celebrities` — redirects to Browse)
+Same as #16.
+
+### 14. Greeting Cards (`/greeting-cards`)
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input, Label, Textarea, Select, Checkbox, Tabs, Badge, Alert, AlertDescription, PricingDisplay
+
+**Layout**:
+- **Tabs**: "Create Card" | "My Cards"
+- **Create Tab**: Occasion Select (12 options), Recipient Name input, Sender Name input, Prompt textarea (card description), "Refine with AI" checkbox, Reference Image section (None/Upload/URL radio), Wallet balance display, Pricing with discount, "Generate Card" button with Sparkles icon
+- **Generated Card Preview**: Large image display, Download button
+- **My Cards Tab**: Grid of previous cards with image thumbnail, occasion badge, date, status badge, download button
+
+### 15. Image Promotions (`/image-promotions`)
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Input, Label, Textarea, Select, Tabs, Badge, Alert, AlertDescription, PricingDisplay
+
+**Layout**:
+- **Tabs**: "Create Promotion" | "My Promotions"
+- **Create Tab**: Celebrity Select (from favorites only, shows Lock icon if none), Concept/Idea textarea, Branding Details textarea, Reference Image section (None/Upload/URL), Pricing display with discount, "Generate Promotion" button
+- Requires celebrity subscription (shows alert if no favorites)
+- **Generated Preview**: Large image, Download button
+- **My Promotions Tab**: Grid of history with image, celebrity name, date, status
+
+### 16. Browse Celebrities (`/celebrities`)
+**Components**: Card, CardContent, Button, Input, Badge, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Link
+
+**Layout**:
+- Header: "Discover Celebrities"
+- **Search**: Input with Search icon
+- **Filters** (collapsible): Category Select (All/Actors/Musicians/Influencers/Athletes/Politicians), Delivery Time Select (All/Under 24h/24-48h/48-72h/1 week+)
+- **Celebrity Grid**: Cards with image (full-width top), name, category, Star rating, verified Badge, delivery time text, service icons (Video/MessageSquare/ImageIcon). Click → `/celebrity/:id`
+- **Pagination**: Previous/Next buttons, page counter
+- **Celebrity Profile Page** (`/celebrity/:id`): Tabs — Overview (bio, stats, rating), Services (BookAServiceSection with pricing gate), Events, Media gallery. Subscribe button with SubscriptionGate modal.
+
+### 17. Referrals (`/referrals`)
+**Components**: Card, CardContent, CardHeader, CardTitle, Button, Input, Badge, Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+
+**Layout**:
+- **Stats Row**: 4 cards — Total Referrals, Total Earnings (₹), Pending Earnings, L1/L2 counts
+- **Referral Code Section**: Code display with Copy button, Share2 icon
+- **Commission Rates Card**: Shows L1 and L2 percentages based on plan
+- **Referral History Table**: Columns — Referred User, Level, Commission Amount, Status Badge, Date
+- **CTA**: "Upgrade Plan" button linking to `/plan`
+
+### 18. Commission (`/commission`)
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Badge, Button, Input, Label
+
+**Layout**:
+- **Summary Cards**: Total Referral Earned, Total Celebrity Earned, Total TDS Deducted
+- **Date Filter**: Start Date + End Date inputs
+- **Referral Commissions List**: Cards showing booking ID, level (L1/L2) badge, amount, status badge, date
+- **Celebrity Commissions List** (if celebrity): Cards showing gross amount, TDS percentage, TDS amount, net amount, description, date
+
+### 19. Occasions (`/occasions`)
+**Components**: Card, CardContent, CardHeader, CardTitle, Button, Calendar icon, ArrowRight icon
+
+**Layout**:
+- Hero: "Celebrate Special Occasions" heading, subtitle
+- **Featured Occasions**: Large cards (2-col) with full-width image (h-64), gradient overlay, occasion name + description on image, date with Calendar icon, "Book Now" button
+- **All Upcoming Occasions**: 4-col grid, smaller cards with image (h-48), title, description (line-clamp-2), date, "Book for Free" button
+- **Info Banner**: Gradient purple/pink banner — "Book UNLIMITED celebrity videos for every occasion for FREE"
+
+### 20. Occasion Alerts (`/occasion-alerts`)
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Button, Badge, Switch
+
+**Layout**:
+- Header: "Occasion Alerts" with Bell icon
+- List of alert cards showing:
+  - Occasion name + type badge (Birthday/Anniversary/Custom)
+  - Date display with Calendar icon
+  - Loved one name or Celebrity name
+  - "Alert Enabled" Switch toggle
+  - "Auto-send Enabled" Switch toggle
+  - Days before alert number
+  - Status indicators (upcoming = green, past = gray)
+
+### 21. Settings (`/settings`) — in sidebar footer
+**Components**: Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label, Button, Avatar, AvatarFallback, AvatarImage, Tabs, TabsContent, TabsList, TabsTrigger
+
+**Layout**:
+- **Tabs**: "Profile" | "Security"
+- **Profile Tab**: Avatar with camera upload overlay, First Name input, Last Name input, Email (read-only), Phone input with validation, "Save Changes" button
+- **Security Tab**: Current Password input, New Password input, Confirm Password input, "Change Password" button
+
+---
+
+## Shared UI Components Used Across Pages
+
+| Component | From | Usage |
+|-----------|------|-------|
+| Button | shadcn/ui | Primary actions, variants: default/outline/ghost/secondary/destructive |
+| Card, CardContent, CardHeader, CardTitle, CardDescription | shadcn/ui | Content containers everywhere |
+| Input | shadcn/ui | Text inputs, search bars |
+| Label | shadcn/ui | Form field labels |
+| Textarea | shadcn/ui | Multi-line inputs (messages, descriptions) |
+| Select, SelectContent, SelectItem, SelectTrigger, SelectValue | shadcn/ui | Dropdowns (categories, occasions, etc.) |
+| Badge | shadcn/ui | Status pills, category labels, verified marks |
+| Tabs, TabsContent, TabsList, TabsTrigger | shadcn/ui | Multi-section pages (Bookings has 12 tabs) |
+| Dialog, DialogContent, DialogHeader, DialogTitle | shadcn/ui | Modal dialogs (add/edit forms, payment) |
+| Avatar, AvatarFallback, AvatarImage | shadcn/ui | User/celebrity profile pictures |
+| Switch | shadcn/ui | Toggle controls (alerts, auto-send) |
+| ScrollArea | shadcn/ui | Scrollable containers (chat messages) |
+| Slider | shadcn/ui | Range inputs (duration, effects) |
+| Calendar | shadcn/ui | Date picker |
+| Popover, PopoverContent, PopoverTrigger | shadcn/ui | Floating panels (calendar popup) |
+| RadioGroup, RadioGroupItem | shadcn/ui | Single-choice selection |
+| Checkbox | shadcn/ui | Multi-choice toggles |
+| Table, TableBody, TableCell, TableHead, TableHeader, TableRow | shadcn/ui | Data tables (referrals, commissions) |
+| Alert, AlertDescription | shadcn/ui | Warning/info banners |
+| Separator | shadcn/ui | Visual dividers |
+| Toast/Sonner | shadcn/ui | Notification popups |
+| Loader2 (lucide) | lucide-react | Spinning loader icon |
+
+## Icons Library
+All icons from **lucide-react**. Most used: Star, Heart, Phone, Music, Wallet, Users, Send, Search, Filter, Calendar, Download, Upload, Loader2, CheckCircle, XCircle, Eye, Copy, Share2, TrendingUp, Bell, Lock, Sparkles, Wand2, Video, ImageIcon, MessageSquare, ArrowRight, Plus, Edit, Trash2, Mic.
+
+## Design Tokens
+- **Primary gradient**: `bg-gradient-primary` = linear-gradient(90deg, #FF6B33, #E8527A, #B44CFF)
+- **Border radius**: 12px (rounded-xl) default for cards/inputs on mobile
+- **Dark mode default**: Deep Navy #1E283E background
+- **Fonts**: Inter (UI), Playfair Display (headlines)
+- **Currency**: Indian Rupees (₹) throughout
+
