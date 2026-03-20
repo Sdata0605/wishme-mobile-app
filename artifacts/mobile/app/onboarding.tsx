@@ -21,28 +21,28 @@ const SLIDES = [
     key: '1',
     title: 'Wish a Friend',
     desc: 'Send personalized video wishes to your loved ones from their favorite stars',
-    image: 'https://picsum.photos/seed/wish1/800/1200',
+    image: require('@/assets/images/splash1.jpeg'),
     gradient: ['transparent', 'rgba(255,107,51,0.9)'] as const,
   },
   {
     key: '2',
     title: 'Wish a Celebrity',
     desc: 'Get personalized video messages from your favorite celebrities',
-    image: 'https://picsum.photos/seed/wish2/800/1200',
+    image: require('@/assets/images/splash2.jpeg'),
     gradient: ['transparent', 'rgba(180,76,255,0.9)'] as const,
   },
   {
     key: '3',
     title: 'Make Promotion Ads',
     desc: 'Create professional promotion videos with celebrity endorsements',
-    image: 'https://picsum.photos/seed/wish3/800/1200',
+    image: require('@/assets/images/splash3.jpeg'),
     gradient: ['transparent', 'rgba(232,82,122,0.9)'] as const,
   },
   {
     key: '4',
     title: 'UGC Videos',
     desc: 'User-generated content videos with celebrity collaborations',
-    image: 'https://picsum.photos/seed/wish4/800/1200',
+    image: require('@/assets/images/splash4.jpeg'),
     gradient: ['transparent', 'rgba(75,0,130,0.95)'] as const,
   },
 ];
@@ -98,7 +98,7 @@ function SlideScreen({
   return (
     <Animated.View style={[styles.slide, { opacity }]}>
       <Animated.Image
-        source={{ uri: slide.image }}
+        source={slide.image}
         style={[StyleSheet.absoluteFill, { transform: [{ scale: imageScale }] }]}
         resizeMode="cover"
       />
