@@ -129,7 +129,7 @@ export default function LovedOnesScreen() {
     const fullName = [draft.firstName, draft.lastName].filter(Boolean).join(' ') || 'New Person';
     if (editTarget) {
       setItems(prev => prev.map(it => it.id === editTarget.id
-        ? { ...it, name: fullName, relation: draft.relation, email: draft.email, phone: draft.phone, birthday: draft.dob || it.birthday, notes: draft.notes }
+        ? { ...it, name: fullName, relation: draft.relation, email: draft.email, phone: draft.phone, birthday: draft.dob.trim() || null, notes: draft.notes }
         : it));
     } else {
       setItems(prev => [...prev, { id: `lo${Date.now()}`, name: fullName, relation: draft.relation, birthday: draft.dob || null, anniversary: null, email: draft.email, phone: draft.phone, notes: draft.notes }]);

@@ -68,7 +68,7 @@ export default function WishOrdersScreen() {
                 )}
                 <TouchableOpacity
                   style={[s.actionBtn, { backgroundColor: colors.muted, borderColor: colors.border, flex: item.status === 'Completed' ? 0 : 1 }]}
-                  onPress={() => router.push({ pathname: '/booking/[id]', params: { id: item.id } } as never)}
+                  onPress={() => router.push({ pathname: '/booking/[id]', params: { id: item.celebrityId } } as never)}
                 >
                   <Icon name="eye" size={14} color={colors.foreground} />
                   <Text style={[s.actionBtnText, { color: colors.foreground }]}>View</Text>
