@@ -165,18 +165,22 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
           <View style={styles.quickGrid}>
-            {QUICK_ACTIONS.map((action) => (
-              <TouchableOpacity
-                key={action.label}
-                style={[styles.quickItem, { backgroundColor: colors.card }]}
-                onPress={() => router.push(action.route as any)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.quickIcon, { backgroundColor: action.color + '20' }]}>
-                  <Feather name={action.icon as any} size={24} color={action.color} />
-                </View>
-                <Text style={[styles.quickLabel, { color: colors.foreground }]}>{action.label}</Text>
-              </TouchableOpacity>
+            {[0, 1].map((row) => (
+              <View key={row} style={styles.quickRow}>
+                {QUICK_ACTIONS.slice(row * 3, row * 3 + 3).map((action) => (
+                  <TouchableOpacity
+                    key={action.label}
+                    style={[styles.quickItem, { backgroundColor: colors.card }]}
+                    onPress={() => router.push(action.route as any)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.quickIcon, { backgroundColor: action.color + '20' }]}>
+                      <Feather name={action.icon as any} size={24} color={action.color} />
+                    </View>
+                    <Text style={[styles.quickLabel, { color: colors.foreground }]}>{action.label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
             ))}
           </View>
         </View>
@@ -309,7 +313,8 @@ const styles = StyleSheet.create({
   dotRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ccc' },
   dotActive: { backgroundColor: '#FF6B33', width: 16 },
-  quickGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 10 },
+  quickGrid: { paddingHorizontal: 16 },
+  quickRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   quickItem: { width: (W - 52) / 3, alignItems: 'center', padding: 14, borderRadius: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },
   quickIcon: { width: 52, height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
   quickLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center', lineHeight: 16 },
