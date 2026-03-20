@@ -46,7 +46,7 @@ export default function WishCelebrityScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
-        <Text style={[s.headerTitle, { color: colors.foreground }]}>Wish a Celebrity</Text>
+        <Text style={[s.headerTitle, { color: colors.foreground }]}>Wish Your Favorite Celebrity</Text>
         <View style={{ width: 22 }} />
       </View>
 

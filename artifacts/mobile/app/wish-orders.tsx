@@ -93,7 +93,7 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   card: { borderRadius: 16, borderWidth: 1, padding: 14, gap: 12 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  celebImg: { width: 64, height: 64, borderRadius: 12 },
+  celebImg: { width: 64, height: 64, borderRadius: 32 },
   celebName: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 2 },
   occasion: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 4 },
   price: { fontSize: 14, fontFamily: 'Inter_700Bold' },
