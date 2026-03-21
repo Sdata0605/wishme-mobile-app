@@ -65,7 +65,7 @@ function InputField({
           style={[
             styles.input,
             { color: colors.foreground, fontFamily: 'Inter_400Regular' },
-            multiline && { minHeight: 80, textAlignVertical: 'top' },
+            multiline && { height: undefined, minHeight: 80, textAlignVertical: 'top' },
           ]}
           placeholder={placeholder}
           placeholderTextColor={colors.mutedForeground}
@@ -385,7 +385,7 @@ type AppStatus = 'pending' | 'approved' | 'rejected' | null;
 function CelebrityTab() {
   const { colors } = useTheme();
 
-  const [appStatus, setAppStatus] = useState<AppStatus>('pending');
+  const [appStatus, setAppStatus] = useState<AppStatus>(null);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
