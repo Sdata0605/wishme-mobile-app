@@ -1,0 +1,1224 @@
+Auth Page (/auth) — Complete Mobile View Documentation
+Route: /auth
+File: src/pages/Auth.tsx
+GLOBAL STRUCTURE (Mobile)
+
+┌─────────────────────────────┐
+│  Sticky Header               │
+│  ┌─────────────────────────┐ │
+│  │ "StarConnect" (gradient) │ │
+│  │ subtitle text            │ │
+│  └─────────────────────────┘ │
+│  ┌───────┬───────┬──────────┐│
+│  │Sign In│Sign Up│ Celebrity ││
+│  └───────┴───────┴──────────┘│
+├─────────────────────────────┤
+│  Scrollable Content          │
+│  ┌─────────────────────────┐ │
+│  │ Auth Card (form)         │ │
+│  └─────────────────────────┘ │
+│  ┌─────────────────────────┐ │
+│  │ Featured Celebrities     │ │
+│  └─────────────────────────┘ │
+│  ┌─────────────────────────┐ │
+│  │ Why Choose StarConnect?  │ │
+│  └─────────────────────────┘ │
+├─────────────────────────────┤
+│  Footer + MobileBottomNav    │
+└─────────────────────────────┘
+TAB NAVIGATION (Custom, not shadcn Tabs)
+Container: div with flex bg-muted rounded-xl p-1
+3 <button> elements, each flex-1 py-3 text-sm font-medium rounded-lg
+Active state: bg-background text-foreground shadow-sm
+Inactive state: text-muted-foreground hover:text-foreground
+Tabs: "Sign In" | "Sign Up" | "Celebrity"
+State variable: activeTab (values: "signin", "signup", "celebrity")
+TAB 1: SIGN IN
+Default View (authView === 'main')
+Header text:
+
+h2: "Welcome Back!" (text-xl font-bold)
+p: "Sign in to your account" (text-sm text-muted-foreground)
+Form elements (<form onSubmit={handleSignIn}>):
+
+Element	Component	Props	Styling
+Email Label	<Label>	htmlFor="signin-emailOrPhone"	default
+Email Input	<Input>	id="signin-emailOrPhone", name="emailOrPhone", type="email", placeholder="your@email.com", required	className="h-12 rounded-xl"
+Password Label	<Label>	htmlFor="signin-password"	Wrapped in flex justify-between div
+Forgot Password link	<button type="button">	onClick → setAuthView('forgot-password')	text-xs text-primary hover:text-primary/80 font-medium
+Password Input	<Input>	id="signin-password", name="password", type="password", required	className="h-12 rounded-xl"
+Submit Button	<Button>	type="submit", disabled={isLoading}	className="w-full h-12 rounded-xl"
+Loading spinner	<Loader2>	className="w-4 h-4 mr-2 animate-spin"	Only shown when isLoading
+Submit button text: "Sign In"
+
+Below form:
+
+Text: "Are you a celebrity?" + button "Register here" → switches to celebrity tab
+Sign In API Flow
+Step 1: Supabase Auth
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/auth/v1/token?grant_type=password
+Request Body:
+
+
+{
+  "email": "user@example.com",
+  "password": "userpassword"
+}
+Success Response (200):
+
+
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "expires_in": 3600,
+  "expires_at": 1773955000,
+  "refresh_token": "abc123...",
+  "user": {
+    "id": "uuid-here",
+    "aud": "authenticated",
+    "role": "authenticated",
+    "email": "user@example.com",
+    "email_confirmed_at": "2026-03-20T10:00:00Z",
+    "phone": "",
+    "confirmed_at": "2026-03-20T10:00:00Z",
+    "user_metadata": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "phone": "+919876543210"
+    },
+    "app_metadata": { "provider": "email", "providers": ["email"] },
+    "created_at": "2026-03-20T10:00:00Z",
+    "updated_at": "2026-03-20T10:00:00Z"
+  }
+}
+Error Response (400):
+
+
+{
+  "error": "invalid_grant",
+  "error_description": "Invalid login credentials"
+}
+Step 2: Post-login redirect logic After successful sign-in, the app queries:
+
+GET /rest/v1/profiles?select=id&user_id=eq.{user.id}
+Then:
+
+GET /rest/v1/celebrities?select=id&profile_id=eq.{profile.id}
+If celebrity found → navigate /celebrity-dashboard
+Else → navigate /dashboard
+Forgot Password View (authView === 'forgot-password')
+Header row:
+
+<Button variant="ghost" size="icon"> with <ArrowLeft> icon → goes back to main
+<KeyRound> icon (w-5 h-5 text-primary)
+h2: "Forgot Password" (text-lg font-bold)
+Subtitle: "Choose how you'd like to reset your password"
+
+Reset Method Selection (<RadioGroup>):
+
+Two side-by-side radio options in styled labels
+Each label: flex-1 flex items-center gap-3 p-3 rounded-xl border-2
+Active: border-primary bg-primary/5
+Inactive: border-border hover:border-primary/40
+Option	Icon	Label
+email	<Mail> (w-4 h-4 text-primary)	"Email"
+sms	<Phone> (w-4 h-4 text-primary)	"Phone"
+If method = "email":
+
+Label: "Email Address"
+Input: type="email", placeholder="your@email.com", h-12 rounded-xl
+If method = "sms":
+
+Label: "Phone Number"
+Input: type="tel", placeholder="+91 9876543210", h-12 rounded-xl
+Helper text: "We'll send the reset link to the email associated with this number"
+Error display:
+
+div with flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg
+<AlertCircle> icon + error message
+Submit button: "Send Reset Link" (w-full h-12 rounded-xl)
+
+Success state (forgotSent = true):
+
+Green circle: w-16 h-16 rounded-full bg-primary/10 with <CheckCircle> (w-8 h-8 text-primary)
+h3: "Reset Link Sent!"
+Message text varies by method
+"Back to Sign In" button (variant="outline" w-full h-12 rounded-xl)
+Forgot Password API
+Email method:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/auth/v1/recover
+Request Body:
+
+
+{
+  "email": "user@example.com",
+  "redirect_to": "https://wishmefinal.lovable.app/reset-password"
+}
+Response (200): {} (empty - Supabase sends email silently)
+
+Phone method — Step 1: Look up email by phone:
+
+GET /rest/v1/profiles?select=email&phone=eq.+919876543210
+Response:
+
+
+{ "email": "user@example.com" }
+Then sends same recover request with found email.
+
+Error if no account: "No account found with this phone number"
+
+TAB 2: SIGN UP
+Step 1: Form (signUpStep === 'form')
+Header:
+
+h2: "Create Account" (text-xl font-bold)
+p: "Join Wish Me and start connecting" (text-sm text-muted-foreground)
+Form elements (<form onSubmit={handleSignUpFormSubmit}>):
+
+#	Element	Component	Props	Styling
+1	First Name	<Input>	id="firstName", name="firstName", placeholder="John", required	h-12 rounded-xl, inside 2-col grid
+2	Last Name	<Input>	id="lastName", name="lastName", placeholder="Doe", required	h-12 rounded-xl, inside 2-col grid
+3	Email	<Input>	id="signup-email", name="email", type="email", placeholder="your@email.com", required	h-12 rounded-xl, red border if emailError
+3a	Email Error	<p>	—	text-sm text-destructive with <AlertCircle w-3 h-3>
+4	Phone	<Input>	id="signup-phone", name="phone", type="tel", placeholder="+91 98765 43210", required	h-12 rounded-xl, red border if phoneError
+4a	Phone Error	<p>	—	text-sm text-destructive with <AlertCircle w-3 h-3>
+4b	Phone Helper	<p>	—	text-xs text-muted-foreground "Enter 10-digit Indian mobile number"
+5	Password	<PasswordStrengthMeter>	password, onPasswordChange, onValidityChange, id="signup-password", name="password"	className="h-12 rounded-xl"
+6	Referral Code	<Input>	id="referralCode", name="referralCode", placeholder="Enter referral code", optional	h-12 rounded-xl
+7	Submit	<Button>	type="submit", disabled={isLoading || !isPasswordValid}	w-full h-12 rounded-xl
+Submit button text: "Continue to Verification"
+
+PasswordStrengthMeter Component (embedded in form)
+File: src/components/auth/PasswordStrengthMeter.tsx
+
+Elements:
+
+Label with <Shield> icon: "Password"
+"Generate Strong Password" ghost button with <Sparkles> icon
+Password input with show/hide toggle (<Eye>/<EyeOff>) and copy button (<Copy>)
+Progress bar (<Progress> component, h-2)
+Strength label: "Very Weak" / "Weak" / "Fair" / "Strong" / "Very Strong"
+Requirements checklist in bg-muted/50 rounded-lg p-3:
+"At least 12 characters" — regex: /.{12,}/
+"One uppercase letter (A-Z)" — regex: /[A-Z]/
+"One lowercase letter (a-z)" — regex: /[a-z]/
+"One number (0-9)" — regex: /[0-9]/
+"One special character (!@#$%^&*)" — regex: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/
+Each requirement shows <Check> (green) or <X> (gray)
+Password valid only when score >= 5 (all requirements met)
+Sign-Up Validation (before OTP)
+Email validation (validateEmail):
+
+Regex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+Error: "Please enter a valid email address"
+Phone validation (validatePhone):
+
+Regex: /^(\+91|91)?[6-9]\d{9}$/ (strips spaces/dashes first)
+Error: "Please enter a valid Indian phone number (10 digits starting with 6-9)"
+Password validation (checkPasswordStrength):
+
+Must pass all 5 requirements (score >= 5)
+Also checks common patterns (password, qwerty, 123456, etc.) and repeated chars
+Phone duplicate check API:
+
+GET /rest/v1/profiles?select=id&or=(phone.eq.9876543210,phone.eq.+919876543210)&limit=1
+Response if exists:
+
+
+{ "id": "some-uuid" }
+Error shown: "This phone number is already registered. Please login."
+
+Step 2: OTP Verification (signUpStep === 'otp')
+File: src/components/auth/OTPVerification.tsx
+
+Header:
+
+h2: "Verify Your Email" (text-xl font-bold)
+p: "Complete verification to create your account" (text-sm)
+OTP Component elements:
+
+Element	Component	Details
+Mail icon circle	div w-14 h-14 bg-primary/10 rounded-full	<Mail> w-7 h-7 text-primary
+Title	h3	"Verify Your Email"
+Email display	<span>	Shows the email address
+OTP Input	<InputOTP> with 6 <InputOTPSlot>	maxLength=6, auto-verifies when 6 digits entered
+Error message	div	<AlertCircle> icon + error text, text-destructive
+Verify button	<Button>	"Verify Email", disabled until 6 digits, shows Loader2
+Resend section	text + <Button variant="ghost">	"Didn't receive the code?" + "Resend in Xs" or "Resend Code" with <RefreshCw> icon
+Back button	<Button variant="outline">	"Back to Registration"
+Success state (isVerified):
+
+Green circle: w-16 h-16 bg-green-500/10 with <CheckCircle2> w-8 h-8 text-green-500
+h3: "Email Verified!"
+p: "Your email has been successfully verified."
+OTP API Endpoints
+1. Send OTP:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/send-email-otp
+Headers:
+
+
+{
+  "Content-Type": "application/json",
+  "apikey": "eyJhbGciOiJIUzI1NiIs...",
+  "authorization": "Bearer eyJhbGciOiJIUzI1NiIs..."
+}
+Request Body:
+
+
+{
+  "email": "newuser@example.com"
+}
+Success Response (200):
+
+
+{
+  "success": true,
+  "message": "OTP sent successfully"
+}
+Error — Email already exists (409):
+
+
+{
+  "success": false,
+  "error": "email_exists",
+  "message": "An account with this email already exists. Please login."
+}
+Error — Rate limited / Cooldown (429):
+
+
+{
+  "success": false,
+  "error": "Please wait 25 seconds before requesting a new code.",
+  "retryAfter": 25
+}
+Error — Too many requests (429):
+
+
+{
+  "success": false,
+  "error": "Too many OTP requests. Please try again later."
+}
+Error — Invalid email (400):
+
+
+{
+  "success": false,
+  "error": "Invalid email format"
+}
+2. Verify OTP:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/verify-email-otp
+Request Body:
+
+
+{
+  "email": "newuser@example.com",
+  "otp": "123456"
+}
+Success Response (200):
+
+
+{
+  "verified": true,
+  "message": "Email verified successfully"
+}
+Error — Invalid code (400):
+
+
+{
+  "verified": false,
+  "error": "Invalid verification code"
+}
+Error — Already used (400):
+
+
+{
+  "verified": false,
+  "error": "This code has already been used"
+}
+Error — Expired (400):
+
+
+{
+  "verified": false,
+  "error": "This code has expired. Please request a new one."
+}
+Error — Bad format (400):
+
+
+{
+  "verified": false,
+  "error": "Invalid OTP format"
+}
+After OTP Verified → Create Account
+Supabase Auth Sign Up:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/auth/v1/signup
+Request Body:
+
+
+{
+  "email": "newuser@example.com",
+  "password": "SecurePass123!@",
+  "options": {
+    "emailRedirectTo": "https://wishmefinal.lovable.app/",
+    "data": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "phone": "+919876543210",
+      "referral_code": "ABC123",
+      "referred_by": "referrer-profile-uuid-or-null"
+    }
+  }
+}
+Success Response (200):
+
+
+{
+  "id": "new-user-uuid",
+  "aud": "authenticated",
+  "role": "authenticated",
+  "email": "newuser@example.com",
+  "email_confirmed_at": null,
+  "phone": "",
+  "confirmed_at": null,
+  "user_metadata": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "phone": "+919876543210",
+    "referral_code": "ABC123",
+    "referred_by": "referrer-uuid"
+  },
+  "app_metadata": { "provider": "email", "providers": ["email"] },
+  "created_at": "2026-03-21T07:00:00Z"
+}
+Post-signup: WhatsApp Welcome (fire-and-forget):
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/send-whatsapp-welcome
+Body:
+
+
+{
+  "phone": "+919876543210",
+  "firstName": "John"
+}
+Post-signup: Welcome Message Trigger (fire-and-forget):
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/trigger-message-event
+Body:
+
+
+{
+  "event_key": "USER_REGISTERED",
+  "email": "newuser@example.com",
+  "phone": "+919876543210",
+  "variables": {
+    "first_name": "John",
+    "email": "newuser@example.com"
+  }
+}
+After success → navigate to /dashboard
+
+TAB 3: CELEBRITY
+Mobile View in Auth Page
+Header:
+
+h2: "Join as Celebrity" (text-xl font-bold)
+p: "Connect with your fans directly" (text-sm text-muted-foreground)
+Elements:
+
+<Link to="/celebrity-signup"> wrapping <Button className="w-full h-12 rounded-xl"> with <Star> icon + "Register as Celebrity"
+Helper: "Already registered? Use the sign in form above"
+This navigates to the full Celebrity Signup page at /celebrity-signup.
+
+Celebrity Signup Page (/celebrity-signup)
+File: src/pages/CelebritySignup.tsx
+
+Mobile layout (md:hidden):
+
+Header section:
+
+h1: "Join as a" + "Celebrity" (gradient text), text-3xl
+Subtitle: "Turn your influence into income. Connect with fans and earn money"
+Benefits cards (3 items, stacked): Each card has icon (w-8 h-8 text-primary) + title (font-semibold text-sm) + description (text-xs)
+
+Icon	Title	Description
+TrendingUp	Earn Extra Income	Monetize your fame...
+Users	Connect with Fans	Build deeper relationships...
+Star	Flexible Schedule	Work on your own time...
+Application Form sections:
+
+1. Personal Information:
+
+Field	Component	ID	Props
+First Name*	<Input>	mobileFirstName	placeholder="Your first name", required
+Last Name*	<Input>	mobileLastName	placeholder="Your last name", required
+Email*	<Input>	mobileEmail	type="email", placeholder="your@email.com", required
+Phone*	<Input>	mobilePhone	type="tel", placeholder="+91 98765 43210", required
+Date of Birth*	<Input>	mobileDob	type="date", required
+First/Last Name are in a 2-col grid (grid-cols-2 gap-3).
+
+2. Professional Info:
+
+Field	Component	ID	Props
+Stage Name*	<Input>	mobileStageName	placeholder="How fans know you", required
+Category*	<Select>	—	Fetches from celebrity_categories table
+Professional Bio*	<Textarea>	mobileBio	placeholder="Tell us about...", min-h-[100px], required
+Key Achievements	<Textarea>	mobileAchievements	placeholder="Awards, recognitions...", min-h-[80px]
+Category Select options — fetched dynamically:
+
+GET /rest/v1/celebrity_categories?select=id,name&is_active=eq.true&order=name
+Response:
+
+
+[
+  { "id": "uuid-1", "name": "Actor/Actress" },
+  { "id": "uuid-2", "name": "Comedian" },
+  { "id": "uuid-3", "name": "Musician" },
+  { "id": "uuid-4", "name": "Influencer" }
+]
+3. Social Media:
+
+Field	Icon	Placeholder
+Instagram	<Instagram>	"Instagram @username"
+YouTube	<Youtube>	"YouTube channel"
+Twitter	<Twitter>	"Twitter @username"
+Each input has pl-10 with icon positioned absolute left-3 top-3.
+
+4. Pricing Note:
+
+Box: p-4 bg-muted/50 rounded-lg
+Text: "Service pricing will be set by our admin team..."
+5. Verification:
+
+Field	Component	ID
+Portfolio Link	<Input>	mobilePortfolio
+ID Upload	Styled div	Dashed border area with <Upload> icon
+Upload area: border-2 border-dashed border-border rounded-lg p-4 text-center
+
+6. Terms & Consent (Checkboxes):
+
+ID	Label
+mobileTerms	"I agree to the Terms of Service, Privacy Policy, and Celebrity Agreement"
+mobileBackground	"I consent to background verification and identity confirmation"
+Both use <Checkbox> component with <Label> (text-xs).
+
+Buttons:
+
+"🚀 Fill Sample Data" — bg-gradient-primary (dev/test helper)
+"Submit Complete Application" — variant="outline"
+Celebrity Application API
+Check existing application:
+
+GET /rest/v1/celebrity_applications?select=id,status&email=eq.celebrity@example.com
+Response if exists:
+
+
+{ "id": "app-uuid", "status": "pending" }
+Error messages:
+
+pending: "You already have a pending application. Please wait for admin approval."
+approved: "You already have an approved celebrity account. Please sign in."
+rejected: "Your previous application was rejected. Please contact support."
+Submit application:
+
+POST /rest/v1/celebrity_applications
+Request Body:
+
+
+{
+  "first_name": "John",
+  "last_name": "Doe",
+  "email": "celebrity@example.com",
+  "phone": "+91 9876543210",
+  "date_of_birth": "1990-01-15",
+  "stage_name": "Johnny Star",
+  "category": "Actor/Actress",
+  "bio": "Professional actor with 10+ years experience...",
+  "portfolio_link": "https://portfolio-example.com/johndoe",
+  "social_media": {
+    "instagram": "@johnnystar",
+    "youtube": "Johnny Star Official",
+    "twitter": "@johnnystar90",
+    "tiktok": "",
+    "facebook": "",
+    "linkedin": "",
+    "website": "",
+    "other": ""
+  }
+}
+Success Response (201): Returns the inserted row.
+
+After success: Toast "Application submitted successfully!" → navigate to / after 2 seconds.
+
+BELOW THE AUTH CARD (Mobile)
+Featured Celebrities Section
+Card: bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20
+  CardHeader → CardTitle: "Featured Celebrities" (centered)
+  CardContent → 2x2 grid (grid-cols-2 gap-4)
+    4 static placeholder items, each:
+      - div w-16 h-16 bg-gradient-primary rounded-full with Star icon (w-8 h-8)
+      - h4: "Celebrity {1-4}" (font-semibold text-sm)
+      - p: "Actor" (text-xs text-muted-foreground)
+Why Choose StarConnect? Section
+Card (default)
+  CardHeader → CardTitle: "Why Choose StarConnect?" (centered)
+  CardContent → 3 feature rows, each:
+    - Icon box: bg-primary/10 p-2 rounded-lg
+    - Title + description
+
+Features:
+1. Video icon → "Personal Videos" / "Custom messages for any occasion"
+2. Heart icon → "Direct Connection" / "Chat directly with your favorite stars"
+3. Shield icon → "Verified Celebrities" / "All stars are verified and authentic"
+SUPABASE BASE URL
+All API calls use:
+
+https://eqikeuqwbphwongtfzhe.supabase.co
+Headers for all REST API calls:
+
+
+{
+  "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y",
+  "authorization": "Bearer {same_anon_key_or_user_token}",
+  "Content-Type": "application/json",
+  "accept-profile": "public"
+}
+Edge function calls use the same apikey and authorization headers, sent to /functions/v1/{function-name}.
+
+COMPONENTS LIBRARY REFERENCE
+All from @/components/ui/ (shadcn/ui):
+
+Component	Used In
+Button	All forms, navigation
+Input	All text fields
+Label	All form labels
+Card, CardContent, CardHeader, CardTitle, CardDescription	Auth card, features, celebrities
+Tabs, TabsList, TabsTrigger, TabsContent	Desktop only (mobile uses custom buttons)
+RadioGroup, RadioGroupItem	Forgot password method selection
+Checkbox	Celebrity signup terms
+Select, SelectContent, SelectItem, SelectTrigger, SelectValue	Celebrity category
+Textarea	Celebrity bio/achievements
+Progress	Password strength bar
+InputOTP, InputOTPGroup, InputOTPSlot	OTP input (6 slots)
+Icons (all from lucide-react): UserPlus, LogIn, Star, Heart, Video, Shield, AlertCircle, ArrowLeft, Mail, Phone, KeyRound, CheckCircle, Loader2, Eye, EyeOff, Copy, Sparkles, Check, X, RefreshCw, CheckCircle2, TrendingUp, Users, Upload, Instagram, Youtube, Twitter
+
+I now have all the information needed. This isn't an implementation task — it's a documentation/research request. I'll provide the complete documentation directly.
+
+Here is the complete mobile view Auth documentation for Replit, covering every UI element, endpoint, payload, and response format:
+
+Auth Page (/auth) — Complete Mobile View Documentation
+Route: /auth
+File: src/pages/Auth.tsx
+GLOBAL STRUCTURE (Mobile)
+
+┌─────────────────────────────┐
+│  Sticky Header               │
+│  ┌─────────────────────────┐ │
+│  │ "StarConnect" (gradient) │ │
+│  │ subtitle text            │ │
+│  └─────────────────────────┘ │
+│  ┌───────┬───────┬──────────┐│
+│  │Sign In│Sign Up│ Celebrity ││
+│  └───────┴───────┴──────────┘│
+├─────────────────────────────┤
+│  Scrollable Content          │
+│  ┌─────────────────────────┐ │
+│  │ Auth Card (form)         │ │
+│  └─────────────────────────┘ │
+│  ┌─────────────────────────┐ │
+│  │ Featured Celebrities     │ │
+│  └─────────────────────────┘ │
+│  ┌─────────────────────────┐ │
+│  │ Why Choose StarConnect?  │ │
+│  └─────────────────────────┘ │
+├─────────────────────────────┤
+│  Footer + MobileBottomNav    │
+└─────────────────────────────┘
+TAB NAVIGATION (Custom, not shadcn Tabs)
+Container: div with flex bg-muted rounded-xl p-1
+3 <button> elements, each flex-1 py-3 text-sm font-medium rounded-lg
+Active state: bg-background text-foreground shadow-sm
+Inactive state: text-muted-foreground hover:text-foreground
+Tabs: "Sign In" | "Sign Up" | "Celebrity"
+State variable: activeTab (values: "signin", "signup", "celebrity")
+TAB 1: SIGN IN
+Default View (authView === 'main')
+Header text:
+
+h2: "Welcome Back!" (text-xl font-bold)
+p: "Sign in to your account" (text-sm text-muted-foreground)
+Form elements (<form onSubmit={handleSignIn}>):
+
+Element	Component	Props	Styling
+Email Label	<Label>	htmlFor="signin-emailOrPhone"	default
+Email Input	<Input>	id="signin-emailOrPhone", name="emailOrPhone", type="email", placeholder="your@email.com", required	className="h-12 rounded-xl"
+Password Label	<Label>	htmlFor="signin-password"	Wrapped in flex justify-between div
+Forgot Password link	<button type="button">	onClick → setAuthView('forgot-password')	text-xs text-primary hover:text-primary/80 font-medium
+Password Input	<Input>	id="signin-password", name="password", type="password", required	className="h-12 rounded-xl"
+Submit Button	<Button>	type="submit", disabled={isLoading}	className="w-full h-12 rounded-xl"
+Loading spinner	<Loader2>	className="w-4 h-4 mr-2 animate-spin"	Only shown when isLoading
+Submit button text: "Sign In"
+
+Below form:
+
+Text: "Are you a celebrity?" + button "Register here" → switches to celebrity tab
+Sign In API Flow
+Step 1: Supabase Auth
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/auth/v1/token?grant_type=password
+Request Body:
+
+
+{
+  "email": "user@example.com",
+  "password": "userpassword"
+}
+Success Response (200):
+
+
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "expires_in": 3600,
+  "expires_at": 1773955000,
+  "refresh_token": "abc123...",
+  "user": {
+    "id": "uuid-here",
+    "aud": "authenticated",
+    "role": "authenticated",
+    "email": "user@example.com",
+    "email_confirmed_at": "2026-03-20T10:00:00Z",
+    "phone": "",
+    "confirmed_at": "2026-03-20T10:00:00Z",
+    "user_metadata": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "phone": "+919876543210"
+    },
+    "app_metadata": { "provider": "email", "providers": ["email"] },
+    "created_at": "2026-03-20T10:00:00Z",
+    "updated_at": "2026-03-20T10:00:00Z"
+  }
+}
+Error Response (400):
+
+
+{
+  "error": "invalid_grant",
+  "error_description": "Invalid login credentials"
+}
+Step 2: Post-login redirect logic After successful sign-in, the app queries:
+
+GET /rest/v1/profiles?select=id&user_id=eq.{user.id}
+Then:
+
+GET /rest/v1/celebrities?select=id&profile_id=eq.{profile.id}
+If celebrity found → navigate /celebrity-dashboard
+Else → navigate /dashboard
+Forgot Password View (authView === 'forgot-password')
+Header row:
+
+<Button variant="ghost" size="icon"> with <ArrowLeft> icon → goes back to main
+<KeyRound> icon (w-5 h-5 text-primary)
+h2: "Forgot Password" (text-lg font-bold)
+Subtitle: "Choose how you'd like to reset your password"
+
+Reset Method Selection (<RadioGroup>):
+
+Two side-by-side radio options in styled labels
+Each label: flex-1 flex items-center gap-3 p-3 rounded-xl border-2
+Active: border-primary bg-primary/5
+Inactive: border-border hover:border-primary/40
+Option	Icon	Label
+email	<Mail> (w-4 h-4 text-primary)	"Email"
+sms	<Phone> (w-4 h-4 text-primary)	"Phone"
+If method = "email":
+
+Label: "Email Address"
+Input: type="email", placeholder="your@email.com", h-12 rounded-xl
+If method = "sms":
+
+Label: "Phone Number"
+Input: type="tel", placeholder="+91 9876543210", h-12 rounded-xl
+Helper text: "We'll send the reset link to the email associated with this number"
+Error display:
+
+div with flex items-center gap-2 text-sm text-destructive bg-destructive/10 p-3 rounded-lg
+<AlertCircle> icon + error message
+Submit button: "Send Reset Link" (w-full h-12 rounded-xl)
+
+Success state (forgotSent = true):
+
+Green circle: w-16 h-16 rounded-full bg-primary/10 with <CheckCircle> (w-8 h-8 text-primary)
+h3: "Reset Link Sent!"
+Message text varies by method
+"Back to Sign In" button (variant="outline" w-full h-12 rounded-xl)
+Forgot Password API
+Email method:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/auth/v1/recover
+Request Body:
+
+
+{
+  "email": "user@example.com",
+  "redirect_to": "https://wishmefinal.lovable.app/reset-password"
+}
+Response (200): {} (empty - Supabase sends email silently)
+
+Phone method — Step 1: Look up email by phone:
+
+GET /rest/v1/profiles?select=email&phone=eq.+919876543210
+Response:
+
+
+{ "email": "user@example.com" }
+Then sends same recover request with found email.
+
+Error if no account: "No account found with this phone number"
+
+TAB 2: SIGN UP
+Step 1: Form (signUpStep === 'form')
+Header:
+
+h2: "Create Account" (text-xl font-bold)
+p: "Join Wish Me and start connecting" (text-sm text-muted-foreground)
+Form elements (<form onSubmit={handleSignUpFormSubmit}>):
+
+#	Element	Component	Props	Styling
+1	First Name	<Input>	id="firstName", name="firstName", placeholder="John", required	h-12 rounded-xl, inside 2-col grid
+2	Last Name	<Input>	id="lastName", name="lastName", placeholder="Doe", required	h-12 rounded-xl, inside 2-col grid
+3	Email	<Input>	id="signup-email", name="email", type="email", placeholder="your@email.com", required	h-12 rounded-xl, red border if emailError
+3a	Email Error	<p>	—	text-sm text-destructive with <AlertCircle w-3 h-3>
+4	Phone	<Input>	id="signup-phone", name="phone", type="tel", placeholder="+91 98765 43210", required	h-12 rounded-xl, red border if phoneError
+4a	Phone Error	<p>	—	text-sm text-destructive with <AlertCircle w-3 h-3>
+4b	Phone Helper	<p>	—	text-xs text-muted-foreground "Enter 10-digit Indian mobile number"
+5	Password	<PasswordStrengthMeter>	password, onPasswordChange, onValidityChange, id="signup-password", name="password"	className="h-12 rounded-xl"
+6	Referral Code	<Input>	id="referralCode", name="referralCode", placeholder="Enter referral code", optional	h-12 rounded-xl
+7	Submit	<Button>	type="submit", disabled={isLoading || !isPasswordValid}	w-full h-12 rounded-xl
+Submit button text: "Continue to Verification"
+
+PasswordStrengthMeter Component (embedded in form)
+File: src/components/auth/PasswordStrengthMeter.tsx
+
+Elements:
+
+Label with <Shield> icon: "Password"
+"Generate Strong Password" ghost button with <Sparkles> icon
+Password input with show/hide toggle (<Eye>/<EyeOff>) and copy button (<Copy>)
+Progress bar (<Progress> component, h-2)
+Strength label: "Very Weak" / "Weak" / "Fair" / "Strong" / "Very Strong"
+Requirements checklist in bg-muted/50 rounded-lg p-3:
+"At least 12 characters" — regex: /.{12,}/
+"One uppercase letter (A-Z)" — regex: /[A-Z]/
+"One lowercase letter (a-z)" — regex: /[a-z]/
+"One number (0-9)" — regex: /[0-9]/
+"One special character (!@#$%^&*)" — regex: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/
+Each requirement shows <Check> (green) or <X> (gray)
+Password valid only when score >= 5 (all requirements met)
+Sign-Up Validation (before OTP)
+Email validation (validateEmail):
+
+Regex: /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+Error: "Please enter a valid email address"
+Phone validation (validatePhone):
+
+Regex: /^(\+91|91)?[6-9]\d{9}$/ (strips spaces/dashes first)
+Error: "Please enter a valid Indian phone number (10 digits starting with 6-9)"
+Password validation (checkPasswordStrength):
+
+Must pass all 5 requirements (score >= 5)
+Also checks common patterns (password, qwerty, 123456, etc.) and repeated chars
+Phone duplicate check API:
+
+GET /rest/v1/profiles?select=id&or=(phone.eq.9876543210,phone.eq.+919876543210)&limit=1
+Response if exists:
+
+
+{ "id": "some-uuid" }
+Error shown: "This phone number is already registered. Please login."
+
+Step 2: OTP Verification (signUpStep === 'otp')
+File: src/components/auth/OTPVerification.tsx
+
+Header:
+
+h2: "Verify Your Email" (text-xl font-bold)
+p: "Complete verification to create your account" (text-sm)
+OTP Component elements:
+
+Element	Component	Details
+Mail icon circle	div w-14 h-14 bg-primary/10 rounded-full	<Mail> w-7 h-7 text-primary
+Title	h3	"Verify Your Email"
+Email display	<span>	Shows the email address
+OTP Input	<InputOTP> with 6 <InputOTPSlot>	maxLength=6, auto-verifies when 6 digits entered
+Error message	div	<AlertCircle> icon + error text, text-destructive
+Verify button	<Button>	"Verify Email", disabled until 6 digits, shows Loader2
+Resend section	text + <Button variant="ghost">	"Didn't receive the code?" + "Resend in Xs" or "Resend Code" with <RefreshCw> icon
+Back button	<Button variant="outline">	"Back to Registration"
+Success state (isVerified):
+
+Green circle: w-16 h-16 bg-green-500/10 with <CheckCircle2> w-8 h-8 text-green-500
+h3: "Email Verified!"
+p: "Your email has been successfully verified."
+OTP API Endpoints
+1. Send OTP:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/send-email-otp
+Headers:
+
+
+{
+  "Content-Type": "application/json",
+  "apikey": "eyJhbGciOiJIUzI1NiIs...",
+  "authorization": "Bearer eyJhbGciOiJIUzI1NiIs..."
+}
+Request Body:
+
+
+{
+  "email": "newuser@example.com"
+}
+Success Response (200):
+
+
+{
+  "success": true,
+  "message": "OTP sent successfully"
+}
+Error — Email already exists (409):
+
+
+{
+  "success": false,
+  "error": "email_exists",
+  "message": "An account with this email already exists. Please login."
+}
+Error — Rate limited / Cooldown (429):
+
+
+{
+  "success": false,
+  "error": "Please wait 25 seconds before requesting a new code.",
+  "retryAfter": 25
+}
+Error — Too many requests (429):
+
+
+{
+  "success": false,
+  "error": "Too many OTP requests. Please try again later."
+}
+Error — Invalid email (400):
+
+
+{
+  "success": false,
+  "error": "Invalid email format"
+}
+2. Verify OTP:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/verify-email-otp
+Request Body:
+
+
+{
+  "email": "newuser@example.com",
+  "otp": "123456"
+}
+Success Response (200):
+
+
+{
+  "verified": true,
+  "message": "Email verified successfully"
+}
+Error — Invalid code (400):
+
+
+{
+  "verified": false,
+  "error": "Invalid verification code"
+}
+Error — Already used (400):
+
+
+{
+  "verified": false,
+  "error": "This code has already been used"
+}
+Error — Expired (400):
+
+
+{
+  "verified": false,
+  "error": "This code has expired. Please request a new one."
+}
+Error — Bad format (400):
+
+
+{
+  "verified": false,
+  "error": "Invalid OTP format"
+}
+After OTP Verified → Create Account
+Supabase Auth Sign Up:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/auth/v1/signup
+Request Body:
+
+
+{
+  "email": "newuser@example.com",
+  "password": "SecurePass123!@",
+  "options": {
+    "emailRedirectTo": "https://wishmefinal.lovable.app/",
+    "data": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "phone": "+919876543210",
+      "referral_code": "ABC123",
+      "referred_by": "referrer-profile-uuid-or-null"
+    }
+  }
+}
+Success Response (200):
+
+
+{
+  "id": "new-user-uuid",
+  "aud": "authenticated",
+  "role": "authenticated",
+  "email": "newuser@example.com",
+  "email_confirmed_at": null,
+  "phone": "",
+  "confirmed_at": null,
+  "user_metadata": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "phone": "+919876543210",
+    "referral_code": "ABC123",
+    "referred_by": "referrer-uuid"
+  },
+  "app_metadata": { "provider": "email", "providers": ["email"] },
+  "created_at": "2026-03-21T07:00:00Z"
+}
+Post-signup: WhatsApp Welcome (fire-and-forget):
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/send-whatsapp-welcome
+Body:
+
+
+{
+  "phone": "+919876543210",
+  "firstName": "John"
+}
+Post-signup: Welcome Message Trigger (fire-and-forget):
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/trigger-message-event
+Body:
+
+
+{
+  "event_key": "USER_REGISTERED",
+  "email": "newuser@example.com",
+  "phone": "+919876543210",
+  "variables": {
+    "first_name": "John",
+    "email": "newuser@example.com"
+  }
+}
+After success → navigate to /dashboard
+
+TAB 3: CELEBRITY
+Mobile View in Auth Page
+Header:
+
+h2: "Join as Celebrity" (text-xl font-bold)
+p: "Connect with your fans directly" (text-sm text-muted-foreground)
+Elements:
+
+<Link to="/celebrity-signup"> wrapping <Button className="w-full h-12 rounded-xl"> with <Star> icon + "Register as Celebrity"
+Helper: "Already registered? Use the sign in form above"
+This navigates to the full Celebrity Signup page at /celebrity-signup.
+
+Celebrity Signup Page (/celebrity-signup)
+File: src/pages/CelebritySignup.tsx
+
+Mobile layout (md:hidden):
+
+Header section:
+
+h1: "Join as a" + "Celebrity" (gradient text), text-3xl
+Subtitle: "Turn your influence into income. Connect with fans and earn money"
+Benefits cards (3 items, stacked): Each card has icon (w-8 h-8 text-primary) + title (font-semibold text-sm) + description (text-xs)
+
+Icon	Title	Description
+TrendingUp	Earn Extra Income	Monetize your fame...
+Users	Connect with Fans	Build deeper relationships...
+Star	Flexible Schedule	Work on your own time...
+Application Form sections:
+
+1. Personal Information:
+
+Field	Component	ID	Props
+First Name*	<Input>	mobileFirstName	placeholder="Your first name", required
+Last Name*	<Input>	mobileLastName	placeholder="Your last name", required
+Email*	<Input>	mobileEmail	type="email", placeholder="your@email.com", required
+Phone*	<Input>	mobilePhone	type="tel", placeholder="+91 98765 43210", required
+Date of Birth*	<Input>	mobileDob	type="date", required
+First/Last Name are in a 2-col grid (grid-cols-2 gap-3).
+
+2. Professional Info:
+
+Field	Component	ID	Props
+Stage Name*	<Input>	mobileStageName	placeholder="How fans know you", required
+Category*	<Select>	—	Fetches from celebrity_categories table
+Professional Bio*	<Textarea>	mobileBio	placeholder="Tell us about...", min-h-[100px], required
+Key Achievements	<Textarea>	mobileAchievements	placeholder="Awards, recognitions...", min-h-[80px]
+Category Select options — fetched dynamically:
+
+GET /rest/v1/celebrity_categories?select=id,name&is_active=eq.true&order=name
+Response:
+
+
+[
+  { "id": "uuid-1", "name": "Actor/Actress" },
+  { "id": "uuid-2", "name": "Comedian" },
+  { "id": "uuid-3", "name": "Musician" },
+  { "id": "uuid-4", "name": "Influencer" }
+]
+3. Social Media:
+
+Field	Icon	Placeholder
+Instagram	<Instagram>	"Instagram @username"
+YouTube	<Youtube>	"YouTube channel"
+Twitter	<Twitter>	"Twitter @username"
+Each input has pl-10 with icon positioned absolute left-3 top-3.
+
+4. Pricing Note:
+
+Box: p-4 bg-muted/50 rounded-lg
+Text: "Service pricing will be set by our admin team..."
+5. Verification:
+
+Field	Component	ID
+Portfolio Link	<Input>	mobilePortfolio
+ID Upload	Styled div	Dashed border area with <Upload> icon
+Upload area: border-2 border-dashed border-border rounded-lg p-4 text-center
+
+6. Terms & Consent (Checkboxes):
+
+ID	Label
+mobileTerms	"I agree to the Terms of Service, Privacy Policy, and Celebrity Agreement"
+mobileBackground	"I consent to background verification and identity confirmation"
+Both use <Checkbox> component with <Label> (text-xs).
+
+Buttons:
+
+"🚀 Fill Sample Data" — bg-gradient-primary (dev/test helper)
+"Submit Complete Application" — variant="outline"
+Celebrity Application API
+Check existing application:
+
+GET /rest/v1/celebrity_applications?select=id,status&email=eq.celebrity@example.com
+Response if exists:
+
+
+{ "id": "app-uuid", "status": "pending" }
+Error messages:
+
+pending: "You already have a pending application. Please wait for admin approval."
+approved: "You already have an approved celebrity account. Please sign in."
+rejected: "Your previous application was rejected. Please contact support."
+Submit application:
+
+POST /rest/v1/celebrity_applications
+Request Body:
+
+
+{
+  "first_name": "John",
+  "last_name": "Doe",
+  "email": "celebrity@example.com",
+  "phone": "+91 9876543210",
+  "date_of_birth": "1990-01-15",
+  "stage_name": "Johnny Star",
+  "category": "Actor/Actress",
+  "bio": "Professional actor with 10+ years experience...",
+  "portfolio_link": "https://portfolio-example.com/johndoe",
+  "social_media": {
+    "instagram": "@johnnystar",
+    "youtube": "Johnny Star Official",
+    "twitter": "@johnnystar90",
+    "tiktok": "",
+    "facebook": "",
+    "linkedin": "",
+    "website": "",
+    "other": ""
+  }
+}
+Success Response (201): Returns the inserted row.
+
+After success: Toast "Application submitted successfully!" → navigate to / after 2 seconds.
+
+BELOW THE AUTH CARD (Mobile)
+Featured Celebrities Section
+Card: bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20
+  CardHeader → CardTitle: "Featured Celebrities" (centered)
+  CardContent → 2x2 grid (grid-cols-2 gap-4)
+    4 static placeholder items, each:
+      - div w-16 h-16 bg-gradient-primary rounded-full with Star icon (w-8 h-8)
+      - h4: "Celebrity {1-4}" (font-semibold text-sm)
+      - p: "Actor" (text-xs text-muted-foreground)
+Why Choose StarConnect? Section
+Card (default)
+  CardHeader → CardTitle: "Why Choose StarConnect?" (centered)
+  CardContent → 3 feature rows, each:
+    - Icon box: bg-primary/10 p-2 rounded-lg
+    - Title + description
+
+Features:
+1. Video icon → "Personal Videos" / "Custom messages for any occasion"
+2. Heart icon → "Direct Connection" / "Chat directly with your favorite stars"
+3. Shield icon → "Verified Celebrities" / "All stars are verified and authentic"
+SUPABASE BASE URL
+All API calls use:
+
+https://eqikeuqwbphwongtfzhe.supabase.co
+Headers for all REST API calls:
+
+
+{
+  "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y",
+  "authorization": "Bearer {same_anon_key_or_user_token}",
+  "Content-Type": "application/json",
+  "accept-profile": "public"
+}
+Edge function calls use the same apikey and authorization headers, sent to /functions/v1/{function-name}.
+
+COMPONENTS LIBRARY REFERENCE
+All from @/components/ui/ (shadcn/ui):
+
+Component	Used In
+Button	All forms, navigation
+Input	All text fields
+Label	All form labels
+Card, CardContent, CardHeader, CardTitle, CardDescription	Auth card, features, celebrities
+Tabs, TabsList, TabsTrigger, TabsContent	Desktop only (mobile uses custom buttons)
+RadioGroup, RadioGroupItem	Forgot password method selection
+Checkbox	Celebrity signup terms
+Select, SelectContent, SelectItem, SelectTrigger, SelectValue	Celebrity category
+Textarea	Celebrity bio/achievements
+Progress	Password strength bar
+InputOTP, InputOTPGroup, InputOTPSlot	OTP input (6 slots)
+Icons (all from lucide-react): UserPlus, LogIn, Star, Heart, Video, Shield, AlertCircle, ArrowLeft, Mail, Phone, KeyRound, CheckCircle, Loader2, Eye, EyeOff, Copy, Sparkles, Check, X, RefreshCw, CheckCircle2, TrendingUp, Users, Upload, Instagram, Youtube, Twitter
+
+
+
+
+
