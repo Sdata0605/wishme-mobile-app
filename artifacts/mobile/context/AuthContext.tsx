@@ -153,7 +153,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         access_token: data.access_token as string,
         refresh_token: data.refresh_token as string,
       };
-      const u = buildUserFromSupabase(data.user as Record<string, unknown>, { email });
+      const supaUser = data.user as Record<string, unknown>;
+      let u = buildUserFromSupabase(supaUser, { email });
+
+      try {
+        const profileRes = await supabaseFetch(
+          `/rest/v1/profiles?select=*&id=eq.${supaUser.id}&limit=1`,
+          {},
+          newSession.access_token,
+        );
+        if (profileRes.ok) {
+          const profiles = await profileRes.json() as Array<Record<string, unknown>>;
+          if (profiles && profiles.length > 0) {
+            const p = profiles[0];
+            u = {
+              ...u,
+              firstName: (p.first_name as string) ?? u.firstName,
+              lastName: (p.last_name as string) ?? u.lastName,
+              phone: (p.phone as string) ?? u.phone,
+              walletBalance: (p.wallet_balance as number) ?? u.walletBalance,
+              memberSince: (p.member_since as string) ?? u.memberSince,
+              referralCode: (p.referral_code as string) ?? u.referralCode,
+            };
+          }
+        }
+      } catch {}
+
+      try {
+        const celebRes = await supabaseFetch(
+          `/rest/v1/celebrities?select=id,status&user_id=eq.${supaUser.id}&limit=1`,
+          {},
+          newSession.access_token,
+        );
+        if (celebRes.ok) {
+          const celebs = await celebRes.json() as Array<{ id: string; status: string }>;
+          if (celebs && celebs.length > 0 && celebs[0].status === 'approved') {
+            u = { ...u, role: 'celebrity' };
+          }
+        }
+      } catch {}
+
       setSession(newSession);
       setUser(u);
       await AsyncStorage.multiSet([
@@ -185,6 +224,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         body: JSON.stringify({ email }),
       });
       if (!res.ok) {
+        if (res.status === 409) {
+          return { error: 'An account with this email already exists. Please sign in instead.' };
+        }
+        if (res.status === 429) {
+          let retryAfter = 60;
+          try {
+            const body = await res.json() as Record<string, unknown>;
+            retryAfter = (body.retryAfter ?? body.retry_after ?? 60) as number;
+          } catch {}
+          return { error: `Too many attempts. Please wait ${retryAfter} seconds before trying again.` };
+        }
+        if (res.status === 400) {
+          return { error: 'Please enter a valid email address.' };
+        }
         const msg = await parseApiError(res);
         return { error: msg };
       }

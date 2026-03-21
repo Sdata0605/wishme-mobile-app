@@ -434,7 +434,6 @@ function CelebrityTab() {
 
   const [appStatus, setAppStatus] = useState<AppStatus>(null);
   const [statusChecking, setStatusChecking] = useState(false);
-
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -455,6 +454,12 @@ function CelebrityTab() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!submitted) return;
+    const timer = setTimeout(() => router.replace('/(tabs)'), 2000);
+    return () => clearTimeout(timer);
+  }, [submitted]);
 
   useEffect(() => {
     if (!email || !/\S+@\S+\.\S+/.test(email)) return;
