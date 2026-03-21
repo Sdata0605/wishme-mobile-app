@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -13,12 +14,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 
+const RESEND_DELAY = 30;
+
 export default function VerifyOtpScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [countdown, setCountdown] = useState(30);
+  const [countdown, setCountdown] = useState(RESEND_DELAY);
+  const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
+  const [otpError, setOtpError] = useState<string | null>(null);
   const inputRefs = useRef<TextInput[]>([]);
 
   useEffect(() => {
@@ -28,18 +33,12 @@ export default function VerifyOtpScreen() {
     }
   }, [countdown]);
 
-  useEffect(() => {
-    if (otp.every((d) => d !== '')) {
-      setVerified(true);
-      setTimeout(() => router.replace('/(tabs)'), 1000);
-    }
-  }, [otp]);
-
   const handleChange = (text: string, index: number) => {
     const digit = text.replace(/\D/g, '').slice(-1);
     const next = [...otp];
     next[index] = digit;
     setOtp(next);
+    setOtpError(null);
     if (digit && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -51,25 +50,56 @@ export default function VerifyOtpScreen() {
     }
   };
 
+  const allFilled = otp.every((d) => d !== '');
+
+  const handleVerify = async () => {
+    if (!allFilled) return;
+    setVerifying(true);
+    setOtpError(null);
+    await new Promise((r) => setTimeout(r, 1500));
+    setVerifying(false);
+    setVerified(true);
+    setTimeout(() => router.replace('/(tabs)'), 1200);
+  };
+
+  const handleResend = () => {
+    if (countdown > 0) return;
+    setOtp(['', '', '', '', '', '']);
+    setOtpError(null);
+    setCountdown(RESEND_DELAY);
+    inputRefs.current[0]?.focus();
+  };
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+    <View style={[styles.container, {
+      backgroundColor: colors.background,
+      paddingTop: insets.top + 20,
+      paddingBottom: insets.bottom + 20,
+    }]}>
       <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
         <Icon name="arrow-left" size={22} color={colors.foreground} />
       </TouchableOpacity>
 
       <View style={[styles.iconCircle, { backgroundColor: colors.primary + '20' }]}>
-        <Icon name="mail-check" size={32} color={colors.primary} />
+        <Icon name="mail" size={32} color={colors.primary} />
       </View>
 
-      <Text style={[styles.title, { color: colors.foreground }]}>Verify your number</Text>
+      <Text style={[styles.title, { color: colors.foreground }]}>Verify Your Email</Text>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-        Enter the 6-digit OTP sent to your mobile number
+        Enter the 6-digit code sent to your email address to complete registration
       </Text>
 
       {verified && (
         <View style={[styles.successBanner, { backgroundColor: '#22C55E20' }]}>
           <Icon name="check-circle" size={18} color="#22C55E" />
-          <Text style={[styles.successText, { color: '#22C55E' }]}>Verified! Redirecting...</Text>
+          <Text style={[styles.successText, { color: '#22C55E' }]}>Email verified! Redirecting...</Text>
+        </View>
+      )}
+
+      {otpError && (
+        <View style={[styles.errorBanner, { backgroundColor: colors.destructive + '20' }]}>
+          <Icon name="alert-circle" size={18} color={colors.destructive} />
+          <Text style={[styles.errorText, { color: colors.destructive }]}>{otpError}</Text>
         </View>
       )}
 
@@ -82,7 +112,7 @@ export default function VerifyOtpScreen() {
               styles.otpBox,
               {
                 backgroundColor: colors.input,
-                borderColor: digit ? colors.primary : colors.border,
+                borderColor: otpError ? colors.destructive : digit ? colors.primary : colors.border,
                 color: colors.foreground,
                 fontFamily: 'Inter_700Bold',
               },
@@ -99,26 +129,41 @@ export default function VerifyOtpScreen() {
       </View>
 
       <Pressable
-        onPress={() => {}}
-        style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
-        disabled={countdown > 0}
+        onPress={handleVerify}
+        disabled={!allFilled || verifying || verified}
+        style={({ pressed }) => [{ opacity: pressed || !allFilled || verifying || verified ? 0.6 : 1, marginTop: 8, paddingHorizontal: 24, alignSelf: 'stretch' }]}
       >
-        <Text style={[styles.resendText, { color: countdown > 0 ? colors.mutedForeground : colors.primary }]}>
-          {countdown > 0 ? `Resend OTP in ${countdown}s` : 'Resend OTP'}
-        </Text>
-      </Pressable>
-
-      <Pressable
-        onPress={() => {
-          setVerified(true);
-          setTimeout(() => router.replace('/(tabs)'), 1000);
-        }}
-        style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, marginTop: 32, paddingHorizontal: 24 }]}
-      >
-        <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.verifyBtn}>
-          <Text style={styles.verifyBtnText}>Verify & Continue</Text>
+        <LinearGradient
+          colors={['#FF6B33', '#B44CFF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.verifyBtn}
+        >
+          {verifying ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.verifyBtnText}>Verify Email</Text>
+          )}
         </LinearGradient>
       </Pressable>
+
+      <TouchableOpacity
+        onPress={handleResend}
+        disabled={countdown > 0}
+        style={[styles.resendBtn, { opacity: countdown > 0 ? 0.5 : 1 }]}
+      >
+        <Icon name="refresh-cw" size={14} color={countdown > 0 ? colors.mutedForeground : colors.primary} />
+        <Text style={[styles.resendText, { color: countdown > 0 ? colors.mutedForeground : colors.primary }]}>
+          {countdown > 0 ? `Resend code in ${countdown}s` : 'Resend Code'}
+        </Text>
+      </TouchableOpacity>
+
+      <View style={[styles.infoBox, { backgroundColor: colors.muted }]}>
+        <Icon name="info" size={14} color={colors.mutedForeground} />
+        <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
+          Check your spam folder if you don't see the email. The code expires in 10 minutes.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -131,9 +176,14 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 21, marginBottom: 28 },
   otpRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
   otpBox: { width: 44, height: 52, borderRadius: 12, borderWidth: 2, fontSize: 22 },
+  resendBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 18 },
   resendText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-  verifyBtn: { height: 52, borderRadius: 9999, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 48 },
+  verifyBtn: { height: 52, borderRadius: 9999, alignItems: 'center', justifyContent: 'center' },
   verifyBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   successBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 10, marginBottom: 16, alignSelf: 'stretch' },
   successText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 10, marginBottom: 16, alignSelf: 'stretch' },
+  errorText: { fontSize: 13, fontFamily: 'Inter_500Medium', flex: 1 },
+  infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, padding: 12, borderRadius: 10, marginTop: 20, alignSelf: 'stretch' },
+  infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', flex: 1, lineHeight: 18 },
 });

@@ -467,6 +467,37 @@ const ICONS = {
       <Polyline points="6,9 12,15 18,9" {...p(c)} />
     </Svg>
   ),
+  'refresh-cw': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Polyline points="23,4 23,10 17,10" {...p(c)} />
+      <Polyline points="1,20 1,14 7,14" {...p(c)} />
+      <Path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" {...p(c)} />
+    </Svg>
+  ),
+  link: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" {...p(c)} />
+      <Path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" {...p(c)} />
+    </Svg>
+  ),
+  instagram: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Rect x={2} y={2} width={20} height={20} rx={5} ry={5} {...p(c)} />
+      <Path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" {...p(c)} />
+      <Line x1={17.5} y1={6.5} x2={17.51} y2={6.5} {...p(c)} />
+    </Svg>
+  ),
+  youtube: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M22.54 6.42a2.78 2.78 0 0 0-1.95-1.97C18.88 4 12 4 12 4s-6.88 0-8.59.45A2.78 2.78 0 0 0 1.46 6.42 29 29 0 0 0 1 12a29 29 0 0 0 .46 5.58 2.78 2.78 0 0 0 1.95 1.97C5.12 20 12 20 12 20s6.88 0 8.59-.45a2.78 2.78 0 0 0 1.95-1.97A29 29 0 0 0 23 12a29 29 0 0 0-.46-5.58z" {...p(c)} />
+      <Polygon points="9.75,15.02 15.5,12 9.75,8.98 9.75,15.02" {...p(c)} />
+    </Svg>
+  ),
+  twitter: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z" {...p(c)} />
+    </Svg>
+  ),
 } satisfies Record<string, RenderFn>;
 
 const ALIASES = {
