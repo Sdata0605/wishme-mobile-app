@@ -49,7 +49,7 @@ interface AuthContextValue {
   session: Session | null;
   isLoading: boolean;
   pendingSignup: PendingSignup | null;
-  login: (email: string, password: string) => Promise<{ error: string | null }>;
+  login: (email: string, password: string) => Promise<{ error: string | null; role: 'user' | 'celebrity' | null }>;
   signup: (
     email: string,
     password: string,
@@ -135,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (
     email: string,
     password: string,
-  ): Promise<{ error: string | null }> => {
+  ): Promise<{ error: string | null; role: 'user' | 'celebrity' | null }> => {
     try {
       const res = await supabaseFetch('/auth/v1/token?grant_type=password', {
         method: 'POST',
@@ -146,7 +146,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const friendly = msg.toLowerCase().includes('invalid')
           ? 'Incorrect email or password. Please try again.'
           : msg;
-        return { error: friendly };
+        return { error: friendly, role: null };
       }
       const data = await res.json() as Record<string, unknown>;
       const newSession: Session = {
@@ -199,9 +199,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         [STORAGE_SESSION, JSON.stringify(newSession)],
         [STORAGE_USER, JSON.stringify(u)],
       ]);
-      return { error: null };
+      return { error: null, role: u.role };
     } catch {
-      return { error: 'Network error. Please check your connection.' };
+      return { error: 'Network error. Please check your connection.', role: null };
     }
   }, []);
 
@@ -303,13 +303,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           method: 'POST',
           body: JSON.stringify({ email: pending.email, password: pending.password }),
         });
-        if (loginRes.ok) {
-          const ld = await loginRes.json() as Record<string, unknown>;
-          newSession = {
-            access_token: ld.access_token as string,
-            refresh_token: (ld.refresh_token as string) ?? '',
+        if (!loginRes.ok) {
+          return {
+            error:
+              'Account created but sign-in failed. Please return to Sign In and use your credentials.',
           };
         }
+        const ld = await loginRes.json() as Record<string, unknown>;
+        newSession = {
+          access_token: ld.access_token as string,
+          refresh_token: (ld.refresh_token as string) ?? '',
+        };
       }
 
       const referralCode = (pending.firstName.toUpperCase() + '2025').slice(0, 10);

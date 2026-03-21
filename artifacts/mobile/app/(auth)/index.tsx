@@ -141,10 +141,14 @@ function SignInTab({ onSwitchToCelebrity }: { onSwitchToCelebrity: () => void })
     if (!email || !password) { setError('Please fill in all fields'); return; }
     setLoading(true);
     setError('');
-    const { error: apiErr } = await login(email, password);
+    const { error: apiErr, role } = await login(email, password);
     setLoading(false);
     if (apiErr) { setError(apiErr); return; }
-    router.replace('/(tabs)');
+    if (role === 'celebrity') {
+      router.replace('/celebrity-dashboard');
+    } else {
+      router.replace('/(tabs)');
+    }
   };
 
   const handleForgotSend = async () => {
@@ -521,6 +525,14 @@ function CelebrityTab() {
 
     setSubmitLoading(true);
     setSubmitError('');
+
+    const { status: existingStatus } = await checkCelebrityStatus(email);
+    if (existingStatus) {
+      setAppStatus(existingStatus as AppStatus);
+      setSubmitLoading(false);
+      return;
+    }
+
     const payload: CelebrityApplyData = {
       first_name: firstName,
       last_name: lastName,
