@@ -66,6 +66,9 @@ export default function VerifyOtpScreen() {
     setVerifying(false);
     if (error) {
       setOtpError(error);
+      if (error.toLowerCase().includes('expired') || error.toLowerCase().includes('start sign-up')) {
+        setTimeout(() => router.back(), 2500);
+      }
       return;
     }
     setVerified(true);
