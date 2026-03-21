@@ -435,23 +435,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const forgotPasswordByPhone = useCallback(async (phone: string): Promise<{ error: string | null }> => {
     try {
       const cleaned = phone.replace(/[\s\-]/g, '');
-      const normalized = cleaned.startsWith('+91')
-        ? cleaned
-        : cleaned.startsWith('91') && cleaned.length === 12
-        ? `+${cleaned}`
-        : `+91${cleaned}`;
+      const tenDigit = cleaned.replace(/^(\+91|91)/, '').slice(-10);
+      const normalized = `+91${tenDigit}`;
+      const lookupPhones = [normalized, tenDigit, `91${tenDigit}`];
 
-      const lookupRes = await supabaseFetch(
-        `/rest/v1/profiles?select=email&phone=eq.${encodeURIComponent(normalized)}&limit=1`,
-      );
-      if (!lookupRes.ok) {
-        return { error: 'Could not find an account with this mobile number.' };
+      let foundEmail: string | null = null;
+      for (const ph of lookupPhones) {
+        const res = await supabaseFetch(
+          `/rest/v1/profiles?select=email&phone=eq.${encodeURIComponent(ph)}&limit=1`,
+        );
+        if (res.ok) {
+          const rows = await res.json() as Array<{ email: string }>;
+          if (rows && rows.length > 0) { foundEmail = rows[0].email; break; }
+        }
       }
-      const profiles = await lookupRes.json() as Array<{ email: string }>;
-      if (!profiles || profiles.length === 0) {
+      if (!foundEmail) {
         return { error: 'No account found with this mobile number.' };
       }
-      const email = profiles[0].email;
+      const email = foundEmail;
 
       const recoverRes = await supabaseFetch('/auth/v1/recover', {
         method: 'POST',

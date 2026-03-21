@@ -320,7 +320,10 @@ function SignUpTab() {
     const { error } = await signup(email, password, firstName, lastName, phone, referral);
     setLoading(false);
     if (error) { setApiError(error); return; }
-    router.push('/(auth)/verify-otp');
+    router.push({
+      pathname: '/(auth)/verify-otp',
+      params: { email, firstName, lastName, phone, referral: referral || '' },
+    });
   };
 
   return (

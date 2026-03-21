@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,6 +20,7 @@ const RESEND_DELAY = 30;
 export default function VerifyOtpScreen() {
   const { colors } = useTheme();
   const { verifyOtp, resendOtp, pendingSignup } = useAuth();
+  const params = useLocalSearchParams<{ email?: string; firstName?: string }>();
   const insets = useSafeAreaInsets();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(RESEND_DELAY);
@@ -88,9 +89,10 @@ export default function VerifyOtpScreen() {
     inputRefs.current[0]?.focus();
   };
 
-  const maskedEmail = pendingSignup?.email
+  const rawEmail = pendingSignup?.email || params.email || '';
+  const maskedEmail = rawEmail
     ? (() => {
-        const [local, domain] = pendingSignup.email.split('@');
+        const [local, domain] = rawEmail.split('@');
         const visible = local.length > 3 ? local.slice(0, 3) + '***' : local.slice(0, 1) + '***';
         return `${visible}@${domain}`;
       })()
