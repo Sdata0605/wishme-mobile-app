@@ -21,11 +21,14 @@ export interface Session {
 
 export interface PendingSignup {
   email: string;
-  password: string;
   firstName: string;
   lastName: string;
   phone: string;
   referral?: string;
+}
+
+interface InternalSignupData extends PendingSignup {
+  password: string;
 }
 
 export interface CelebrityApplyData {
@@ -98,7 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [pendingSignup, setPendingSignup] = useState<PendingSignup | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const pendingRef = useRef(pendingSignup);
+  const pendingRef = useRef<PendingSignup | null>(pendingSignup);
+  const internalSignupRef = useRef<InternalSignupData | null>(null);
   const sessionRef = useRef(session);
   useEffect(() => { pendingRef.current = pendingSignup; }, [pendingSignup]);
   useEffect(() => { sessionRef.current = session; }, [session]);
@@ -214,9 +218,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     referral?: string,
   ): Promise<{ error: string | null }> => {
     try {
-      const pending: PendingSignup = { email, password, firstName, lastName, phone, referral };
+      const pending: PendingSignup = { email, firstName, lastName, phone, referral };
+      const internal: InternalSignupData = { ...pending, password };
       setPendingSignup(pending);
       pendingRef.current = pending;
+      internalSignupRef.current = internal;
       await AsyncStorage.setItem(STORAGE_PENDING, JSON.stringify(pending));
 
       const res = await supabaseFetch('/functions/v1/send-email-otp', {
@@ -248,14 +254,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const verifyOtp = useCallback(async (code: string): Promise<{ error: string | null }> => {
+    const internal = internalSignupRef.current;
     const pending = pendingRef.current;
-    if (!pending) {
-      return { error: 'Session expired. Please start registration again.' };
+    if (!internal || !pending) {
+      return { error: 'Registration session expired. Please start sign-up again.' };
+    }
+    if (!internal.password) {
+      return { error: 'Registration session expired. Please start sign-up again.' };
     }
     try {
       const verifyRes = await supabaseFetch('/functions/v1/verify-email-otp', {
         method: 'POST',
-        body: JSON.stringify({ email: pending.email, otp: code }),
+        body: JSON.stringify({ email: internal.email, otp: code }),
       });
       if (!verifyRes.ok) {
         const msg = await parseApiError(verifyRes);
@@ -271,13 +281,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const signupRes = await supabaseFetch('/auth/v1/signup', {
         method: 'POST',
         body: JSON.stringify({
-          email: pending.email,
-          password: pending.password,
+          email: internal.email,
+          password: internal.password,
           data: {
-            first_name: pending.firstName,
-            last_name: pending.lastName,
-            phone: pending.phone,
-            referral_code: pending.referral ?? '',
+            first_name: internal.firstName,
+            last_name: internal.lastName,
+            phone: internal.phone,
+            referral_code: internal.referral ?? '',
             role: 'user',
             wallet_balance: 0,
             member_since: new Date().toISOString().split('T')[0],
@@ -301,7 +311,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         const loginRes = await supabaseFetch('/auth/v1/token?grant_type=password', {
           method: 'POST',
-          body: JSON.stringify({ email: pending.email, password: pending.password }),
+          body: JSON.stringify({ email: internal.email, password: internal.password }),
         });
         if (!loginRes.ok) {
           return {
@@ -316,13 +326,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const referralCode = (pending.firstName.toUpperCase() + '2025').slice(0, 10);
+      const referralCode = (internal.firstName.toUpperCase() + '2025').slice(0, 10);
       const supaUser = (signupData.user ?? signupData) as Record<string, unknown>;
       const u = buildUserFromSupabase(supaUser, {
-        firstName: pending.firstName,
-        lastName: pending.lastName,
-        email: pending.email,
-        phone: pending.phone,
+        firstName: internal.firstName,
+        lastName: internal.lastName,
+        email: internal.email,
+        phone: internal.phone,
         referralCode,
         walletBalance: 0,
         memberSince: new Date().toISOString().split('T')[0],
@@ -332,6 +342,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(u);
       setPendingSignup(null);
       pendingRef.current = null;
+      internalSignupRef.current = null;
 
       await AsyncStorage.multiSet([
         [STORAGE_SESSION, JSON.stringify(newSession)],
@@ -339,12 +350,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ]);
       await AsyncStorage.removeItem(STORAGE_PENDING);
 
-      const formattedPhone = pending.phone.startsWith('+91')
-        ? pending.phone
-        : `+91${pending.phone.replace(/^91/, '')}`;
+      const formattedPhone = internal.phone.startsWith('+91')
+        ? internal.phone
+        : `+91${internal.phone.replace(/^91/, '')}`;
       supabaseFetch(
         '/functions/v1/send-whatsapp-welcome',
-        { method: 'POST', body: JSON.stringify({ phone: formattedPhone, name: pending.firstName }) },
+        { method: 'POST', body: JSON.stringify({ phone: formattedPhone, name: internal.firstName }) },
         newSession.access_token || null,
       ).catch(() => {});
       supabaseFetch(
@@ -392,6 +403,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPendingSignup(null);
     sessionRef.current = null;
     pendingRef.current = null;
+    internalSignupRef.current = null;
     await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER, STORAGE_PENDING, 'user']);
   }, []);
 
