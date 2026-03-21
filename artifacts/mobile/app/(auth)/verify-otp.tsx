@@ -58,6 +58,19 @@ export default function VerifyOtpScreen() {
     setOtpError(null);
     await new Promise((r) => setTimeout(r, 1500));
     setVerifying(false);
+    const code = otp.join('');
+    if (code === '000000') {
+      setOtpError('This code has expired. Please request a new one.');
+      return;
+    }
+    if (code === '111111') {
+      setOtpError('Invalid code. Please check your email and try again.');
+      return;
+    }
+    if (code === '222222') {
+      setOtpError('This code has already been used. Please request a new one.');
+      return;
+    }
     setVerified(true);
     setTimeout(() => router.replace('/(tabs)'), 1200);
   };

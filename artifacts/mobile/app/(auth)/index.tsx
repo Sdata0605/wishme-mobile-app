@@ -24,7 +24,7 @@ type Tab = 'signin' | 'signup' | 'celebrity';
 
 const CATEGORIES = [
   'Actor/Actress', 'Comedian', 'Musician', 'Influencer',
-  'Athlete', 'Model', 'YouTuber', 'Cricketer',
+  'Athlete', 'Model', 'YouTuber', 'Influencer',
 ];
 
 function InputField({
@@ -385,7 +385,7 @@ type AppStatus = 'pending' | 'approved' | 'rejected' | null;
 function CelebrityTab() {
   const { colors } = useTheme();
 
-  const [appStatus] = useState<AppStatus>(null);
+  const [appStatus, setAppStatus] = useState<AppStatus>('pending');
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -428,12 +428,18 @@ function CelebrityTab() {
     };
     const s = STATUS_MAP[appStatus];
     return (
-      <View style={[styles.statusCard, { backgroundColor: s.color + '15' }]}>
-        <View style={[styles.iconCircle, { backgroundColor: s.color + '25', marginBottom: 12 }]}>
-          <Icon name={s.icon} size={32} color={s.color} />
+      <View>
+        <View style={[styles.statusCard, { backgroundColor: s.color + '15' }]}>
+          <View style={[styles.iconCircle, { backgroundColor: s.color + '25', marginBottom: 12 }]}>
+            <Icon name={s.icon} size={32} color={s.color} />
+          </View>
+          <Text style={{ fontSize: 18, fontFamily: 'Inter_700Bold', color: s.color, marginBottom: 8 }}>{s.label}</Text>
+          <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, textAlign: 'center', lineHeight: 20 }}>{s.msg}</Text>
         </View>
-        <Text style={{ fontSize: 18, fontFamily: 'Inter_700Bold', color: s.color, marginBottom: 8 }}>{s.label}</Text>
-        <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, textAlign: 'center', lineHeight: 20 }}>{s.msg}</Text>
+        <TouchableOpacity onPress={() => setAppStatus(null)} style={{ alignSelf: 'center', marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Icon name="edit-2" size={13} color={colors.mutedForeground} />
+          <Text style={{ fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.mutedForeground }}>Use a different account to apply</Text>
+        </TouchableOpacity>
       </View>
     );
   }
