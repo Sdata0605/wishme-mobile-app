@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, type CelebrityApplyData } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Icon, type IconName } from '@/components/Icon';
 
@@ -24,7 +24,7 @@ type Tab = 'signin' | 'signup' | 'celebrity';
 
 const CATEGORIES = [
   'Actor/Actress', 'Comedian', 'Musician', 'Influencer',
-  'Athlete', 'Model', 'YouTuber', 'Influencer',
+  'Athlete', 'Model', 'YouTuber', 'Podcaster',
 ];
 
 function InputField({
@@ -121,32 +121,60 @@ function validateIndianPhone(raw: string) {
 }
 
 function SignInTab({ onSwitchToCelebrity }: { onSwitchToCelebrity: () => void }) {
-  const { login } = useAuth();
+  const { login, forgotPasswordByEmail, forgotPasswordByPhone } = useAuth();
   const { colors } = useTheme();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
   const [forgotMode, setForgotMode] = useState(false);
   const [forgotMethod, setForgotMethod] = useState<'email' | 'phone'>('email');
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotPhone, setForgotPhone] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
 
   const handleLogin = async () => {
     if (!email || !password) { setError('Please fill in all fields'); return; }
     setLoading(true);
     setError('');
-    await login(email, password);
+    const { error: apiErr } = await login(email, password);
     setLoading(false);
+    if (apiErr) { setError(apiErr); return; }
     router.replace('/(tabs)');
+  };
+
+  const handleForgotSend = async () => {
+    setForgotError('');
+    if (forgotMethod === 'email') {
+      if (!forgotEmail.trim() || !/\S+@\S+\.\S+/.test(forgotEmail)) {
+        setForgotError('Enter a valid email address');
+        return;
+      }
+      setForgotLoading(true);
+      const { error: apiErr } = await forgotPasswordByEmail(forgotEmail.trim());
+      setForgotLoading(false);
+      if (apiErr) { setForgotError(apiErr); return; }
+    } else {
+      if (!forgotPhone || !validateIndianPhone(forgotPhone)) {
+        setForgotError('Enter a valid Indian mobile number');
+        return;
+      }
+      setForgotLoading(true);
+      const { error: apiErr } = await forgotPasswordByPhone(forgotPhone);
+      setForgotLoading(false);
+      if (apiErr) { setForgotError(apiErr); return; }
+    }
+    setForgotSent(true);
   };
 
   if (forgotMode) {
     return (
       <View>
-        <TouchableOpacity onPress={() => { setForgotMode(false); setForgotSent(false); }} style={styles.backRow}>
+        <TouchableOpacity onPress={() => { setForgotMode(false); setForgotSent(false); setForgotError(''); }} style={styles.backRow}>
           <Icon name="arrow-left" size={18} color={colors.primary} />
           <Text style={[styles.backText, { color: colors.primary }]}>Back to Sign In</Text>
         </TouchableOpacity>
@@ -170,12 +198,18 @@ function SignInTab({ onSwitchToCelebrity }: { onSwitchToCelebrity: () => void })
           </View>
         ) : (
           <>
+            {forgotError ? (
+              <View style={[styles.errorBanner, { backgroundColor: colors.destructive + '20' }]}>
+                <Text style={[styles.errorBannerText, { color: colors.destructive }]}>{forgotError}</Text>
+              </View>
+            ) : null}
+
             <View style={[styles.methodToggleRow, { backgroundColor: colors.muted }]}>
               {(['email', 'phone'] as const).map((m) => (
                 <TouchableOpacity
                   key={m}
                   style={[styles.methodBtn, forgotMethod === m && { backgroundColor: colors.card }]}
-                  onPress={() => setForgotMethod(m)}
+                  onPress={() => { setForgotMethod(m); setForgotError(''); }}
                 >
                   <Icon name={m === 'email' ? 'mail' : 'phone'} size={15} color={forgotMethod === m ? colors.primary : colors.mutedForeground} />
                   <Text style={[styles.methodBtnText, { color: forgotMethod === m ? colors.primary : colors.mutedForeground, fontFamily: forgotMethod === m ? 'Inter_600SemiBold' : 'Inter_400Regular' }]}>
@@ -191,14 +225,17 @@ function SignInTab({ onSwitchToCelebrity }: { onSwitchToCelebrity: () => void })
               <>
                 <InputField icon="phone" placeholder="Mobile number (e.g. 9876543210)" value={forgotPhone} onChangeText={(t) => setForgotPhone(t.replace(/\D/g, '').slice(0, 10))} keyboardType="number-pad" />
                 <Text style={[styles.helperText, { color: colors.mutedForeground }]}>
-                  We'll send a 6-digit OTP to your registered mobile number
+                  We'll look up your email from your registered mobile number
                 </Text>
               </>
             )}
 
-            <Pressable onPress={() => setForgotSent(true)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
+            <Pressable onPress={handleForgotSend} disabled={forgotLoading} style={({ pressed }) => [{ opacity: pressed || forgotLoading ? 0.7 : 1 }]}>
               <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradBtn}>
-                <Text style={styles.gradBtnText}>{forgotMethod === 'email' ? 'Send Reset Link' : 'Send OTP'}</Text>
+                {forgotLoading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.gradBtnText}>{forgotMethod === 'email' ? 'Send Reset Link' : 'Send OTP'}</Text>
+                }
               </LinearGradient>
             </Pressable>
           </>
@@ -257,6 +294,7 @@ function SignUpTab() {
   const [referral, setReferral] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [apiError, setApiError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const strength = getPasswordStrength(password);
@@ -274,13 +312,21 @@ function SignUpTab() {
     const e = validate();
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     setLoading(true);
-    await signup(email, password, firstName, lastName, phone, referral);
+    setApiError('');
+    const { error } = await signup(email, password, firstName, lastName, phone, referral);
     setLoading(false);
+    if (error) { setApiError(error); return; }
     router.push('/(auth)/verify-otp');
   };
 
   return (
     <View>
+      {apiError ? (
+        <View style={[styles.errorBanner, { backgroundColor: colors.destructive + '20' }]}>
+          <Text style={[styles.errorBannerText, { color: colors.destructive }]}>{apiError}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
           <InputField icon="user" placeholder="First Name" value={firstName} onChangeText={setFirstName} error={errors.firstName} />
@@ -384,8 +430,10 @@ type AppStatus = 'pending' | 'approved' | 'rejected' | null;
 
 function CelebrityTab() {
   const { colors } = useTheme();
+  const { applyCelebrity, checkCelebrityStatus } = useAuth();
 
   const [appStatus, setAppStatus] = useState<AppStatus>(null);
+  const [statusChecking, setStatusChecking] = useState(false);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -404,7 +452,20 @@ function CelebrityTab() {
   const [backgroundAgreed, setBackgroundAgreed] = useState(false);
   const [showPicker, setShowPicker] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!email || !/\S+@\S+\.\S+/.test(email)) return;
+    const timer = setTimeout(async () => {
+      setStatusChecking(true);
+      const { status } = await checkCelebrityStatus(email);
+      setStatusChecking(false);
+      if (status) setAppStatus(status as AppStatus);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [email, checkCelebrityStatus]);
 
   if (submitted) {
     return (
@@ -444,7 +505,7 @@ function CelebrityTab() {
     );
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const e: Record<string, string> = {};
     if (!firstName.trim()) e.firstName = 'Required';
     if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) e.email = 'Valid email required';
@@ -452,6 +513,27 @@ function CelebrityTab() {
     if (!termsAgreed) e.terms = 'You must agree to Terms of Service';
     if (!backgroundAgreed) e.background = 'You must consent to background verification';
     if (Object.keys(e).length > 0) { setErrors(e); return; }
+
+    setSubmitLoading(true);
+    setSubmitError('');
+    const payload: CelebrityApplyData = {
+      first_name: firstName,
+      last_name: lastName,
+      email,
+      phone,
+      dob,
+      stage_name: stageName,
+      category,
+      bio,
+      achievements,
+      instagram,
+      youtube,
+      twitter,
+      portfolio,
+    };
+    const { error } = await applyCelebrity(payload);
+    setSubmitLoading(false);
+    if (error) { setSubmitError(error); return; }
     setSubmitted(true);
   };
 
@@ -477,6 +559,12 @@ function CelebrityTab() {
         </View>
       </View>
 
+      {submitError ? (
+        <View style={[styles.errorBanner, { backgroundColor: colors.destructive + '20' }]}>
+          <Text style={[styles.errorBannerText, { color: colors.destructive }]}>{submitError}</Text>
+        </View>
+      ) : null}
+
       <SectionHeader icon="user" title="Personal Information" />
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
@@ -486,7 +574,12 @@ function CelebrityTab() {
           <InputField icon="user" placeholder="Last Name" value={lastName} onChangeText={setLastName} />
         </View>
       </View>
-      <InputField icon="mail" placeholder="Email address" value={email} onChangeText={setEmail} keyboardType="email-address" error={errors.email} />
+      <View style={{ position: 'relative' }}>
+        <InputField icon="mail" placeholder="Email address" value={email} onChangeText={setEmail} keyboardType="email-address" error={errors.email} />
+        {statusChecking && (
+          <ActivityIndicator size="small" color={colors.primary} style={{ position: 'absolute', right: 14, top: 14 }} />
+        )}
+      </View>
       <InputField icon="phone" placeholder="Mobile number" value={phone} onChangeText={(t) => setPhone(t.replace(/\D/g, '').slice(0, 10))} keyboardType="number-pad" />
       <InputField icon="calendar" placeholder="Date of Birth (DD/MM/YYYY)" value={dob} onChangeText={setDob} />
 
@@ -567,9 +660,9 @@ function CelebrityTab() {
       </TouchableOpacity>
       {errors.background ? <Text style={[styles.errorText, { color: colors.destructive, marginBottom: 8 }]}>{errors.background}</Text> : null}
 
-      <Pressable onPress={handleSubmit} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1, marginTop: 16 }]}>
+      <Pressable onPress={handleSubmit} disabled={submitLoading} style={({ pressed }) => [{ opacity: pressed || submitLoading ? 0.7 : 1, marginTop: 16 }]}>
         <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradBtn}>
-          <Text style={styles.gradBtnText}>Submit Application</Text>
+          {submitLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.gradBtnText}>Submit Application</Text>}
         </LinearGradient>
       </Pressable>
 
@@ -696,7 +789,7 @@ const styles = StyleSheet.create({
   backText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   iconCircle: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', alignSelf: 'center', marginBottom: 12 },
   sectionTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', textAlign: 'center', marginBottom: 20 },
-  successBox: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 16, borderRadius: 12 },
+  successBox: {},
   methodToggleRow: { flexDirection: 'row', borderRadius: 12, padding: 4, marginBottom: 16 },
   methodBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 10 },
   methodBtnText: { fontSize: 14 },

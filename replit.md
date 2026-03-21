@@ -98,7 +98,8 @@ Expo React Native app — **WishMe**, a celebrity video wish platform for Indian
 - **Tech**: Expo SDK 53, Expo Router v6, React Native, TypeScript
 - **Design**: Orange-to-purple gradient branding (#FF6B33 → #B44CFF), PlayfairDisplay_700Bold for headings, Inter for body
 - **Theme**: Dark/light mode via ThemeContext + AsyncStorage persistence
-- **Auth**: Mock auth via AuthContext (login/signup/logout), AsyncStorage user persistence
+- **Auth**: Supabase auth integration (AuthContext) — login, signup (OTP flow), logout, forgot password (email+phone), celebrity apply, OTP verify/resend, session persistence in AsyncStorage
+- **Supabase**: `constants/supabase.ts` — URL + anon key + `supabaseFetch` helper; Project: eqikeuqwbphwongtfzhe.supabase.co
 - **Navigation**: File-based Expo Router, 5-tab layout (Home, Stars, Music, Calls, Profile) + Drawer sidebar
 - **Drawer**: Slide-and-scale animated sidebar (DrawerContext) with 20+ nav items
 - **Fonts**: `@expo-google-fonts/inter`, `@expo-google-fonts/playfair-display`

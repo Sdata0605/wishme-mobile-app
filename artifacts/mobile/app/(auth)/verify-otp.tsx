@@ -12,18 +12,22 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 
 const RESEND_DELAY = 30;
 
 export default function VerifyOtpScreen() {
   const { colors } = useTheme();
+  const { verifyOtp, resendOtp, pendingSignup } = useAuth();
   const insets = useSafeAreaInsets();
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = useState(RESEND_DELAY);
   const [verifying, setVerifying] = useState(false);
   const [verified, setVerified] = useState(false);
   const [otpError, setOtpError] = useState<string | null>(null);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
   const inputRefs = useRef<TextInput[]>([]);
 
   useEffect(() => {
@@ -39,6 +43,7 @@ export default function VerifyOtpScreen() {
     next[index] = digit;
     setOtp(next);
     setOtpError(null);
+    setResendSuccess(false);
     if (digit && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
@@ -56,32 +61,40 @@ export default function VerifyOtpScreen() {
     if (!allFilled) return;
     setVerifying(true);
     setOtpError(null);
-    await new Promise((r) => setTimeout(r, 1500));
+    const { error } = await verifyOtp(otp.join(''));
     setVerifying(false);
-    const code = otp.join('');
-    if (code === '000000') {
-      setOtpError('This code has expired. Please request a new one.');
-      return;
-    }
-    if (code === '111111') {
-      setOtpError('Invalid code. Please check your email and try again.');
-      return;
-    }
-    if (code === '222222') {
-      setOtpError('This code has already been used. Please request a new one.');
+    if (error) {
+      setOtpError(error);
       return;
     }
     setVerified(true);
     setTimeout(() => router.replace('/(tabs)'), 1200);
   };
 
-  const handleResend = () => {
-    if (countdown > 0) return;
-    setOtp(['', '', '', '', '', '']);
+  const handleResend = async () => {
+    if (countdown > 0 || resendLoading) return;
+    setResendLoading(true);
     setOtpError(null);
+    setResendSuccess(false);
+    const { error } = await resendOtp();
+    setResendLoading(false);
+    if (error) {
+      setOtpError(error);
+      return;
+    }
+    setOtp(['', '', '', '', '', '']);
     setCountdown(RESEND_DELAY);
+    setResendSuccess(true);
     inputRefs.current[0]?.focus();
   };
+
+  const maskedEmail = pendingSignup?.email
+    ? (() => {
+        const [local, domain] = pendingSignup.email.split('@');
+        const visible = local.length > 3 ? local.slice(0, 3) + '***' : local.slice(0, 1) + '***';
+        return `${visible}@${domain}`;
+      })()
+    : 'your email address';
 
   return (
     <View style={[styles.container, {
@@ -99,13 +112,21 @@ export default function VerifyOtpScreen() {
 
       <Text style={[styles.title, { color: colors.foreground }]}>Verify Your Email</Text>
       <Text style={[styles.subtitle, { color: colors.mutedForeground }]}>
-        Enter the 6-digit code sent to your email address to complete registration
+        Enter the 6-digit code sent to{'\n'}
+        <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{maskedEmail}</Text>
       </Text>
 
       {verified && (
         <View style={[styles.successBanner, { backgroundColor: '#22C55E20' }]}>
           <Icon name="check-circle" size={18} color="#22C55E" />
           <Text style={[styles.successText, { color: '#22C55E' }]}>Email verified! Redirecting...</Text>
+        </View>
+      )}
+
+      {resendSuccess && !verified && (
+        <View style={[styles.successBanner, { backgroundColor: '#22C55E20' }]}>
+          <Icon name="check-circle" size={18} color="#22C55E" />
+          <Text style={[styles.successText, { color: '#22C55E' }]}>New code sent! Check your inbox.</Text>
         </View>
       )}
 
@@ -162,12 +183,20 @@ export default function VerifyOtpScreen() {
 
       <TouchableOpacity
         onPress={handleResend}
-        disabled={countdown > 0}
-        style={[styles.resendBtn, { opacity: countdown > 0 ? 0.5 : 1 }]}
+        disabled={countdown > 0 || resendLoading || verified}
+        style={[styles.resendBtn, { opacity: countdown > 0 || resendLoading || verified ? 0.5 : 1 }]}
       >
-        <Icon name="refresh-cw" size={14} color={countdown > 0 ? colors.mutedForeground : colors.primary} />
+        {resendLoading ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Icon name="refresh-cw" size={14} color={countdown > 0 ? colors.mutedForeground : colors.primary} />
+        )}
         <Text style={[styles.resendText, { color: countdown > 0 ? colors.mutedForeground : colors.primary }]}>
-          {countdown > 0 ? `Resend code in ${countdown}s` : 'Resend Code'}
+          {resendLoading
+            ? 'Sending...'
+            : countdown > 0
+            ? `Resend code in ${countdown}s`
+            : 'Resend Code'}
         </Text>
       </TouchableOpacity>
 
