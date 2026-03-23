@@ -1,11 +1,9 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
-  Animated,
   Dimensions,
   Image,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -16,20 +14,98 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
-import { Celebrity } from '@/constants/mockData';
+import { supabaseFetch } from '@/constants/supabase';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { useCelebrities } from '@/hooks/useCelebrities';
+import { Celebrity, useCelebrities } from '@/hooks/useCelebrities';
 
 const { width: W } = Dimensions.get('window');
 const CARD_W = (W - 52) / 2;
 
-const OCCASIONS = ['Birthday', 'Anniversary', 'Motivation', 'Wedding', 'Corporate', 'Graduation', 'Festival'];
-const TONES = ['Warm & Loving', 'Funny', 'Motivational', 'Inspirational'] as const;
-const LANGUAGES = ['Hindi', 'English', 'Telugu', 'Tamil', 'Bengali', 'Punjabi', 'Marathi'];
+const OCCASIONS = [
+  'Birthday', 'Anniversary', 'Graduation', 'New Year', 'Diwali', 'Christmas',
+  'Eid', 'Holi', 'Promotion', 'Wedding', 'Engagement', 'Baby Shower',
+  'Retirement', 'Get Well Soon', 'Thank You', 'Congratulations', 'Good Luck', 'Other',
+];
+
+const TONES: Array<{ label: string; value: string }> = [
+  { label: 'Warm & Loving', value: 'warm_loving' },
+  { label: 'Funny & Playful', value: 'funny_playful' },
+  { label: 'Inspirational', value: 'inspirational' },
+  { label: 'Formal', value: 'formal' },
+  { label: 'Casual', value: 'casual' },
+  { label: 'Emotional', value: 'emotional' },
+];
+
+const RELATIONSHIPS: Array<{ label: string; value: string }> = [
+  { label: 'Friend', value: 'friend' },
+  { label: 'Parent', value: 'parent' },
+  { label: 'Child', value: 'child' },
+  { label: 'Spouse', value: 'spouse' },
+  { label: 'Sibling', value: 'sibling' },
+  { label: 'Colleague', value: 'colleague' },
+  { label: 'Boss', value: 'boss' },
+  { label: 'Relative', value: 'relative' },
+  { label: 'Other', value: 'other' },
+];
+
+const LANGUAGES: Array<{ label: string; value: string }> = [
+  { label: 'English', value: 'english' },
+  { label: 'Hindi', value: 'hindi' },
+  { label: 'Tamil', value: 'tamil' },
+  { label: 'Telugu', value: 'telugu' },
+  { label: 'Kannada', value: 'kannada' },
+  { label: 'Malayalam', value: 'malayalam' },
+  { label: 'Marathi', value: 'marathi' },
+  { label: 'Bengali', value: 'bengali' },
+  { label: 'Gujarati', value: 'gujarati' },
+  { label: 'Punjabi', value: 'punjabi' },
+];
 
 const MOCK_WALLET = 3250;
-const MOCK_CALL_MINUTES = 5;
 const DISCOUNT_PCT = 10;
+
+function generateDates(): Array<{ label: string; dateStr: string }> {
+  const result: Array<{ label: string; dateStr: string }> = [];
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const now = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + i);
+    const label =
+      i === 0 ? `Today, ${monthNames[d.getMonth()]} ${d.getDate()}` :
+      i === 1 ? `Tomorrow, ${monthNames[d.getMonth()]} ${d.getDate()}` :
+      `${dayNames[d.getDay()]}, ${monthNames[d.getMonth()]} ${d.getDate()}`;
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    result.push({ label, dateStr: `${yyyy}-${mm}-${dd}` });
+  }
+  return result;
+}
+
+const DATES = generateDates();
+
+function generateTimes(): string[] {
+  const times: string[] = [];
+  for (let h = 0; h < 24; h++) {
+    for (let m = 0; m < 60; m += 30) {
+      times.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+  }
+  return times;
+}
+
+const TIMES = generateTimes();
+
+function buildScheduledAt(dateStr: string, time: string): string {
+  const [h, m] = time.split(':').map(Number);
+  const d = new Date(dateStr);
+  d.setHours(h, m, 0, 0);
+  return d.toISOString();
+}
+
 
 function StepIndicator({ step }: { step: 1 | 2 }) {
   const { colors } = useTheme();
@@ -40,7 +116,8 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
         const active = step === n;
         return (
           <React.Fragment key={n}>
-            <View style={[styles.stepCircle,
+            <View style={[
+              styles.stepCircle,
               done && { backgroundColor: colors.primary, borderColor: colors.primary },
               active && { borderColor: colors.primary },
               !done && !active && { borderColor: colors.border },
@@ -60,6 +137,7 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
     </View>
   );
 }
+
 
 function CelebSelectGrid({
   celebrities,
@@ -141,7 +219,7 @@ function CelebSelectGrid({
                   <Icon name="star" size={11} color="#F59E0B" />
                   <Text style={[styles.ratingText, { color: colors.foreground }]}>{celeb.rating}</Text>
                 </View>
-                <Text style={[styles.rateText, { color: colors.primary }]}>₹{celeb.ratePerMinute}/min</Text>
+                <Text style={[styles.rateText, { color: colors.primary }]}>₹{celeb.pricePerCall || 500}/call</Text>
               </View>
             </TouchableOpacity>
           ))}
@@ -151,32 +229,161 @@ function CelebSelectGrid({
   );
 }
 
+
+type SuccessResult =
+  | { scheduled: false; callId?: string; message: string }
+  | { scheduled: true; scheduledAt: string; message: string };
+
 function CallDetailsForm({
   celeb,
   onBack,
-  onCall,
   colors,
   bottomPad,
 }: {
   celeb: Celebrity;
   onBack: () => void;
-  onCall: () => void;
   colors: ReturnType<typeof import('@/context/ThemeContext').useTheme>['colors'];
   bottomPad: number;
 }) {
-  const [occasion, setOccasion] = useState('Birthday');
-  const [recipient, setRecipient] = useState('');
-  const [message, setMessage] = useState('');
-  const [tone, setTone] = useState<(typeof TONES)[number]>('Warm & Loving');
-  const [lang, setLang] = useState('Hindi');
-  const [schedDate, setSchedDate] = useState('');
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const { user, session } = useAuth();
 
-  const basePrice = celeb.ratePerMinute * MOCK_CALL_MINUTES;
+  const [senderName, setSenderName] = useState(
+    user ? `${user.firstName} ${user.lastName}`.trim() : '',
+  );
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
+  const [occasion, setOccasion] = useState('Birthday');
+
+  const [callTiming, setCallTiming] = useState<'now' | 'later'>('now');
+  const [selectedDate, setSelectedDate] = useState<{ label: string; dateStr: string }>(DATES[0]);
+  const [selectedTime, setSelectedTime] = useState('10:00');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+
+  const [customMessage, setCustomMessage] = useState('');
+  const [tone, setTone] = useState('');
+  const [relationship, setRelationship] = useState('');
+  const [language, setLanguage] = useState('english');
+  const [thingsToAvoid, setThingsToAvoid] = useState('');
+  const [additionalContext, setAdditionalContext] = useState('');
+
+  const [submitting, setSubmitting] = useState(false);
+  const [callError, setCallError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<SuccessResult | null>(null);
+
+  const basePrice = celeb.pricePerCall || 500;
   const discountAmt = Math.round((basePrice * DISCOUNT_PCT) / 100);
   const finalPrice = basePrice - discountAmt;
 
-  const mockDates = ['Today, 6:00 PM', 'Tomorrow, 10:00 AM', 'Tomorrow, 4:00 PM', 'Mar 22, 9:00 AM'];
+  async function handleMakeCall() {
+    if (!senderName.trim() || !recipientName.trim() || !recipientPhone.trim()) {
+      setCallError('Please fill in Your Name, Recipient Name, and Phone Number.');
+      return;
+    }
+    if (callTiming === 'later' && (!selectedDate || !selectedTime)) {
+      setCallError('Please select a date and time for scheduling.');
+      return;
+    }
+    setCallError(null);
+    setSubmitting(true);
+
+    try {
+      const body: Record<string, unknown> = {
+        recipientName: recipientName.trim(),
+        recipientPhone: recipientPhone.trim(),
+        occasion,
+        senderName: senderName.trim(),
+        celebrityId: celeb.id,
+        celebrityName: celeb.name,
+        price: finalPrice,
+        language,
+      };
+      if (celeb.vapiVoiceId) body.voiceId = celeb.vapiVoiceId;
+      if (celeb.vapiPhoneId) body.celebrityPhoneId = celeb.vapiPhoneId;
+      if (customMessage.trim()) body.customMessage = customMessage.trim();
+      if (tone) body.tone = tone;
+      if (relationship) body.relationship = relationship;
+      if (thingsToAvoid.trim()) body.thingsToAvoid = thingsToAvoid.trim();
+      if (additionalContext.trim()) body.additionalContext = additionalContext.trim();
+      if (callTiming === 'later') {
+        body.scheduledAt = buildScheduledAt(selectedDate.dateStr, selectedTime);
+      }
+
+      const res = await supabaseFetch(
+        '/functions/v1/vapi-celebrity-call',
+        { method: 'POST', body: JSON.stringify(body) },
+        session?.access_token,
+      );
+
+      const json = await res.json();
+
+      if (!res.ok || !json.success) {
+        const msg = json.error ?? json.message ?? `Request failed (${res.status})`;
+        setCallError(msg);
+        return;
+      }
+
+      if (json.scheduled) {
+        setSuccess({ scheduled: true, scheduledAt: json.scheduledAt, message: json.message });
+      } else {
+        setSuccess({ scheduled: false, callId: json.callId, message: json.message });
+      }
+    } catch (err: unknown) {
+      setCallError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (success) {
+    return (
+      <View style={[styles.successCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <LinearGradient
+          colors={['#FF6B33', '#B44CFF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.successIconWrap}
+        >
+          <Icon name={success.scheduled ? 'calendar' : 'phone-call'} size={36} color="#fff" />
+        </LinearGradient>
+
+        <Text style={[styles.successTitle, { color: colors.foreground }]}>
+          {success.scheduled ? 'Call Scheduled!' : 'Call Initiated!'}
+        </Text>
+
+        <Text style={[styles.successMsg, { color: colors.mutedForeground }]}>
+          {success.message}
+        </Text>
+
+        {success.scheduled && (
+          <View style={[styles.successMetaRow, { backgroundColor: colors.backgroundSecondary ?? colors.muted }]}>
+            <Icon name="clock" size={14} color={colors.primary} />
+            <Text style={[styles.successMetaText, { color: colors.foreground }]}>
+              {new Date(success.scheduledAt).toLocaleString('en-IN', {
+                dateStyle: 'medium', timeStyle: 'short',
+              })}
+            </Text>
+          </View>
+        )}
+
+        <View style={[styles.successMetaRow, { backgroundColor: colors.backgroundSecondary ?? colors.muted, marginTop: 8 }]}>
+          <Image source={{ uri: celeb.imageUrl }} style={styles.successAvatar} />
+          <Text style={[styles.successMetaText, { color: colors.foreground }]}>{celeb.name}</Text>
+        </View>
+
+        <TouchableOpacity
+          onPress={onBack}
+          activeOpacity={0.85}
+          style={styles.bookAnotherBtnWrap}
+        >
+          <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bookAnotherBtn}>
+            <Icon name="phone" size={16} color="#fff" />
+            <Text style={styles.bookAnotherText}>Book Another Call</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.formContent, { paddingBottom: bottomPad }]}>
@@ -190,111 +397,257 @@ function CallDetailsForm({
         <View style={{ flex: 1 }}>
           <Text style={[styles.selectedName, { color: colors.foreground }]}>{celeb.name}</Text>
           <Text style={[styles.selectedCat, { color: colors.mutedForeground }]}>{celeb.category}</Text>
-          <Text style={[styles.selectedRate, { color: colors.primary }]}>₹{celeb.ratePerMinute}/min · {MOCK_CALL_MINUTES} min call</Text>
+          <Text style={[styles.selectedRate, { color: colors.primary }]}>₹{basePrice.toLocaleString('en-IN')} / call</Text>
         </View>
       </View>
 
       <View style={[styles.formSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Occasion</Text>
-        <View style={styles.chipRow}>
-          {OCCASIONS.map((oc) => (
-            <TouchableOpacity
-              key={oc}
-              onPress={() => setOccasion(oc)}
-              style={[styles.chip, { borderColor: occasion === oc ? colors.primary : colors.border },
-                occasion === oc && { backgroundColor: colors.primary + '18' }]}
-            >
-              <Text style={[styles.chipText, { color: occasion === oc ? colors.primary : colors.mutedForeground }]}>{oc}</Text>
-            </TouchableOpacity>
-          ))}
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Required Details</Text>
+
+        <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Your Name *</Text>
+        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
+          <Icon name="user" size={15} color={colors.mutedForeground} />
+          <TextInput
+            value={senderName}
+            onChangeText={setSenderName}
+            placeholder="Your full name"
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.textInput, { color: colors.foreground }]}
+          />
         </View>
 
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 16 }]}>Recipient Name</Text>
+        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Recipient's Name *</Text>
         <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
+          <Icon name="user" size={15} color={colors.mutedForeground} />
           <TextInput
-            value={recipient}
-            onChangeText={setRecipient}
+            value={recipientName}
+            onChangeText={setRecipientName}
             placeholder="Who is this call for?"
             placeholderTextColor={colors.mutedForeground}
             style={[styles.textInput, { color: colors.foreground }]}
           />
         </View>
 
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 16 }]}>Special Message</Text>
+        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Phone Number *</Text>
+        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
+          <Icon name="phone" size={15} color={colors.mutedForeground} />
+          <TextInput
+            value={recipientPhone}
+            onChangeText={setRecipientPhone}
+            placeholder="+91 XXXXXXXXXX"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="phone-pad"
+            style={[styles.textInput, { color: colors.foreground }]}
+          />
+        </View>
+
+        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Occasion *</Text>
+        <View style={styles.chipRow}>
+          {OCCASIONS.map((oc) => (
+            <TouchableOpacity
+              key={oc}
+              onPress={() => setOccasion(oc)}
+              style={[
+                styles.chip,
+                { borderColor: occasion === oc ? colors.primary : colors.border },
+                occasion === oc && { backgroundColor: colors.primary + '18' },
+              ]}
+            >
+              <Text style={[styles.chipText, { color: occasion === oc ? colors.primary : colors.mutedForeground }]}>{oc}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      <View style={[styles.formSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>When to Make the Call</Text>
+
+        <View style={styles.timingToggle}>
+          {(['now', 'later'] as const).map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              onPress={() => setCallTiming(opt)}
+              style={[
+                styles.timingBtn,
+                { borderColor: callTiming === opt ? colors.primary : colors.border },
+                callTiming === opt && { backgroundColor: colors.primary + '18' },
+              ]}
+            >
+              <Icon
+                name={opt === 'now' ? 'phone-call' : 'calendar'}
+                size={15}
+                color={callTiming === opt ? colors.primary : colors.mutedForeground}
+              />
+              <Text style={[styles.timingBtnText, { color: callTiming === opt ? colors.primary : colors.mutedForeground }]}>
+                {opt === 'now' ? 'Call Now' : 'Schedule for Later'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {callTiming === 'later' && (
+          <>
+            <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Select Date</Text>
+            <TouchableOpacity
+              onPress={() => { setShowDatePicker(!showDatePicker); setShowTimePicker(false); }}
+              style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}
+            >
+              <Icon name="calendar" size={15} color={colors.mutedForeground} />
+              <Text style={[styles.dateText, { color: selectedDate ? colors.foreground : colors.mutedForeground }]}>
+                {selectedDate.label}
+              </Text>
+              <Icon name={showDatePicker ? 'chevron-up' : 'chevron-down'} size={14} color={colors.mutedForeground} />
+            </TouchableOpacity>
+            {showDatePicker && (
+              <View style={[styles.pickerDropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                {DATES.map((d) => (
+                  <TouchableOpacity
+                    key={d.dateStr}
+                    onPress={() => { setSelectedDate(d); setShowDatePicker(false); }}
+                    style={[
+                      styles.pickerOption,
+                      { borderBottomColor: colors.border },
+                      selectedDate.dateStr === d.dateStr && { backgroundColor: colors.primary + '10' },
+                    ]}
+                  >
+                    <Icon name="calendar" size={14} color={colors.primary} />
+                    <Text style={[styles.pickerOptionText, { color: selectedDate.dateStr === d.dateStr ? colors.primary : colors.foreground }]}>
+                      {d.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Select Time</Text>
+            <TouchableOpacity
+              onPress={() => { setShowTimePicker(!showTimePicker); setShowDatePicker(false); }}
+              style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}
+            >
+              <Icon name="clock" size={15} color={colors.mutedForeground} />
+              <Text style={[styles.dateText, { color: colors.foreground }]}>{selectedTime}</Text>
+              <Icon name={showTimePicker ? 'chevron-up' : 'chevron-down'} size={14} color={colors.mutedForeground} />
+            </TouchableOpacity>
+            {showTimePicker && (
+              <View style={[styles.pickerDropdown, styles.timeDropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ maxHeight: 200 }}>
+                  {TIMES.map((t) => (
+                    <TouchableOpacity
+                      key={t}
+                      onPress={() => { setSelectedTime(t); setShowTimePicker(false); }}
+                      style={[
+                        styles.pickerOption,
+                        { borderBottomColor: colors.border },
+                        selectedTime === t && { backgroundColor: colors.primary + '10' },
+                      ]}
+                    >
+                      <Icon name="clock" size={14} color={colors.primary} />
+                      <Text style={[styles.pickerOptionText, { color: selectedTime === t ? colors.primary : colors.foreground }]}>
+                        {t}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      <View style={[styles.formSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Personalization <Text style={[styles.optionalTag, { color: colors.mutedForeground }]}>(Optional)</Text></Text>
+
+        <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Custom Message</Text>
         <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background, height: 90, alignItems: 'flex-start', paddingTop: 10 }]}>
           <TextInput
-            value={message}
-            onChangeText={setMessage}
-            placeholder="Any specific message or topic for the call..."
+            value={customMessage}
+            onChangeText={setCustomMessage}
+            placeholder="Specific wishes, memories, or things to mention..."
             placeholderTextColor={colors.mutedForeground}
             multiline
             style={[styles.textInput, { color: colors.foreground, textAlignVertical: 'top', flex: 1, width: '100%' }]}
           />
         </View>
 
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 16 }]}>Tone</Text>
-        <View style={styles.toneGroup}>
+        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Tone & Style</Text>
+        <View style={styles.chipRow}>
           {TONES.map((t) => (
             <TouchableOpacity
-              key={t}
-              onPress={() => setTone(t)}
-              style={[styles.toneOption]}
+              key={t.value}
+              onPress={() => setTone(tone === t.value ? '' : t.value)}
+              style={[
+                styles.chip,
+                { borderColor: tone === t.value ? colors.primary : colors.border },
+                tone === t.value && { backgroundColor: colors.primary + '18' },
+              ]}
             >
-              <View style={[styles.radioOuter, { borderColor: tone === t ? colors.primary : colors.border }]}>
-                {tone === t && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
-              </View>
-              <Text style={[styles.toneLabel, { color: tone === t ? colors.foreground : colors.mutedForeground }]}>{t}</Text>
+              <Text style={[styles.chipText, { color: tone === t.value ? colors.primary : colors.mutedForeground }]}>{t.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 16 }]}>Schedule Date</Text>
-        <TouchableOpacity
-          onPress={() => setShowDatePicker(true)}
-          style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}
-        >
-          <Icon name="calendar" size={15} color={colors.mutedForeground} />
-          <Text style={[styles.dateText, { color: schedDate ? colors.foreground : colors.mutedForeground }]}>
-            {schedDate || 'Select date & time'}
-          </Text>
-        </TouchableOpacity>
+        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Relationship to Recipient</Text>
+        <View style={styles.chipRow}>
+          {RELATIONSHIPS.map((r) => (
+            <TouchableOpacity
+              key={r.value}
+              onPress={() => setRelationship(relationship === r.value ? '' : r.value)}
+              style={[
+                styles.chip,
+                { borderColor: relationship === r.value ? colors.primary : colors.border },
+                relationship === r.value && { backgroundColor: colors.primary + '18' },
+              ]}
+            >
+              <Text style={[styles.chipText, { color: relationship === r.value ? colors.primary : colors.mutedForeground }]}>{r.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
-        {showDatePicker && (
-          <View style={[styles.dateDropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            {mockDates.map((d) => (
-              <TouchableOpacity
-                key={d}
-                onPress={() => { setSchedDate(d); setShowDatePicker(false); }}
-                style={[styles.dateOption, { borderBottomColor: colors.border }]}
-              >
-                <Icon name="clock" size={14} color={colors.primary} />
-                <Text style={[styles.dateOptionText, { color: colors.foreground }]}>{d}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 16 }]}>Language</Text>
+        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Language</Text>
         <View style={styles.chipRow}>
           {LANGUAGES.map((l) => (
             <TouchableOpacity
-              key={l}
-              onPress={() => setLang(l)}
-              style={[styles.chip, { borderColor: lang === l ? colors.primary : colors.border },
-                lang === l && { backgroundColor: colors.primary + '18' }]}
+              key={l.value}
+              onPress={() => setLanguage(l.value)}
+              style={[
+                styles.chip,
+                { borderColor: language === l.value ? colors.primary : colors.border },
+                language === l.value && { backgroundColor: colors.primary + '18' },
+              ]}
             >
-              <Text style={[styles.chipText, { color: lang === l ? colors.primary : colors.mutedForeground }]}>{l}</Text>
+              <Text style={[styles.chipText, { color: language === l.value ? colors.primary : colors.mutedForeground }]}>{l.label}</Text>
             </TouchableOpacity>
           ))}
+        </View>
+
+        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Things to Avoid</Text>
+        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
+          <TextInput
+            value={thingsToAvoid}
+            onChangeText={setThingsToAvoid}
+            placeholder="Topics or phrases to exclude..."
+            placeholderTextColor={colors.mutedForeground}
+            style={[styles.textInput, { color: colors.foreground }]}
+          />
+        </View>
+
+        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Additional Context</Text>
+        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background, height: 80, alignItems: 'flex-start', paddingTop: 10 }]}>
+          <TextInput
+            value={additionalContext}
+            onChangeText={setAdditionalContext}
+            placeholder="Any extra info about the recipient..."
+            placeholderTextColor={colors.mutedForeground}
+            multiline
+            style={[styles.textInput, { color: colors.foreground, textAlignVertical: 'top', flex: 1, width: '100%' }]}
+          />
         </View>
       </View>
 
       <View style={[styles.pricingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Text style={[styles.pricingTitle, { color: colors.foreground }]}>Pricing Summary</Text>
         <View style={styles.pricingRow}>
-          <Text style={[styles.pricingLabel, { color: colors.mutedForeground }]}>
-            Base price ({MOCK_CALL_MINUTES} min × ₹{celeb.ratePerMinute})
-          </Text>
+          <Text style={[styles.pricingLabel, { color: colors.mutedForeground }]}>Voice call price</Text>
           <Text style={[styles.pricingValue, { color: colors.foreground }]}>₹{basePrice.toLocaleString('en-IN')}</Text>
         </View>
         <View style={styles.pricingRow}>
@@ -319,158 +672,37 @@ function CallDetailsForm({
         </View>
       </View>
 
-      <TouchableOpacity onPress={onCall} activeOpacity={0.85} style={styles.callBtnWrap}>
+      {callError && (
+        <View style={[styles.callErrorBanner, { backgroundColor: '#EF444420', borderColor: '#EF4444' }]}>
+          <Icon name="alert-circle" size={16} color="#EF4444" />
+          <Text style={[styles.callErrorText, { color: '#EF4444' }]}>{callError}</Text>
+        </View>
+      )}
+
+      <TouchableOpacity
+        onPress={handleMakeCall}
+        disabled={submitting}
+        activeOpacity={0.85}
+        style={[styles.callBtnWrap, submitting && { opacity: 0.7 }]}
+      >
         <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callCTA}>
-          <Icon name="phone" size={18} color="#fff" />
-          <Text style={styles.callCTAText}>Make Call</Text>
+          {submitting ? (
+            <>
+              <ActivityIndicator size="small" color="#fff" />
+              <Text style={styles.callCTAText}>Initiating...</Text>
+            </>
+          ) : (
+            <>
+              <Icon name="phone" size={18} color="#fff" />
+              <Text style={styles.callCTAText}>Make Call</Text>
+            </>
+          )}
         </LinearGradient>
       </TouchableOpacity>
     </View>
   );
 }
 
-function CallModal({
-  visible,
-  celeb,
-  onEnd,
-}: {
-  visible: boolean;
-  celeb: Celebrity | null;
-  onEnd: () => void;
-}) {
-  const { colors } = useTheme();
-  const [callState, setCallState] = useState<'connecting' | 'in-progress'>('connecting');
-  const [seconds, setSeconds] = useState(0);
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const phoneAnim = useRef(new Animated.Value(1)).current;
-  const pulseRef = useRef<Animated.CompositeAnimation | null>(null);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopPulse = useCallback(() => {
-    if (pulseRef.current) {
-      pulseRef.current.stop();
-      pulseRef.current = null;
-    }
-  }, []);
-
-  const startPulse = useCallback(() => {
-    stopPulse();
-    pulseAnim.setValue(1);
-    phoneAnim.setValue(1);
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.parallel([
-          Animated.timing(pulseAnim, { toValue: 1.3, duration: 700, useNativeDriver: true }),
-          Animated.timing(phoneAnim, { toValue: 1.15, duration: 700, useNativeDriver: true }),
-        ]),
-        Animated.parallel([
-          Animated.timing(pulseAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
-          Animated.timing(phoneAnim, { toValue: 1, duration: 700, useNativeDriver: true }),
-        ]),
-      ]),
-    );
-    pulseRef.current = loop;
-    loop.start();
-  }, [pulseAnim, phoneAnim, stopPulse]);
-
-  useEffect(() => {
-    if (visible) {
-      setCallState('connecting');
-      setSeconds(0);
-      startPulse();
-      const t = setTimeout(() => setCallState('in-progress'), 2500);
-      return () => clearTimeout(t);
-    } else {
-      stopPulse();
-    }
-  }, [visible, startPulse, stopPulse]);
-
-  useEffect(() => {
-    if (callState === 'in-progress') {
-      timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [callState]);
-
-  useEffect(() => {
-    if (!visible) {
-      if (timerRef.current) clearInterval(timerRef.current);
-      setSeconds(0);
-    }
-  }, [visible]);
-
-  const formatTime = (s: number) => {
-    const m = Math.floor(s / 60);
-    const sec = s % 60;
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  };
-
-  if (!celeb) return null;
-
-  return (
-    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onEnd}>
-      <LinearGradient colors={['#1a0030', '#0d0020']} style={styles.modalBg}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalStatus}>
-            {callState === 'connecting' ? 'Connecting...' : 'Call in Progress'}
-          </Text>
-
-          {callState === 'connecting' ? (
-            <View style={styles.modalAvatarWrap}>
-              <Animated.View style={[styles.pulseBg, { transform: [{ scale: pulseAnim }] }]} />
-              <Animated.View style={[styles.phoneIconCircle, { transform: [{ scale: phoneAnim }] }]}>
-                <Icon name="phone-call" size={40} color="#fff" />
-              </Animated.View>
-            </View>
-          ) : (
-            <View style={styles.modalAvatarWrap}>
-              <Image source={{ uri: celeb.imageUrl }} style={styles.modalAvatar} />
-            </View>
-          )}
-
-          <Text style={styles.modalCelebName}>{celeb.name}</Text>
-          <Text style={styles.modalCelebCat}>{celeb.category}</Text>
-
-          {callState === 'in-progress' ? (
-            <View style={styles.timerWrap}>
-              <Icon name="clock" size={16} color="rgba(255,255,255,0.6)" />
-              <Text style={styles.timerText}>{formatTime(seconds)}</Text>
-            </View>
-          ) : (
-            <View style={styles.connectingDots}>
-              {[0, 1, 2].map((i) => (
-                <View key={i} style={styles.dot} />
-              ))}
-            </View>
-          )}
-
-          <View style={styles.modalActions}>
-            <View style={styles.actionCol}>
-              <TouchableOpacity style={[styles.circleBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                <Icon name="volume-x" size={20} color="#fff" />
-              </TouchableOpacity>
-              <Text style={styles.actionLabel}>Mute</Text>
-            </View>
-            <View style={styles.actionCol}>
-              <TouchableOpacity onPress={onEnd} style={[styles.circleBtn, { backgroundColor: '#EF4444' }]}>
-                <Icon name="phone-off" size={22} color="#fff" />
-              </TouchableOpacity>
-              <Text style={styles.actionLabel}>End Call</Text>
-            </View>
-            <View style={styles.actionCol}>
-              <TouchableOpacity style={[styles.circleBtn, { backgroundColor: 'rgba(255,255,255,0.15)' }]}>
-                <Icon name="volume-2" size={20} color="#fff" />
-              </TouchableOpacity>
-              <Text style={styles.actionLabel}>Speaker</Text>
-            </View>
-          </View>
-        </View>
-      </LinearGradient>
-    </Modal>
-  );
-}
 
 export default function VoiceCallScreen() {
   const { colors } = useTheme();
@@ -483,7 +715,6 @@ export default function VoiceCallScreen() {
   const [step, setStep] = useState<1 | 2>(1);
   const [search, setSearch] = useState('');
   const [selectedCeleb, setSelectedCeleb] = useState<Celebrity | null>(null);
-  const [callVisible, setCallVisible] = useState(false);
 
   const handleSelectCeleb = (c: Celebrity) => {
     setSelectedCeleb(c);
@@ -495,22 +726,30 @@ export default function VoiceCallScreen() {
     setSelectedCeleb(null);
   };
 
-  const handleCall = () => setCallVisible(true);
-  const handleEndCall = () => setCallVisible(false);
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.header, { paddingTop: topPad + 16 }]}>
+      <LinearGradient
+        colors={['#FF6B33', '#B44CFF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={[styles.header, { paddingTop: topPad + 16 }]}
+      >
         <Text style={styles.headerTitle}>Celebrity Voice Calls</Text>
         <Text style={styles.headerSub}>Book a live 1-on-1 call with your favourite star</Text>
       </LinearGradient>
 
       <View style={[styles.stepBarWrap, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <View style={styles.stepLabels}>
-          <Text style={[styles.stepLabelText, { color: step === 1 ? colors.primary : colors.mutedForeground, fontFamily: step === 1 ? 'Inter_700Bold' : 'Inter_400Regular' }]}>
+          <Text style={[styles.stepLabelText, {
+            color: step === 1 ? colors.primary : colors.mutedForeground,
+            fontFamily: step === 1 ? 'Inter_700Bold' : 'Inter_400Regular',
+          }]}>
             Select Celebrity
           </Text>
-          <Text style={[styles.stepLabelText, { color: step === 2 ? colors.primary : colors.mutedForeground, fontFamily: step === 2 ? 'Inter_700Bold' : 'Inter_400Regular' }]}>
+          <Text style={[styles.stepLabelText, {
+            color: step === 2 ? colors.primary : colors.mutedForeground,
+            fontFamily: step === 2 ? 'Inter_700Bold' : 'Inter_400Regular',
+          }]}>
             Call Details
           </Text>
         </View>
@@ -537,14 +776,11 @@ export default function VoiceCallScreen() {
           <CallDetailsForm
             celeb={selectedCeleb}
             onBack={handleBack}
-            onCall={handleCall}
             colors={colors}
             bottomPad={bottomPad}
           />
         ) : null}
       </ScrollView>
-
-      <CallModal visible={callVisible} celeb={selectedCeleb} onEnd={handleEndCall} />
     </View>
   );
 }
@@ -566,7 +802,7 @@ const styles = StyleSheet.create({
   stepNum: { fontSize: 13, fontFamily: 'Inter_700Bold' },
   stepLine: { flex: 1, height: 2, marginHorizontal: 8 },
 
-  scrollContent: { padding: 16, gap: 12 },
+  scrollContent: { padding: 16, gap: 14 },
 
   searchWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
@@ -591,6 +827,14 @@ const styles = StyleSheet.create({
   ratingText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   rateText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
 
+  loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },
+  loadingText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  errorWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12, paddingHorizontal: 20 },
+  errorTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  errorSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
+  retryText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   backText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
 
@@ -602,30 +846,35 @@ const styles = StyleSheet.create({
 
   formContent: { gap: 14 },
   formSection: { borderRadius: 16, padding: 18, borderWidth: 1, gap: 4 },
-  fieldLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
+  sectionTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 12 },
+  optionalTag: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  fieldLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', marginBottom: 8 },
+
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, borderWidth: 1.5 },
   chipText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
+
   inputWrap: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, height: 46,
   },
   textInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
   dateText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  dateDropdown: {
-    borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden',
+
+  timingToggle: { flexDirection: 'row', gap: 10 },
+  timingBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 6, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5,
   },
-  dateOption: {
+  timingBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+
+  pickerDropdown: { borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
+  timeDropdown: {},
+  pickerOption: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1,
   },
-  dateOptionText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-
-  toneGroup: { gap: 10 },
-  toneOption: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  radioOuter: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  radioInner: { width: 9, height: 9, borderRadius: 4.5 },
-  toneLabel: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  pickerOptionText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
 
   pricingCard: { borderRadius: 16, padding: 18, borderWidth: 1, gap: 10 },
   pricingTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 4 },
@@ -639,33 +888,33 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 15, fontFamily: 'Inter_700Bold', flex: 1 },
   totalValue: { fontSize: 17, fontFamily: 'Inter_700Bold' },
 
+  callErrorBanner: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    borderWidth: 1, borderRadius: 10, padding: 12,
+  },
+  callErrorText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular' },
+
   callBtnWrap: { borderRadius: 14, overflow: 'hidden' },
   callCTA: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
   callCTAText: { color: '#fff', fontSize: 17, fontFamily: 'Inter_700Bold' },
 
-  modalBg: { flex: 1 },
-  modalContent: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 16 },
-  modalStatus: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontFamily: 'Inter_500Medium' },
-  modalAvatarWrap: { position: 'relative', alignItems: 'center', justifyContent: 'center', width: 140, height: 140 },
-  pulseBg: { position: 'absolute', width: 130, height: 130, borderRadius: 65, backgroundColor: '#FF6B33', opacity: 0.5 },
-  phoneIconCircle: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#FF6B33', alignItems: 'center', justifyContent: 'center' },
-  modalAvatar: { width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: '#fff' },
-  modalCelebName: { color: '#fff', fontSize: 24, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  modalCelebCat: { color: 'rgba(255,255,255,0.6)', fontSize: 14, fontFamily: 'Inter_400Regular' },
-  timerWrap: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(255,255,255,0.1)', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 9999 },
-  timerText: { color: '#fff', fontSize: 22, fontFamily: 'Inter_700Bold', letterSpacing: 2 },
-  connectingDots: { flexDirection: 'row', gap: 8, paddingVertical: 10 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.5)' },
-  modalActions: { flexDirection: 'row', gap: 32, marginTop: 20 },
-  actionCol: { alignItems: 'center', gap: 8 },
-  circleBtn: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontFamily: 'Inter_500Medium' },
-
-  loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },
-  loadingText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  errorWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12, paddingHorizontal: 20 },
-  errorTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
-  errorSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
-  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
-  retryText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  successCard: {
+    borderRadius: 20, borderWidth: 1, padding: 28,
+    alignItems: 'center', gap: 14,
+  },
+  successIconWrap: {
+    width: 80, height: 80, borderRadius: 40,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  successTitle: { fontSize: 22, fontFamily: 'PlayfairDisplay_700Bold', textAlign: 'center' },
+  successMsg: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
+  successMetaRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, alignSelf: 'stretch',
+  },
+  successMetaText: { fontSize: 14, fontFamily: 'Inter_500Medium', flex: 1 },
+  successAvatar: { width: 28, height: 28, borderRadius: 14 },
+  bookAnotherBtnWrap: { borderRadius: 12, overflow: 'hidden', alignSelf: 'stretch', marginTop: 6 },
+  bookAnotherBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
+  bookAnotherText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_700Bold' },
 });

@@ -20,6 +20,8 @@ export interface Celebrity {
   deliveryTime?: string;
   subscription?: { is_enabled: boolean; price: number };
   socialMedia?: { instagram?: string; twitter?: string };
+  vapiVoiceId?: string;
+  vapiPhoneId?: string;
 }
 
 interface ApiCelebrity {
@@ -43,6 +45,8 @@ interface ApiCelebrity {
     video_promotion?: number;
   };
   voice_call_price?: number;
+  vapi_voice_id?: string;
+  vapi_phone_id?: string;
   social_media?: { instagram?: string; twitter?: string };
   subscription?: { is_enabled: boolean; price: number };
   occasions?: string[];
@@ -74,6 +78,8 @@ function normalizeCelebrity(raw: ApiCelebrity): Celebrity {
     tags: [],
     subscription: raw.subscription,
     socialMedia: raw.social_media,
+    vapiVoiceId: raw.vapi_voice_id,
+    vapiPhoneId: raw.vapi_phone_id,
   };
 }
 
