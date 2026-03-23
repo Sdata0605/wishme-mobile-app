@@ -47,7 +47,7 @@ export default function TabLayout() {
   const isWeb = Platform.OS === 'web';
   const [quickMenuVisible, setQuickMenuVisible] = useState(false);
 
-  const TAB_CONTENT_H = isWeb ? 64 : 60;
+  const TAB_CONTENT_H = isWeb ? 84 : 60;
   const tabBarH = TAB_CONTENT_H + (isWeb ? 0 : insets.bottom);
   const moreBtnBottom = tabBarH + 10;
 
