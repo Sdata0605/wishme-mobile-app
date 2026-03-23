@@ -47,8 +47,9 @@ export default function TabLayout() {
   const isWeb = Platform.OS === 'web';
   const [quickMenuVisible, setQuickMenuVisible] = useState(false);
 
-  const tabBarH = isWeb ? 84 : 60;
-  const moreBtnBottom = tabBarH + insets.bottom + 10;
+  const TAB_CONTENT_H = isWeb ? 64 : 60;
+  const tabBarH = TAB_CONTENT_H + (isWeb ? 0 : insets.bottom);
+  const moreBtnBottom = tabBarH + 10;
 
   const navigateQuick = (route: Href) => {
     setQuickMenuVisible(false);
@@ -69,7 +70,8 @@ export default function TabLayout() {
               borderTopWidth: isWeb ? 1 : 0,
               borderTopColor: colors.border,
               elevation: 0,
-              height: isWeb ? 84 : 60,
+              height: tabBarH,
+              paddingBottom: isWeb ? 0 : insets.bottom,
             },
             tabBarBackground: () =>
               isIOS ? (
@@ -78,7 +80,8 @@ export default function TabLayout() {
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? colors.card : '#fff' }]} />
               ),
             tabBarShowLabel: true,
-            tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 2 },
+            tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 4 },
+            tabBarIconStyle: { marginTop: 6 },
           }}
         >
           <Tabs.Screen
