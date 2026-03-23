@@ -23,7 +23,7 @@ export default function CelebrityDetailScreen() {
   const insets = useSafeAreaInsets();
   const [isFav, setIsFav] = useState(false);
 
-  const { celebrities, loading } = useCelebrities({ limit: 50 });
+  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
   const celebrity = celebrities.find((c) => c.id === id);
 
   if (loading) {
@@ -31,6 +31,25 @@ export default function CelebrityDetailScreen() {
       <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={[{ marginTop: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.mutedForeground }]}>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 24 }]}>
+        <Icon name="alert-circle" size={48} color={colors.primary} />
+        <Text style={[{ fontSize: 18, fontFamily: 'Inter_700Bold', color: colors.foreground, textAlign: 'center' }]}>Could not load celebrity</Text>
+        <Text style={[{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, textAlign: 'center' }]}>{error}</Text>
+        <TouchableOpacity
+          onPress={refetch}
+          style={[{ paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.primary }]}
+        >
+          <Text style={{ color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Try Again</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={{ color: colors.mutedForeground, fontSize: 13, fontFamily: 'Inter_400Regular' }}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
