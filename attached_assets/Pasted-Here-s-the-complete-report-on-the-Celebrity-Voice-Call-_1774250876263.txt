@@ -1,0 +1,98 @@
+Here's the complete report on the Celebrity Voice Call form — every field, its type, whether it's required, and the exact JSON to send to the API.
+
+Call Details Form — Complete Field Reference
+Section 1: Required Fields
+Field	UI Label	Input Type	Required	State Variable	Notes
+senderName	Your Name *	Text input	Yes	senderName	Auto-filled from user profile (first_name + last_name)
+recipientName	Recipient's Name *	Text input	Yes	recipientName	Person receiving the call
+recipientPhone	Phone Number *	Text input	Yes	recipientPhone	Indian number, auto-formatted to +91XXXXXXXXXX by the backend
+occasion	Occasion *	Select dropdown	Yes	occasion	One of: Birthday, Anniversary, Graduation, New Year, Diwali, Christmas, Eid, Holi, Promotion, Wedding, Engagement, Baby Shower, Retirement, Get Well Soon, Thank You, Congratulations, Good Luck, Other
+Section 2: Call Timing (Required)
+Field	UI Label	Input Type	Required	Notes
+callTiming	When to Make the Call	Radio group (now / scheduled)	Yes	Defaults to now
+scheduledDate	Select Date	Calendar date picker	Only if scheduled	Cannot pick past dates
+scheduledTime	Select Time	Select dropdown (30-min intervals, 00:00–23:30)	Only if scheduled	Defaults to 10:00
+When scheduled is chosen, the frontend combines scheduledDate + scheduledTime into a single ISO-8601 string sent as scheduledAt.
+
+Section 3: Personalization (All Optional)
+Field	UI Label	Input Type	State Variable	Notes
+customMessage	Custom Message / Things to Say	Textarea (3 rows)	customMessage	Specific wishes, memories, jokes to mention
+tone	Tone & Style	Select dropdown	tone	One of: warm_loving, funny_playful, inspirational, formal, casual, emotional
+relationship	Relationship to Recipient	Select dropdown	relationship	One of: friend, parent, child, spouse, sibling, colleague, boss, relative, other
+language	Language	Select dropdown	language	One of: english, hindi, tamil, telugu, kannada, malayalam, marathi, bengali, gujarati, punjabi. Defaults to english
+thingsToAvoid	Things to Avoid	Text input	thingsToAvoid	Topics/phrases to exclude
+additionalContext	Additional Context	Textarea (2 rows)	additionalContext	Extra info about recipient
+Section 4: Pricing Display (Read-only)
+Shows the celebrity's voice_call_price (default ₹500), applies plan discount if applicable, and displays current wallet balance.
+
+Exact API Call
+Endpoint: vapi-celebrity-call (Supabase Edge Function)
+
+Method: POST (via supabase.functions.invoke)
+
+Authentication: User JWT (passed automatically by Supabase client)
+
+Exact JSON body sent by the frontend:
+
+
+{
+  "recipientName": "Rahul Kumar",
+  "recipientPhone": "+91 9876543210",
+  "occasion": "Birthday",
+  "senderName": "Priya Sharma",
+  "celebrityId": "uuid-of-selected-celebrity",
+  "celebrityName": "Shah Rukh Khan",
+  "voiceId": "elevenlabs-voice-id-from-celebrity-record",
+  "price": 425,
+  "celebrityPhoneId": "vapi-phone-id-or-null",
+  "customMessage": "Please mention that Rahul loves cricket and just got promoted",
+  "tone": "warm_loving",
+  "relationship": "friend",
+  "language": "hindi",
+  "thingsToAvoid": "Don't mention his age",
+  "additionalContext": "He is turning 30 and loves Bollywood",
+  "scheduledAt": "2026-03-25T10:00:00.000Z"
+}
+Field-by-field mapping:
+
+JSON Key	Source	Required	Type
+recipientName	Form input	Yes	string
+recipientPhone	Form input	Yes	string (raw, backend formats it)
+occasion	Select dropdown	Yes	string
+senderName	Form input	Yes	string
+celebrityId	From selected celebrity object	Yes	string (UUID)
+celebrityName	From selected celebrity object	Yes	string
+voiceId	selectedCelebrity.vapi_voice_id	Yes	string (ElevenLabs voice ID)
+price	Computed: getDiscountedPrice(voice_call_price)	Yes	number (INR)
+celebrityPhoneId	selectedCelebrity.vapi_phone_id	No	string or undefined
+customMessage	Textarea	No	string (trimmed)
+tone	Select dropdown	No	string (enum value)
+relationship	Select dropdown	No	string (enum value)
+language	Select dropdown	No	string (defaults "english")
+thingsToAvoid	Text input	No	string (trimmed)
+additionalContext	Textarea	No	string (trimmed)
+scheduledAt	Computed from date+time pickers	No	string (ISO-8601) or null
+API Response
+Immediate call success:
+
+
+{
+  "success": true,
+  "callId": "vapi-call-uuid",
+  "message": "Call initiated to Rahul Kumar"
+}
+Scheduled call success:
+
+
+{
+  "success": true,
+  "scheduled": true,
+  "scheduledAt": "2026-03-25T10:00:00.000Z",
+  "message": "Call scheduled for Rahul Kumar"
+}
+Error responses:
+
+
+{ "error": "Missing required fields" }
+{ "error": "Insufficient wallet balance. Required: ₹500, Available: ₹200" }
+{ "error": "Failed to initiate celebrity call", "details": { "status": 400, "body": "..." } }

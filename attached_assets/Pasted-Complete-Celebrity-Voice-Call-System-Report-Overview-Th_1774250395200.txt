@@ -1,0 +1,263 @@
+Complete Celebrity Voice Call System Report
+Overview
+There are two separate voice call features in the platform:
+
+Celebrity Voice Call (/celebrity-voice-call) — User picks a celebrity, and an AI call is made in that celebrity's cloned voice
+AI Voice Call Wish (/voice-call-wish) — User picks any Vapi voice (or uploads their own) and makes a generic AI wish call
+UI Pages
+1. Celebrity Voice Call — /celebrity-voice-call
+File: src/pages/CelebrityVoiceCall.tsx (697 lines)
+
+UI Flow:
+
+Page loads → if no ?celebrityId= param, opens CelebrityCallModal to pick a celebrity
+Modal (src/components/celebrity/CelebrityCallModal.tsx) queries celebrities table where vapi_voice_id IS NOT NULL and is_active = true
+User fills form: Sender Name, Recipient Name, Phone Number, Occasion (dropdown of 18 options)
+Optional personalization: Custom Message, Tone (6 options), Relationship (9 options), Language (10 Indian languages), Things to Avoid, Additional Context
+Call timing: "Call Now" or "Schedule for Later" (date/time picker)
+Price shown with plan discount support via usePlanDiscount()
+Calls supabase.functions.invoke('vapi-celebrity-call', { body: {...} })
+2. AI Voice Call Wish — /voice-call-wish
+File: src/pages/VoiceCallWish.tsx (488 lines)
+
+UI Flow:
+
+Two tabs: "Make a Call" and "Upload Voice"
+"Make a Call": Recipient Name, Phone, Occasion (free text), Voice selection dropdown
+Voice dropdown shows user's custom voices + Vapi platform voices (fetched from vapi-get-voices)
+Fixed price: ₹100
+Calls supabase.functions.invoke('vapi-make-call', { body: {...} })
+"Upload Voice": Upload audio file (≤10MB) to clone a voice via vapi-upload-voice
+Edge Function Endpoints
+Endpoint 1: vapi-celebrity-call (Authenticated)
+Invoke: supabase.functions.invoke('vapi-celebrity-call', { body })
+
+Request JSON:
+
+
+{
+  "recipientName": "Rahul",
+  "recipientPhone": "+919876543210",
+  "occasion": "Birthday",
+  "senderName": "Priya",
+  "celebrityId": "uuid-of-celebrity",
+  "celebrityName": "Shah Rukh Khan",
+  "voiceId": "elevenlabs-voice-id",
+  "price": 3000,
+  "celebrityPhoneId": "vapi-phone-id-or-null",
+  "customMessage": "Mention his love for cricket",
+  "tone": "warm_loving",
+  "relationship": "friend",
+  "language": "hindi",
+  "thingsToAvoid": "Don't mention his ex",
+  "additionalContext": "He just got promoted",
+  "scheduledAt": "2026-03-25T10:00:00.000Z"
+}
+Success Response (immediate call):
+
+
+{
+  "success": true,
+  "callId": "vapi-call-uuid",
+  "message": "Call initiated to Rahul"
+}
+Success Response (scheduled call):
+
+
+{
+  "success": true,
+  "scheduled": true,
+  "scheduledAt": "2026-03-25T10:00:00.000Z",
+  "message": "Call scheduled for Rahul"
+}
+What it does:
+
+Validates auth + profile + wallet balance
+Formats phone number (adds +91 if needed)
+Builds personalized AI prompt with celebrity persona, tone, language, relationship context
+If scheduledAt provided: deducts wallet, saves record with status scheduled, returns immediately (no Vapi call yet)
+If immediate: calls POST https://api.vapi.ai/call with Deepgram transcriber + ElevenLabs voice + GPT-4o-mini model
+Deducts wallet, records wallet_transactions and voice_call_wishes
+Vapi API payload sent:
+
+
+{
+  "phoneNumberId": "VAPI_PHONE_NUMBER_ID",
+  "customer": { "number": "+919876543210", "name": "Rahul" },
+  "assistant": {
+    "firstMessageMode": "assistant-speaks-first",
+    "firstMessage": "Hello Rahul! This is Shah Rukh Khan! Priya has arranged this special surprise for you!",
+    "transcriber": { "provider": "deepgram", "model": "nova-2", "language": "hi" },
+    "model": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "messages": [{ "role": "system", "content": "You are Shah Rukh Khan..." }]
+    },
+    "voice": {
+      "provider": "11labs",
+      "voiceId": "elevenlabs-voice-id",
+      "model": "eleven_turbo_v2_5",
+      "stability": 0.5,
+      "similarityBoost": 0.75,
+      "useSpeakerBoost": true
+    },
+    "silenceTimeoutSeconds": 60,
+    "maxDurationSeconds": 180,
+    "backgroundSound": "office",
+    "endCallMessage": "Thank you so much! Have a wonderful day and God bless you!",
+    "endCallPhrases": ["goodbye", "bye bye", "take care", "thank you bye", "ok bye"]
+  }
+}
+Endpoint 2: vapi-make-call (Authenticated)
+Invoke: supabase.functions.invoke('vapi-make-call', { body })
+
+Request JSON:
+
+
+{
+  "recipientName": "Rahul",
+  "recipientPhone": "+919876543210",
+  "occasion": "Birthday",
+  "voiceId": "elevenlabs-voice-id",
+  "voiceName": "My Custom Voice",
+  "voiceProvider": "11labs"
+}
+Success Response:
+
+
+{
+  "success": true,
+  "callId": "vapi-call-uuid",
+  "message": "Call initiated to Rahul!",
+  "callRecord": { "id": "uuid", "...": "..." }
+}
+What it does: Same as celebrity call but simpler — fixed ₹100 price, no celebrity persona, generic AI wish prompt.
+
+Endpoint 3: vapi-get-voices (Authenticated)
+Invoke: supabase.functions.invoke('vapi-get-voices')
+
+Response JSON:
+
+
+{
+  "vapiVoices": [
+    { "id": "voice-id", "name": "Rachel", "provider": "11labs" }
+  ],
+  "userVoices": [
+    { "id": "uuid", "vapi_voice_id": "voice-id", "voice_name": "My Voice", "created_at": "..." }
+  ]
+}
+What it does: Calls GET https://api.vapi.ai/voice to list platform voices, plus queries user_vapi_voices for user's custom voices.
+
+Endpoint 4: vapi-upload-voice (Authenticated)
+Invoke: supabase.functions.invoke('vapi-upload-voice', { body })
+
+Request JSON:
+
+
+{
+  "voiceName": "My Custom Voice",
+  "audioBase64": "base64-encoded-audio-data",
+  "provider": "11labs"
+}
+Response JSON:
+
+
+{
+  "success": true,
+  "voiceId": "vapi-voice-uuid",
+  "voiceName": "My Custom Voice",
+  "audioUrl": "https://f005.backblazeb2.com/file/wishmetoday/vapi-voices/..."
+}
+What it does:
+
+Uploads audio to Backblaze B2 (avoids payload size limits)
+Calls POST https://api.vapi.ai/voice with the B2 public URL for voice cloning
+Saves to user_vapi_voices table
+Endpoint 5: vapi-webhook (Public, no JWT)
+URL: POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/vapi-webhook
+
+Incoming Vapi webhook payload (example):
+
+
+{
+  "message": {
+    "type": "end-of-call-report",
+    "call": { "id": "vapi-call-uuid" },
+    "endedReason": "assistant-said-end-call-phrase",
+    "durationSeconds": 95,
+    "transcript": [
+      { "role": "assistant", "text": "Hello Rahul!" },
+      { "role": "user", "text": "Hi! Who is this?" }
+    ]
+  }
+}
+What it does: Receives Vapi call status updates and updates voice_call_wishes table:
+
+call.ringing → status ringing
+call.in-progress → status in-progress
+call.ended / end-of-call-report → status completed + duration + transcript
+call.failed → status failed + error message
+Database Table: voice_call_wishes
+Key columns:
+
+user_id, recipient_name, recipient_phone, occasion
+celebrity_id, sender_name
+vapi_voice_id, vapi_voice_name, vapi_call_id
+call_status (initiated/scheduled/ringing/in-progress/completed/failed)
+price_paid, call_duration_seconds, call_transcript
+disconnect_reason, error_message, webhook_payload
+scheduled_at, completed_at
+Complete Flow Diagram
+
+USER FLOW (Celebrity Voice Call):
+
+  User visits /celebrity-voice-call
+         │
+         ▼
+  CelebrityCallModal opens
+  (queries celebrities WHERE vapi_voice_id IS NOT NULL)
+         │
+         ▼
+  User selects celebrity + fills form
+  (name, phone, occasion, tone, language, etc.)
+         │
+         ▼
+  Frontend calls: supabase.functions.invoke('vapi-celebrity-call')
+         │
+         ├── If scheduledAt provided:
+         │     └── Deduct wallet → Save record (status: scheduled) → Return
+         │
+         └── If immediate:
+               │
+               ▼
+         POST https://api.vapi.ai/call
+         (with ElevenLabs voice + Deepgram transcriber + GPT-4o-mini)
+               │
+               ▼
+         Vapi initiates outbound phone call
+               │
+               ▼
+         Recipient's phone rings → AI speaks as celebrity
+               │
+               ▼
+         Vapi sends webhooks to vapi-webhook endpoint
+         (ringing → in-progress → completed/failed)
+               │
+               ▼
+         voice_call_wishes table updated with
+         status, duration, transcript, disconnect_reason
+Required Secrets
+Secret	Purpose
+VAPI_API_KEY	Authenticates with Vapi API
+VAPI_PHONE_NUMBER_ID	Default outbound phone number
+B2_KEY_ID / B2_APPLICATION_KEY	Voice upload to Backblaze B2
+OPENAI_API_KEY	GPT-4o-mini for conversation (used by Vapi)
+ELEVENLABS_API_KEY	Voice synthesis (used by Vapi via Provider Keys)
+All are already configured in your project.
+
+Important Notes for Mobile Integration
+All endpoints except vapi-webhook require Authorization: Bearer <user-jwt> header
+vapi-webhook is public (called by Vapi servers) — configured with verify_jwt = false in config.toml
+Wallet balance must be checked client-side before calling; the backend also validates
+Scheduled calls store the record but do NOT call Vapi yet — a separate scheduler is needed to trigger those calls at the scheduled time
