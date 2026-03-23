@@ -295,7 +295,7 @@ function CallDetailsForm({
         senderName: senderName.trim(),
         celebrityId: celeb.id,
         celebrityName: celeb.name,
-        price: finalPrice,
+        price: celeb.pricePerCall || 500,
         language,
       };
       if (celeb.vapiVoiceId) body.voiceId = celeb.vapiVoiceId;
