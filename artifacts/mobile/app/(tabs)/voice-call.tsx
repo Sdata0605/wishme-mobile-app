@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Dimensions,
   Image,
@@ -15,8 +16,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
-import { CELEBRITIES, Celebrity } from '@/constants/mockData';
+import { Celebrity } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrities } from '@/hooks/useCelebrities';
 
 const { width: W } = Dimensions.get('window');
 const CARD_W = (W - 52) / 2;
@@ -60,14 +62,25 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
 }
 
 function CelebSelectGrid({
-  search, setSearch, onSelect, colors,
+  celebrities,
+  loading,
+  error,
+  onRetry,
+  search,
+  setSearch,
+  onSelect,
+  colors,
 }: {
+  celebrities: Celebrity[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
   search: string;
   setSearch: (s: string) => void;
   onSelect: (c: Celebrity) => void;
   colors: ReturnType<typeof import('@/context/ThemeContext').useTheme>['colors'];
 }) {
-  const filtered = CELEBRITIES.filter(
+  const filtered = celebrities.filter(
     (c) =>
       c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.category.toLowerCase().includes(search.toLowerCase()),
@@ -86,37 +99,54 @@ function CelebSelectGrid({
         />
       </View>
 
-      <View style={styles.grid}>
-        {filtered.map((celeb) => (
-          <TouchableOpacity
-            key={celeb.id}
-            activeOpacity={0.82}
-            onPress={() => onSelect(celeb)}
-            style={[styles.celebCard, { backgroundColor: colors.card, borderColor: colors.border, width: CARD_W }]}
-          >
-            <View style={styles.celebAvatarWrap}>
-              <Image source={{ uri: celeb.imageUrl }} style={styles.celebAvatar} />
-              {celeb.isAvailable && <View style={styles.onlineDot} />}
-            </View>
-            <View style={styles.celebInfo}>
-              <View style={styles.celebNameRow}>
-                <Text style={[styles.celebName, { color: colors.foreground }]} numberOfLines={1}>{celeb.name}</Text>
-                {celeb.isVerified && (
-                  <View style={styles.verifiedBadge}>
-                    <Icon name="check" size={8} color="#fff" />
-                  </View>
-                )}
-              </View>
-              <Text style={[styles.celebCat, { color: colors.mutedForeground }]}>{celeb.category}</Text>
-              <View style={styles.ratingRow}>
-                <Icon name="star" size={11} color="#F59E0B" />
-                <Text style={[styles.ratingText, { color: colors.foreground }]}>{celeb.rating}</Text>
-              </View>
-              <Text style={[styles.rateText, { color: colors.primary }]}>₹{celeb.ratePerMinute}/min</Text>
-            </View>
+      {loading ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading celebrities...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorWrap}>
+          <Icon name="alert-circle" size={40} color={colors.primary} />
+          <Text style={[styles.errorTitle, { color: colors.foreground }]}>Could not load celebrities</Text>
+          <Text style={[styles.errorSub, { color: colors.mutedForeground }]}>{error}</Text>
+          <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={onRetry}>
+            <Icon name="refresh-cw" size={14} color="#fff" />
+            <Text style={styles.retryText}>Try Again</Text>
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
+      ) : (
+        <View style={styles.grid}>
+          {filtered.map((celeb) => (
+            <TouchableOpacity
+              key={celeb.id}
+              activeOpacity={0.82}
+              onPress={() => onSelect(celeb)}
+              style={[styles.celebCard, { backgroundColor: colors.card, borderColor: colors.border, width: CARD_W }]}
+            >
+              <View style={styles.celebAvatarWrap}>
+                <Image source={{ uri: celeb.imageUrl }} style={styles.celebAvatar} />
+                {celeb.isAvailable && <View style={styles.onlineDot} />}
+              </View>
+              <View style={styles.celebInfo}>
+                <View style={styles.celebNameRow}>
+                  <Text style={[styles.celebName, { color: colors.foreground }]} numberOfLines={1}>{celeb.name}</Text>
+                  {celeb.isVerified && (
+                    <View style={styles.verifiedBadge}>
+                      <Icon name="check" size={8} color="#fff" />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.celebCat, { color: colors.mutedForeground }]}>{celeb.category}</Text>
+                <View style={styles.ratingRow}>
+                  <Icon name="star" size={11} color="#F59E0B" />
+                  <Text style={[styles.ratingText, { color: colors.foreground }]}>{celeb.rating}</Text>
+                </View>
+                <Text style={[styles.rateText, { color: colors.primary }]}>₹{celeb.ratePerMinute}/min</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
     </>
   );
 }
@@ -448,6 +478,8 @@ export default function VoiceCallScreen() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = insets.bottom + 24;
 
+  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
+
   const [step, setStep] = useState<1 | 2>(1);
   const [search, setSearch] = useState('');
   const [selectedCeleb, setSelectedCeleb] = useState<Celebrity | null>(null);
@@ -492,6 +524,10 @@ export default function VoiceCallScreen() {
       >
         {step === 1 ? (
           <CelebSelectGrid
+            celebrities={celebrities}
+            loading={loading}
+            error={error}
+            onRetry={refetch}
             search={search}
             setSearch={setSearch}
             onSelect={handleSelectCeleb}
@@ -624,4 +660,12 @@ const styles = StyleSheet.create({
   actionCol: { alignItems: 'center', gap: 8 },
   circleBtn: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
   actionLabel: { color: 'rgba(255,255,255,0.7)', fontSize: 12, fontFamily: 'Inter_500Medium' },
+
+  loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },
+  loadingText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  errorWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12, paddingHorizontal: 20 },
+  errorTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  errorSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
+  retryText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
 });
