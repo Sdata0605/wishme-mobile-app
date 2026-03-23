@@ -184,9 +184,16 @@ export function useCelebrities({ limit = 20, category }: UseCelebritiesOptions =
     })
     .slice(0, limit);
 
+  /**
+   * Treat the store as "loading" if no data and no error yet — this prevents
+   * a brief "not found" or empty flash on the first render before fetchOnce()
+   * has had a chance to flip store.loading to true.
+   */
+  const loading = store.loading || (store.celebrities.length === 0 && store.error === null);
+
   return {
     celebrities,
-    loading: store.loading,
+    loading,
     error: store.error,
     refetch: refetchAll,
   };
