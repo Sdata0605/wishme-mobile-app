@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -250,6 +250,13 @@ function CallDetailsForm({
   const [senderName, setSenderName] = useState(
     user ? `${user.firstName} ${user.lastName}`.trim() : '',
   );
+
+  useEffect(() => {
+    if (user && !senderName.trim()) {
+      setSenderName(`${user.firstName} ${user.lastName}`.trim());
+    }
+  }, [user]);
+
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [occasion, setOccasion] = useState('Birthday');
@@ -278,6 +285,11 @@ function CallDetailsForm({
   async function handleMakeCall() {
     if (!senderName.trim() || !recipientName.trim() || !recipientPhone.trim()) {
       setCallError('Please fill in Your Name, Recipient Name, and Phone Number.');
+      return;
+    }
+    const phoneDigits = recipientPhone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      setCallError('Please enter a valid 10-digit phone number.');
       return;
     }
     if (callTiming === 'later' && (!selectedDate || !selectedTime)) {
@@ -324,9 +336,12 @@ function CallDetailsForm({
       }
 
       if (json.scheduled) {
-        setSuccess({ scheduled: true, scheduledAt: json.scheduledAt, message: json.message });
+        const scheduledAt: string = json.scheduledAt ?? buildScheduledAt(selectedDate.dateStr, selectedTime);
+        const fallbackMsg = `Your call from ${celeb.name} to ${recipientName.trim()} has been scheduled!`;
+        setSuccess({ scheduled: true, scheduledAt, message: json.message || fallbackMsg });
       } else {
-        setSuccess({ scheduled: false, callId: json.callId, message: json.message });
+        const fallbackMsg = `${celeb.name} will call ${recipientName.trim()} shortly. Fingers crossed! 🤞`;
+        setSuccess({ scheduled: false, callId: json.callId, message: json.message || fallbackMsg });
       }
     } catch (err: unknown) {
       setCallError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
