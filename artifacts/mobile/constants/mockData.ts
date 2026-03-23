@@ -1,25 +1,11 @@
+export { type Celebrity } from '@/hooks/useCelebrities';
+
 export const COMMISSION_RATES = {
   L1: { pct: 10, label: 'Direct referral' },
   L2: { pct: 5, label: '2nd level referral' },
 } as const;
 
-export interface Celebrity {
-  id: string;
-  name: string;
-  category: string;
-  rating: number;
-  reviewCount: number;
-  pricePerWish: number;
-  pricePerCall: number;
-  imageUrl: string;
-  bio: string;
-  tags: string[];
-  isVerified: boolean;
-  isAvailable: boolean;
-  ratePerMinute: number;
-}
-
-export const CELEBRITIES: Celebrity[] = [
+export const CELEBRITIES = [
   {
     id: '1',
     name: 'Ranveer Singh',

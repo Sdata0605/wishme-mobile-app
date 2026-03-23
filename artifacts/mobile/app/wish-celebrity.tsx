@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Platform,
   ScrollView,
   StyleSheet,
@@ -13,10 +14,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
-import { CELEBRITIES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
-
-const SUBSCRIBED_IDS = new Set(['1', '2', '3']);
+import { useCelebrities, type Celebrity } from '@/hooks/useCelebrities';
 
 export default function WishCelebrityScreen() {
   const { colors } = useTheme();
@@ -25,7 +24,9 @@ export default function WishCelebrityScreen() {
   const [toast, setToast] = useState('');
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
-  const filtered = CELEBRITIES.filter(c =>
+  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 30 });
+
+  const filtered = celebrities.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.category.toLowerCase().includes(search.toLowerCase())
   );
@@ -35,7 +36,12 @@ export default function WishCelebrityScreen() {
     setTimeout(() => setToast(''), 2500);
   };
 
-  const pairs: (typeof CELEBRITIES[0] | null)[][] = [];
+  const isSubscribed = (celeb: Celebrity, index: number): boolean => {
+    if (celeb.subscription) return celeb.subscription.is_enabled;
+    return index < 3;
+  };
+
+  const pairs: (Celebrity | null)[][] = [];
   for (let i = 0; i < filtered.length; i += 2) {
     pairs.push([filtered[i] ?? null, filtered[i + 1] ?? null]);
   }
@@ -75,56 +81,77 @@ export default function WishCelebrityScreen() {
           )}
         </View>
 
+        {/* Loading */}
+        {loading && (
+          <View style={s.loadingWrap}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Loading celebrities...</Text>
+          </View>
+        )}
+
+        {/* Error */}
+        {!loading && error && (
+          <View style={s.errorWrap}>
+            <Icon name="alert-circle" size={36} color={colors.primary} />
+            <Text style={[s.errorTitle, { color: colors.foreground }]}>Could not load celebrities</Text>
+            <TouchableOpacity style={[s.retryBtn, { backgroundColor: colors.primary }]} onPress={refetch}>
+              <Text style={s.retryText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Grid */}
-        <View style={s.grid}>
-          {pairs.map((pair, ri) => (
-            <View key={ri} style={s.gridRow}>
-              {pair.map((celeb, ci) => {
-                if (!celeb) return <View key={ci} style={s.gridCell} />;
-                const subscribed = SUBSCRIBED_IDS.has(celeb.id);
-                return (
-                  <View key={celeb.id} style={[s.gridCell, s.celebCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                    <View style={s.imgWrap}>
-                      <Image source={{ uri: celeb.imageUrl }} style={s.celebImg} contentFit="cover" />
-                      {!subscribed && (
-                        <View style={s.lockOverlay}>
-                          <Icon name="lock" size={22} color="#fff" />
-                        </View>
-                      )}
-                      {celeb.isVerified && (
-                        <View style={s.verifiedBadge}>
-                          <Icon name="check" size={10} color="#fff" />
-                        </View>
+        {!loading && !error && (
+          <View style={s.grid}>
+            {pairs.map((pair, ri) => (
+              <View key={ri} style={s.gridRow}>
+                {pair.map((celeb, ci) => {
+                  if (!celeb) return <View key={ci} style={s.gridCell} />;
+                  const subscribed = isSubscribed(celeb, ri * 2 + ci);
+                  return (
+                    <View key={celeb.id} style={[s.gridCell, s.celebCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <View style={s.imgWrap}>
+                        <Image source={{ uri: celeb.imageUrl }} style={s.celebImg} contentFit="cover" />
+                        {!subscribed && (
+                          <View style={s.lockOverlay}>
+                            <Icon name="lock" size={22} color="#fff" />
+                          </View>
+                        )}
+                        {celeb.isVerified && (
+                          <View style={s.verifiedBadge}>
+                            <Icon name="check" size={10} color="#fff" />
+                          </View>
+                        )}
+                      </View>
+                      <Text style={[s.celebName, { color: colors.foreground }]} numberOfLines={1}>{celeb.name}</Text>
+                      <Text style={[s.celebCat, { color: colors.mutedForeground }]} numberOfLines={1}>{celeb.category}</Text>
+                      <View style={s.starsRow}>
+                        <Icon name="star" size={12} color="#F59E0B" />
+                        <Text style={[s.rating, { color: colors.mutedForeground }]}>{celeb.rating}</Text>
+                      </View>
+                      {subscribed ? (
+                        <TouchableOpacity
+                          style={s.sendWishBtn}
+                          onPress={() => router.push({ pathname: '/booking/[id]', params: { id: celeb.id } } as never)}
+                          activeOpacity={0.85}
+                        >
+                          <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.sendWishGrad}>
+                            <Text style={s.sendWishText}>Send Wish</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity style={[s.subscribeBtn, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={() => showToast(`Subscribe to ${celeb.name} to send wishes`)}>
+                          <Icon name="lock" size={12} color={colors.mutedForeground} />
+                          <Text style={[s.subscribeBtnText, { color: colors.mutedForeground }]}>Subscribe First</Text>
+                        </TouchableOpacity>
                       )}
                     </View>
-                    <Text style={[s.celebName, { color: colors.foreground }]} numberOfLines={1}>{celeb.name}</Text>
-                    <Text style={[s.celebCat, { color: colors.mutedForeground }]} numberOfLines={1}>{celeb.category}</Text>
-                    <View style={s.starsRow}>
-                      <Icon name="star" size={12} color="#F59E0B" />
-                      <Text style={[s.rating, { color: colors.mutedForeground }]}>{celeb.rating}</Text>
-                    </View>
-                    {subscribed ? (
-                      <TouchableOpacity
-                        style={s.sendWishBtn}
-                        onPress={() => router.push({ pathname: '/booking/[id]', params: { id: celeb.id } } as never)}
-                        activeOpacity={0.85}
-                      >
-                        <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.sendWishGrad}>
-                          <Text style={s.sendWishText}>Send Wish</Text>
-                        </LinearGradient>
-                      </TouchableOpacity>
-                    ) : (
-                      <TouchableOpacity style={[s.subscribeBtn, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={() => showToast(`Subscribe to ${celeb.name} to send wishes`)}>
-                        <Icon name="lock" size={12} color={colors.mutedForeground} />
-                        <Text style={[s.subscribeBtnText, { color: colors.mutedForeground }]}>Subscribe First</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                );
-              })}
-            </View>
-          ))}
-        </View>
+                  );
+                })}
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       {/* Toast */}
@@ -146,6 +173,12 @@ const s = StyleSheet.create({
   heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
   searchWrap: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderRadius: 14, paddingHorizontal: 14, height: 46, margin: 16 },
   searchInput: { flex: 1, fontSize: 14, height: 46 },
+  loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, gap: 12 },
+  loadingText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  errorWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40, gap: 12, paddingHorizontal: 20 },
+  errorTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
+  retryText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   grid: { paddingHorizontal: 12, gap: 10 },
   gridRow: { flexDirection: 'row', gap: 10 },
   gridCell: { flex: 1 },

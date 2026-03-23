@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   Platform,
   RefreshControl,
@@ -13,8 +14,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CelebCard } from '@/components/CelebCard';
 import { Icon } from '@/components/Icon';
-import { CATEGORIES, CELEBRITIES } from '@/constants/mockData';
+import { CATEGORIES } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrities } from '@/hooks/useCelebrities';
 
 const { width: W } = Dimensions.get('window');
 const CARD_WIDTH = (W - 52) / 2;
@@ -44,34 +46,38 @@ export default function CelebritiesScreen() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeDelivery, setActiveDelivery] = useState('All');
-  const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);
+
+  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const filtered = useMemo(() => {
-    return CELEBRITIES.filter((c) => {
+    return celebrities.filter((c) => {
       const matchSearch =
         c.name.toLowerCase().includes(search.toLowerCase()) ||
         c.category.toLowerCase().includes(search.toLowerCase());
-      const matchCat = activeCategory === 'All' || c.category === CATEGORY_MAP[activeCategory];
+
+      const catValue = CATEGORY_MAP[activeCategory] ?? '';
+      const matchCat =
+        activeCategory === 'All' ||
+        c.category === catValue ||
+        c.category.toLowerCase().includes(catValue.toLowerCase()) ||
+        catValue.toLowerCase().includes(c.category.toLowerCase());
+
       const matchDelivery =
         activeDelivery === 'All' ||
         (activeDelivery === 'Under 24h' && c.pricePerWish < 1500) ||
         (activeDelivery === '24-48h' && c.pricePerWish >= 1500 && c.pricePerWish < 3000) ||
         (activeDelivery === '48-72h' && c.pricePerWish >= 3000 && c.pricePerWish < 5000) ||
         (activeDelivery === '1 week+' && c.pricePerWish >= 5000);
+
       return matchSearch && matchCat && matchDelivery;
     });
-  }, [search, activeCategory, activeDelivery]);
+  }, [celebrities, search, activeCategory, activeDelivery]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1500);
-  };
 
   const onCategoryChange = (cat: string) => {
     setActiveCategory(cat);
@@ -157,53 +163,71 @@ export default function CelebritiesScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={colors.primary} />}
       >
-        {/* Results count */}
-        <View style={styles.resultsRow}>
-          <Text style={[styles.resultsText, { color: colors.mutedForeground }]}>
-            {filtered.length} {filtered.length === 1 ? 'celebrity' : 'celebrities'} found
-          </Text>
-        </View>
-
-        {/* Grid */}
-        {paged.length > 0 ? (
-          <View style={styles.grid}>
-            {paged.map((item) => (
-              <CelebCard key={item.id} celebrity={item} width={CARD_WIDTH} />
-            ))}
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading celebrities...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorWrap}>
+            <Icon name="alert-circle" size={40} color={colors.primary} />
+            <Text style={[styles.errorTitle, { color: colors.foreground }]}>Could not load celebrities</Text>
+            <Text style={[styles.errorSub, { color: colors.mutedForeground }]}>{error}</Text>
+            <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={refetch}>
+              <Text style={styles.retryText}>Try Again</Text>
+            </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.empty}>
-            <Icon name="search" size={48} color={colors.mutedForeground} />
-            <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No celebrities found</Text>
-            <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Try a different search or filter</Text>
-          </View>
-        )}
+          <>
+            {/* Results count */}
+            <View style={styles.resultsRow}>
+              <Text style={[styles.resultsText, { color: colors.mutedForeground }]}>
+                {filtered.length} {filtered.length === 1 ? 'celebrity' : 'celebrities'} found
+              </Text>
+            </View>
 
-        {/* Pagination */}
-        {filtered.length > PAGE_SIZE && (
-          <View style={styles.paginationRow}>
-            <TouchableOpacity
-              style={[styles.pageBtn, { backgroundColor: colors.card, opacity: page <= 1 ? 0.4 : 1 }]}
-              onPress={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-            >
-              <Icon name="chevron-left" size={16} color={colors.foreground} />
-              <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Previous</Text>
-            </TouchableOpacity>
-            <Text style={[styles.pageLabel, { color: colors.mutedForeground }]}>
-              Page {page} of {totalPages}
-            </Text>
-            <TouchableOpacity
-              style={[styles.pageBtn, { backgroundColor: colors.card, opacity: page >= totalPages ? 0.4 : 1 }]}
-              onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-            >
-              <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Next</Text>
-              <Icon name="chevron-right" size={16} color={colors.foreground} />
-            </TouchableOpacity>
-          </View>
+            {/* Grid */}
+            {paged.length > 0 ? (
+              <View style={styles.grid}>
+                {paged.map((item) => (
+                  <CelebCard key={item.id} celebrity={item} width={CARD_WIDTH} />
+                ))}
+              </View>
+            ) : (
+              <View style={styles.empty}>
+                <Icon name="search" size={48} color={colors.mutedForeground} />
+                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No celebrities found</Text>
+                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Try a different search or filter</Text>
+              </View>
+            )}
+
+            {/* Pagination */}
+            {filtered.length > PAGE_SIZE && (
+              <View style={styles.paginationRow}>
+                <TouchableOpacity
+                  style={[styles.pageBtn, { backgroundColor: colors.card, opacity: page <= 1 ? 0.4 : 1 }]}
+                  onPress={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                >
+                  <Icon name="chevron-left" size={16} color={colors.foreground} />
+                  <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Previous</Text>
+                </TouchableOpacity>
+                <Text style={[styles.pageLabel, { color: colors.mutedForeground }]}>
+                  Page {page} of {totalPages}
+                </Text>
+                <TouchableOpacity
+                  style={[styles.pageBtn, { backgroundColor: colors.card, opacity: page >= totalPages ? 0.4 : 1 }]}
+                  onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                >
+                  <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Next</Text>
+                  <Icon name="chevron-right" size={16} color={colors.foreground} />
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </View>
@@ -222,6 +246,13 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   deliveryRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 4 },
   scrollContent: { paddingHorizontal: 20 },
+  loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12 },
+  loadingText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  errorWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12, paddingHorizontal: 20 },
+  errorTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  errorSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  retryBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
+  retryText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   resultsRow: { paddingVertical: 10 },
   resultsText: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

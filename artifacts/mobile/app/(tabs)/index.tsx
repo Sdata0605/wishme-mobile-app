@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Dimensions,
   FlatList,
   Platform,
@@ -19,7 +20,8 @@ import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useDrawer } from '@/context/DrawerContext';
 import { useTheme } from '@/context/ThemeContext';
-import { CATEGORIES, CELEBRITIES } from '@/constants/mockData';
+import { CATEGORIES } from '@/constants/mockData';
+import { useCelebrities } from '@/hooks/useCelebrities';
 
 const { width: W } = Dimensions.get('window');
 const DASH_PAGE_SIZE = 4;
@@ -100,8 +102,11 @@ export default function HomeScreen() {
   const [activePriceRange, setActivePriceRange] = useState('All');
   const [dashPage, setDashPage] = useState(1);
 
+  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 20 });
+
   const onRefresh = () => {
     setRefreshing(true);
+    refetch();
     setTimeout(() => setRefreshing(false), 1500);
   };
 
@@ -110,8 +115,12 @@ export default function HomeScreen() {
 
   const priceRange = PRICE_RANGES.find((p) => p.label === activePriceRange) ?? PRICE_RANGES[0];
 
-  const filteredCelebs = CELEBRITIES.filter((c) => {
-    const matchCat = activeCategory === 'All' || c.category === CATEGORY_MAP[activeCategory];
+  const filteredCelebs = celebrities.filter((c) => {
+    const catValue = CATEGORY_MAP[activeCategory] ?? '';
+    const matchCat = activeCategory === 'All' ||
+      c.category === catValue ||
+      c.category.toLowerCase().includes(catValue.toLowerCase()) ||
+      catValue.toLowerCase().includes(c.category.toLowerCase());
     const matchPrice = c.pricePerWish >= priceRange.min && c.pricePerWish < priceRange.max;
     return matchCat && matchPrice;
   });
@@ -256,14 +265,27 @@ export default function HomeScreen() {
               <Text style={[styles.seeAll, { color: colors.primary }]}>See all</Text>
             </TouchableOpacity>
           </View>
-          <FlatList
-            data={CELEBRITIES.slice(0, 6)}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
-            renderItem={({ item }) => <CelebCard celebrity={item} />}
-            keyExtractor={(item) => item.id}
-          />
+          {loading ? (
+            <View style={styles.featuredSkeletonRow}>
+              {[0, 1, 2, 3].map((i) => (
+                <View key={i} style={[styles.featuredSkeleton, { backgroundColor: colors.muted }]} />
+              ))}
+            </View>
+          ) : error ? (
+            <TouchableOpacity style={[styles.errorBanner, { backgroundColor: colors.muted }]} onPress={refetch}>
+              <Icon name="alert-circle" size={16} color={colors.primary} />
+              <Text style={[styles.errorText, { color: colors.foreground }]}>Tap to retry</Text>
+            </TouchableOpacity>
+          ) : (
+            <FlatList
+              data={celebrities.slice(0, 6)}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+              renderItem={({ item }) => <CelebCard celebrity={item} />}
+              keyExtractor={(item) => item.id}
+            />
+          )}
         </View>
 
         {/* Browse with Filters + Pagination */}
@@ -315,41 +337,54 @@ export default function HomeScreen() {
           )}
 
           {/* Paginated Celebrity Grid */}
-          <View style={styles.celebGrid}>
-            {pagedCelebs.map((celeb, i) => (
-              <CelebCard key={celeb.id} celebrity={celeb} width={(W - 52) / 2} />
-            ))}
-            {pagedCelebs.length === 0 && (
-              <View style={styles.emptyState}>
-                <Icon name="search" size={36} color={colors.mutedForeground} />
-                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No celebrities found</Text>
-              </View>
-            )}
-          </View>
-
-          {/* Pagination Controls */}
-          {filteredCelebs.length > DASH_PAGE_SIZE && (
-            <View style={styles.paginationRow}>
-              <TouchableOpacity
-                style={[styles.pageBtn, { backgroundColor: colors.card, opacity: dashPage <= 1 ? 0.4 : 1 }]}
-                onPress={() => setDashPage((p) => Math.max(1, p - 1))}
-                disabled={dashPage <= 1}
-              >
-                <Icon name="chevron-left" size={16} color={colors.foreground} />
-                <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Previous</Text>
-              </TouchableOpacity>
-              <Text style={[styles.pageLabel, { color: colors.mutedForeground }]}>
-                Page {dashPage} of {totalPages}
-              </Text>
-              <TouchableOpacity
-                style={[styles.pageBtn, { backgroundColor: colors.card, opacity: dashPage >= totalPages ? 0.4 : 1 }]}
-                onPress={() => setDashPage((p) => Math.min(totalPages, p + 1))}
-                disabled={dashPage >= totalPages}
-              >
-                <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Next</Text>
-                <Icon name="chevron-right" size={16} color={colors.foreground} />
-              </TouchableOpacity>
+          {loading ? (
+            <View style={[styles.celebGrid, { paddingHorizontal: 20 }]}>
+              <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1, marginVertical: 32 }} />
             </View>
+          ) : error ? (
+            <TouchableOpacity style={[styles.errorBanner, { backgroundColor: colors.muted, marginHorizontal: 20 }]} onPress={refetch}>
+              <Icon name="alert-circle" size={16} color={colors.primary} />
+              <Text style={[styles.errorText, { color: colors.foreground }]}>Failed to load. Tap to retry.</Text>
+            </TouchableOpacity>
+          ) : (
+            <>
+              <View style={styles.celebGrid}>
+                {pagedCelebs.map((celeb) => (
+                  <CelebCard key={celeb.id} celebrity={celeb} width={(W - 52) / 2} />
+                ))}
+                {pagedCelebs.length === 0 && (
+                  <View style={styles.emptyState}>
+                    <Icon name="search" size={36} color={colors.mutedForeground} />
+                    <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>No celebrities found</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Pagination Controls */}
+              {filteredCelebs.length > DASH_PAGE_SIZE && (
+                <View style={styles.paginationRow}>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, { backgroundColor: colors.card, opacity: dashPage <= 1 ? 0.4 : 1 }]}
+                    onPress={() => setDashPage((p) => Math.max(1, p - 1))}
+                    disabled={dashPage <= 1}
+                  >
+                    <Icon name="chevron-left" size={16} color={colors.foreground} />
+                    <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Previous</Text>
+                  </TouchableOpacity>
+                  <Text style={[styles.pageLabel, { color: colors.mutedForeground }]}>
+                    Page {dashPage} of {totalPages}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.pageBtn, { backgroundColor: colors.card, opacity: dashPage >= totalPages ? 0.4 : 1 }]}
+                    onPress={() => setDashPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={dashPage >= totalPages}
+                  >
+                    <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Next</Text>
+                    <Icon name="chevron-right" size={16} color={colors.foreground} />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
           )}
         </View>
 
@@ -470,6 +505,10 @@ const styles = StyleSheet.create({
   quickLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', textAlign: 'center', lineHeight: 15 },
   badge: { position: 'absolute', top: -4, right: -4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#EF4444', alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: '#fff', fontSize: 9, fontFamily: 'Inter_700Bold' },
+  featuredSkeletonRow: { flexDirection: 'row', paddingHorizontal: 20, gap: 12 },
+  featuredSkeleton: { width: 130, height: 180, borderRadius: 12 },
+  errorBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, marginHorizontal: 20 },
+  errorText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   filterToggleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 12 },
   filterToggleChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9999 },
   filterToggleText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
@@ -487,24 +526,24 @@ const styles = StyleSheet.create({
   pageLabel: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   videoCard: { borderRadius: 16, overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3 },
   videoThumb: { height: 160, alignItems: 'center', justifyContent: 'center' },
-  playBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
-  tagBadge: { position: 'absolute', bottom: 10, left: 10, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
-  tagText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_500Medium' },
-  videoInfo: { padding: 14 },
-  videoTitle: { fontSize: 17, fontFamily: 'PlayfairDisplay_700Bold', marginBottom: 4 },
+  playBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+  tagBadge: { position: 'absolute', top: 12, left: 12, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+  tagText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  videoInfo: { padding: 16 },
+  videoTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 6 },
   videoDesc: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
-  wishBtn: { height: 38, borderRadius: 9999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  wishBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  howCard: { marginHorizontal: 20, borderRadius: 16, padding: 20, flexDirection: 'row' },
-  howStep: { flex: 1, alignItems: 'center', paddingHorizontal: 4, gap: 4 },
-  stepCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  stepNum: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold' },
-  stepTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', textAlign: 'center', marginTop: 2 },
-  stepCaption: { fontSize: 10, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 14 },
-  referralBanner: { borderRadius: 16, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  referralTitle: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
-  referralSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  referralBtnText: { color: '#7B2FFF', fontSize: 13, fontFamily: 'Inter_700Bold' },
-  referralBtn: { backgroundColor: '#fff', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 9999 },
-  fab: { position: 'absolute', bottom: 84, right: 20, width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', shadowColor: '#FF6B33', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
+  wishBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 10 },
+  wishBtnText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  howCard: { marginHorizontal: 20, borderRadius: 16, padding: 20, flexDirection: 'row', justifyContent: 'space-between' },
+  howStep: { flex: 1, alignItems: 'center', gap: 8 },
+  stepCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  stepNum: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold' },
+  stepTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  stepCaption: { fontSize: 11, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 15 },
+  referralBanner: { borderRadius: 16, padding: 20, flexDirection: 'row', alignItems: 'center' },
+  referralTitle: { color: '#fff', fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 4 },
+  referralSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontFamily: 'Inter_400Regular' },
+  referralBtn: { backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 9999 },
+  referralBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  fab: { position: 'absolute', bottom: 100, right: 20, width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', shadowColor: '#FF6B33', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
 });

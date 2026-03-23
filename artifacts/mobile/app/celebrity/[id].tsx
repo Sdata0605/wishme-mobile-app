@@ -2,6 +2,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useState } from 'react';
 import {
+  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -12,15 +13,42 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
-import { CELEBRITIES, MOCK_REVIEWS } from '@/constants/mockData';
+import { MOCK_REVIEWS } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrities } from '@/hooks/useCelebrities';
 
 export default function CelebrityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const celebrity = CELEBRITIES.find((c) => c.id === id) ?? CELEBRITIES[0];
   const [isFav, setIsFav] = useState(false);
+
+  const { celebrities, loading } = useCelebrities({ limit: 50 });
+  const celebrity = celebrities.find((c) => c.id === id);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={[{ marginTop: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.mutedForeground }]}>Loading...</Text>
+      </View>
+    );
+  }
+
+  if (!celebrity) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
+        <Icon name="user-x" size={48} color={colors.mutedForeground} />
+        <Text style={[{ fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.foreground }]}>Celebrity not found</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={[{ paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10, backgroundColor: colors.primary }]}
+        >
+          <Text style={{ color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' }}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -74,6 +102,24 @@ export default function CelebrityDetailScreen() {
             <Text style={[styles.reviews, { color: colors.mutedForeground }]}>({celebrity.reviewCount.toLocaleString('en-IN')} reviews)</Text>
           </View>
 
+          {/* Location + Delivery */}
+          {(celebrity.location || celebrity.deliveryTime) && (
+            <View style={[styles.metaRow, { backgroundColor: colors.backgroundSecondary }]}>
+              {celebrity.location && (
+                <View style={styles.metaItem}>
+                  <Icon name="map-pin" size={14} color={colors.mutedForeground} />
+                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{celebrity.location}</Text>
+                </View>
+              )}
+              {celebrity.deliveryTime && (
+                <View style={styles.metaItem}>
+                  <Icon name="clock" size={14} color={colors.mutedForeground} />
+                  <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{celebrity.deliveryTime}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
           {/* Pricing */}
           <View style={[styles.priceRow, { backgroundColor: colors.backgroundSecondary }]}>
             <View style={styles.priceItem}>
@@ -92,14 +138,18 @@ export default function CelebrityDetailScreen() {
           <Text style={[styles.bio, { color: colors.mutedForeground }]}>{celebrity.bio}</Text>
 
           {/* Tags */}
-          <Text style={[styles.bioTitle, { color: colors.foreground }]}>What I can do for you</Text>
-          <View style={styles.tagsWrap}>
-            {celebrity.tags.map((tag) => (
-              <View key={tag} style={[styles.tag, { backgroundColor: colors.primary + '20', borderColor: colors.primary + '40' }]}>
-                <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
+          {celebrity.tags.length > 0 && (
+            <>
+              <Text style={[styles.bioTitle, { color: colors.foreground }]}>What I can do for you</Text>
+              <View style={styles.tagsWrap}>
+                {celebrity.tags.map((tag) => (
+                  <View key={tag} style={[styles.tag, { backgroundColor: colors.primary + '20', borderColor: colors.primary + '40' }]}>
+                    <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </View>
+            </>
+          )}
 
           {/* Reviews */}
           <Text style={[styles.bioTitle, { color: colors.foreground }]}>Reviews</Text>
@@ -162,6 +212,9 @@ const styles = StyleSheet.create({
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
   rating: { fontSize: 18, fontFamily: 'Inter_700Bold' },
   reviews: { fontSize: 14, fontFamily: 'Inter_400Regular' },
+  metaRow: { flexDirection: 'row', gap: 16, borderRadius: 12, padding: 12, marginBottom: 16 },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metaText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   priceRow: { flexDirection: 'row', borderRadius: 14, padding: 16, marginBottom: 20 },
   priceItem: { flex: 1, alignItems: 'center' },
   priceDivider: { width: 1, marginHorizontal: 8 },
