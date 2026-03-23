@@ -57,7 +57,7 @@ export default function CelebrityDetailScreen() {
   if (!celebrity) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', gap: 12 }]}>
-        <Icon name="user-x" size={48} color={colors.mutedForeground} />
+        <Icon name="user" size={48} color={colors.mutedForeground} />
         <Text style={[{ fontSize: 20, fontFamily: 'Inter_700Bold', color: colors.foreground }]}>Celebrity not found</Text>
         <TouchableOpacity
           onPress={() => router.back()}
@@ -126,7 +126,7 @@ export default function CelebrityDetailScreen() {
             <View style={[styles.metaRow, { backgroundColor: colors.backgroundSecondary }]}>
               {celebrity.location && (
                 <View style={styles.metaItem}>
-                  <Icon name="map-pin" size={14} color={colors.mutedForeground} />
+                  <Icon name="globe" size={14} color={colors.mutedForeground} />
                   <Text style={[styles.metaText, { color: colors.mutedForeground }]}>{celebrity.location}</Text>
                 </View>
               )}
