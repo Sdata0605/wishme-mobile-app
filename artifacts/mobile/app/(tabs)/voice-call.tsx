@@ -292,6 +292,10 @@ function CallDetailsForm({
       setCallError('Please enter a valid 10-digit phone number.');
       return;
     }
+    if (!celeb.vapiVoiceId) {
+      setCallError('This celebrity is not yet set up for voice calls. Please choose a different celebrity.');
+      return;
+    }
     if (callTiming === 'later' && (!selectedDate || !selectedTime)) {
       setCallError('Please select a date and time for scheduling.');
       return;
@@ -309,17 +313,17 @@ function CallDetailsForm({
         celebrityName: celeb.name,
         price: celeb.pricePerCall || 500,
         language,
+        voiceId: celeb.vapiVoiceId,
+        scheduledAt: callTiming === 'later'
+          ? buildScheduledAt(selectedDate.dateStr, selectedTime)
+          : null,
       };
-      if (celeb.vapiVoiceId) body.voiceId = celeb.vapiVoiceId;
       if (celeb.vapiPhoneId) body.celebrityPhoneId = celeb.vapiPhoneId;
       if (customMessage.trim()) body.customMessage = customMessage.trim();
       if (tone) body.tone = tone;
       if (relationship) body.relationship = relationship;
       if (thingsToAvoid.trim()) body.thingsToAvoid = thingsToAvoid.trim();
       if (additionalContext.trim()) body.additionalContext = additionalContext.trim();
-      if (callTiming === 'later') {
-        body.scheduledAt = buildScheduledAt(selectedDate.dateStr, selectedTime);
-      }
 
       const res = await supabaseFetch(
         '/functions/v1/vapi-celebrity-call',
