@@ -157,7 +157,7 @@ interface UseCelebritiesResult {
   celebrities: Celebrity[];
   loading: boolean;
   error: string | null;
-  refetch: () => void;
+  refetch: () => Promise<void>;
 }
 
 export function useCelebrities({ limit = 20, category }: UseCelebritiesOptions = {}): UseCelebritiesResult {
