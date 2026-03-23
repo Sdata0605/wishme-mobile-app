@@ -1,0 +1,77 @@
+Celebrity Voice Call - Complete Technical Documentation
+Form Fields (Call Details Card)
+The form has two sections: Required fields and Optional personalization.
+
+Required Fields (marked with *)
+Field	State Variable	Type	UI Component	Validation
+Your Name	senderName	string	<Input>	Must not be empty (.trim()) — auto-filled from profile.first_name + last_name
+Recipient's Name	recipientName	string	<Input>	Must not be empty (.trim())
+Phone Number	recipientPhone	string	<Input>	Must not be empty (.trim()) — formatted to +91XXXXXXXXXX by backend
+Occasion	occasion	string	<Select> dropdown	Must be selected (non-empty string) — options: Birthday, Anniversary, Graduation, New Year, Diwali, Christmas, Eid, Holi, Promotion, Wedding, Engagement, Baby Shower, Retirement, Get Well Soon, Thank You, Congratulations, Good Luck, Other
+Celebrity	selectedCelebrity	object	Selected via CelebrityCallModal	Must not be null
+Call Timing	callTiming	'now' or 'scheduled'	<RadioGroup>	Default: 'now'. If 'scheduled', then scheduledDate is also required
+Optional Personalization Fields
+Field	State Variable	Type	Sent as
+Custom Message	customMessage	string (textarea)	customMessage
+Tone & Style	tone	string (select)	tone — values: warm_loving, funny_playful, inspirational, formal, casual, emotional
+Relationship	relationship	string (select)	relationship — values: friend, parent, child, spouse, sibling, colleague, boss, relative, other
+Language	language	string (select)	language — default: english. Options: english, hindi, tamil, telugu, kannada, malayalam, marathi, bengali, gujarati, punjabi
+Things to Avoid	thingsToAvoid	string (input)	thingsToAvoid
+Additional Context	additionalContext	string (textarea)	additionalContext
+What Happens When Button is Tapped
+Step 1 — Client-side validation (line 167-184):
+
+if (!recipientName.trim() || !recipientPhone.trim() || !occasion || !selectedCelebrity || !senderName.trim()) → "Missing information" error
+if (callTiming === 'scheduled' && !scheduledDate) → "Missing schedule" error
+Step 2 — Wallet check (line 186-197):
+
+baseCallPrice = selectedCelebrity.voice_call_price || 500
+callPrice = getDiscountedPrice(baseCallPrice)  // applies plan discount
+if (walletBalance < callPrice) → redirects to /wallet
+Step 3 — Build scheduledAt (line 200-206): If callTiming === 'scheduled', combines scheduledDate + scheduledTime into ISO string.
+
+Step 4 — API call (line 210-231):
+
+
+supabase.functions.invoke('vapi-celebrity-call', { body: payload })
+Exact Payload JSON
+
+{
+  "recipientName": "Prashant",
+  "recipientPhone": "+91 9876543210",
+  "occasion": "Birthday",
+  "senderName": "Pramod N",
+  "celebrityId": "uuid-of-celebrity",
+  "celebrityName": "Shah Rukh Khan",
+  "voiceId": "3m0iZUjIszB6L7S4hSjV",
+  "price": 450,
+  "celebrityPhoneId": "a412affb-e24c-43b7-b926-918b81857764",
+  "customMessage": "happy birthday prashant",
+  "tone": "warm_loving",
+  "relationship": "friend",
+  "language": "hindi",
+  "thingsToAvoid": "politics",
+  "additionalContext": "be polite",
+  "scheduledAt": null
+}
+When scheduledAt is null or absent → immediate call. When it's an ISO string like "2026-03-25T10:00:00.000Z" → scheduled call.
+
+Backend Flow (vapi-celebrity-call Edge Function)
+Validates auth JWT → gets user profile
+Checks recipientName, recipientPhone, occasion, celebrityId, voiceId, senderName are present — if any missing, returns 400 "Missing required fields"
+Picks phoneNumberId = celebrityPhoneId (from payload) or VAPI_PHONE_NUMBER_ID env var
+Checks wallet: profile.wallet_balance >= price
+Formats phone to +91XXXXXXXXXX
+Builds GPT system prompt using all personalization fields
+If scheduledAt is set → saves to DB with call_status: 'scheduled', deducts wallet, returns
+If immediate → calls POST https://api.vapi.ai/call with the full Vapi payload
+On success → deducts wallet, records wallet_transactions, inserts into voice_call_wishes with call_status: 'initiated'
+Returns { success: true, callId: "vapi-call-id" }
+The "Missing Required Fields" Error on Mobile
+The backend validation at line 76-83 of the edge function checks:
+
+
+if (!recipientName || !recipientPhone || !occasion || !celebrityId || !voiceId || !senderName)
+The most likely cause on mobile is that occasion is not being sent. The <Select> component sometimes doesn't fire onValueChange properly on mobile touch. The occasion state starts as '' (empty string), which is falsy. If the dropdown doesn't register the tap, occasion stays empty and passes client validation (line 167 checks !occasion which catches empty string) — but if it somehow passes, the backend rejects it.
+
+The button is also disabled unless all required fields are filled (line 660), so if you're seeing the button enabled but getting the error, it suggests the client-side state has values but the payload arriving at the backend is missing something — potentially a race condition or the selectedCelebrity.vapi_voice_id being null/undefined in the database for that celebrity.
