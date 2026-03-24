@@ -66,9 +66,10 @@ function useRealtimeBookings(profileId: string | null, accessToken: string | nul
       ws.onmessage = (evt) => {
         try {
           const msg = JSON.parse(evt.data as string);
-          if (msg.event === 'postgres_changes' && msg.payload?.data?.type === 'UPDATE') {
-            onUpdateRef.current();
-          }
+          const isUpdate =
+            msg.event === 'postgres_changes' &&
+            (msg.payload?.data?.type === 'UPDATE' || msg.payload?.eventType === 'UPDATE');
+          if (isUpdate) onUpdateRef.current();
         } catch {}
       };
       ws.onerror = () => {};
@@ -271,6 +272,7 @@ function BookingAudioPlayer({ audioUrl, colors }: { audioUrl: string | null; col
       try {
         await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
         const { sound } = await Audio.Sound.createAsync({ uri: audioUrl }, { shouldPlay: true });
+        await sound.setProgressUpdateIntervalAsync(500);
         sound.setOnPlaybackStatusUpdate(st => {
           if (!st.isLoaded) return;
           setPosition(st.positionMillis);
