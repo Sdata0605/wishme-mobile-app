@@ -1,0 +1,373 @@
+Celebrity Voice Call — Complete Data Flow
+Step 1: Fetch Celebrities for Voice Call Selection
+Component: src/components/celebrity/CelebrityCallModal.tsx
+
+Supabase Query (REST API equivalent):
+
+GET /rest/v1/celebrities?select=id,name,category,image_url,vapi_voice_id,voice_call_price,rating,is_verified,bio,followers,vapi_phone_id&vapi_voice_id=not.is.null&is_active=eq.true&order=rating.desc
+Headers:
+
+apikey: <SUPABASE_ANON_KEY>
+Authorization: Bearer <SUPABASE_ANON_KEY>
+Response shape:
+
+
+[
+  {
+    "id": "uuid",
+    "name": "Hari Raj Shetty",
+    "category": "Actor/Actress",
+    "image_url": "https://...",
+    "vapi_voice_id": "3m0iZUjIszB6L7S4hSjV",
+    "voice_call_price": 500,
+    "rating": 4.5,
+    "is_verified": true,
+    "bio": "Professional actor...",
+    "followers": null,
+    "vapi_phone_id": "a412affb-e24c-43b7-b926-918b81857764"
+  }
+]
+Key filter: Only celebrities with vapi_voice_id IS NOT NULL are shown (meaning they have a cloned voice configured).
+
+Step 2: Pre-select Celebrity via URL (Optional)
+Route: /celebrity-voice-call?celebrityId=<uuid>
+
+If celebrityId is in the URL query params, the page fetches that specific celebrity:
+
+GET /rest/v1/celebrities?select=id,name,category,image_url,vapi_voice_id,voice_call_price,rating,is_verified,vapi_phone_id&id=eq.<celebrityId>&vapi_voice_id=not.is.null
+If no celebrityId param, the CelebrityCallModal opens automatically for selection.
+
+Step 3: User Fills Form — Values Collected
+The page collects these fields from the user:
+
+Field	Required	Type	Source
+recipientName	Yes	string	Text input
+recipientPhone	Yes	string	Text input (10+ digits)
+occasion	Yes	string	Select dropdown (Birthday, Anniversary, etc.)
+senderName	Yes	string	Auto-filled from profile.first_name + last_name
+selectedCelebrity	Yes	object	From Step 1 modal selection
+customMessage	No	string	Textarea — specific things to mention
+tone	No	enum	Select: warm_loving, funny_playful, inspirational, formal, casual, emotional
+relationship	No	enum	Select: friend, parent, child, spouse, sibling, colleague, boss, relative, other
+language	No	string	Select: english, hindi, tamil, telugu, kannada, malayalam, marathi, bengali, gujarati, punjabi (default: english)
+thingsToAvoid	No	string	Textarea
+additionalContext	No	string	Textarea
+callTiming	Yes	'now' or 'scheduled'	Radio group
+scheduledDate	If scheduled	Date	Calendar picker
+scheduledTime	If scheduled	string "HH:MM"	Time input (default: "10:00")
+Price calculation:
+
+basePrice = selectedCelebrity.voice_call_price || 500
+finalPrice = getDiscountedPrice(basePrice)  // applies plan-based discount
+Wallet check (client-side):
+
+if (walletBalance < finalPrice) → redirect to /wallet
+Step 4: Invoke the Edge Function
+Endpoint:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/vapi-celebrity-call
+Headers:
+
+Authorization: Bearer <user_jwt_token>
+Content-Type: application/json
+apikey: <SUPABASE_ANON_KEY>
+Request Body:
+
+
+{
+  "recipientName": "John",
+  "recipientPhone": "9876543210",
+  "occasion": "Birthday",
+  "senderName": "Alice",
+  "celebrityId": "00865ec8-5b5e-435f-ae8f-625d343f02f6",
+  "celebrityName": "Hari Raj Shetty",
+  "voiceId": "3m0iZUjIszB6L7S4hSjV",
+  "price": 500,
+  "celebrityPhoneId": "a412affb-e24c-43b7-b926-918b81857764",
+  "customMessage": "Mention his love for cricket",
+  "tone": "funny_playful",
+  "relationship": "friend",
+  "language": "hindi",
+  "thingsToAvoid": "Don't mention work",
+  "additionalContext": "He just got a promotion",
+  "scheduledAt": null
+}
+If scheduledAt is a valid ISO string (e.g. "2026-03-25T10:00:00.000Z"), it becomes a scheduled call instead of immediate.
+
+Step 5: Edge Function Internal Flow
+The vapi-celebrity-call function does this:
+
+Auth: Validates JWT → gets auth.uid()
+Profile: Fetches profiles by user_id = auth.uid() → gets profile.id and wallet_balance
+Wallet check (server-side): wallet_balance >= callPrice
+Phone formatting: Adds +91 prefix if missing
+Builds Vapi AI prompt using all the personalization fields (tone, relationship, custom message, things to avoid, context)
+If Immediate Call (scheduledAt is null):
+
+Calls Vapi API:
+POST https://api.vapi.ai/call
+Authorization: Bearer <VAPI_API_KEY>
+
+{
+  "phoneNumberId": "<celebrity.vapi_phone_id or VAPI_PHONE_NUMBER_ID>",
+  "customer": { "number": "+919876543210", "name": "John" },
+  "assistant": {
+    "firstMessageMode": "assistant-speaks-first",
+    "firstMessage": "Hello John! This is Hari Raj Shetty! Alice has arranged this special surprise for you!",
+    "transcriber": { "provider": "deepgram", "model": "nova-2", "language": "hi" },
+    "model": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "messages": [{ "role": "system", "content": "<generated prompt>" }]
+    },
+    "voice": {
+      "provider": "11labs",
+      "voiceId": "3m0iZUjIszB6L7S4hSjV",
+      "model": "eleven_turbo_v2_5",
+      "stability": 0.5,
+      "similarityBoost": 0.75,
+      "useSpeakerBoost": true
+    },
+    "silenceTimeoutSeconds": 60,
+    "maxDurationSeconds": 180,
+    "backgroundSound": "office",
+    "endCallMessage": "Thank you so much! Have a wonderful day and God bless you!",
+    "endCallPhrases": ["goodbye", "bye bye", "take care", "thank you bye", "ok bye"]
+  }
+}
+Deducts wallet: UPDATE profiles SET wallet_balance = wallet_balance - price WHERE id = profile.id
+Records transaction: INSERT INTO wallet_transactions (...)
+Records call: INSERT INTO voice_call_wishes (...) with call_status = 'initiated', vapi_call_id = <from Vapi response>
+Response (immediate):
+
+
+{ "success": true, "callId": "vapi-call-uuid", "message": "Call initiated to John" }
+If Scheduled Call (scheduledAt is set):
+
+Deducts wallet immediately (payment upfront)
+Records transaction
+Records call with call_status = 'scheduled', scheduled_at = <ISO timestamp>, and full call_config JSONB:
+
+{
+  "customMessage": "...",
+  "tone": "funny_playful",
+  "relationship": "friend",
+  "language": "hindi",
+  "thingsToAvoid": "...",
+  "additionalContext": "...",
+  "celebrityPhoneId": "..."
+}
+Response (scheduled):
+
+
+{ "success": true, "scheduled": true, "scheduledAt": "2026-03-25T10:00:00.000Z", "message": "Call scheduled for John" }
+Step 6: Scheduled Call Processing (Background)
+Edge Function: process-scheduled-calls (triggered by pg_cron every 5 minutes)
+
+GET voice_call_wishes WHERE call_status = 'scheduled' 
+  AND scheduled_at <= now() 
+  AND scheduled_at >= now() - 10 minutes
+For each due call: reconstructs the Vapi payload from call_config JSONB, calls POST https://api.vapi.ai/call, updates call_status = 'initiated'. If Vapi fails, sets call_status = 'failed' and refunds wallet.
+
+Database Tables Used
+Table	Purpose
+celebrities	Celebrity profiles with vapi_voice_id, vapi_phone_id, voice_call_price
+profiles	User profile with wallet_balance, linked via user_id = auth.uid()
+wallet_transactions	Payment records
+voice_call_wishes	Call records with status tracking
+Required Secrets (Edge Function Environment)
+Secret	Usage
+VAPI_API_KEY	Vapi API authentication
+VAPI_PHONE_NUMBER_ID	Default outbound phone number (fallback)
+SUPABASE_URL	Supabase project URL
+SUPABASE_ANON_KEY	Supabase anon key for auth-aware queries
+Here's the complete voice call flow documentation for Replit:
+
+Celebrity Voice Call — Complete Data Flow
+Step 1: Fetch Celebrities for Voice Call Selection
+Component: src/components/celebrity/CelebrityCallModal.tsx
+
+Supabase Query (REST API equivalent):
+
+GET /rest/v1/celebrities?select=id,name,category,image_url,vapi_voice_id,voice_call_price,rating,is_verified,bio,followers,vapi_phone_id&vapi_voice_id=not.is.null&is_active=eq.true&order=rating.desc
+Headers:
+
+apikey: <SUPABASE_ANON_KEY>
+Authorization: Bearer <SUPABASE_ANON_KEY>
+Response shape:
+
+
+[
+  {
+    "id": "uuid",
+    "name": "Hari Raj Shetty",
+    "category": "Actor/Actress",
+    "image_url": "https://...",
+    "vapi_voice_id": "3m0iZUjIszB6L7S4hSjV",
+    "voice_call_price": 500,
+    "rating": 4.5,
+    "is_verified": true,
+    "bio": "Professional actor...",
+    "followers": null,
+    "vapi_phone_id": "a412affb-e24c-43b7-b926-918b81857764"
+  }
+]
+Key filter: Only celebrities with vapi_voice_id IS NOT NULL are shown (meaning they have a cloned voice configured).
+
+Step 2: Pre-select Celebrity via URL (Optional)
+Route: /celebrity-voice-call?celebrityId=<uuid>
+
+If celebrityId is in the URL query params, the page fetches that specific celebrity:
+
+GET /rest/v1/celebrities?select=id,name,category,image_url,vapi_voice_id,voice_call_price,rating,is_verified,vapi_phone_id&id=eq.<celebrityId>&vapi_voice_id=not.is.null
+If no celebrityId param, the CelebrityCallModal opens automatically for selection.
+
+Step 3: User Fills Form — Values Collected
+The page collects these fields from the user:
+
+Field	Required	Type	Source
+recipientName	Yes	string	Text input
+recipientPhone	Yes	string	Text input (10+ digits)
+occasion	Yes	string	Select dropdown (Birthday, Anniversary, etc.)
+senderName	Yes	string	Auto-filled from profile.first_name + last_name
+selectedCelebrity	Yes	object	From Step 1 modal selection
+customMessage	No	string	Textarea — specific things to mention
+tone	No	enum	Select: warm_loving, funny_playful, inspirational, formal, casual, emotional
+relationship	No	enum	Select: friend, parent, child, spouse, sibling, colleague, boss, relative, other
+language	No	string	Select: english, hindi, tamil, telugu, kannada, malayalam, marathi, bengali, gujarati, punjabi (default: english)
+thingsToAvoid	No	string	Textarea
+additionalContext	No	string	Textarea
+callTiming	Yes	'now' or 'scheduled'	Radio group
+scheduledDate	If scheduled	Date	Calendar picker
+scheduledTime	If scheduled	string "HH:MM"	Time input (default: "10:00")
+Price calculation:
+
+basePrice = selectedCelebrity.voice_call_price || 500
+finalPrice = getDiscountedPrice(basePrice)  // applies plan-based discount
+Wallet check (client-side):
+
+if (walletBalance < finalPrice) → redirect to /wallet
+Step 4: Invoke the Edge Function
+Endpoint:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/vapi-celebrity-call
+Headers:
+
+Authorization: Bearer <user_jwt_token>
+Content-Type: application/json
+apikey: <SUPABASE_ANON_KEY>
+Request Body:
+
+
+{
+  "recipientName": "John",
+  "recipientPhone": "9876543210",
+  "occasion": "Birthday",
+  "senderName": "Alice",
+  "celebrityId": "00865ec8-5b5e-435f-ae8f-625d343f02f6",
+  "celebrityName": "Hari Raj Shetty",
+  "voiceId": "3m0iZUjIszB6L7S4hSjV",
+  "price": 500,
+  "celebrityPhoneId": "a412affb-e24c-43b7-b926-918b81857764",
+  "customMessage": "Mention his love for cricket",
+  "tone": "funny_playful",
+  "relationship": "friend",
+  "language": "hindi",
+  "thingsToAvoid": "Don't mention work",
+  "additionalContext": "He just got a promotion",
+  "scheduledAt": null
+}
+If scheduledAt is a valid ISO string (e.g. "2026-03-25T10:00:00.000Z"), it becomes a scheduled call instead of immediate.
+
+Step 5: Edge Function Internal Flow
+The vapi-celebrity-call function does this:
+
+Auth: Validates JWT → gets auth.uid()
+Profile: Fetches profiles by user_id = auth.uid() → gets profile.id and wallet_balance
+Wallet check (server-side): wallet_balance >= callPrice
+Phone formatting: Adds +91 prefix if missing
+Builds Vapi AI prompt using all the personalization fields (tone, relationship, custom message, things to avoid, context)
+If Immediate Call (scheduledAt is null):
+
+Calls Vapi API:
+POST https://api.vapi.ai/call
+Authorization: Bearer <VAPI_API_KEY>
+
+{
+  "phoneNumberId": "<celebrity.vapi_phone_id or VAPI_PHONE_NUMBER_ID>",
+  "customer": { "number": "+919876543210", "name": "John" },
+  "assistant": {
+    "firstMessageMode": "assistant-speaks-first",
+    "firstMessage": "Hello John! This is Hari Raj Shetty! Alice has arranged this special surprise for you!",
+    "transcriber": { "provider": "deepgram", "model": "nova-2", "language": "hi" },
+    "model": {
+      "provider": "openai",
+      "model": "gpt-4o-mini",
+      "messages": [{ "role": "system", "content": "<generated prompt>" }]
+    },
+    "voice": {
+      "provider": "11labs",
+      "voiceId": "3m0iZUjIszB6L7S4hSjV",
+      "model": "eleven_turbo_v2_5",
+      "stability": 0.5,
+      "similarityBoost": 0.75,
+      "useSpeakerBoost": true
+    },
+    "silenceTimeoutSeconds": 60,
+    "maxDurationSeconds": 180,
+    "backgroundSound": "office",
+    "endCallMessage": "Thank you so much! Have a wonderful day and God bless you!",
+    "endCallPhrases": ["goodbye", "bye bye", "take care", "thank you bye", "ok bye"]
+  }
+}
+Deducts wallet: UPDATE profiles SET wallet_balance = wallet_balance - price WHERE id = profile.id
+Records transaction: INSERT INTO wallet_transactions (...)
+Records call: INSERT INTO voice_call_wishes (...) with call_status = 'initiated', vapi_call_id = <from Vapi response>
+Response (immediate):
+
+
+{ "success": true, "callId": "vapi-call-uuid", "message": "Call initiated to John" }
+If Scheduled Call (scheduledAt is set):
+
+Deducts wallet immediately (payment upfront)
+Records transaction
+Records call with call_status = 'scheduled', scheduled_at = <ISO timestamp>, and full call_config JSONB:
+
+{
+  "customMessage": "...",
+  "tone": "funny_playful",
+  "relationship": "friend",
+  "language": "hindi",
+  "thingsToAvoid": "...",
+  "additionalContext": "...",
+  "celebrityPhoneId": "..."
+}
+Response (scheduled):
+
+
+{ "success": true, "scheduled": true, "scheduledAt": "2026-03-25T10:00:00.000Z", "message": "Call scheduled for John" }
+Step 6: Scheduled Call Processing (Background)
+Edge Function: process-scheduled-calls (triggered by pg_cron every 5 minutes)
+
+GET voice_call_wishes WHERE call_status = 'scheduled' 
+  AND scheduled_at <= now() 
+  AND scheduled_at >= now() - 10 minutes
+For each due call: reconstructs the Vapi payload from call_config JSONB, calls POST https://api.vapi.ai/call, updates call_status = 'initiated'. If Vapi fails, sets call_status = 'failed' and refunds wallet.
+
+Database Tables Used
+Table	Purpose
+celebrities	Celebrity profiles with vapi_voice_id, vapi_phone_id, voice_call_price
+profiles	User profile with wallet_balance, linked via user_id = auth.uid()
+wallet_transactions	Payment records
+voice_call_wishes	Call records with status tracking
+Required Secrets (Edge Function Environment)
+Secret	Usage
+VAPI_API_KEY	Vapi API authentication
+VAPI_PHONE_NUMBER_ID	Default outbound phone number (fallback)
+SUPABASE_URL	Supabase project URL
+SUPABASE_ANON_KEY	Supabase anon key for auth-aware queries
+
+
+
+
+
