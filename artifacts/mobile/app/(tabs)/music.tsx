@@ -30,7 +30,7 @@ interface MusicCtx {
   walletBalance: number;
   refreshWallet: () => void;
   session: { access_token: string } | null;
-  userId: string;
+  profileId: string;
   onVoiceCloned: () => void;
 }
 
@@ -551,6 +551,71 @@ function WalletCard({ balance }: { balance: number }) {
   );
 }
 
+function buildMp4ViaCanvas(imgSrc: string, audioDataUri: string): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 800;
+      canvas.height = 450;
+      const ctx2d = canvas.getContext('2d');
+      if (!ctx2d) { resolve(); return; }
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        ctx2d.drawImage(img, 0, 0, 800, 450);
+        const stream = canvas.captureStream(1);
+        const mimeType =
+          typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('video/mp4')
+            ? 'video/mp4'
+            : 'video/webm';
+        if (typeof MediaRecorder === 'undefined') { resolve(); return; }
+        const recorder = new MediaRecorder(stream, { mimeType });
+        const chunks: Blob[] = [];
+        recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size > 0) chunks.push(e.data); };
+        recorder.onstop = () => {
+          const blob = new Blob(chunks, { type: mimeType });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `wishme_video_${Date.now()}.${mimeType === 'video/mp4' ? 'mp4' : 'webm'}`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+          resolve();
+        };
+        try {
+          const audioBase64 = audioDataUri.includes(',') ? audioDataUri.split(',')[1] : audioDataUri;
+          const binary = atob(audioBase64);
+          const bytes = new Uint8Array(binary.length);
+          for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+          const audioCtx = new AudioContext();
+          audioCtx.decodeAudioData(bytes.buffer.slice(0)).then((buffer) => {
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            const dest = audioCtx.createMediaStreamDestination();
+            source.connect(dest);
+            stream.addTrack(dest.stream.getAudioTracks()[0]);
+            recorder.start();
+            source.start();
+            setTimeout(() => { recorder.stop(); source.stop(); audioCtx.close(); }, buffer.duration * 1000 + 300);
+          }).catch(() => {
+            recorder.start();
+            setTimeout(() => recorder.stop(), 5000);
+          });
+        } catch {
+          recorder.start();
+          setTimeout(() => recorder.stop(), 5000);
+        }
+      };
+      img.onerror = () => resolve();
+      img.src = imgSrc;
+    } catch {
+      resolve();
+    }
+  });
+}
+
 function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
   audioUrl: string;
   imgBase64: string;
@@ -598,8 +663,10 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
 
   const downloadMp4 = async () => {
     try {
-      const path = (FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '') + `wishme_video_${Date.now()}.mp4`;
-      if (videoUrl) {
+      if (Platform.OS === 'web') {
+        await buildMp4ViaCanvas(imgBase64, audioUrl);
+      } else if (videoUrl) {
+        const path = (FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '') + `wishme_video_${Date.now()}.mp4`;
         if (videoUrl.startsWith('data:')) {
           const b64 = videoUrl.includes(',') ? videoUrl.split(',')[1] : videoUrl;
           await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
@@ -607,8 +674,7 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
           await FileSystem.downloadAsync(videoUrl, path);
         }
       } else {
-        const base64 = audioUrl.includes(',') ? audioUrl.split(',')[1] : audioUrl;
-        await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+        return;
       }
       setVideoSaved(true);
       setTimeout(() => setVideoSaved(false), 2500);
@@ -678,7 +744,7 @@ function TTSTab({ ctx }: { ctx: MusicCtx }) {
       await supabaseFetch('/rest/v1/tts_generations', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.userId, text: text.slice(0, 500), voice_id: voice.voice_id, voice_name: voice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.tts }),
+        body: JSON.stringify({ user_id: ctx.profileId, text: text.slice(0, 500), voice_id: voice.voice_id, voice_name: voice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.tts }),
       }, ctx.session?.access_token);
       setAudioUri(data.audioUrl);
       ctx.refreshWallet();
@@ -736,7 +802,7 @@ function ConvertTab({ ctx }: { ctx: MusicCtx }) {
       await supabaseFetch('/rest/v1/voice_conversion_generations', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.userId, original_file_name: audioFileName ?? 'audio.wav', target_voice_id: voice.voice_id, target_voice_name: voice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.convert }),
+        body: JSON.stringify({ user_id: ctx.profileId, original_file_name: audioFileName ?? 'audio.wav', target_voice_id: voice.voice_id, target_voice_name: voice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.convert }),
       }, ctx.session?.access_token);
       setAudioUri(data.audioUrl);
       ctx.refreshWallet();
@@ -841,7 +907,7 @@ function SFXTab({ ctx }: { ctx: MusicCtx }) {
       await supabaseFetch('/rest/v1/sound_effect_generations', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.userId, description: desc.slice(0, 500), duration_seconds: duration, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.sfx }),
+        body: JSON.stringify({ user_id: ctx.profileId, description: desc.slice(0, 500), duration_seconds: duration, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.sfx }),
       }, ctx.session?.access_token);
       setAudioUri(data.audioUrl);
       ctx.refreshWallet();
@@ -890,7 +956,7 @@ function IsolateTab({ ctx }: { ctx: MusicCtx }) {
       await supabaseFetch('/rest/v1/audio_isolation_generations', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.userId, original_file_name: audioFileName ?? 'audio.wav', audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.isolate }),
+        body: JSON.stringify({ user_id: ctx.profileId, original_file_name: audioFileName ?? 'audio.wav', audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.isolate }),
       }, ctx.session?.access_token);
       setAudioUri(data.audioUrl);
       ctx.refreshWallet();
@@ -959,7 +1025,7 @@ function MusicTab({ ctx }: { ctx: MusicCtx }) {
       await supabaseFetch('/rest/v1/wallet_transactions', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.userId, transaction_type: 'music_generation', amount: cost, status: 'completed', payment_method: 'wallet', description: `AI Music: ${title || 'Untitled'} (${genre})` }),
+        body: JSON.stringify({ user_id: ctx.profileId, transaction_type: 'music_generation', amount: cost, status: 'completed', payment_method: 'wallet', description: `AI Music: ${title || 'Untitled'} (${genre})` }),
       }, ctx.session?.access_token);
 
       let payload: Record<string, unknown> = { songTitle: title.trim() || 'Untitled', genre, mood, description: desc.trim() };
@@ -1121,7 +1187,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
         body: JSON.stringify({
-          user_id: ctx.userId,
+          user_id: ctx.profileId,
           image_url: imageBase64,
           audio_url: data.audioUrl,
           video_url: data.videoUrl ?? null,
@@ -1221,7 +1287,7 @@ export default function MusicScreen() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const { voices, loading: voicesLoading, refetch: refetchVoices } = useVoices();
-  const { balance: walletBalance, refetch: refetchWallet } = useWallet();
+  const { balance: walletBalance, profileId, refetch: refetchWallet } = useWallet();
 
   useEffect(() => {
     Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false }).catch(() => {});
@@ -1235,7 +1301,7 @@ export default function MusicScreen() {
     walletBalance,
     refreshWallet: refetchWallet,
     session,
-    userId: user?.id ?? '',
+    profileId,
     onVoiceCloned: refetchVoices,
   };
 
