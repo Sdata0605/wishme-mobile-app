@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabaseFetch } from '@/constants/supabase';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
 
 export interface Celebrity {
   id: string;
@@ -134,6 +134,39 @@ async function fetchOnce() {
       }
 
       store.celebrities = json.data.map(normalizeCelebrity);
+
+      // Enrich with vapi fields that the edge function doesn't return
+      try {
+        const vapiRes = await fetch(
+          `${SUPABASE_URL}/rest/v1/celebrities?select=id,vapi_voice_id,vapi_phone_id`,
+          {
+            headers: {
+              apikey: SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            },
+          },
+        );
+        if (vapiRes.ok) {
+          const vapiRows: Array<{
+            id: string;
+            vapi_voice_id: string | null;
+            vapi_phone_id: string | null;
+          }> = await vapiRes.json();
+          const vapiMap = new Map(vapiRows.map((r) => [r.id, r]));
+          store.celebrities = store.celebrities.map((c) => {
+            const row = vapiMap.get(c.id);
+            if (!row) return c;
+            return {
+              ...c,
+              vapiVoiceId: row.vapi_voice_id ?? undefined,
+              vapiPhoneId: row.vapi_phone_id ?? undefined,
+            };
+          });
+        }
+      } catch {
+        // Non-fatal: voice calls will show "not set up" for all celebrities
+      }
+
       store.error = null;
     } catch (err: unknown) {
       store.error = err instanceof Error ? err.message : 'Failed to load celebrities';
