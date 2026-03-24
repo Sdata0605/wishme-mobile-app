@@ -1,10 +1,12 @@
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Image,
   KeyboardAvoidingView,
@@ -56,6 +58,58 @@ async function saveAudioToCache(dataUri: string): Promise<string> {
   const path = (FileSystem.cacheDirectory ?? '') + `wishme_${Date.now()}.${ext}`;
   await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
   return path;
+}
+
+async function downloadToDevice(dataUri: string, filename: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    const mimeMatch = dataUri.match(/^data:([^;]+);base64,/);
+    const mime = mimeMatch?.[1] ?? 'application/octet-stream';
+    const base64 = dataUri.includes(',') ? dataUri.split(',')[1] : dataUri;
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const blob = new Blob([bytes], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return;
+  }
+
+  const { status } = await MediaLibrary.requestPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert('Permission Required', 'Please allow access to your media library to save files.');
+    return;
+  }
+
+  const base64 = dataUri.includes(',') ? dataUri.split(',')[1] : dataUri;
+  const tempPath = (FileSystem.cacheDirectory ?? '') + filename;
+  await FileSystem.writeAsStringAsync(tempPath, base64, { encoding: FileSystem.EncodingType.Base64 });
+  await MediaLibrary.saveToLibraryAsync(tempPath);
+}
+
+async function downloadUrlToDevice(url: string, filename: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
+
+  const { status } = await MediaLibrary.requestPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert('Permission Required', 'Please allow access to your media library to save files.');
+    return;
+  }
+
+  const tempPath = (FileSystem.cacheDirectory ?? '') + filename;
+  await FileSystem.downloadAsync(url, tempPath);
+  await MediaLibrary.saveToLibraryAsync(tempPath);
 }
 
 async function fileUriToBase64(uri: string, mimeType = 'audio/wav'): Promise<string> {
@@ -139,13 +193,14 @@ function AudioPlayerCard({ title, audioUri, badge }: { title: string; audioUri: 
 
   const saveAudio = async () => {
     try {
-      const docDir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
-      const path = docDir + `wishme_audio_${Date.now()}.mp3`;
-      const base64 = audioUri.includes(',') ? audioUri.split(',')[1] : audioUri;
-      await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+      const isMP3 = audioUri.startsWith('data:audio/mpeg');
+      const ext = isMP3 ? 'mp3' : audioUri.startsWith('data:audio/mp4') || audioUri.startsWith('data:audio/m4a') ? 'm4a' : 'wav';
+      await downloadToDevice(audioUri, `wishme_audio_${Date.now()}.${ext}`);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch {}
+    } catch {
+      Alert.alert('Save Failed', 'Could not save the audio. Please try again.');
+    }
   };
 
   const durationLabel = duration > 0 ? fmtMs(duration) : '--:--';
@@ -679,12 +734,14 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
 
   const saveAudio = async () => {
     try {
-      const path = (FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '') + `wishme_audio_${Date.now()}.mp3`;
-      const base64 = audioUrl.includes(',') ? audioUrl.split(',')[1] : audioUrl;
-      await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+      const isMP3 = audioUrl.startsWith('data:audio/mpeg');
+      const ext = isMP3 ? 'mp3' : audioUrl.startsWith('data:audio/mp4') || audioUrl.startsWith('data:audio/m4a') ? 'm4a' : 'wav';
+      await downloadToDevice(audioUrl, `wishme_audio_${Date.now()}.${ext}`);
       setAudioSaved(true);
       setTimeout(() => setAudioSaved(false), 2500);
-    } catch {}
+    } catch {
+      Alert.alert('Save Failed', 'Could not save the audio. Please try again.');
+    }
   };
 
   const downloadMp4 = async () => {
@@ -692,19 +749,20 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
       if (Platform.OS === 'web') {
         await buildMp4ViaCanvas(imgBase64, audioUrl);
       } else if (videoUrl) {
-        const path = (FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '') + `wishme_video_${Date.now()}.mp4`;
+        const filename = `wishme_video_${Date.now()}.mp4`;
         if (videoUrl.startsWith('data:')) {
-          const b64 = videoUrl.includes(',') ? videoUrl.split(',')[1] : videoUrl;
-          await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+          await downloadToDevice(videoUrl, filename);
         } else {
-          await FileSystem.downloadAsync(videoUrl, path);
+          await downloadUrlToDevice(videoUrl, filename);
         }
       } else {
         return;
       }
       setVideoSaved(true);
       setTimeout(() => setVideoSaved(false), 2500);
-    } catch {}
+    } catch {
+      Alert.alert('Save Failed', 'Could not save the video. Please try again.');
+    }
   };
 
   return (
