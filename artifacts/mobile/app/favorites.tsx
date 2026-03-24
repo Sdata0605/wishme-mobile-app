@@ -863,36 +863,19 @@ export default function FavoritesScreen() {
         });
         rzp.open();
       } else {
-        let usedNativeSDK = false;
+        type RazorpayModule = { open: (opts: Record<string, unknown>) => Promise<{ razorpay_payment_id: string }> };
+        let razorpayModule: RazorpayModule | null = null;
         try {
-          const mod = require('react-native-razorpay');
-          const RazorpayCheckout = mod.default ?? mod;
-          if (RazorpayCheckout && typeof RazorpayCheckout.open === 'function') {
-            usedNativeSDK = true;
-            const data = await RazorpayCheckout.open({
-              key: order.key_id,
-              amount: String(order.amount),
-              currency: order.currency ?? 'INR',
-              order_id: order.id,
-              name: 'WishMe',
-              description: `Subscribe to ${selectedCeleb.name}`,
-              prefill: {
-                name: prefillName,
-                email: user?.email ?? '',
-                contact: user?.phone ?? '',
-              },
-              theme: { color: '#FF6B33' },
-            }) as { razorpay_payment_id: string };
-
-            if (data?.razorpay_payment_id) {
-              await onPaymentSuccess();
-            }
+          const mod = require('react-native-razorpay') as { default?: RazorpayModule } & RazorpayModule;
+          const candidate = mod.default ?? mod;
+          if (candidate && typeof candidate.open === 'function') {
+            razorpayModule = candidate;
           }
         } catch {
-          usedNativeSDK = false;
+          // native module not linked
         }
 
-        if (!usedNativeSDK) {
+        if (!razorpayModule) {
           setPayingRazorpay(false);
           Alert.alert(
             'Native Checkout Not Available',
@@ -900,6 +883,25 @@ export default function FavoritesScreen() {
             [{ text: 'OK' }],
           );
           return;
+        }
+
+        const data = await razorpayModule.open({
+          key: order.key_id,
+          amount: String(order.amount),
+          currency: order.currency ?? 'INR',
+          order_id: order.id,
+          name: 'WishMe',
+          description: `Subscribe to ${selectedCeleb.name}`,
+          prefill: {
+            name: prefillName,
+            email: user?.email ?? '',
+            contact: user?.phone ?? '',
+          },
+          theme: { color: '#FF6B33' },
+        });
+
+        if (data?.razorpay_payment_id) {
+          await onPaymentSuccess();
         }
       }
     } catch (err) {
