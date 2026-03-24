@@ -1,0 +1,269 @@
+Complete Wallet System — Technical Reference for Mobile App Integration
+1. WHERE WALLET BALANCE IS STORED
+Table: profiles Column: wallet_balance (integer, in ₹) User ID: profiles.id (UUID) — this is the Profile ID, NOT auth.users.id
+
+How to fetch balance:
+
+GET profiles WHERE id = {profileId}
+SELECT wallet_balance
+Real-time updates: The web app subscribes to Supabase Realtime on profiles table filtered by id=eq.{profileId}, listening for changes to wallet_balance.
+
+2. DATABASE TABLE: wallet_transactions
+
+{
+  "id": "uuid (auto)",
+  "user_id": "uuid — references profiles.id (NOT auth uid)",
+  "amount": "integer (always positive, in ₹)",
+  "transaction_type": "string enum",
+  "status": "string — 'pending' | 'completed' | 'approved' | 'rejected'",
+  "payment_method": "string | null — 'razorpay' | 'wallet' | null",
+  "description": "string | null",
+  "admin_note": "string | null",
+  "transaction_details": "json | null",
+  "payment_screenshot_url": "string | null",
+  "processed_by": "uuid | null — admin profile id",
+  "processed_at": "timestamp | null",
+  "created_at": "timestamp (auto)",
+  "updated_at": "timestamp (auto)"
+}
+Allowed transaction_type values: deposit, withdrawal, admin_credit, referral_commission, music_generation, music_download, greeting_card_generation, celebrity_subscription, booking, image_promotion, ugc_video, photo_wish, celebrity_call, voice_call, plan_upgrade, service_payment, debit, earning, favorite_subscription, refund
+
+3. AUTO-BALANCE TRIGGER: update_wallet_balance()
+A database trigger on wallet_transactions automatically updates profiles.wallet_balance. The mobile app does NOT need to manually update wallet_balance — just insert the transaction correctly:
+
+On INSERT with status='completed':
+
+Credit types (deposit, admin_credit, referral_commission): wallet_balance += amount
+Debit types (withdrawal, music_generation, booking, ugc_video, image_promotion, etc.): wallet_balance -= amount
+On UPDATE from 'pending' → 'approved':
+
+Credits the wallet and auto-sets status to 'completed'
+This means: insert a completed transaction → balance updates automatically.
+
+4. ADDING MONEY (Razorpay Flow)
+Step 1 — Create Razorpay Order
+
+Endpoint: POST /functions/v1/create-razorpay-order
+Headers: Authorization: Bearer {supabase_jwt}, apikey: {anon_key}
+
+// Request
+{
+  "amount": 500,
+  "currency": "INR",
+  "receipt": "wallet_{profileId}_{timestamp}",
+  "notes": {
+    "user_id": "{profileId}",
+    "type": "wallet_deposit"
+  }
+}
+
+// Response
+{
+  "id": "order_xxxxx",
+  "amount": 50000,
+  "currency": "INR",
+  "key_id": "rzp_live_xxxxx",
+  ...
+}
+Note: Razorpay amount is in paise (×100). The edge function multiplies by 100 internally.
+
+Step 2 — Open Razorpay Checkout (native SDK on mobile) Pass key_id, order_id, amount, currency to Razorpay SDK.
+
+Step 3 — Verify Payment
+
+Endpoint: POST /functions/v1/verify-razorpay-payment
+Headers: Authorization: Bearer {supabase_jwt}, apikey: {anon_key}
+
+// Request
+{
+  "razorpay_order_id": "order_xxxxx",
+  "razorpay_payment_id": "pay_xxxxx",
+  "razorpay_signature": "hex_signature"
+}
+
+// Response
+{ "success": true, "message": "Payment verified successfully" }
+Step 4 — Insert Wallet Transaction (client-side after verify)
+
+
+// INSERT into wallet_transactions
+{
+  "user_id": "{profileId}",
+  "transaction_type": "deposit",
+  "amount": 500,
+  "status": "completed",
+  "payment_method": "razorpay",
+  "transaction_details": {
+    "razorpay_order_id": "order_xxxxx",
+    "razorpay_payment_id": "pay_xxxxx"
+  }
+}
+The trigger automatically adds ₹500 to profiles.wallet_balance.
+
+Minimum deposit: ₹100
+
+5. SPENDING FROM WALLET — Every Feature
+The pattern is the same everywhere: check balance → do the action → insert wallet_transaction with status='completed'. The trigger auto-deducts.
+
+5A. Celebrity Video Booking (CheckoutStep.tsx)
+
+// INSERT into wallet_transactions
+{
+  "user_id": "{profileId}",
+  "transaction_type": "booking",
+  "amount": 499,
+  "status": "completed",
+  "payment_method": "wallet",
+  "description": "Video booking for {celebrityName}"
+}
+Also creates a row in bookings table with status 'pending'.
+
+5B. Wish Celebrity Order (WishBooking.tsx, WishCelebrityOccasion.tsx)
+
+// INSERT into wallet_transactions
+{
+  "user_id": "{profileId}",
+  "transaction_type": "booking",
+  "amount": 99,
+  "status": "completed",
+  "payment_method": "wallet",
+  "description": "Wish to {celebrityName}"
+}
+Also creates row in wish_celebrity_orders.
+
+5C. Celebrity Voice Call (CelebrityVoiceCall.tsx)
+Wallet deduction happens inside the edge function vapi-celebrity-call, not client-side.
+
+Endpoint: POST /functions/v1/vapi-celebrity-call
+The function checks profiles.wallet_balance >= price, deducts via direct UPDATE, and inserts into wallet_transactions with type 'voice_call'.
+
+5D. Music Generation (MusicStudio.tsx)
+Wallet deduction happens client-side before calling the edge function:
+
+
+// Client calls updateWallet(-cost) which does:
+// UPDATE profiles SET wallet_balance = wallet_balance - {cost} WHERE id = {profileId}
+
+// Then INSERT into wallet_transactions
+{
+  "user_id": "{profileId}",
+  "amount": 80,
+  "transaction_type": "debit",
+  "status": "completed",
+  "description": "AI Music Generation: {title}"
+}
+Edge functions used: elevenlabs-text-to-speech, elevenlabs-speech-to-speech, elevenlabs-sound-effects, elevenlabs-audio-isolation, elevenlabs-generate-music, elevenlabs-image-music-video
+
+Cost table for Music Studio:
+
+Feature	Cost (₹)
+Text-to-Speech	40
+Speech-to-Speech	60
+Sound Effects	50
+Audio Isolation	50
+Music (single)	80
+Music (two-track)	120
+Voice Clone	100
+Image+Music Video	100
+5E. Greeting Card (generate-greeting-card-ai edge function)
+Wallet deduction happens inside the edge function:
+
+Checks balance, deducts via UPDATE profiles SET wallet_balance = wallet_balance - price
+Inserts wallet_transactions with type 'greeting_card_generation'
+5F. Photo Wish (generate-photo-wish edge function)
+Same pattern — deduction inside edge function with type 'photo_wish'.
+
+5G. Image Promotion (generate-image-promotion edge function)
+Deduction inside edge function with type 'image_promotion'.
+
+5H. UGC Video (generate-ugc-video / generate-ugc-ad)
+Deduction with type 'ugc_video'.
+
+5I. Celebrity Subscription / Following (Following.tsx)
+Client-side deduction:
+
+
+{
+  "user_id": "{profileId}",
+  "transaction_type": "celebrity_subscription",
+  "amount": 99,
+  "status": "completed",
+  "payment_method": "wallet",
+  "description": "Subscribed to {celebrityName}"
+}
+5J. Suno Persona Song (suno-generate-persona-music)
+Deduction inside edge function: direct UPDATE profiles and insert wallet_transactions with type 'debit', amount ₹150.
+
+6. RAZORPAY AS ALTERNATIVE PAYMENT
+Every feature that accepts wallet also offers Razorpay as alternative. The flow is always:
+
+Call create-razorpay-order with amount
+Open Razorpay checkout
+On success callback, call verify-razorpay-payment
+Create the order/booking record (no wallet_transaction needed since money didn't come from wallet)
+7. CELEBRITY WITHDRAWALS (Payout System)
+Celebrities earn commission stored in celebrities.available_balance. They withdraw via:
+
+Table: payout_requests
+
+
+{
+  "celebrity_id": "uuid",
+  "amount": 1000,
+  "bank_detail_id": "uuid — references bank_details table",
+  "status": "pending",
+  "notes": "optional"
+}
+On submit, celebrities.available_balance is reduced immediately. Admin approves/rejects in AdminWalletManagement. If rejected, balance is restored.
+
+Celebrity earnings come from celebrity_wallet_transactions (auto-created by calculate_booking_commission trigger when bookings are confirmed/completed). TDS is auto-deducted.
+
+8. ADMIN WALLET OPERATIONS
+Admin can credit any user's wallet (AdminWalletManagement.tsx):
+
+
+// INSERT into wallet_transactions
+{
+  "user_id": "{targetProfileId}",
+  "transaction_type": "admin_credit",
+  "amount": 500,
+  "status": "completed",
+  "admin_note": "Compensation for issue #123",
+  "processed_by": "{adminProfileId}"
+}
+Trigger auto-credits the user's balance.
+
+Admin can approve/reject pending deposits by updating transaction status.
+
+Sync all wallets RPC: sync_all_wallet_balances — recalculates all balances from transaction history.
+
+9. REFUNDS
+When services fail (e.g., MusicAPI credits depleted, HeyGen timeout), edge functions insert:
+
+
+{
+  "user_id": "{profileId}",
+  "amount": 100,
+  "transaction_type": "refund",
+  "status": "completed",
+  "transaction_details": {
+    "reason": "musicapi_error",
+    "generation_id": "xxx"
+  }
+}
+10. TRANSACTION HISTORY (for display)
+Fetch from two tables and merge:
+
+
+-- Wallet transactions
+SELECT * FROM wallet_transactions WHERE user_id = {profileId} ORDER BY created_at DESC
+
+-- Referral commissions  
+SELECT *, bookings(id, service_type, final_price, celebrities(name))
+FROM referral_transactions WHERE referrer_id = {profileId} ORDER BY created_at DESC
+Credit types (show green +): deposit, admin_credit, commission_earning, referral_commission Debit types (show red -): everything else
+
+11. IMPORTANT ID NOTE
+wallet_transactions.user_id = profiles.id (Profile table primary key) This is NOT the same as auth.users.id (Auth UID).
+
+To get profile ID from auth: SELECT id FROM profiles WHERE user_id = {auth_uid}
