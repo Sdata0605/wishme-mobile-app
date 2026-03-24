@@ -194,10 +194,11 @@ rzp.open();
         const result = await WebBrowser.openAuthSessionAsync(dataUri, callbackBase);
 
         if (result.type === 'success' && result.url) {
-          const parsed = new URL(result.url);
-          const paymentId = parsed.searchParams.get('payment_id');
-          const orderId = parsed.searchParams.get('order_id');
-          const signature = parsed.searchParams.get('signature');
+          const parsed = Linking.parse(result.url);
+          const qp = parsed.queryParams ?? {};
+          const paymentId = qp['payment_id'] as string | undefined;
+          const orderId = qp['order_id'] as string | undefined;
+          const signature = qp['signature'] as string | undefined;
           if (paymentId && orderId && signature) {
             await verifyAndCredit(paymentId, orderId, signature);
           }
