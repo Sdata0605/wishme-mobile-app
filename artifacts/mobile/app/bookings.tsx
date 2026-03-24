@@ -976,7 +976,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1,
   },
   headerTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
-  tabBar: { borderBottomWidth: 1, maxHeight: 54 },
+  tabBar: { borderBottomWidth: 1, height: 54, flexShrink: 0 },
   tabBarContent: { paddingHorizontal: 14, alignItems: 'center', gap: 8, paddingVertical: 9 },
   tabPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999 },
   tabPillText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
