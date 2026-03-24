@@ -500,7 +500,7 @@ function MyFavoritesTab({ favorites, colors, bottomPad, refreshing, onRefresh, o
                       router.push({ pathname: '/booking/[id]', params: { id: celeb.id, service: 'wish' } });
                     }}
                   >
-                    <Icon name="phone-call" size={12} color="#3B82F6" />
+                    <Icon name="mic" size={12} color="#3B82F6" />
                     <Text style={[styles.actionBtnText, { color: '#3B82F6' }]}>Book</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
