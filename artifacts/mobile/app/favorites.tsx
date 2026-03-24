@@ -1,5 +1,3 @@
-import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { format } from 'date-fns';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
@@ -569,7 +567,9 @@ export default function FavoritesScreen() {
         (prows ?? []).forEach((p) => map.set(p.celebrity_id, p));
         setPricingMap(map);
       }
-    } catch {}
+    } catch {
+      Alert.alert('Error', 'Failed to load celebrities. Pull down to refresh.');
+    }
   }, [accessToken]);
 
   const fetchUserFavorites = useCallback(async () => {
@@ -583,8 +583,12 @@ export default function FavoritesScreen() {
       if (res.ok) {
         const rows = await res.json() as FavoriteRow[];
         setUserFavorites(rows ?? []);
+      } else {
+        Alert.alert('Error', 'Failed to load your favorites. Pull down to refresh.');
       }
-    } catch {}
+    } catch {
+      Alert.alert('Error', 'Failed to load your favorites. Please check your connection.');
+    }
   }, [profileId, accessToken]);
 
   const fetchAll = useCallback(async () => {
@@ -617,24 +621,26 @@ export default function FavoritesScreen() {
     const referrerCommission = Math.floor(pricing.price * pricing.referrer_commission_percentage / 100);
     const celebrityCommission = Math.floor(pricing.price * pricing.celebrity_commission_percentage / 100);
 
-    try {
-      await supabaseFetch(
-        '/rest/v1/celebrity_favorites',
-        {
-          method: 'POST',
-          headers: { Prefer: 'return=minimal' } as Record<string, string>,
-          body: JSON.stringify({
-            user_id: profileId,
-            celebrity_id: celeb.id,
-            price_paid: pricing.price,
-            referrer_commission: referrerCommission,
-            celebrity_commission: celebrityCommission,
-            status: 'active',
-          }),
-        },
-        accessToken,
-      );
-    } catch {}
+    const favRes = await supabaseFetch(
+      '/rest/v1/celebrity_favorites',
+      {
+        method: 'POST',
+        headers: { Prefer: 'return=minimal' } as Record<string, string>,
+        body: JSON.stringify({
+          user_id: profileId,
+          celebrity_id: celeb.id,
+          price_paid: pricing.price,
+          referrer_commission: referrerCommission,
+          celebrity_commission: celebrityCommission,
+          status: 'active',
+        }),
+      },
+      accessToken,
+    );
+    if (!favRes.ok) {
+      const e = await favRes.json().catch(() => ({})) as Record<string, string>;
+      throw new Error(e.message ?? e.error ?? 'Failed to record subscription. Please contact support.');
+    }
 
     try {
       const profileRes = await supabaseFetch(
@@ -646,7 +652,7 @@ export default function FavoritesScreen() {
         const profiles = await profileRes.json() as Array<{ referred_by: string | null }>;
         const referredBy = profiles?.[0]?.referred_by;
         if (referredBy) {
-          await supabaseFetch(
+          const refRes = await supabaseFetch(
             '/rest/v1/referral_transactions',
             {
               method: 'POST',
@@ -662,9 +668,14 @@ export default function FavoritesScreen() {
             },
             accessToken,
           );
+          if (!refRes.ok) {
+            console.warn('Referral transaction insert failed:', await refRes.text().catch(() => ''));
+          }
         }
       }
-    } catch {}
+    } catch (err) {
+      console.warn('Referral processing error (non-critical):', err);
+    }
 
     try {
       const celebDetailsRes = await supabaseFetch(
@@ -684,7 +695,7 @@ export default function FavoritesScreen() {
           const tdsAmount = Math.floor(celebrityCommission * tdsRate / 100);
           const netCommission = celebrityCommission - tdsAmount;
 
-          await supabaseFetch(
+          const cwRes = await supabaseFetch(
             '/rest/v1/celebrity_wallet_transactions',
             {
               method: 'POST',
@@ -702,8 +713,11 @@ export default function FavoritesScreen() {
             },
             accessToken,
           );
+          if (!cwRes.ok) {
+            console.warn('Celebrity wallet transaction insert failed:', await cwRes.text().catch(() => ''));
+          }
 
-          await supabaseFetch(
+          const patchRes = await supabaseFetch(
             `/rest/v1/celebrities?id=eq.${celeb.id}`,
             {
               method: 'PATCH',
@@ -715,9 +729,16 @@ export default function FavoritesScreen() {
             },
             accessToken,
           );
+          if (!patchRes.ok) {
+            console.warn('Celebrity earnings update failed:', await patchRes.text().catch(() => ''));
+          }
         }
+      } else {
+        console.warn('Failed to fetch celebrity PAN details:', celebDetailsRes.status);
       }
-    } catch {}
+    } catch (err) {
+      console.warn('Celebrity commission processing error (non-critical):', err);
+    }
 
     supabaseFetch(
       '/functions/v1/send-celebrity-subscription-email',
@@ -872,37 +893,13 @@ export default function FavoritesScreen() {
         }
 
         if (!usedNativeSDK) {
-          const callbackBase = Linking.createURL('payment/callback');
-          const html = `<!DOCTYPE html><html><body style="margin:0;background:#fff;">
-<script src="https://checkout.razorpay.com/v1/checkout.js"><\/script>
-<script>
-var rzp = new Razorpay({
-  key: "${order.key_id}",
-  amount: "${order.amount}",
-  currency: "${order.currency ?? 'INR'}",
-  order_id: "${order.id}",
-  name: "WishMe",
-  description: "Subscribe to ${selectedCeleb.name.replace(/"/g, '')}",
-  prefill: { name: "${prefillName.replace(/"/g, '')}", email: "${(user?.email ?? '').replace(/"/g, '')}", contact: "${(user?.phone ?? '').replace(/"/g, '')}" },
-  theme: { color: "#FF6B33" },
-  handler: function(r) {
-    window.location.href = "${callbackBase}?payment_id=" + r.razorpay_payment_id + "&status=success";
-  },
-  modal: { ondismiss: function() { window.location.href = "${callbackBase}?cancelled=1"; } }
-});
-rzp.open();
-<\/script></body></html>`;
-
-          const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
-          const result = await WebBrowser.openAuthSessionAsync(dataUri, callbackBase);
-
-          if (result.type === 'success' && result.url) {
-            const parsed = Linking.parse(result.url);
-            const qp = parsed.queryParams ?? {};
-            if (qp['status'] === 'success' && qp['payment_id']) {
-              await onPaymentSuccess();
-            }
-          }
+          setPayingRazorpay(false);
+          Alert.alert(
+            'Native Checkout Not Available',
+            'Razorpay native checkout requires a custom development build (not Expo Go). Use wallet payment, or install the production app from the App Store/Play Store.',
+            [{ text: 'OK' }],
+          );
+          return;
         }
       }
     } catch (err) {
