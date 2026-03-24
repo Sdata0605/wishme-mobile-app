@@ -231,10 +231,20 @@ function BrowseTab({
       {filtered.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Icon name="search" size={40} color={colors.mutedForeground} />
-          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No celebrities found</Text>
-          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
-            Try a different name or category
+          <Text style={[styles.emptyTitle, { color: colors.foreground }]}>
+            {search.length > 0 ? 'No celebrities found' : 'No celebrities available'}
           </Text>
+          <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>
+            {search.length > 0 ? 'Try a different name or category' : 'Check back soon for new celebrities'}
+          </Text>
+          {search.length > 0 && (
+            <TouchableOpacity
+              style={[styles.browseCelebsBtn, { borderColor: colors.primary, marginTop: 16 }]}
+              onPress={() => setSearch('')}
+            >
+              <Text style={[styles.browseCelebsBtnText, { color: colors.primary }]}>Clear Search</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <View style={styles.grid}>
@@ -793,6 +803,19 @@ export default function FavoritesScreen() {
 
       updateUser({ walletBalance: walletBalance - selectedPricing.price });
 
+      supabaseFetch(
+        `/rest/v1/profiles?select=wallet_balance&id=eq.${profileId}&limit=1`,
+        {},
+        accessToken,
+      ).then(async (r) => {
+        if (r.ok) {
+          const rows = await r.json() as Array<{ wallet_balance: number }>;
+          if (rows?.[0]?.wallet_balance != null) {
+            updateUser({ walletBalance: rows[0].wallet_balance });
+          }
+        }
+      }).catch(() => {});
+
       try {
         await processSubscription(selectedCeleb, selectedPricing);
       } catch (subErr) {
@@ -846,9 +869,17 @@ export default function FavoritesScreen() {
       const prefillName = `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim();
 
       const onPaymentSuccess = async () => {
-        await processSubscription(selectedCeleb, selectedPricing);
-        setModalVisible(false);
-        Alert.alert('Subscribed!', `You are now subscribed to ${selectedCeleb.name}!`);
+        try {
+          await processSubscription(selectedCeleb, selectedPricing);
+          setModalVisible(false);
+          Alert.alert('Subscribed!', `You are now subscribed to ${selectedCeleb.name}!`);
+        } catch (subErr) {
+          Alert.alert(
+            'Partial Payment Error',
+            'Payment was received but the subscription could not be confirmed. Please contact support.',
+          );
+          console.error('processSubscription failed after Razorpay payment:', subErr);
+        }
       };
 
       if (Platform.OS === 'web') {
