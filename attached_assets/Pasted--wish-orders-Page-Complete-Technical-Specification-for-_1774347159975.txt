@@ -1,0 +1,216 @@
+/wish-orders Page -- Complete Technical Specification for Replit Mobile App
+1. Purpose
+This page lets authenticated users track all their celebrity wish orders (greeting cards sent to celebrities on occasions like birthdays, anniversaries, etc.). It shows two sections: Active/Pending Orders and Completed Wishes, with actions to continue a pending wish, view/download the generated greeting card, or navigate to the conversation.
+
+2. Database Table: wish_celebrity_orders
+Column	Type	Default	Nullable	Description
+id	uuid	gen_random_uuid()	NO	Primary key
+user_id	uuid	-	NO	FK to profiles.id (NOT auth.uid)
+celebrity_id	uuid	-	NO	FK to celebrities.id
+occasion_type	text	-	NO	e.g. "Birthday", "Anniversary"
+message	text	-	NO	User's wish message
+recipient_name	text	-	YES	Who the wish is for
+status	text	'pending'	YES	pending / processing / completed / sent
+payment_status	text	'pending'	YES	pending / completed / failed
+amount_paid	integer	-	YES	Amount in smallest currency unit
+payment_method	text	-	YES	wallet / razorpay
+razorpay_order_id	text	-	YES	Razorpay order reference
+razorpay_payment_id	text	-	YES	Razorpay payment reference
+card_generation_type	text	'ai'	YES	ai / upload
+card_url	text	-	YES	User-provided card URL
+card_prompt	text	-	YES	AI prompt used to generate card
+reference_image_url	text	-	YES	Reference image for AI generation
+generated_card_image_url	text	-	YES	Final generated card image URL
+generated_card_text	text	-	YES	Generated card text
+greeting_text	text	-	YES	Final greeting message on the card
+card_approved	boolean	false	YES	Whether user approved the card
+user_uploaded_card_url	text	-	YES	User's own uploaded card
+user_uploaded_video_url	text	-	YES	User's own uploaded video
+generation_attempts	integer	0	YES	How many times AI generation was tried
+discount_percentage	integer	0	YES	Discount applied
+discount_amount	integer	0	YES	Discount amount
+completed_at	timestamptz	-	YES	When order was completed/sent
+created_at	timestamptz	now()	YES	Created timestamp
+updated_at	timestamptz	now()	YES	Updated timestamp
+3. Data Flow
+
+1. User opens /wish-orders
+2. Auth check → redirect to /auth if not logged in
+3. Fetch orders:
+   SELECT *, celebrities(id, name, image_url)
+   FROM wish_celebrity_orders
+   WHERE user_id = {profile.id}
+   ORDER BY created_at DESC
+
+4. Client-side split:
+   - Pending: payment_status = 'completed' AND status != 'sent'
+   - Completed: status = 'sent'
+
+5. User actions:
+   - Pending → "Continue Wish" → navigate to /wish-confirmation/{orderId}
+   - Pending → "View Card" → open generated_card_image_url in browser
+   - Completed → "View Conversation" → navigate to /messages
+   - Completed → "View Card" → open generated_card_image_url
+   - Completed → "Download" → fetch blob → trigger file download
+4. API Endpoint Used
+No edge function is called on this page. It uses a single direct Supabase query.
+
+Fetch All Wish Orders
+
+Method: Supabase SDK (not HTTP)
+Table: wish_celebrity_orders
+Operation: SELECT with join
+Equivalent REST call:
+
+GET https://eqikeuqwbphwongtfzhe.supabase.co/rest/v1/wish_celebrity_orders?select=*,celebrities(id,name,image_url)&user_id=eq.{PROFILE_ID}&order=created_at.desc
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {USER_JWT}
+Response JSON format (array):
+
+
+[
+  {
+    "id": "uuid-order-id",
+    "user_id": "uuid-profile-id",
+    "celebrity_id": "uuid-celebrity-id",
+    "occasion_type": "Birthday",
+    "message": "Happy Birthday! Wishing you the best day ever!",
+    "recipient_name": "Mom",
+    "status": "sent",
+    "payment_status": "completed",
+    "amount_paid": 199,
+    "payment_method": "wallet",
+    "card_generation_type": "ai",
+    "card_prompt": "A beautiful birthday card with flowers",
+    "generated_card_image_url": "https://example.com/card.jpg",
+    "generated_card_text": "Wishing you joy and happiness!",
+    "greeting_text": "Happy Birthday dear Mom!",
+    "card_approved": true,
+    "generation_attempts": 1,
+    "discount_percentage": 0,
+    "discount_amount": 0,
+    "completed_at": "2025-01-15T10:30:00Z",
+    "created_at": "2025-01-15T09:00:00Z",
+    "updated_at": "2025-01-15T10:30:00Z",
+    "razorpay_order_id": null,
+    "razorpay_payment_id": null,
+    "card_url": null,
+    "reference_image_url": null,
+    "user_uploaded_card_url": null,
+    "user_uploaded_video_url": null,
+    "celebrities": {
+      "id": "uuid-celebrity-id",
+      "name": "Virat Kohli",
+      "image_url": "https://example.com/virat.jpg"
+    }
+  }
+]
+5. Related Edge Function: send-wish-to-celebrity
+This is NOT called from this page but is part of the wish flow (called from /wish-confirmation). For completeness:
+
+
+POST /functions/v1/send-wish-to-celebrity
+Headers:
+  Authorization: Bearer {USER_JWT}
+  Content-Type: application/json
+Request:
+
+
+{
+  "orderId": "uuid-order-id"
+}
+Response (success):
+
+
+{
+  "success": true,
+  "message": "Greeting card sent successfully to celebrity",
+  "conversation_id": "uuid-conversation-id"
+}
+What it does:
+
+Fetches the order with celebrity/user data
+Validates card is generated and not already sent
+Finds or creates a conversations row between user and celebrity
+Inserts the greeting card as a message in messages table
+Inserts an AI-generated thank-you reply from the celebrity
+Updates order: card_approved = true, status = 'sent', completed_at = now()
+6. Client-Side Filtering Logic
+
+// Pending = paid but not yet sent to celebrity
+const pendingOrders = orders.filter(order => 
+  order.payment_status === 'completed' && order.status !== 'sent'
+);
+
+// Completed = fully sent to celebrity
+const completedOrders = orders.filter(order => 
+  order.status === 'sent'
+);
+7. Status Badge Colors
+Status	Badge Variant
+completed	default (primary color)
+processing	secondary (gray)
+pending	outline (border only)
+sent	Custom green (bg-green-500)
+8. UI Components & Layout
+Component	Purpose
+AuthenticatedLayout	Wrapper with header, sidebar, bottom nav
+Card + CardContent	Order card container
+Badge	Status indicator
+Button	Actions (Continue Wish, View Card, Download, View Conversation, Make New Wish)
+Loader2 (lucide)	Spinning loader for loading state and processing indicator
+Eye (lucide)	View Card icon
+Download (lucide)	Download icon
+img	Celebrity avatar (16x16 rounded-full)
+Page structure:
+
+
+AuthenticatedLayout
+└── Container (max-w-6xl, pt-24)
+    ├── Header Row
+    │   ├── Title: "My Wish Orders"
+    │   ├── Subtitle: "Track your celebrity wishes..."
+    │   └── Button: "Make New Wish" → /wish-celebrity
+    │
+    ├── Empty State (if no orders)
+    │   └── Card with "Create Your First Wish" button
+    │
+    ├── Section: Active/Pending Orders (orange border)
+    │   └── Order Card × N
+    │       ├── Celebrity Avatar (rounded circle)
+    │       ├── Celebrity Name
+    │       ├── Occasion + Recipient
+    │       ├── Status Badge
+    │       ├── Message (2-line clamp)
+    │       └── Actions: [Continue Wish] [View Card?] [Generating spinner?]
+    │
+    └── Section: Completed Wishes (green border)
+        └── Order Card × N
+            ├── Celebrity Avatar
+            ├── Celebrity Name
+            ├── Occasion + Recipient
+            ├── "Sent" Badge (green)
+            ├── Message (2-line clamp)
+            └── Actions: [View Conversation] [View Card?] [Download?]
+9. Download Card Function
+For mobile app, replace the browser blob download with a native file save:
+
+
+// Web version:
+const response = await fetch(cardUrl);
+const blob = await response.blob();
+// Creates <a> element and triggers download
+
+// Mobile equivalent:
+// Use react-native's RNFS or expo-file-system to download
+// the image from generated_card_image_url to the device gallery
+10. Navigation Actions
+Action	Destination
+"Make New Wish" button	/wish-celebrity
+"Create Your First Wish"	/wish-celebrity
+"Continue Wish"	/wish-confirmation/{orderId}
+"View Conversation"	/messages
+"View Card"	Opens generated_card_image_url in browser/image viewer
+11. Key Identity Note
+All queries use profile.id (from the profiles table), NOT auth.uid(). The user_id column in wish_celebrity_orders references profiles.id.
