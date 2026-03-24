@@ -259,7 +259,7 @@ function BrowseTab({
                     <Image source={{ uri: imageUri }} style={styles.browseImage} resizeMode="cover" />
                   ) : (
                     <View style={[styles.imgPlaceholder, { backgroundColor: colors.border }]}>
-                      <Icon name="users" size={32} color={colors.mutedForeground} />
+                      <Icon name="heart" size={32} color={colors.mutedForeground} />
                     </View>
                   )}
                   {celeb.is_verified && (
@@ -500,7 +500,7 @@ function MyFavoritesTab({ favorites, colors, bottomPad, refreshing, onRefresh, o
                       router.push({ pathname: '/booking/[id]', params: { id: celeb.id, service: 'wish' } });
                     }}
                   >
-                    <Icon name="clock" size={12} color="#3B82F6" />
+                    <Icon name="phone-call" size={12} color="#3B82F6" />
                     <Text style={[styles.actionBtnText, { color: '#3B82F6' }]}>Book</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -793,7 +793,16 @@ export default function FavoritesScreen() {
 
       updateUser({ walletBalance: walletBalance - selectedPricing.price });
 
-      await processSubscription(selectedCeleb, selectedPricing);
+      try {
+        await processSubscription(selectedCeleb, selectedPricing);
+      } catch (subErr) {
+        Alert.alert(
+          'Partial Payment Error',
+          'Your wallet was debited but the subscription could not be confirmed. Please contact support with your transaction details.',
+        );
+        console.error('processSubscription failed after wallet deduction:', subErr);
+        return;
+      }
 
       setModalVisible(false);
       Alert.alert('Subscribed!', `You are now subscribed to ${selectedCeleb.name}!`);
