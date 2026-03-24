@@ -18,10 +18,69 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
-import { supabaseFetch } from '@/constants/supabase';
+import { supabaseFetch, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
 import { useTheme } from '@/context/ThemeContext';
 
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
+
+function useRealtimeBookings(profileId: string | null, accessToken: string | null, onUpdate: () => void) {
+  const onUpdateRef = useRef(onUpdate);
+  onUpdateRef.current = onUpdate;
+
+  useEffect(() => {
+    if (!profileId || !accessToken) return;
+    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
+    let ws: WebSocket | null = null;
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let ref = 0;
+
+    const send = (msg: object) => {
+      try { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); } catch {}
+    };
+
+    const join = (table: string) => {
+      send({
+        topic: `realtime:public:${table}`,
+        event: 'phx_join',
+        payload: {
+          config: {
+            broadcast: { ack: false, self: false },
+            postgres_changes: [{ event: 'UPDATE', schema: 'public', table, filter: `user_id=eq.${profileId}` }],
+          },
+          access_token: accessToken,
+        },
+        ref: String(++ref),
+      });
+    };
+
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        join('bookings');
+        join('music_generations');
+        heartbeat = setInterval(() => {
+          send({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) });
+        }, 30000);
+      };
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data as string);
+          if (msg.event === 'postgres_changes' && msg.payload?.data?.type === 'UPDATE') {
+            onUpdateRef.current();
+          }
+        } catch {}
+      };
+      ws.onerror = () => {};
+    } catch {}
+
+    return () => {
+      closed = true;
+      if (heartbeat) clearInterval(heartbeat);
+      ws?.close();
+    };
+  }, [profileId, accessToken]);
+}
 
 function fmtDate(s: string | null | undefined): string {
   if (!s) return '';
@@ -724,8 +783,8 @@ function OccasionCard({ item, colors }: { item: OccasionBooking; colors: Colors 
 const EMPTY_CONFIG: Record<BookingTab, { icon: string; label: string; route: string; btnLabel: string }> = {
   Celebrity: { icon: 'star', label: 'No celebrity bookings yet', route: '/(tabs)/home', btnLabel: 'Book a Celebrity' },
   Wishes: { icon: 'heart', label: 'No wishes yet', route: '/(tabs)/home', btnLabel: 'Send a Wish' },
-  Cards: { icon: 'gift', label: 'No greeting cards yet', route: '/(tabs)/home', btnLabel: 'Create a Card' },
-  Photo: { icon: 'image', label: 'No photo wishes yet', route: '/(tabs)/home', btnLabel: 'Create Photo Wish' },
+  Cards: { icon: 'gift', label: 'No greeting cards yet', route: '/create-card', btnLabel: 'Create a Card' },
+  Photo: { icon: 'image', label: 'No photo wishes yet', route: '/photo-wish', btnLabel: 'Create Photo Wish' },
   Calls: { icon: 'phone', label: 'No celebrity calls yet', route: '/(tabs)/home', btnLabel: 'Book a Call' },
   Music: { icon: 'music', label: 'No music generated yet', route: '/(tabs)/music', btnLabel: 'Generate Music' },
   'Img+Music': { icon: 'image', label: 'No image+music yet', route: '/(tabs)/music', btnLabel: 'Create Img+Music' },
@@ -733,7 +792,7 @@ const EMPTY_CONFIG: Record<BookingTab, { icon: string; label: string; route: str
   SFX: { icon: 'zap', label: 'No sound effects yet', route: '/(tabs)/music', btnLabel: 'Generate SFX' },
   Convert: { icon: 'mic', label: 'No voice conversions yet', route: '/(tabs)/music', btnLabel: 'Convert Voice' },
   Isolate: { icon: 'volume-x', label: 'No audio isolations yet', route: '/(tabs)/music', btnLabel: 'Isolate Audio' },
-  Occasions: { icon: 'gift', label: 'No occasion bookings yet', route: '/(tabs)/home', btnLabel: 'Book an Occasion' },
+  Occasions: { icon: 'gift', label: 'No occasion bookings yet', route: '/occasions', btnLabel: 'Book an Occasion' },
 };
 
 function EmptyState({ tab, colors }: { tab: BookingTab; colors: Colors }) {
@@ -804,6 +863,12 @@ export default function BookingsScreen() {
     const interval = setInterval(() => fetchAllBookings(true), 30000);
     return () => clearInterval(interval);
   }, [fetchAllBookings]);
+
+  useRealtimeBookings(
+    user?.profileId ?? null,
+    session?.access_token ?? null,
+    useCallback(() => fetchAllBookings(true), [fetchAllBookings]),
+  );
 
   function renderTab() {
     if (loading) {
