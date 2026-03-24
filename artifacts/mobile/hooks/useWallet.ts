@@ -5,7 +5,7 @@ import { supabaseFetch } from '@/constants/supabase';
 export function useWallet() {
   const { session, user } = useAuth();
   const [balance, setBalance] = useState<number>(user?.walletBalance ?? 0);
-  const [profileId, setProfileId] = useState<string>(user?.id ?? '');
+  const [profileId, setProfileId] = useState<string>(user?.profileId ?? '');
   const [loading, setLoading] = useState(false);
 
   const refetch = useCallback(async () => {
@@ -13,7 +13,7 @@ export function useWallet() {
     setLoading(true);
     try {
       const res = await supabaseFetch(
-        `/rest/v1/profiles?select=id,wallet_balance&id=eq.${user.id}&limit=1`,
+        `/rest/v1/profiles?select=id,wallet_balance&user_id=eq.${user.id}&limit=1`,
         {},
         session.access_token,
       );

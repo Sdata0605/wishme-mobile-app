@@ -4,6 +4,7 @@ import { parseApiError, supabaseFetch } from '@/constants/supabase';
 
 export interface User {
   id: string;
+  profileId: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -81,6 +82,7 @@ function buildUserFromSupabase(supaUser: Record<string, unknown>, fallback: Part
   const meta = (supaUser.user_metadata ?? {}) as Record<string, unknown>;
   return {
     id: (supaUser.id as string) ?? fallback.id ?? 'usr_' + Date.now(),
+    profileId: fallback.profileId ?? '',
     firstName: (meta.first_name as string) ?? (meta.firstName as string) ?? fallback.firstName ?? '',
     lastName: (meta.last_name as string) ?? (meta.lastName as string) ?? fallback.lastName ?? '',
     email: (supaUser.email as string) ?? fallback.email ?? '',
@@ -162,7 +164,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const profileRes = await supabaseFetch(
-          `/rest/v1/profiles?select=*&id=eq.${supaUser.id}&limit=1`,
+          `/rest/v1/profiles?select=*&user_id=eq.${supaUser.id}&limit=1`,
           {},
           newSession.access_token,
         );
@@ -172,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const p = profiles[0];
             u = {
               ...u,
+              profileId: (p.id as string) ?? '',
               firstName: (p.first_name as string) ?? u.firstName,
               lastName: (p.last_name as string) ?? u.lastName,
               phone: (p.phone as string) ?? u.phone,

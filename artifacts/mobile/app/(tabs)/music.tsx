@@ -47,7 +47,7 @@ const MUSIC_MOODS = ['happy', 'sad', 'energetic', 'calm', 'romantic', 'epic', 'm
 const IMG_MUSIC_GENRES = ['ambient', 'pop', 'classical', 'electronic', 'rock', 'r&b'];
 const IMG_MUSIC_MOODS = ['calm', 'happy', 'romantic', 'epic', 'sad', 'energetic'];
 
-const COSTS = { tts: 50, convert: 75, clone: 150, sfx: 60, isolate: 40, music_base: 100, music_cloned: 150, img_base: 120, img_vocals: 150 };
+const COSTS = { tts: 40, convert: 60, clone: 100, sfx: 50, isolate: 50, music_base: 80, music_cloned: 120, img_base: 100, img_vocals: 100 };
 
 async function saveAudioToCache(dataUri: string): Promise<string> {
   const isMP3 = dataUri.startsWith('data:audio/mpeg');
@@ -1058,7 +1058,7 @@ function MusicTab({ ctx }: { ctx: MusicCtx }) {
       await supabaseFetch('/rest/v1/wallet_transactions', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.profileId, transaction_type: 'music_generation', amount: cost, status: 'completed', payment_method: 'wallet', description: `AI Music: ${title || 'Untitled'} (${genre})` }),
+        body: JSON.stringify({ user_id: ctx.profileId, transaction_type: 'debit', amount: cost, status: 'completed', payment_method: 'wallet', description: `AI Music: ${title || 'Untitled'} (${genre})` }),
       }, ctx.session?.access_token);
 
       let payload: Record<string, unknown> = { songTitle: title.trim() || 'Untitled', genre, mood, description: desc.trim() };

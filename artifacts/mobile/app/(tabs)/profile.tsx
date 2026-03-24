@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useWallet } from '@/hooks/useWallet';
 
 function ProfileItem({
   icon,
@@ -48,6 +49,9 @@ export default function ProfileScreen() {
   const { colors, isDark, toggle } = useTheme();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const { balance: liveBalance, refetch: refetchWallet } = useWallet();
+
+  React.useEffect(() => { refetchWallet(); }, [refetchWallet]);
 
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : 'WM';
 
@@ -81,7 +85,7 @@ export default function ProfileScreen() {
         <View>
           <Text style={[styles.walletLabel, { color: colors.mutedForeground }]}>Wallet Balance</Text>
           <Text style={[styles.walletBalance, { color: colors.foreground }]}>
-            ₹{user?.walletBalance?.toLocaleString('en-IN') ?? '0'}
+            ₹{liveBalance.toLocaleString('en-IN')}
           </Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/wallet')}>
