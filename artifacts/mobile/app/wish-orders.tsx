@@ -51,9 +51,9 @@ interface WishOrder {
   };
 }
 
-const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string }> = {
+const STATUS_CONFIG: Record<string, { bg: string; text: string; label: string; primary?: true }> = {
   sent: { bg: '#22C55E20', text: '#22C55E', label: 'Sent' },
-  completed: { bg: '#FF6B3320', text: '#FF6B33', label: 'Completed' },
+  completed: { bg: '', text: '', label: 'Completed', primary: true },
   processing: { bg: '#6B728020', text: '#6B7280', label: 'Processing' },
   pending: { bg: 'transparent', text: '#F59E0B', label: 'Pending' },
 };
@@ -106,7 +106,7 @@ function OrderCard({ order, isPending, colors }: OrderCardProps) {
 
   const celeb = order.celebrities;
   const avatarUri = imageUri(celeb.image_url);
-  const cardUrl = order.generated_card_image_url;
+  const cardUrl = imageUri(order.generated_card_image_url);
   const status = getStatusConfig(order.status);
 
   const handleViewCard = async () => {
@@ -187,13 +187,15 @@ function OrderCard({ order, isPending, colors }: OrderCardProps) {
           style={[
             s.statusBadge,
             {
-              backgroundColor: status.bg,
+              backgroundColor: status.primary ? colors.primary + '20' : status.bg,
               borderWidth: order.status.toLowerCase() === 'pending' ? 1 : 0,
-              borderColor: status.text,
+              borderColor: status.primary ? colors.primary : status.text,
             },
           ]}
         >
-          <Text style={[s.statusText, { color: status.text }]}>{status.label}</Text>
+          <Text style={[s.statusText, { color: status.primary ? colors.primary : status.text }]}>
+            {status.label}
+          </Text>
         </View>
       </View>
 
@@ -243,7 +245,7 @@ function OrderCard({ order, isPending, colors }: OrderCardProps) {
                   activeOpacity={0.8}
                 >
                   <Icon name="eye" size={14} color={colors.foreground} />
-                  <Text style={[s.actionText, { color: colors.foreground }]}>View</Text>
+                  <Text style={[s.actionText, { color: colors.foreground }]}>View Card</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[s.actionBtn, { backgroundColor: '#22C55E15', borderColor: '#22C55E40' }]}
@@ -346,7 +348,7 @@ export default function WishOrdersScreen() {
           activeOpacity={0.8}
         >
           <Icon name="plus" size={14} color="#FF6B33" />
-          <Text style={[s.newWishText, { color: '#FF6B33' }]}>New Wish</Text>
+          <Text style={[s.newWishText, { color: '#FF6B33' }]}>Make New Wish</Text>
         </TouchableOpacity>
       </View>
 
