@@ -1,0 +1,506 @@
+/following Page — Complete Technical Specification for Mobile App
+Purpose
+The Celebrity Favorites page lets authenticated users browse all active celebrities, subscribe to them via wallet or Razorpay payment, and manage their active subscriptions. A subscription grants lifetime access to that celebrity's UGC videos, wishes, and image promotions.
+
+Database Tables Used
+1. celebrities (READ)
+GET /rest/v1/celebrities?is_active=eq.true&order=name.asc
+Response row shape:
+
+
+{
+  "id": "uuid",
+  "name": "Shah Rukh Khan",
+  "category": "Actor",
+  "image_url": "https://...",
+  "location": "Mumbai",
+  "rating": 4.8,
+  "review_count": 125,
+  "is_verified": true,
+  "is_active": true
+}
+2. celebrity_favorite_pricing (READ)
+GET /rest/v1/celebrity_favorite_pricing?is_enabled=eq.true
+Response row shape:
+
+
+{
+  "id": "uuid",
+  "celebrity_id": "uuid",
+  "price": 299,
+  "referrer_commission_percentage": 5,
+  "celebrity_commission_percentage": 70,
+  "is_enabled": true
+}
+3. celebrity_favorites (READ + INSERT)
+Read (user's active subscriptions):
+
+GET /rest/v1/celebrity_favorites?select=*,celebrities(*)&user_id=eq.<profile.id>&status=eq.active
+Response row shape:
+
+
+{
+  "id": "uuid",
+  "user_id": "uuid (profile.id)",
+  "celebrity_id": "uuid",
+  "price_paid": 299,
+  "referrer_commission": 15,
+  "celebrity_commission": 209,
+  "status": "active",
+  "created_at": "2025-01-15T10:00:00Z",
+  "celebrities": {
+    "id": "uuid",
+    "name": "Shah Rukh Khan",
+    "category": "Actor",
+    "image_url": "https://...",
+    "rating": 4.8,
+    "review_count": 125,
+    "is_verified": true
+  }
+}
+Insert (after payment):
+
+
+{
+  "user_id": "<profile.id>",
+  "celebrity_id": "<celebrity_id>",
+  "price_paid": 299,
+  "referrer_commission": 15,
+  "celebrity_commission": 209,
+  "status": "active"
+}
+4. wallet_transactions (INSERT — wallet payment)
+
+{
+  "user_id": "<profile.id>",
+  "transaction_type": "celebrity_subscription",
+  "amount": 299,
+  "status": "completed",
+  "payment_method": "wallet",
+  "transaction_details": {
+    "celebrity_id": "<uuid>",
+    "celebrity_name": "Shah Rukh Khan",
+    "subscription_type": "favorite"
+  }
+}
+The DB trigger update_wallet_balance() auto-deducts the amount from profiles.wallet_balance.
+
+5. celebrity_wallet_transactions (INSERT — celebrity commission)
+
+{
+  "celebrity_id": "<uuid>",
+  "transaction_type": "favorite_subscription",
+  "gross_amount": 209,
+  "tds_percentage": 10,
+  "tds_amount": 21,
+  "amount": 188,
+  "description": "Favorite subscription commission (TDS 10% deducted)",
+  "status": "completed"
+}
+6. referral_transactions (INSERT — if user has referrer)
+
+{
+  "referrer_id": "<profile.referred_by>",
+  "referred_id": "<profile.id>",
+  "booking_id": null,
+  "commission_level": 1,
+  "commission_amount": 15,
+  "status": "completed"
+}
+7. celebrities (UPDATE — earnings)
+After commission insert, update:
+
+total_earnings += netCommission
+available_balance += netCommission
+Edge Functions Used
+1. create-razorpay-order (for Razorpay payment)
+POST /functions/v1/create-razorpay-order
+Headers: { Authorization: Bearer <session_token>, apikey: <anon_key> }
+Request:
+
+
+{
+  "amount": 299,
+  "currency": "INR",
+  "receipt": "fav_<timestamp>_<userId6chars>",
+  "notes": {
+    "user_id": "<profile.id>",
+    "celebrity_id": "<uuid>",
+    "type": "celebrity_favorite"
+  }
+}
+Response:
+
+
+{
+  "id": "order_xxxxxxxxx",
+  "amount": 29900,
+  "currency": "INR",
+  "key_id": "rzp_test_xxx"
+}
+Use amount (paise), id, key_id to open Razorpay SDK checkout.
+
+2. send-celebrity-subscription-email (fire-and-forget notification)
+POST /functions/v1/send-celebrity-subscription-email
+Request:
+
+
+{
+  "celebrity_id": "<uuid>",
+  "subscriber_name": "John Doe",
+  "subscriber_email": "john@example.com",
+  "price_paid": 299
+}
+Complete Data Flow
+
+User opens /following
+       │
+       ├── fetchCelebrities()
+       │     ├── GET celebrities (is_active=true, order=name)
+       │     └── GET celebrity_favorite_pricing (is_enabled=true)
+       │
+       └── fetchUserFavorites()
+             └── GET celebrity_favorites (user_id=profile.id, status=active, join celebrities)
+
+User clicks "Subscribe" on a celebrity card
+       │
+       ├── Check: does celebrity have pricing?
+       │     ├── NO → navigate to /celebrity/<id> profile page
+       │     └── YES → open PaymentMethodSelector modal
+       │
+       ├── WALLET PATH:
+       │     ├── Check profiles.wallet_balance >= price
+       │     ├── INSERT wallet_transactions (type=celebrity_subscription, status=completed)
+       │     │     └── DB trigger auto-deducts balance
+       │     └── Call processSubscription()
+       │
+       └── RAZORPAY PATH:
+             ├── POST create-razorpay-order edge function
+             ├── Open Razorpay native SDK checkout
+             ├── On success handler → call processSubscription()
+             └── On failure → show error toast
+
+processSubscription():
+       ├── Calculate commissions:
+       │     referrerCommission = price × referrer_commission_percentage / 100
+       │     celebrityCommission = price × celebrity_commission_percentage / 100
+       │
+       ├── INSERT celebrity_favorites (status=active)
+       │
+       ├── If user has referred_by:
+       │     └── INSERT referral_transactions (L1 commission)
+       │
+       ├── Fetch celebrity's PAN verification status
+       │     ├── TDS rate: PAN verified = 10%, not verified = 20%
+       │     ├── tdsAmount = celebrityCommission × tdsRate / 100
+       │     ├── netCommission = celebrityCommission - tdsAmount
+       │     ├── INSERT celebrity_wallet_transactions
+       │     └── UPDATE celebrities (total_earnings, available_balance)
+       │
+       ├── POST send-celebrity-subscription-email (fire & forget)
+       │
+       └── Refresh userFavorites + show success toast
+UI Components & Layout
+Page Structure
+Wrapper: AuthenticatedLayout with sidebar
+Header: Gradient title "Celebrity Favorites" + subtitle
+Tabs (2 tabs, centered):
+Browse (Search icon + "Browse")
+My Favorites (Heart icon + "My Favorites (count)")
+Browse Tab
+Search bar: Input with Search icon, placeholder "Search celebrities...", filters by name/category
+Celebrity Grid: 1 col mobile / 2 cols tablet / 3 cols desktop
+Each Card:
+Image (aspect 4:3) with hover zoom
+Verified badge (top-right, blue) if is_verified
+"Subscribed" badge (top-left, green) if already subscribed
+Name, category, location
+Star rating + review count
+Feature badges: "UGC Videos", "Wishes", "Promotions"
+Price display (₹ with IndianRupee icon) + "Lifetime access" label
+Button: "Subscribe" / "Subscribed" (disabled) / "View Profile" (no pricing)
+Empty state: Search icon + "No celebrities found"
+My Favorites Tab
+Empty state: Heart icon + "No favorites yet" + "Browse Celebrities" button
+Subscribed Grid: Same 1/2/3 col layout
+Each Card:
+Image (4:3) with "Active" green badge
+Name, category, subscribed date
+"Wish Celebrity" button (full width, navigates to /occasions/wish-celebrity/<id>)
+3 quick action buttons in a row:
+UGC → /ugc-videos?celebrity=<id>
+Book → /booking/<id>?service=wish
+Promo → /image-promotions?celebrity=<id>
+Payment Modal (PaymentMethodSelector)
+Dialog with title + description
+Total amount display (centered, large)
+Wallet balance display
+2 payment buttons side by side (each 132px tall):
+Wallet: Wallet icon, "Pay ₹X", disabled if insufficient + red "Insufficient" badge
+Razorpay: CreditCard icon, "Pay ₹X"
+Loading spinner replaces icon when processing
+Icons Used (Lucide)
+Heart, Search, Star, CheckCircle, IndianRupee, Sparkles, Video, Image, MessageSquare, Wallet, CreditCard, Loader2
+
+Key Notes for Mobile App
+user_id is always profile.id (NOT auth.uid())
+The DB trigger process_celebrity_favorite_referral_commission() also fires on insert to celebrity_favorites — so the client-side referral insert may be redundant but harmless
+For Razorpay on mobile, use the Razorpay React Native SDK or Flutter SDK instead of the web window.Razorpay
+Celebrity cards without pricing show "View Profile" instead of "Subscribe"
+Wallet balance comes from profiles.wallet_balance field
+Here is the complete technical specification for the /following page for Replit integration:
+
+/following Page — Complete Technical Specification for Mobile App
+Purpose
+The Celebrity Favorites page lets authenticated users browse all active celebrities, subscribe to them via wallet or Razorpay payment, and manage their active subscriptions. A subscription grants lifetime access to that celebrity's UGC videos, wishes, and image promotions.
+
+Database Tables Used
+1. celebrities (READ)
+GET /rest/v1/celebrities?is_active=eq.true&order=name.asc
+Response row shape:
+
+
+{
+  "id": "uuid",
+  "name": "Shah Rukh Khan",
+  "category": "Actor",
+  "image_url": "https://...",
+  "location": "Mumbai",
+  "rating": 4.8,
+  "review_count": 125,
+  "is_verified": true,
+  "is_active": true
+}
+2. celebrity_favorite_pricing (READ)
+GET /rest/v1/celebrity_favorite_pricing?is_enabled=eq.true
+Response row shape:
+
+
+{
+  "id": "uuid",
+  "celebrity_id": "uuid",
+  "price": 299,
+  "referrer_commission_percentage": 5,
+  "celebrity_commission_percentage": 70,
+  "is_enabled": true
+}
+3. celebrity_favorites (READ + INSERT)
+Read (user's active subscriptions):
+
+GET /rest/v1/celebrity_favorites?select=*,celebrities(*)&user_id=eq.<profile.id>&status=eq.active
+Response row shape:
+
+
+{
+  "id": "uuid",
+  "user_id": "uuid (profile.id)",
+  "celebrity_id": "uuid",
+  "price_paid": 299,
+  "referrer_commission": 15,
+  "celebrity_commission": 209,
+  "status": "active",
+  "created_at": "2025-01-15T10:00:00Z",
+  "celebrities": {
+    "id": "uuid",
+    "name": "Shah Rukh Khan",
+    "category": "Actor",
+    "image_url": "https://...",
+    "rating": 4.8,
+    "review_count": 125,
+    "is_verified": true
+  }
+}
+Insert (after payment):
+
+
+{
+  "user_id": "<profile.id>",
+  "celebrity_id": "<celebrity_id>",
+  "price_paid": 299,
+  "referrer_commission": 15,
+  "celebrity_commission": 209,
+  "status": "active"
+}
+4. wallet_transactions (INSERT — wallet payment)
+
+{
+  "user_id": "<profile.id>",
+  "transaction_type": "celebrity_subscription",
+  "amount": 299,
+  "status": "completed",
+  "payment_method": "wallet",
+  "transaction_details": {
+    "celebrity_id": "<uuid>",
+    "celebrity_name": "Shah Rukh Khan",
+    "subscription_type": "favorite"
+  }
+}
+The DB trigger update_wallet_balance() auto-deducts the amount from profiles.wallet_balance.
+
+5. celebrity_wallet_transactions (INSERT — celebrity commission)
+
+{
+  "celebrity_id": "<uuid>",
+  "transaction_type": "favorite_subscription",
+  "gross_amount": 209,
+  "tds_percentage": 10,
+  "tds_amount": 21,
+  "amount": 188,
+  "description": "Favorite subscription commission (TDS 10% deducted)",
+  "status": "completed"
+}
+6. referral_transactions (INSERT — if user has referrer)
+
+{
+  "referrer_id": "<profile.referred_by>",
+  "referred_id": "<profile.id>",
+  "booking_id": null,
+  "commission_level": 1,
+  "commission_amount": 15,
+  "status": "completed"
+}
+7. celebrities (UPDATE — earnings)
+After commission insert, update:
+
+total_earnings += netCommission
+available_balance += netCommission
+Edge Functions Used
+1. create-razorpay-order (for Razorpay payment)
+POST /functions/v1/create-razorpay-order
+Headers: { Authorization: Bearer <session_token>, apikey: <anon_key> }
+Request:
+
+
+{
+  "amount": 299,
+  "currency": "INR",
+  "receipt": "fav_<timestamp>_<userId6chars>",
+  "notes": {
+    "user_id": "<profile.id>",
+    "celebrity_id": "<uuid>",
+    "type": "celebrity_favorite"
+  }
+}
+Response:
+
+
+{
+  "id": "order_xxxxxxxxx",
+  "amount": 29900,
+  "currency": "INR",
+  "key_id": "rzp_test_xxx"
+}
+Use amount (paise), id, key_id to open Razorpay SDK checkout.
+
+2. send-celebrity-subscription-email (fire-and-forget notification)
+POST /functions/v1/send-celebrity-subscription-email
+Request:
+
+
+{
+  "celebrity_id": "<uuid>",
+  "subscriber_name": "John Doe",
+  "subscriber_email": "john@example.com",
+  "price_paid": 299
+}
+Complete Data Flow
+
+User opens /following
+       │
+       ├── fetchCelebrities()
+       │     ├── GET celebrities (is_active=true, order=name)
+       │     └── GET celebrity_favorite_pricing (is_enabled=true)
+       │
+       └── fetchUserFavorites()
+             └── GET celebrity_favorites (user_id=profile.id, status=active, join celebrities)
+
+User clicks "Subscribe" on a celebrity card
+       │
+       ├── Check: does celebrity have pricing?
+       │     ├── NO → navigate to /celebrity/<id> profile page
+       │     └── YES → open PaymentMethodSelector modal
+       │
+       ├── WALLET PATH:
+       │     ├── Check profiles.wallet_balance >= price
+       │     ├── INSERT wallet_transactions (type=celebrity_subscription, status=completed)
+       │     │     └── DB trigger auto-deducts balance
+       │     └── Call processSubscription()
+       │
+       └── RAZORPAY PATH:
+             ├── POST create-razorpay-order edge function
+             ├── Open Razorpay native SDK checkout
+             ├── On success handler → call processSubscription()
+             └── On failure → show error toast
+
+processSubscription():
+       ├── Calculate commissions:
+       │     referrerCommission = price × referrer_commission_percentage / 100
+       │     celebrityCommission = price × celebrity_commission_percentage / 100
+       │
+       ├── INSERT celebrity_favorites (status=active)
+       │
+       ├── If user has referred_by:
+       │     └── INSERT referral_transactions (L1 commission)
+       │
+       ├── Fetch celebrity's PAN verification status
+       │     ├── TDS rate: PAN verified = 10%, not verified = 20%
+       │     ├── tdsAmount = celebrityCommission × tdsRate / 100
+       │     ├── netCommission = celebrityCommission - tdsAmount
+       │     ├── INSERT celebrity_wallet_transactions
+       │     └── UPDATE celebrities (total_earnings, available_balance)
+       │
+       ├── POST send-celebrity-subscription-email (fire & forget)
+       │
+       └── Refresh userFavorites + show success toast
+UI Components & Layout
+Page Structure
+Wrapper: AuthenticatedLayout with sidebar
+Header: Gradient title "Celebrity Favorites" + subtitle
+Tabs (2 tabs, centered):
+Browse (Search icon + "Browse")
+My Favorites (Heart icon + "My Favorites (count)")
+Browse Tab
+Search bar: Input with Search icon, placeholder "Search celebrities...", filters by name/category
+Celebrity Grid: 1 col mobile / 2 cols tablet / 3 cols desktop
+Each Card:
+Image (aspect 4:3) with hover zoom
+Verified badge (top-right, blue) if is_verified
+"Subscribed" badge (top-left, green) if already subscribed
+Name, category, location
+Star rating + review count
+Feature badges: "UGC Videos", "Wishes", "Promotions"
+Price display (₹ with IndianRupee icon) + "Lifetime access" label
+Button: "Subscribe" / "Subscribed" (disabled) / "View Profile" (no pricing)
+Empty state: Search icon + "No celebrities found"
+My Favorites Tab
+Empty state: Heart icon + "No favorites yet" + "Browse Celebrities" button
+Subscribed Grid: Same 1/2/3 col layout
+Each Card:
+Image (4:3) with "Active" green badge
+Name, category, subscribed date
+"Wish Celebrity" button (full width, navigates to /occasions/wish-celebrity/<id>)
+3 quick action buttons in a row:
+UGC → /ugc-videos?celebrity=<id>
+Book → /booking/<id>?service=wish
+Promo → /image-promotions?celebrity=<id>
+Payment Modal (PaymentMethodSelector)
+Dialog with title + description
+Total amount display (centered, large)
+Wallet balance display
+2 payment buttons side by side (each 132px tall):
+Wallet: Wallet icon, "Pay ₹X", disabled if insufficient + red "Insufficient" badge
+Razorpay: CreditCard icon, "Pay ₹X"
+Loading spinner replaces icon when processing
+Icons Used (Lucide)
+Heart, Search, Star, CheckCircle, IndianRupee, Sparkles, Video, Image, MessageSquare, Wallet, CreditCard, Loader2
+
+Key Notes for Mobile App
+user_id is always profile.id (NOT auth.uid())
+The DB trigger process_celebrity_favorite_referral_commission() also fires on insert to celebrity_favorites — so the client-side referral insert may be redundant but harmless
+For Razorpay on mobile, use the Razorpay React Native SDK or Flutter SDK instead of the web window.Razorpay
+Celebrity cards without pricing show "View Profile" instead of "Subscribe"
+Wallet balance comes from profiles.wallet_balance field
+
+
+
+
