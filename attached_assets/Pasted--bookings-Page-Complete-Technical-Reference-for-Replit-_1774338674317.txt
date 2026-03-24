@@ -1,0 +1,604 @@
+/bookings Page — Complete Technical Reference for Replit Mobile App
+Purpose
+This page is the unified order history dashboard where users see ALL their past orders across 12 different service categories. It's read-only — no creation happens here, only viewing status and media playback.
+
+Authentication
+Requires logged-in user. Uses useAuth() hook to get profile.id (UUID from profiles table). All queries filter by user_id = profile.id.
+
+Base URL for all Supabase queries
+https://eqikeuqwbphwongtfzhe.supabase.co
+Headers for all requests:
+
+
+{
+  "apikey": "<SUPABASE_ANON_KEY>",
+  "Authorization": "Bearer <user_access_token>",
+  "Content-Type": "application/json"
+}
+DATA FETCHING — 12 Parallel Queries
+All 12 queries run in parallel via Promise.all. Each is a Supabase .select() with .eq('user_id', profile.id), .order('created_at', { ascending: false }), .limit(50).
+
+Tab 1: Celebrity Bookings (Video/Ad orders)
+GET /rest/v1/bookings?select=*,celebrities:celebrity_id(name,image_url,category)&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Response row shape:
+
+
+{
+  "id": "uuid",
+  "user_id": "uuid",
+  "celebrity_id": "uuid",
+  "service_type": "video_wish | image_promotion | video_promotion | general_wish | text_message",
+  "status": "pending | confirmed | completed | video_sent | sent | cancelled | failed",
+  "generation_status": "null | script_generating | video_generating | downloading | uploading | completed | failed | timeout",
+  "video_status": "null | processing | ready | failed | timeout",
+  "video_file_key": "string (B2 file path) | null",
+  "video_url": "string (direct URL fallback) | null",
+  "message": "string (JSON or plain text)",
+  "final_price": 2500,
+  "created_at": "2026-03-20T...",
+  "generation_error": "string | null",
+  "celebrities": {
+    "name": "Virat Kohli",
+    "image_url": "https://...",
+    "category": "Cricket"
+  }
+}
+Status Logic (priority order — first match wins):
+
+Condition	Display Label	Animated?
+status === 'cancelled'	❌ Cancelled	No
+video_status === 'failed' OR generation_status === 'failed'	⚠️ Failed	No
+generation_status === 'timeout'	⚠️ Timed Out	No
+status === 'completed'	✅ Completed	No
+status === 'video_sent' OR 'sent'	📤 Delivered to You	No
+generation_status === 'completed' AND video_status === 'ready'	🎥 Video Ready	No
+generation_status === 'uploading'	⬆️ Uploading Video	Yes (pulse)
+generation_status === 'downloading'	⬇️ Processing Video	Yes (pulse)
+generation_status === 'video_generating'	🎬 Creating Video...	Yes (pulse)
+generation_status === 'script_generating'	🤖 Writing Script...	Yes (pulse)
+status === 'confirmed'	✅ Confirmed — In Queue	No
+status === 'pending'	⏳ Awaiting Confirmation	No
+Video Playback:
+
+If video_file_key exists AND video_status === 'ready': construct URL as https://f005.backblazeb2.com/file/wishmetoday/<video_file_key>
+Fallback: use video_url directly if it starts with http
+Neither set: show "Video is being processed..."
+6-Step Order Timeline (shown when status !== 'pending'):
+
+Booking Placed (always ✓)
+Confirmed by Team (status !== 'pending')
+Script Generated (generation_status in ['video_generating','downloading','uploading','completed'])
+Video Being Created (generation_status in ['downloading','uploading','completed'])
+Video Ready (video_status === 'ready')
+Delivered (status in ['video_sent','sent','completed'])
+Message Parsing: The message field is JSON:
+
+
+{
+  "requestDetails": { "recipientName": "Rahul", "occasion": "Birthday", "message": "Happy bday!" },
+  "creativeGuidelines": { "toneAndStyle": "Fun", "goal": "Surprise" },
+  "scriptBuilder": { "talkingPoints": "...", "exactScript": "...", "generatedScript": "..." }
+}
+Parse with JSON.parse(), fallback to raw string.
+
+Tab 2: Wishes (Celebrity Wish Orders)
+GET /rest/v1/wish_celebrity_orders?select=*,celebrities:celebrity_id(name,image_url)&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "celebrity_id": "uuid",
+  "occasion_type": "Birthday",
+  "recipient_name": "Mom",
+  "message": "Happy birthday mom!",
+  "amount_paid": 500,
+  "status": "pending | completed | failed",
+  "generated_card_image_url": "https://... | null",
+  "card_url": "https://... | null",
+  "created_at": "...",
+  "celebrities": { "name": "...", "image_url": "..." }
+}
+Displays: celebrity image, occasion, recipient, message, card image (tappable for preview), amount.
+
+Tab 3: Greeting Cards
+GET /rest/v1/greeting_card_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "occasion_name": "Diwali",
+  "recipient_name": "Priya",
+  "greeting_text": "Happy Diwali!",
+  "generated_image_url": "https://...",
+  "amount_charged": 100,
+  "status": "completed | pending | failed",
+  "created_at": "..."
+}
+Tab 4: Photo Wishes
+GET /rest/v1/photo_wishes?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "occasion": "Anniversary",
+  "recipient_name": "Dad",
+  "message": "...",
+  "generated_image_url": "https://...",
+  "price_paid": 200,
+  "status": "completed | pending | failed",
+  "created_at": "..."
+}
+Tab 5: Celebrity Calls
+GET /rest/v1/voice_call_wishes?select=*,celebrities:celebrity_id(name,image_url)&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "celebrity_id": "uuid",
+  "recipient_name": "Brother",
+  "recipient_phone": "+91...",
+  "occasion": "Birthday",
+  "sender_name": "Me",
+  "call_status": "pending | scheduled | completed | failed",
+  "scheduled_at": "2026-04-01T10:00:00Z | null",
+  "call_duration_seconds": 120,
+  "price_paid": 1500,
+  "vapi_voice_name": "Virat Voice",
+  "created_at": "...",
+  "celebrities": { "name": "...", "image_url": "..." }
+}
+Special: shows scheduled date/time if scheduled_at is set. Shows duration if completed.
+
+Tab 6: Music Generations
+GET /rest/v1/music_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "song_title": "My Love Song",
+  "genre": "Pop",
+  "lyrics": "verse text...",
+  "song_url": "https://... or B2-key",
+  "download_url": "https://...",
+  "credits_used": 100,
+  "status": "completed | processing | failed",
+  "error_message": "string | null",
+  "created_at": "..."
+}
+Audio playback: use download_url first, else if song_url starts with http use directly, else construct https://f005.backblazeb2.com/file/wishmetoday/<song_url>.
+
+Tab 7: Image + Music
+GET /rest/v1/image_music_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "genre": "Lo-fi",
+  "mood": "Chill",
+  "has_vocals": true,
+  "description": "Sunset beach vibes",
+  "image_url": "https://...",
+  "audio_url": "https://...",
+  "amount_charged": 120,
+  "status": "completed | pending | failed",
+  "created_at": "..."
+}
+Tab 8: TTS (Text-to-Speech)
+GET /rest/v1/tts_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "text": "Hello world...",
+  "voice_name": "Rachel",
+  "audio_url": "https://...",
+  "credits_used": 50,
+  "status": "completed | failed",
+  "created_at": "..."
+}
+Tab 9: Sound Effects (SFX)
+GET /rest/v1/sound_effect_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "description": "Thunder crack",
+  "duration_seconds": 5,
+  "audio_url": "https://...",
+  "credits_used": 60,
+  "status": "completed | failed",
+  "created_at": "..."
+}
+Tab 10: Voice Conversions
+GET /rest/v1/voice_conversion_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "target_voice_name": "Deep Male",
+  "original_file_name": "recording.webm",
+  "audio_url": "https://...",
+  "credits_used": 75,
+  "status": "completed | failed",
+  "created_at": "..."
+}
+Tab 11: Audio Isolations
+GET /rest/v1/audio_isolation_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "original_file_name": "noisy_audio.mp3",
+  "audio_url": "https://...",
+  "credits_used": 40,
+  "status": "completed | failed",
+  "created_at": "..."
+}
+Tab 12: Occasion Bookings
+GET /rest/v1/occasion_bookings?select=*,celebrities:celebrity_id(name,image_url),occasions:occasion_id(name)&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "recipient_name": "Friend",
+  "message": "Congratulations!",
+  "price": 1000,
+  "status": "pending | completed",
+  "created_at": "...",
+  "celebrities": { "name": "...", "image_url": "..." },
+  "occasions": { "name": "Diwali" }
+}
+REAL-TIME SUBSCRIPTIONS
+Two Supabase Realtime channels auto-refresh data:
+
+Bookings channel: listens for UPDATE on bookings table filtered by user_id
+Music channel: listens for UPDATE on music_generations table filtered by user_id
+On any update event, calls fetchAllBookings() to refresh ALL tabs.
+
+For mobile: use Supabase Realtime client or poll every 30 seconds as fallback.
+
+UI COMPONENTS PER TAB
+Tab	Icon	Card Elements	Media
+Celebrity	Star	Celebrity image, name, category, status badge, 6-step timeline, parsed message, order ID, price	B2VideoPlayer
+Wishes	Heart	Celebrity image, occasion, recipient, message, card image	Image (tappable)
+Cards	Gift	Status icon, occasion, recipient, greeting text, card image	Image (tappable)
+Photo	ImageIcon	Occasion, recipient, message, generated image	Image (tappable)
+Calls	Phone	Celebrity image, phone, occasion, sender, scheduled time, duration	None
+Music	Music	Song title, genre, lyrics, status spinner	<audio> player
+Img+Music	ImageIcon	Genre+mood, vocals badge, description, image	Image + <audio>
+TTS	Volume2	Text preview, voice name	<audio> player
+SFX	Wand2	Description, duration	<audio> player
+Convert	Mic	Target voice, original filename	<audio> player
+Isolate	FileAudio	Original filename	<audio> player
+Occasions	Gift	Occasion name, celebrity, recipient, message	None
+Empty State Pattern
+Each tab shows an icon + message + navigation badge when no items exist. Example:
+
+[Music Icon]
+"No music generated yet"
+[Badge: "Generate Music" → links to /ai-music]
+Image Preview Modal
+Any tappable image opens ImagePreviewModal with { url, alt }. On mobile, implement a fullscreen image viewer.
+
+Date Formatting
+Uses date-fns format(date, 'PP') → outputs like "Mar 20, 2026". Calls tab also uses format(date, "EEEE, MMMM do, yyyy") and format(date, "h:mm a") for scheduled times.
+
+NO Edge Functions Called
+This page is purely read-only. It only queries Supabase tables directly — no edge functions are invoked.
+
+Here's the complete technical reference for Replit to integrate the /bookings page:
+
+/bookings Page — Complete Technical Reference for Replit Mobile App
+Purpose
+This page is the unified order history dashboard where users see ALL their past orders across 12 different service categories. It's read-only — no creation happens here, only viewing status and media playback.
+
+Authentication
+Requires logged-in user. Uses useAuth() hook to get profile.id (UUID from profiles table). All queries filter by user_id = profile.id.
+
+Base URL for all Supabase queries
+https://eqikeuqwbphwongtfzhe.supabase.co
+Headers for all requests:
+
+
+{
+  "apikey": "<SUPABASE_ANON_KEY>",
+  "Authorization": "Bearer <user_access_token>",
+  "Content-Type": "application/json"
+}
+DATA FETCHING — 12 Parallel Queries
+All 12 queries run in parallel via Promise.all. Each is a Supabase .select() with .eq('user_id', profile.id), .order('created_at', { ascending: false }), .limit(50).
+
+Tab 1: Celebrity Bookings (Video/Ad orders)
+GET /rest/v1/bookings?select=*,celebrities:celebrity_id(name,image_url,category)&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Response row shape:
+
+
+{
+  "id": "uuid",
+  "user_id": "uuid",
+  "celebrity_id": "uuid",
+  "service_type": "video_wish | image_promotion | video_promotion | general_wish | text_message",
+  "status": "pending | confirmed | completed | video_sent | sent | cancelled | failed",
+  "generation_status": "null | script_generating | video_generating | downloading | uploading | completed | failed | timeout",
+  "video_status": "null | processing | ready | failed | timeout",
+  "video_file_key": "string (B2 file path) | null",
+  "video_url": "string (direct URL fallback) | null",
+  "message": "string (JSON or plain text)",
+  "final_price": 2500,
+  "created_at": "2026-03-20T...",
+  "generation_error": "string | null",
+  "celebrities": {
+    "name": "Virat Kohli",
+    "image_url": "https://...",
+    "category": "Cricket"
+  }
+}
+Status Logic (priority order — first match wins):
+
+Condition	Display Label	Animated?
+status === 'cancelled'	❌ Cancelled	No
+video_status === 'failed' OR generation_status === 'failed'	⚠️ Failed	No
+generation_status === 'timeout'	⚠️ Timed Out	No
+status === 'completed'	✅ Completed	No
+status === 'video_sent' OR 'sent'	📤 Delivered to You	No
+generation_status === 'completed' AND video_status === 'ready'	🎥 Video Ready	No
+generation_status === 'uploading'	⬆️ Uploading Video	Yes (pulse)
+generation_status === 'downloading'	⬇️ Processing Video	Yes (pulse)
+generation_status === 'video_generating'	🎬 Creating Video...	Yes (pulse)
+generation_status === 'script_generating'	🤖 Writing Script...	Yes (pulse)
+status === 'confirmed'	✅ Confirmed — In Queue	No
+status === 'pending'	⏳ Awaiting Confirmation	No
+Video Playback:
+
+If video_file_key exists AND video_status === 'ready': construct URL as https://f005.backblazeb2.com/file/wishmetoday/<video_file_key>
+Fallback: use video_url directly if it starts with http
+Neither set: show "Video is being processed..."
+6-Step Order Timeline (shown when status !== 'pending'):
+
+Booking Placed (always ✓)
+Confirmed by Team (status !== 'pending')
+Script Generated (generation_status in ['video_generating','downloading','uploading','completed'])
+Video Being Created (generation_status in ['downloading','uploading','completed'])
+Video Ready (video_status === 'ready')
+Delivered (status in ['video_sent','sent','completed'])
+Message Parsing: The message field is JSON:
+
+
+{
+  "requestDetails": { "recipientName": "Rahul", "occasion": "Birthday", "message": "Happy bday!" },
+  "creativeGuidelines": { "toneAndStyle": "Fun", "goal": "Surprise" },
+  "scriptBuilder": { "talkingPoints": "...", "exactScript": "...", "generatedScript": "..." }
+}
+Parse with JSON.parse(), fallback to raw string.
+
+Tab 2: Wishes (Celebrity Wish Orders)
+GET /rest/v1/wish_celebrity_orders?select=*,celebrities:celebrity_id(name,image_url)&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "celebrity_id": "uuid",
+  "occasion_type": "Birthday",
+  "recipient_name": "Mom",
+  "message": "Happy birthday mom!",
+  "amount_paid": 500,
+  "status": "pending | completed | failed",
+  "generated_card_image_url": "https://... | null",
+  "card_url": "https://... | null",
+  "created_at": "...",
+  "celebrities": { "name": "...", "image_url": "..." }
+}
+Displays: celebrity image, occasion, recipient, message, card image (tappable for preview), amount.
+
+Tab 3: Greeting Cards
+GET /rest/v1/greeting_card_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "occasion_name": "Diwali",
+  "recipient_name": "Priya",
+  "greeting_text": "Happy Diwali!",
+  "generated_image_url": "https://...",
+  "amount_charged": 100,
+  "status": "completed | pending | failed",
+  "created_at": "..."
+}
+Tab 4: Photo Wishes
+GET /rest/v1/photo_wishes?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "occasion": "Anniversary",
+  "recipient_name": "Dad",
+  "message": "...",
+  "generated_image_url": "https://...",
+  "price_paid": 200,
+  "status": "completed | pending | failed",
+  "created_at": "..."
+}
+Tab 5: Celebrity Calls
+GET /rest/v1/voice_call_wishes?select=*,celebrities:celebrity_id(name,image_url)&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "celebrity_id": "uuid",
+  "recipient_name": "Brother",
+  "recipient_phone": "+91...",
+  "occasion": "Birthday",
+  "sender_name": "Me",
+  "call_status": "pending | scheduled | completed | failed",
+  "scheduled_at": "2026-04-01T10:00:00Z | null",
+  "call_duration_seconds": 120,
+  "price_paid": 1500,
+  "vapi_voice_name": "Virat Voice",
+  "created_at": "...",
+  "celebrities": { "name": "...", "image_url": "..." }
+}
+Special: shows scheduled date/time if scheduled_at is set. Shows duration if completed.
+
+Tab 6: Music Generations
+GET /rest/v1/music_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "song_title": "My Love Song",
+  "genre": "Pop",
+  "lyrics": "verse text...",
+  "song_url": "https://... or B2-key",
+  "download_url": "https://...",
+  "credits_used": 100,
+  "status": "completed | processing | failed",
+  "error_message": "string | null",
+  "created_at": "..."
+}
+Audio playback: use download_url first, else if song_url starts with http use directly, else construct https://f005.backblazeb2.com/file/wishmetoday/<song_url>.
+
+Tab 7: Image + Music
+GET /rest/v1/image_music_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "genre": "Lo-fi",
+  "mood": "Chill",
+  "has_vocals": true,
+  "description": "Sunset beach vibes",
+  "image_url": "https://...",
+  "audio_url": "https://...",
+  "amount_charged": 120,
+  "status": "completed | pending | failed",
+  "created_at": "..."
+}
+Tab 8: TTS (Text-to-Speech)
+GET /rest/v1/tts_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "text": "Hello world...",
+  "voice_name": "Rachel",
+  "audio_url": "https://...",
+  "credits_used": 50,
+  "status": "completed | failed",
+  "created_at": "..."
+}
+Tab 9: Sound Effects (SFX)
+GET /rest/v1/sound_effect_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "description": "Thunder crack",
+  "duration_seconds": 5,
+  "audio_url": "https://...",
+  "credits_used": 60,
+  "status": "completed | failed",
+  "created_at": "..."
+}
+Tab 10: Voice Conversions
+GET /rest/v1/voice_conversion_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "target_voice_name": "Deep Male",
+  "original_file_name": "recording.webm",
+  "audio_url": "https://...",
+  "credits_used": 75,
+  "status": "completed | failed",
+  "created_at": "..."
+}
+Tab 11: Audio Isolations
+GET /rest/v1/audio_isolation_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "original_file_name": "noisy_audio.mp3",
+  "audio_url": "https://...",
+  "credits_used": 40,
+  "status": "completed | failed",
+  "created_at": "..."
+}
+Tab 12: Occasion Bookings
+GET /rest/v1/occasion_bookings?select=*,celebrities:celebrity_id(name,image_url),occasions:occasion_id(name)&user_id=eq.<profile_id>&order=created_at.desc&limit=50
+Row shape:
+
+
+{
+  "id": "uuid",
+  "recipient_name": "Friend",
+  "message": "Congratulations!",
+  "price": 1000,
+  "status": "pending | completed",
+  "created_at": "...",
+  "celebrities": { "name": "...", "image_url": "..." },
+  "occasions": { "name": "Diwali" }
+}
+REAL-TIME SUBSCRIPTIONS
+Two Supabase Realtime channels auto-refresh data:
+
+Bookings channel: listens for UPDATE on bookings table filtered by user_id
+Music channel: listens for UPDATE on music_generations table filtered by user_id
+On any update event, calls fetchAllBookings() to refresh ALL tabs.
+
+For mobile: use Supabase Realtime client or poll every 30 seconds as fallback.
+
+UI COMPONENTS PER TAB
+Tab	Icon	Card Elements	Media
+Celebrity	Star	Celebrity image, name, category, status badge, 6-step timeline, parsed message, order ID, price	B2VideoPlayer
+Wishes	Heart	Celebrity image, occasion, recipient, message, card image	Image (tappable)
+Cards	Gift	Status icon, occasion, recipient, greeting text, card image	Image (tappable)
+Photo	ImageIcon	Occasion, recipient, message, generated image	Image (tappable)
+Calls	Phone	Celebrity image, phone, occasion, sender, scheduled time, duration	None
+Music	Music	Song title, genre, lyrics, status spinner	<audio> player
+Img+Music	ImageIcon	Genre+mood, vocals badge, description, image	Image + <audio>
+TTS	Volume2	Text preview, voice name	<audio> player
+SFX	Wand2	Description, duration	<audio> player
+Convert	Mic	Target voice, original filename	<audio> player
+Isolate	FileAudio	Original filename	<audio> player
+Occasions	Gift	Occasion name, celebrity, recipient, message	None
+Empty State Pattern
+Each tab shows an icon + message + navigation badge when no items exist. Example:
+
+[Music Icon]
+"No music generated yet"
+[Badge: "Generate Music" → links to /ai-music]
+Image Preview Modal
+Any tappable image opens ImagePreviewModal with { url, alt }. On mobile, implement a fullscreen image viewer.
+
+Date Formatting
+Uses date-fns format(date, 'PP') → outputs like "Mar 20, 2026". Calls tab also uses format(date, "EEEE, MMMM do, yyyy") and format(date, "h:mm a") for scheduled times.
+
+NO Edge Functions Called
+This page is purely read-only. It only queries Supabase tables directly — no edge functions are invoked.
+
+
+
+
+
