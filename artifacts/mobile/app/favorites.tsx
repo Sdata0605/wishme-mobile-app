@@ -432,7 +432,7 @@ function MyFavoritesTab({ favorites, colors, bottomPad, refreshing, onRefresh, o
                   <Image source={{ uri: imageUri }} style={styles.browseImage} resizeMode="cover" />
                 ) : (
                   <View style={[styles.imgPlaceholder, { backgroundColor: colors.border }]}>
-                    <Icon name="user" size={32} color={colors.mutedForeground} />
+                    <Icon name="heart" size={32} color={colors.mutedForeground} />
                   </View>
                 )}
                 <View style={styles.activeBadge}>
