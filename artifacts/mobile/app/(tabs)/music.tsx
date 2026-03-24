@@ -21,18 +21,8 @@ import { Icon } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { supabaseFetch } from '@/constants/supabase';
-
-interface VoiceItem {
-  voice_id: string;
-  name: string;
-  category: string;
-  preview_url?: string;
-}
-
-interface VoiceList {
-  premadeVoices: VoiceItem[];
-  clonedVoices: VoiceItem[];
-}
+import { type VoiceItem, type VoiceList, useVoices } from '@/hooks/useVoices';
+import { useWallet } from '@/hooks/useWallet';
 
 interface MusicCtx {
   voices: VoiceList;
@@ -201,7 +191,6 @@ function AudioRecorder({ onAudio, label = 'Record Audio' }: { onAudio: (base64: 
   }, [pulseAnim]);
 
   const stopPulse = () => { pulseRef.current?.stop(); pulseRef.current = null; };
-
   const stopTimer = () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
 
   useEffect(() => () => {
@@ -364,7 +353,7 @@ function ImageUploadArea({ imageUri, onImage, onClear }: { imageUri: string | nu
       <View style={[s.imagePreview, { borderColor: '#B44CFF' }]}>
         <Image source={{ uri: imageUri }} style={{ width: '100%', height: 160, borderRadius: 12 }} resizeMode="cover" />
         <TouchableOpacity style={s.changeImageBtn} onPress={onClear}>
-          <Text style={s.changeImageText}>Change</Text>
+          <Text style={s.changeImageText}>Change Image</Text>
         </TouchableOpacity>
       </View>
     );
@@ -558,6 +547,105 @@ function WalletCard({ balance }: { balance: number }) {
           </View>
         ))}
       </ScrollView>
+    </View>
+  );
+}
+
+function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
+  audioUrl: string;
+  imgBase64: string;
+  hasVocals: boolean;
+  videoUrl?: string;
+}) {
+  const [playing, setPlaying] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [audioSaved, setAudioSaved] = useState(false);
+  const [videoSaved, setVideoSaved] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => () => { soundRef.current?.unloadAsync().catch(() => {}); }, []);
+
+  const toggle = async () => {
+    if (loading) return;
+    if (!soundRef.current) {
+      setLoading(true);
+      try {
+        await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
+        const filePath = await saveAudioToCache(audioUrl);
+        const { sound } = await Audio.Sound.createAsync({ uri: filePath }, { shouldPlay: true });
+        sound.setOnPlaybackStatusUpdate(st => {
+          if (st.isLoaded && st.didJustFinish) setPlaying(false);
+        });
+        soundRef.current = sound;
+        setPlaying(true);
+      } catch {}
+      setLoading(false);
+      return;
+    }
+    if (playing) { await soundRef.current.pauseAsync(); setPlaying(false); }
+    else { await soundRef.current.playAsync(); setPlaying(true); }
+  };
+
+  const saveAudio = async () => {
+    try {
+      const path = (FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '') + `wishme_audio_${Date.now()}.mp3`;
+      const base64 = audioUrl.includes(',') ? audioUrl.split(',')[1] : audioUrl;
+      await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+      setAudioSaved(true);
+      setTimeout(() => setAudioSaved(false), 2500);
+    } catch {}
+  };
+
+  const downloadMp4 = async () => {
+    try {
+      const path = (FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '') + `wishme_video_${Date.now()}.mp4`;
+      if (videoUrl) {
+        if (videoUrl.startsWith('data:')) {
+          const b64 = videoUrl.includes(',') ? videoUrl.split(',')[1] : videoUrl;
+          await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+        } else {
+          await FileSystem.downloadAsync(videoUrl, path);
+        }
+      } else {
+        const base64 = audioUrl.includes(',') ? audioUrl.split(',')[1] : audioUrl;
+        await FileSystem.writeAsStringAsync(path, base64, { encoding: FileSystem.EncodingType.Base64 });
+      }
+      setVideoSaved(true);
+      setTimeout(() => setVideoSaved(false), 2500);
+    } catch {}
+  };
+
+  return (
+    <View style={s.imgMusicResult}>
+      <View style={{ borderRadius: 16, overflow: 'hidden' }}>
+        <Image source={{ uri: imgBase64 }} style={{ width: '100%', height: 220 }} resizeMode="cover" />
+        <View style={s.imgOverlay}>
+          <TouchableOpacity style={s.overlayPlayBtn} onPress={toggle} disabled={loading} activeOpacity={0.8}>
+            <Icon name={loading ? 'refresh-cw' : playing ? 'pause' : 'play'} size={30} color="#fff" />
+          </TouchableOpacity>
+          {playing && (
+            <View style={s.imgWaveRow}>
+              {Array.from({ length: 10 }).map((_, i) => <WaveformBar key={i} delay={i * 80} color="#fff" active={true} />)}
+            </View>
+          )}
+        </View>
+        {hasVocals && (
+          <View style={s.imgBadgeTop}>
+            <Icon name="music" size={12} color="#fff" />
+            <Text style={s.imgBadgeText}>AI Vocals</Text>
+          </View>
+        )}
+      </View>
+      <View style={s.imgMusicActions}>
+        <TouchableOpacity style={[s.actionBtn, { flex: 1, borderColor: '#B44CFF', borderWidth: 1.5 }]} onPress={saveAudio}>
+          <Icon name={audioSaved ? 'check' : 'download'} size={15} color="#B44CFF" />
+          <Text style={[s.actionBtnText, { color: '#B44CFF' }]}>{audioSaved ? 'Audio Saved!' : 'Save Audio'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[s.actionBtn, { flex: 1, backgroundColor: '#B44CFF' }]} onPress={downloadMp4}>
+          <Icon name={videoSaved ? 'check' : 'download'} size={15} color="#fff" />
+          <Text style={[s.actionBtnText, { color: '#fff' }]}>{videoSaved ? 'Saved!' : 'Download MP4'}</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -855,7 +943,7 @@ function MusicTab({ ctx }: { ctx: MusicCtx }) {
         method: 'POST',
         body: JSON.stringify({ description: desc.trim() || title.trim(), genre, mood }),
       }, ctx.session?.access_token);
-      const data = await res.json() as { lyrics?: string; error?: string };
+      const data = await res.json() as { lyrics?: string };
       if (data.lyrics) setLyrics(data.lyrics);
     } catch {}
     setLyricsGen(false);
@@ -990,10 +1078,8 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
   const [uploadedAudioName, setUploadedAudioName] = useState<string | null>(null);
   const [gen, setGen] = useState(false);
   const [lyricsGen, setLyricsGen] = useState(false);
-  const [result, setResult] = useState<{ audioUrl: string; hasVocals: boolean; imgBase64: string } | null>(null);
+  const [result, setResult] = useState<{ audioUrl: string; hasVocals: boolean; imgBase64: string; videoUrl?: string } | null>(null);
   const [err, setErr] = useState('');
-
-  const cost = result?.hasVocals ? COSTS.img_vocals : COSTS.img_base;
 
   const generateLyrics = async () => {
     setLyricsGen(true);
@@ -1027,7 +1113,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
         method: 'POST',
         body: JSON.stringify(payload),
       }, ctx.session?.access_token);
-      const data = await res.json() as { success: boolean; audioUrl: string; imageBase64?: string; hasVocals?: boolean; error?: string };
+      const data = await res.json() as { success: boolean; audioUrl: string; videoUrl?: string; imageBase64?: string; hasVocals?: boolean; error?: string };
       if (!data.success || !data.audioUrl) throw new Error(data.error ?? 'Generation failed');
 
       const amountCharged = data.hasVocals ? COSTS.img_vocals : COSTS.img_base;
@@ -1038,6 +1124,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
           user_id: ctx.userId,
           image_url: imageBase64,
           audio_url: data.audioUrl,
+          video_url: data.videoUrl ?? null,
           description: desc.trim(),
           lyrics: lyrics.trim() || null,
           genre, mood,
@@ -1049,7 +1136,12 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
         }),
       }, ctx.session?.access_token);
 
-      setResult({ audioUrl: data.audioUrl, hasVocals: data.hasVocals ?? false, imgBase64: data.imageBase64 ?? imageBase64 });
+      setResult({
+        audioUrl: data.audioUrl,
+        hasVocals: data.hasVocals ?? false,
+        imgBase64: data.imageBase64 ?? imageBase64,
+        videoUrl: data.videoUrl,
+      });
       ctx.refreshWallet();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Generation failed');
@@ -1110,20 +1202,12 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
       <ErrBox msg={err} />
       <GenBtn label={`Create (₹${lyrics.trim() ? COSTS.img_vocals : COSTS.img_base})`} onPress={generate} generating={gen} disabled={!imageBase64} />
       {result && (
-        <View style={[s.playerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          {result.imgBase64 && (
-            <View style={{ position: 'relative' }}>
-              <Image source={{ uri: result.imgBase64 }} style={{ width: '100%', height: 200, borderTopLeftRadius: 16, borderTopRightRadius: 16 }} resizeMode="cover" />
-              {result.hasVocals && (
-                <View style={s.imgBadge}>
-                  <Icon name="music" size={12} color="#fff" />
-                  <Text style={s.imgBadgeText}>AI Vocals</Text>
-                </View>
-              )}
-            </View>
-          )}
-          <AudioPlayerCard title="Image Soundtrack" audioUri={result.audioUrl} badge={result.hasVocals ? 'With Vocals' : 'Instrumental'} />
-        </View>
+        <ImgMusicResult
+          audioUrl={result.audioUrl}
+          imgBase64={result.imgBase64}
+          hasVocals={result.hasVocals}
+          videoUrl={result.videoUrl}
+        />
       )}
     </View>
   );
@@ -1136,63 +1220,23 @@ export default function MusicScreen() {
   const [activeTab, setActiveTab] = useState(0);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
-  const [voices, setVoices] = useState<VoiceList>({ premadeVoices: [], clonedVoices: [] });
-  const [voicesLoading, setVoicesLoading] = useState(true);
-  const [walletBalance, setWalletBalance] = useState(user?.walletBalance ?? 0);
-
-  const fetchVoices = useCallback(async () => {
-    if (!session?.access_token) return;
-    setVoicesLoading(true);
-    try {
-      const res = await supabaseFetch('/functions/v1/get-user-voices', {
-        method: 'POST',
-        body: JSON.stringify({}),
-      }, session.access_token);
-      if (res.ok) {
-        const data = await res.json() as { premadeVoices?: VoiceItem[]; clonedVoices?: VoiceItem[] };
-        setVoices({ premadeVoices: data.premadeVoices ?? [], clonedVoices: data.clonedVoices ?? [] });
-        setVoicesLoading(false);
-        return;
-      }
-    } catch {}
-    try {
-      const fallback = await supabaseFetch('/functions/v1/elevenlabs-get-user-voices', {
-        method: 'POST',
-        body: JSON.stringify({}),
-      }, session.access_token);
-      if (fallback.ok) {
-        const data = await fallback.json() as { premadeVoices?: VoiceItem[]; clonedVoices?: VoiceItem[] };
-        setVoices({ premadeVoices: data.premadeVoices ?? [], clonedVoices: data.clonedVoices ?? [] });
-      }
-    } catch {}
-    setVoicesLoading(false);
-  }, [session]);
-
-  const fetchWallet = useCallback(async () => {
-    if (!session?.access_token || !user?.id) return;
-    try {
-      const res = await supabaseFetch(`/rest/v1/profiles?select=wallet_balance&id=eq.${user.id}&limit=1`, {}, session.access_token);
-      if (res.ok) {
-        const rows = await res.json() as Array<{ wallet_balance: number }>;
-        if (rows?.length) setWalletBalance(rows[0].wallet_balance ?? 0);
-      }
-    } catch {}
-  }, [session, user]);
+  const { voices, loading: voicesLoading, refetch: refetchVoices } = useVoices();
+  const { balance: walletBalance, refetch: refetchWallet } = useWallet();
 
   useEffect(() => {
     Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false }).catch(() => {});
-    fetchVoices();
-    fetchWallet();
-  }, [fetchVoices, fetchWallet]);
+    refetchVoices();
+    refetchWallet();
+  }, [refetchVoices, refetchWallet]);
 
   const ctx: MusicCtx = {
     voices,
     voicesLoading,
     walletBalance,
-    refreshWallet: fetchWallet,
+    refreshWallet: refetchWallet,
     session,
     userId: user?.id ?? '',
-    onVoiceCloned: fetchVoices,
+    onVoiceCloned: refetchVoices,
   };
 
   const TABS: React.ReactElement[] = [
@@ -1320,6 +1364,13 @@ const s = StyleSheet.create({
   toggleOpt: { flex: 1, paddingVertical: 10, alignItems: 'center' },
   toggleOptActive: { backgroundColor: '#B44CFF' },
   toggleOptText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  imgBadge: { position: 'absolute', bottom: 10, right: 10, backgroundColor: '#B44CFF', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+  imgMusicResult: { marginTop: 16, borderRadius: 16, overflow: 'hidden' },
+  imgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.42)', alignItems: 'center', justifyContent: 'center' },
+  overlayPlayBtn: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(180,76,255,0.85)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  imgWaveRow: { position: 'absolute', bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 3 },
+  imgBadgeTop: { position: 'absolute', top: 10, right: 10, backgroundColor: '#B44CFF', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
   imgBadgeText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  imgMusicActions: { flexDirection: 'row', gap: 10, padding: 14, backgroundColor: '#1a1a2e' },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12 },
+  actionBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 });
