@@ -127,6 +127,16 @@ function AudioPlayerCard({ title, audioUri, badge }: { title: string; audioUri: 
     else { await soundRef.current.playAsync(); setPlaying(true); }
   };
 
+  const stop = async () => {
+    if (soundRef.current) {
+      await soundRef.current.stopAsync().catch(() => {});
+      await soundRef.current.unloadAsync().catch(() => {});
+      soundRef.current = null;
+    }
+    setPlaying(false);
+    setPosition(0);
+  };
+
   const saveAudio = async () => {
     try {
       const docDir = FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '';
@@ -157,7 +167,12 @@ function AudioPlayerCard({ title, audioUri, badge }: { title: string; audioUri: 
           <TouchableOpacity style={s.playBtn} onPress={toggle} disabled={loading}>
             <Icon name={loading ? 'refresh-cw' : playing ? 'pause' : 'play'} size={20} color="#fff" />
           </TouchableOpacity>
-          <Text style={s.playerDuration}>{positionLabel} / {durationLabel}</Text>
+          {(playing || position > 0) ? (
+            <TouchableOpacity style={[s.playBtn, { marginLeft: 6 }]} onPress={stop}>
+              <Icon name="volume-x" size={16} color="#fff" />
+            </TouchableOpacity>
+          ) : null}
+          <Text style={[s.playerDuration, { flex: 1 }]}>{positionLabel} / {durationLabel}</Text>
           <TouchableOpacity style={s.dlBtn} onPress={saveAudio}>
             <Icon name={saved ? 'check' : 'download'} size={15} color="#fff" />
             <Text style={s.dlText}>{saved ? 'Saved!' : 'Save'}</Text>
@@ -226,8 +241,10 @@ function AudioRecorder({ onAudio, label = 'Record Audio' }: { onAudio: (base64: 
       const uri = rec.getURI();
       recordingRef.current = null;
       if (uri) {
-        const base64 = await fileUriToBase64(uri, 'audio/wav');
-        onAudio(base64, 'recording.wav');
+        const ext = uri.split('.').pop()?.toLowerCase() ?? 'wav';
+        const mime = ext === 'm4a' ? 'audio/m4a' : ext === 'caf' ? 'audio/x-caf' : ext === '3gp' ? 'audio/3gp' : 'audio/wav';
+        const base64 = await fileUriToBase64(uri, mime);
+        onAudio(base64, `recording.${ext}`);
         setState('preview');
       } else {
         setState('idle');
@@ -651,6 +668,15 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
     else { await soundRef.current.playAsync(); setPlaying(true); }
   };
 
+  const stopPlayback = async () => {
+    if (soundRef.current) {
+      await soundRef.current.stopAsync().catch(() => {});
+      await soundRef.current.unloadAsync().catch(() => {});
+      soundRef.current = null;
+    }
+    setPlaying(false);
+  };
+
   const saveAudio = async () => {
     try {
       const path = (FileSystem.documentDirectory ?? FileSystem.cacheDirectory ?? '') + `wishme_audio_${Date.now()}.mp3`;
@@ -686,9 +712,16 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
       <View style={{ borderRadius: 16, overflow: 'hidden' }}>
         <Image source={{ uri: imgBase64 }} style={{ width: '100%', height: 220 }} resizeMode="cover" />
         <View style={s.imgOverlay}>
-          <TouchableOpacity style={s.overlayPlayBtn} onPress={toggle} disabled={loading} activeOpacity={0.8}>
-            <Icon name={loading ? 'refresh-cw' : playing ? 'pause' : 'play'} size={30} color="#fff" />
-          </TouchableOpacity>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <TouchableOpacity style={s.overlayPlayBtn} onPress={toggle} disabled={loading} activeOpacity={0.8}>
+              <Icon name={loading ? 'refresh-cw' : playing ? 'pause' : 'play'} size={30} color="#fff" />
+            </TouchableOpacity>
+            {(playing || soundRef.current !== null) ? (
+              <TouchableOpacity style={[s.overlayPlayBtn, { width: 44, height: 44 }]} onPress={stopPlayback} activeOpacity={0.8}>
+                <Icon name="volume-x" size={20} color="#fff" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
           {playing && (
             <View style={s.imgWaveRow}>
               {Array.from({ length: 10 }).map((_, i) => <WaveformBar key={i} delay={i * 80} color="#fff" active={true} />)}
@@ -1162,6 +1195,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
 
   const generate = async () => {
     if (!imageBase64) { setErr('Please upload an image.'); return; }
+    if (musicSource === 'upload' && !uploadedAudioBase64) { setErr('Please upload an audio file.'); return; }
     const estimatedCost = lyrics.trim() ? COSTS.img_vocals : COSTS.img_base;
     if (ctx.walletBalance < estimatedCost) { setErr(`Insufficient balance. You need ₹${estimatedCost}.`); return; }
     setErr(''); setGen(true); setResult(null);
