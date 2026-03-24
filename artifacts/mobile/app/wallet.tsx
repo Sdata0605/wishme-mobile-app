@@ -96,8 +96,8 @@ function AddMoneyTab({ balance, profileId, colors, session, user, onSuccess }: A
 
   const handleRazorpay = useCallback(async () => {
     const numAmount = parseInt(amount || '0', 10);
-    if (!numAmount || numAmount < 10) {
-      Alert.alert('Invalid Amount', 'Please enter at least ₹10 to add.');
+    if (!numAmount || numAmount < 100) {
+      Alert.alert('Invalid Amount', 'Please enter at least ₹100 to add.');
       return;
     }
     if (!session?.access_token) {

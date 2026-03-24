@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
-import React from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback } from 'react';
 import {
   Platform,
   Pressable,
@@ -51,7 +51,7 @@ export default function ProfileScreen() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { balance: liveBalance, refetch: refetchWallet } = useWallet();
 
-  React.useEffect(() => { refetchWallet(); }, [refetchWallet]);
+  useFocusEffect(useCallback(() => { refetchWallet(); }, [refetchWallet]));
 
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : 'WM';
 

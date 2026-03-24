@@ -546,8 +546,8 @@ function InfoBox({ msg, color = '#B44CFF' }: { msg: string; color?: string }) {
 function WalletCard({ balance }: { balance: number }) {
   const { colors } = useTheme();
   const prices = [
-    ['TTS', '₹50'], ['Convert', '₹75'], ['Clone', '₹150'],
-    ['SFX', '₹60'], ['Isolate', '₹40'], ['Music', '₹100/₹150'], ['Img+Music', '₹120/₹150'],
+    ['TTS', '₹40'], ['Convert', '₹60'], ['Clone', '₹100'],
+    ['SFX', '₹50'], ['Isolate', '₹50'], ['Music', '₹80/₹120'], ['Img+Music', '₹100'],
   ];
   return (
     <View style={[s.walletCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1091,9 +1091,9 @@ function MusicTab({ ctx }: { ctx: MusicCtx }) {
   };
 
   const VOICE_TYPE_OPTS: Array<{ key: 'instrumental' | 'ai' | 'cloned'; label: string; cost: number }> = [
-    { key: 'instrumental', label: 'Instrumental', cost: 100 },
-    { key: 'ai', label: 'AI Vocals', cost: 100 },
-    { key: 'cloned', label: 'My Voice (Cloned)', cost: 150 },
+    { key: 'instrumental', label: 'Instrumental', cost: COSTS.music_base },
+    { key: 'ai', label: 'AI Vocals', cost: COSTS.music_base },
+    { key: 'cloned', label: 'My Voice (Cloned)', cost: COSTS.music_cloned },
   ];
 
   return (
