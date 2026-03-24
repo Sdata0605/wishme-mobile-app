@@ -259,7 +259,7 @@ function BrowseTab({
                     <Image source={{ uri: imageUri }} style={styles.browseImage} resizeMode="cover" />
                   ) : (
                     <View style={[styles.imgPlaceholder, { backgroundColor: colors.border }]}>
-                      <Icon name="user" size={32} color={colors.mutedForeground} />
+                      <Icon name="users" size={32} color={colors.mutedForeground} />
                     </View>
                   )}
                   {celeb.is_verified && (
@@ -500,7 +500,7 @@ function MyFavoritesTab({ favorites, colors, bottomPad, refreshing, onRefresh, o
                       router.push({ pathname: '/booking/[id]', params: { id: celeb.id, service: 'wish' } });
                     }}
                   >
-                    <Icon name="calendar" size={12} color="#3B82F6" />
+                    <Icon name="clock" size={12} color="#3B82F6" />
                     <Text style={[styles.actionBtnText, { color: '#3B82F6' }]}>Book</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
