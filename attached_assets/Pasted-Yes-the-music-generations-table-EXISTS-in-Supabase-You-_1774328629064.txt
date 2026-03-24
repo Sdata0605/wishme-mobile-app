@@ -1,0 +1,74 @@
+Yes, the music_generations table EXISTS in Supabase. You MUST insert into it. It was missing from the summary by mistake. Here is the exact schema:
+
+Table: music_generations
+Column	Type	Nullable	Default
+id	uuid	NO	gen_random_uuid()
+user_id	uuid	NO	— (profile ID, not auth UID)
+song_title	text	NO	—
+genre	text	YES	—
+mood	text	YES	—
+prompt	text	YES	— (the description field)
+lyrics	text	YES	—
+song_url	text	YES	— (audio data URI or B2 URL)
+download_url	text	YES	— (second track URL for two-track mode)
+generation_type	enum	NO	'with_lyrics'
+status	enum	NO	'pending'
+credits_used	integer	NO	1
+api_task_id	text	YES	—
+error_message	text	YES	—
+duration	integer	YES	—
+created_at	timestamptz	NO	now()
+completed_at	timestamptz	YES	—
+Enum values:
+music_generation_type: 'with_lyrics', 'instrumental', 'custom'
+music_generation_status: 'pending', 'processing', 'completed', 'failed'
+What to insert for Music (Tab 6):
+Both a wallet_transactions row AND a music_generations row. The flow is:
+
+Deduct wallet → insert into wallet_transactions with transaction_type: 'music_generation'
+Call the edge function elevenlabs-generate-music
+Insert into music_generations with the result (the edge function already does this server-side, so if you're calling the edge function, it handles the insert — you only need the wallet transaction on the client side)
+Important: The user_id in music_generations is the profile table ID (from profiles.id), NOT the auth UID. Same as wallet_transactions.user_id.
+
+Tell Replit to go ahead — the table exists and is ready.
+
+Here's the answer for Replit:
+
+Yes, the music_generations table EXISTS in Supabase. You MUST insert into it. It was missing from the summary by mistake. Here is the exact schema:
+
+Table: music_generations
+Column	Type	Nullable	Default
+id	uuid	NO	gen_random_uuid()
+user_id	uuid	NO	— (profile ID, not auth UID)
+song_title	text	NO	—
+genre	text	YES	—
+mood	text	YES	—
+prompt	text	YES	— (the description field)
+lyrics	text	YES	—
+song_url	text	YES	— (audio data URI or B2 URL)
+download_url	text	YES	— (second track URL for two-track mode)
+generation_type	enum	NO	'with_lyrics'
+status	enum	NO	'pending'
+credits_used	integer	NO	1
+api_task_id	text	YES	—
+error_message	text	YES	—
+duration	integer	YES	—
+created_at	timestamptz	NO	now()
+completed_at	timestamptz	YES	—
+Enum values:
+music_generation_type: 'with_lyrics', 'instrumental', 'custom'
+music_generation_status: 'pending', 'processing', 'completed', 'failed'
+What to insert for Music (Tab 6):
+Both a wallet_transactions row AND a music_generations row. The flow is:
+
+Deduct wallet → insert into wallet_transactions with transaction_type: 'music_generation'
+Call the edge function elevenlabs-generate-music
+Insert into music_generations with the result (the edge function already does this server-side, so if you're calling the edge function, it handles the insert — you only need the wallet transaction on the client side)
+Important: The user_id in music_generations is the profile table ID (from profiles.id), NOT the auth UID. Same as wallet_transactions.user_id.
+
+Tell Replit to go ahead — the table exists and is ready.
+
+
+
+
+

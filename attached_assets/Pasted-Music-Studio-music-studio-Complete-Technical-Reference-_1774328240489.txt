@@ -1,0 +1,806 @@
+Music Studio (/music-studio) — Complete Technical Reference
+Page Route & Auth
+Route: /music-studio
+Auth: Required. Redirects to /auth if not logged in.
+Layout: Wrapped in <AuthenticatedLayout>
+Wallet System
+Before any generation, the user's wallet_balance is checked from the profiles table. Costs are deducted before the API call. If the API fails, the wallet is refunded.
+
+Feature	Cost (INR)
+Text-to-Speech	₹50
+Voice Conversion	₹75
+Sound Effects	₹60
+Audio Isolation	₹40
+Music (Instrumental/AI Vocals)	₹100
+Music (Cloned Voice)	₹150
+Voice Cloning	₹150
+Image+Music (Instrumental)	₹120
+Image+Music (With Vocals)	₹150
+Wallet fetch query:
+
+GET /rest/v1/profiles?select=wallet_balance&id=eq.{profile.id}
+Voice Fetching (shared across all tabs)
+On mount, fetches all available voices:
+
+Edge Function: POST /functions/v1/get-user-voices
+
+No body needed (uses auth token)
+Response:
+
+{
+  "premadeVoices": [
+    { "voice_id": "abc123", "name": "Rachel", "category": "premade", "preview_url": "https://...", "labels": { "accent": "american" } }
+  ],
+  "clonedVoices": [
+    { "voice_id": "xyz789", "name": "My Voice", "category": "cloned", "preview_url": "https://..." }
+  ]
+}
+Fallback: calls elevenlabs-get-user-voices if primary fails
+TAB 1: Text-to-Speech (TTS)
+User Inputs
+Field	Type	Required	UI Component
+Text	string (multiline)	Yes	<Textarea> rows=5
+Voice	voice_id (string)	Yes	<Select> with cloned voices section + premade voices section, hover play/pause preview
+Edge Function
+POST /functions/v1/elevenlabs-text-to-speech
+
+
+{
+  "text": "Hello world",
+  "voiceId": "abc123"
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Database Insert (after success)
+Table: tts_generations
+
+
+{
+  "user_id": "profile_id",
+  "text": "Hello world (max 500 chars)",
+  "voice_id": "abc123",
+  "voice_name": "Rachel",
+  "audio_url": "data:audio/mpeg;base64,...",
+  "status": "completed",
+  "credits_used": 50
+}
+Result UI
+Audio player with download button.
+
+TAB 2: Voice Conversion (Convert)
+User Inputs
+Field	Type	Required	UI Component
+Audio File	File (audio/*)	Yes	<Input type="file"> OR <AudioRecorderButton> (record from mic)
+Target Voice	voice_id	Yes	<Select> (same as TTS, cloned + premade, with preview)
+Edge Function
+POST /functions/v1/elevenlabs-speech-to-speech
+
+
+{
+  "audioBase64": "data:audio/wav;base64,...",
+  "voiceId": "abc123"
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Database Insert
+Table: voice_conversion_generations
+
+
+{
+  "user_id": "profile_id",
+  "original_file_name": "recording.wav",
+  "target_voice_id": "abc123",
+  "target_voice_name": "Rachel",
+  "audio_url": "data:audio/mpeg;base64,...",
+  "status": "completed",
+  "credits_used": 75
+}
+TAB 3: Voice Clone
+User Inputs
+Field	Type	Required	UI Component
+Voice Sample	File (audio/*)	Yes	<Input type="file"> OR <AudioRecorderButton> (1-5 min recommended)
+Voice Name	string	Yes	<Input> placeholder="My Voice"
+Description	string	No	<Input> placeholder="A warm, friendly voice"
+Edge Function
+POST /functions/v1/elevenlabs-clone-voice
+
+
+{
+  "audioBase64": "data:audio/wav;base64,...",
+  "voiceName": "My Voice",
+  "voiceDescription": "A warm, friendly voice"
+}
+Response:
+
+
+{
+  "success": true,
+  "voiceId": "cloned_xyz789"
+}
+After Success
+Refreshes voice list (fetchVoices())
+Cloned voice appears in all voice dropdowns across TTS, Convert, and Music tabs
+Right panel shows info card explaining: "Clone voice here → Use it in Music tab"
+Result UI
+Shows list of user's cloned voices with name + "Ready to use" badge
+TAB 4: Sound Effects (SFX)
+User Inputs
+Field	Type	Required	UI Component
+Description	string (multiline)	Yes	<Textarea> rows=4, placeholder="Thunder, rain, birds chirping..."
+Duration	number (1-22 seconds)	Yes	<Slider> min=1 max=22 step=1, default=5
+Edge Function
+POST /functions/v1/elevenlabs-sound-effects
+
+
+{
+  "text": "Thunder rolling with rain and birds chirping",
+  "durationSeconds": 5
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Database Insert
+Table: sound_effect_generations
+
+
+{
+  "user_id": "profile_id",
+  "description": "Thunder rolling... (max 500 chars)",
+  "duration_seconds": 5,
+  "audio_url": "data:audio/mpeg;base64,...",
+  "status": "completed",
+  "credits_used": 60
+}
+TAB 5: Audio Isolation (Isolate)
+User Inputs
+Field	Type	Required	UI Component
+Audio File	File (audio/*)	Yes	<Input type="file">
+Edge Function
+POST /functions/v1/elevenlabs-audio-isolation
+
+
+{
+  "audioBase64": "data:audio/wav;base64,..."
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Database Insert
+Table: audio_isolation_generations
+
+
+{
+  "user_id": "profile_id",
+  "original_file_name": "noisy_audio.mp3",
+  "audio_url": "data:audio/mpeg;base64,...",
+  "status": "completed",
+  "credits_used": 40
+}
+TAB 6: Music Generation
+User Inputs
+Field	Type	Required	Condition	UI Component
+Song Title	string	No	Always shown	<Input>
+Description	string (multiline)	Yes (or lyrics)	Always shown	<Textarea> rows=3
+Genre	enum	Yes	Always shown	<Select> options: pop, rock, r&b, hip-hop, jazz, classical, electronic, country, folk, ambient
+Mood	enum	Yes	Always shown	<Select> options: happy, sad, energetic, calm, romantic, epic, melancholic, uplifting
+Voice Type	enum	Yes	Always shown	<Select> options: instrumental (₹100), ai (₹100), cloned (₹150, only if cloned voices exist)
+Cloned Voice	voice_id	Yes	Only when voiceType="cloned"	<Select> from clonedVoices
+Lyrics	string (multiline)	Required for cloned, optional for ai	Only when voiceType="ai" or "cloned"	<Textarea> rows=6 monospace, with "Generate Lyrics" button
+Generate Lyrics Sub-Feature
+POST /functions/v1/generate-lyrics
+
+
+{
+  "description": "A song about summer love",
+  "genre": "pop",
+  "mood": "happy"
+}
+Response:
+
+
+{
+  "lyrics": "Walking through the golden light\nYour hand in mine feels so right..."
+}
+Music Generation Edge Function
+POST /functions/v1/elevenlabs-generate-music
+
+Instrumental:
+
+
+{
+  "songTitle": "Summer Dreams",
+  "genre": "pop",
+  "mood": "happy",
+  "description": "Upbeat summer song with guitar",
+  "isInstrumental": true
+}
+AI Vocals:
+
+
+{
+  "songTitle": "Summer Dreams",
+  "genre": "pop",
+  "mood": "happy",
+  "description": "Upbeat summer song",
+  "isInstrumental": false,
+  "lyrics": "Walking through the golden light..."
+}
+Cloned Voice (Two-Track):
+
+
+{
+  "songTitle": "Summer Dreams",
+  "genre": "pop",
+  "mood": "happy",
+  "description": "Upbeat summer song",
+  "isInstrumental": false,
+  "lyrics": "Walking through the golden light...",
+  "voiceId": "cloned_xyz789",
+  "generateVocals": true
+}
+Response (single-track):
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Response (two-track with cloned voice):
+
+
+{
+  "success": true,
+  "twoTrack": true,
+  "instrumentalUrl": "data:audio/mpeg;base64,...",
+  "vocalsUrl": "data:audio/mpeg;base64,...",
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Wallet Transaction Insert (before API call)
+Table: wallet_transactions
+
+
+{
+  "user_id": "profile_id",
+  "transaction_type": "service_payment",
+  "amount": 100,
+  "status": "completed",
+  "payment_method": "wallet",
+  "description": "AI Music: Summer Dreams (pop)"
+}
+Result UI
+Single track: one audio player + download
+Two-track: "Instrumental Track" player + "Vocals Track (Your Voice)" player + download for each
+TAB 7: Image + Music Video (Img+Music)
+User Inputs
+Field	Type	Required	Condition	UI Component
+Image	File (image/*)	Yes	Always	<Input type="file"> with preview thumbnail
+Music Source	enum	Yes	Always	<Select>: "Generate AI Music" or "Upload My Audio"
+If source = "generate":				
+Music Description	string	Yes (or lyrics)		<Textarea> rows=2
+Genre	enum	Yes		<Select>: ambient, pop, classical, electronic, rock, r&b
+Mood	enum	Yes		<Select>: calm, happy, romantic, epic, sad, energetic
+Lyrics	string	No		<Textarea> rows=5 monospace + "Generate Lyrics" button
+Duration	number (10-60s)	Yes		<Slider> min=10 max=60 step=5, default=30
+If source = "upload":				
+Audio File	File (audio/*)	Yes		<Input type="file">
+Edge Function
+POST /functions/v1/elevenlabs-image-music-video
+
+
+{
+  "imageBase64": "data:image/jpeg;base64,...",
+  "musicDescription": "Calming piano melody",
+  "lyrics": "optional lyrics for vocals",
+  "genre": "ambient",
+  "mood": "calm",
+  "durationSeconds": 30,
+  "uploadedAudioBase64": null
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,...",
+  "imageBase64": "data:image/jpeg;base64,...",
+  "hasVocals": true
+}
+Database Insert
+Table: image_music_generations
+
+
+{
+  "user_id": "profile_id",
+  "image_url": "data:image/jpeg;base64,...",
+  "audio_url": "data:audio/mpeg;base64,...",
+  "description": "Calming piano melody",
+  "lyrics": "optional lyrics",
+  "genre": "ambient",
+  "mood": "calm",
+  "duration_seconds": 30,
+  "has_vocals": true,
+  "amount_charged": 150,
+  "status": "completed",
+  "completed_at": "2026-03-24T..."
+}
+Result UI
+Image displayed with play/pause overlay button (plays audio over image)
+"Download Video (MP4)" button — creates a WebM video client-side using canvas.captureStream() + MediaRecorder combining the static image + audio
+Badge "Song with AI Vocals" if hasVocals=true
+Voice Preview System (shared)
+In any voice <Select>, hovering a voice shows a play/pause button:
+
+If voice has preview_url: plays that URL directly
+If no preview_url: calls elevenlabs-text-to-speech with sample text "Hello! This is how I sound..." to generate a live preview
+Uses a hidden <audio ref={previewAudioRef}> element
+Audio Recording (shared)
+The AudioRecorderButton component (used in Voice Conversion and Voice Clone tabs):
+
+Uses browser MediaRecorder API
+Max 5 minutes, auto-stops with toast warning
+3 states: Idle → Recording (with elapsed timer) → Preview (playback + "Use This Recording" / "Re-record")
+Returns a File object to the parent handler
+Database Tables Summary
+Table	Used By
+profiles	Wallet balance read/update
+wallet_transactions	Music generation debit records
+tts_generations	TTS results
+voice_conversion_generations	Voice conversion results
+sound_effect_generations	SFX results
+audio_isolation_generations	Isolation results
+image_music_generations	Image+Music results
+All Edge Function Endpoints
+Endpoint	Used By	Auth
+get-user-voices	Voice list fetch	Bearer token
+elevenlabs-get-user-voices	Fallback voice fetch	Bearer token
+elevenlabs-text-to-speech	TTS + voice preview	Bearer token
+elevenlabs-speech-to-speech	Voice conversion	Bearer token
+elevenlabs-sound-effects	SFX generation	Bearer token
+elevenlabs-audio-isolation	Audio isolation	Bearer token
+elevenlabs-generate-music	Music generation (all 3 modes)	Bearer token
+elevenlabs-clone-voice	Voice cloning	Bearer token
+elevenlabs-image-music-video	Image+Music video	Bearer token
+generate-lyrics	AI lyrics for Music + Image+Music	Bearer token
+All endpoints use: Authorization: Bearer {session_access_token} and apikey: {SUPABASE_ANON_KEY}
+
+UI Layout Summary
+
+┌─────────────────────────────────────┐
+│         AI Audio Studio             │
+│   Text-to-Speech, Voice Cloning...  │
+├─────────────────────────────────────┤
+│  [Wallet Card: ₹balance + prices]   │
+├─────────────────────────────────────┤
+│ [TTS][Convert][Clone][SFX][Isolate][Music][Img+Music]  ← 7 tabs
+├─────────────────────────────────────┤
+│  ┌──────────┐  ┌──────────┐         │
+│  │  Form    │  │  Result  │         │  ← 2-column grid per tab
+│  │  Card    │  │  Card    │         │
+│  └──────────┘  └──────────┘         │
+└─────────────────────────────────────┘
+On mobile: tabs stack as a scrollable row, form/result cards stack vertically.
+
+Here is the complete documentation of the /music-studio page for your Replit mobile app integration.
+
+Music Studio (/music-studio) — Complete Technical Reference
+Page Route & Auth
+Route: /music-studio
+Auth: Required. Redirects to /auth if not logged in.
+Layout: Wrapped in <AuthenticatedLayout>
+Wallet System
+Before any generation, the user's wallet_balance is checked from the profiles table. Costs are deducted before the API call. If the API fails, the wallet is refunded.
+
+Feature	Cost (INR)
+Text-to-Speech	₹50
+Voice Conversion	₹75
+Sound Effects	₹60
+Audio Isolation	₹40
+Music (Instrumental/AI Vocals)	₹100
+Music (Cloned Voice)	₹150
+Voice Cloning	₹150
+Image+Music (Instrumental)	₹120
+Image+Music (With Vocals)	₹150
+Wallet fetch query:
+
+GET /rest/v1/profiles?select=wallet_balance&id=eq.{profile.id}
+Voice Fetching (shared across all tabs)
+On mount, fetches all available voices:
+
+Edge Function: POST /functions/v1/get-user-voices
+
+No body needed (uses auth token)
+Response:
+
+{
+  "premadeVoices": [
+    { "voice_id": "abc123", "name": "Rachel", "category": "premade", "preview_url": "https://...", "labels": { "accent": "american" } }
+  ],
+  "clonedVoices": [
+    { "voice_id": "xyz789", "name": "My Voice", "category": "cloned", "preview_url": "https://..." }
+  ]
+}
+Fallback: calls elevenlabs-get-user-voices if primary fails
+TAB 1: Text-to-Speech (TTS)
+User Inputs
+Field	Type	Required	UI Component
+Text	string (multiline)	Yes	<Textarea> rows=5
+Voice	voice_id (string)	Yes	<Select> with cloned voices section + premade voices section, hover play/pause preview
+Edge Function
+POST /functions/v1/elevenlabs-text-to-speech
+
+
+{
+  "text": "Hello world",
+  "voiceId": "abc123"
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Database Insert (after success)
+Table: tts_generations
+
+
+{
+  "user_id": "profile_id",
+  "text": "Hello world (max 500 chars)",
+  "voice_id": "abc123",
+  "voice_name": "Rachel",
+  "audio_url": "data:audio/mpeg;base64,...",
+  "status": "completed",
+  "credits_used": 50
+}
+Result UI
+Audio player with download button.
+
+TAB 2: Voice Conversion (Convert)
+User Inputs
+Field	Type	Required	UI Component
+Audio File	File (audio/*)	Yes	<Input type="file"> OR <AudioRecorderButton> (record from mic)
+Target Voice	voice_id	Yes	<Select> (same as TTS, cloned + premade, with preview)
+Edge Function
+POST /functions/v1/elevenlabs-speech-to-speech
+
+
+{
+  "audioBase64": "data:audio/wav;base64,...",
+  "voiceId": "abc123"
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Database Insert
+Table: voice_conversion_generations
+
+
+{
+  "user_id": "profile_id",
+  "original_file_name": "recording.wav",
+  "target_voice_id": "abc123",
+  "target_voice_name": "Rachel",
+  "audio_url": "data:audio/mpeg;base64,...",
+  "status": "completed",
+  "credits_used": 75
+}
+TAB 3: Voice Clone
+User Inputs
+Field	Type	Required	UI Component
+Voice Sample	File (audio/*)	Yes	<Input type="file"> OR <AudioRecorderButton> (1-5 min recommended)
+Voice Name	string	Yes	<Input> placeholder="My Voice"
+Description	string	No	<Input> placeholder="A warm, friendly voice"
+Edge Function
+POST /functions/v1/elevenlabs-clone-voice
+
+
+{
+  "audioBase64": "data:audio/wav;base64,...",
+  "voiceName": "My Voice",
+  "voiceDescription": "A warm, friendly voice"
+}
+Response:
+
+
+{
+  "success": true,
+  "voiceId": "cloned_xyz789"
+}
+After Success
+Refreshes voice list (fetchVoices())
+Cloned voice appears in all voice dropdowns across TTS, Convert, and Music tabs
+Right panel shows info card explaining: "Clone voice here → Use it in Music tab"
+Result UI
+Shows list of user's cloned voices with name + "Ready to use" badge
+TAB 4: Sound Effects (SFX)
+User Inputs
+Field	Type	Required	UI Component
+Description	string (multiline)	Yes	<Textarea> rows=4, placeholder="Thunder, rain, birds chirping..."
+Duration	number (1-22 seconds)	Yes	<Slider> min=1 max=22 step=1, default=5
+Edge Function
+POST /functions/v1/elevenlabs-sound-effects
+
+
+{
+  "text": "Thunder rolling with rain and birds chirping",
+  "durationSeconds": 5
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Database Insert
+Table: sound_effect_generations
+
+
+{
+  "user_id": "profile_id",
+  "description": "Thunder rolling... (max 500 chars)",
+  "duration_seconds": 5,
+  "audio_url": "data:audio/mpeg;base64,...",
+  "status": "completed",
+  "credits_used": 60
+}
+TAB 5: Audio Isolation (Isolate)
+User Inputs
+Field	Type	Required	UI Component
+Audio File	File (audio/*)	Yes	<Input type="file">
+Edge Function
+POST /functions/v1/elevenlabs-audio-isolation
+
+
+{
+  "audioBase64": "data:audio/wav;base64,..."
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Database Insert
+Table: audio_isolation_generations
+
+
+{
+  "user_id": "profile_id",
+  "original_file_name": "noisy_audio.mp3",
+  "audio_url": "data:audio/mpeg;base64,...",
+  "status": "completed",
+  "credits_used": 40
+}
+TAB 6: Music Generation
+User Inputs
+Field	Type	Required	Condition	UI Component
+Song Title	string	No	Always shown	<Input>
+Description	string (multiline)	Yes (or lyrics)	Always shown	<Textarea> rows=3
+Genre	enum	Yes	Always shown	<Select> options: pop, rock, r&b, hip-hop, jazz, classical, electronic, country, folk, ambient
+Mood	enum	Yes	Always shown	<Select> options: happy, sad, energetic, calm, romantic, epic, melancholic, uplifting
+Voice Type	enum	Yes	Always shown	<Select> options: instrumental (₹100), ai (₹100), cloned (₹150, only if cloned voices exist)
+Cloned Voice	voice_id	Yes	Only when voiceType="cloned"	<Select> from clonedVoices
+Lyrics	string (multiline)	Required for cloned, optional for ai	Only when voiceType="ai" or "cloned"	<Textarea> rows=6 monospace, with "Generate Lyrics" button
+Generate Lyrics Sub-Feature
+POST /functions/v1/generate-lyrics
+
+
+{
+  "description": "A song about summer love",
+  "genre": "pop",
+  "mood": "happy"
+}
+Response:
+
+
+{
+  "lyrics": "Walking through the golden light\nYour hand in mine feels so right..."
+}
+Music Generation Edge Function
+POST /functions/v1/elevenlabs-generate-music
+
+Instrumental:
+
+
+{
+  "songTitle": "Summer Dreams",
+  "genre": "pop",
+  "mood": "happy",
+  "description": "Upbeat summer song with guitar",
+  "isInstrumental": true
+}
+AI Vocals:
+
+
+{
+  "songTitle": "Summer Dreams",
+  "genre": "pop",
+  "mood": "happy",
+  "description": "Upbeat summer song",
+  "isInstrumental": false,
+  "lyrics": "Walking through the golden light..."
+}
+Cloned Voice (Two-Track):
+
+
+{
+  "songTitle": "Summer Dreams",
+  "genre": "pop",
+  "mood": "happy",
+  "description": "Upbeat summer song",
+  "isInstrumental": false,
+  "lyrics": "Walking through the golden light...",
+  "voiceId": "cloned_xyz789",
+  "generateVocals": true
+}
+Response (single-track):
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Response (two-track with cloned voice):
+
+
+{
+  "success": true,
+  "twoTrack": true,
+  "instrumentalUrl": "data:audio/mpeg;base64,...",
+  "vocalsUrl": "data:audio/mpeg;base64,...",
+  "audioUrl": "data:audio/mpeg;base64,..."
+}
+Wallet Transaction Insert (before API call)
+Table: wallet_transactions
+
+
+{
+  "user_id": "profile_id",
+  "transaction_type": "service_payment",
+  "amount": 100,
+  "status": "completed",
+  "payment_method": "wallet",
+  "description": "AI Music: Summer Dreams (pop)"
+}
+Result UI
+Single track: one audio player + download
+Two-track: "Instrumental Track" player + "Vocals Track (Your Voice)" player + download for each
+TAB 7: Image + Music Video (Img+Music)
+User Inputs
+Field	Type	Required	Condition	UI Component
+Image	File (image/*)	Yes	Always	<Input type="file"> with preview thumbnail
+Music Source	enum	Yes	Always	<Select>: "Generate AI Music" or "Upload My Audio"
+If source = "generate":				
+Music Description	string	Yes (or lyrics)		<Textarea> rows=2
+Genre	enum	Yes		<Select>: ambient, pop, classical, electronic, rock, r&b
+Mood	enum	Yes		<Select>: calm, happy, romantic, epic, sad, energetic
+Lyrics	string	No		<Textarea> rows=5 monospace + "Generate Lyrics" button
+Duration	number (10-60s)	Yes		<Slider> min=10 max=60 step=5, default=30
+If source = "upload":				
+Audio File	File (audio/*)	Yes		<Input type="file">
+Edge Function
+POST /functions/v1/elevenlabs-image-music-video
+
+
+{
+  "imageBase64": "data:image/jpeg;base64,...",
+  "musicDescription": "Calming piano melody",
+  "lyrics": "optional lyrics for vocals",
+  "genre": "ambient",
+  "mood": "calm",
+  "durationSeconds": 30,
+  "uploadedAudioBase64": null
+}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,...",
+  "imageBase64": "data:image/jpeg;base64,...",
+  "hasVocals": true
+}
+Database Insert
+Table: image_music_generations
+
+
+{
+  "user_id": "profile_id",
+  "image_url": "data:image/jpeg;base64,...",
+  "audio_url": "data:audio/mpeg;base64,...",
+  "description": "Calming piano melody",
+  "lyrics": "optional lyrics",
+  "genre": "ambient",
+  "mood": "calm",
+  "duration_seconds": 30,
+  "has_vocals": true,
+  "amount_charged": 150,
+  "status": "completed",
+  "completed_at": "2026-03-24T..."
+}
+Result UI
+Image displayed with play/pause overlay button (plays audio over image)
+"Download Video (MP4)" button — creates a WebM video client-side using canvas.captureStream() + MediaRecorder combining the static image + audio
+Badge "Song with AI Vocals" if hasVocals=true
+Voice Preview System (shared)
+In any voice <Select>, hovering a voice shows a play/pause button:
+
+If voice has preview_url: plays that URL directly
+If no preview_url: calls elevenlabs-text-to-speech with sample text "Hello! This is how I sound..." to generate a live preview
+Uses a hidden <audio ref={previewAudioRef}> element
+Audio Recording (shared)
+The AudioRecorderButton component (used in Voice Conversion and Voice Clone tabs):
+
+Uses browser MediaRecorder API
+Max 5 minutes, auto-stops with toast warning
+3 states: Idle → Recording (with elapsed timer) → Preview (playback + "Use This Recording" / "Re-record")
+Returns a File object to the parent handler
+Database Tables Summary
+Table	Used By
+profiles	Wallet balance read/update
+wallet_transactions	Music generation debit records
+tts_generations	TTS results
+voice_conversion_generations	Voice conversion results
+sound_effect_generations	SFX results
+audio_isolation_generations	Isolation results
+image_music_generations	Image+Music results
+All Edge Function Endpoints
+Endpoint	Used By	Auth
+get-user-voices	Voice list fetch	Bearer token
+elevenlabs-get-user-voices	Fallback voice fetch	Bearer token
+elevenlabs-text-to-speech	TTS + voice preview	Bearer token
+elevenlabs-speech-to-speech	Voice conversion	Bearer token
+elevenlabs-sound-effects	SFX generation	Bearer token
+elevenlabs-audio-isolation	Audio isolation	Bearer token
+elevenlabs-generate-music	Music generation (all 3 modes)	Bearer token
+elevenlabs-clone-voice	Voice cloning	Bearer token
+elevenlabs-image-music-video	Image+Music video	Bearer token
+generate-lyrics	AI lyrics for Music + Image+Music	Bearer token
+All endpoints use: Authorization: Bearer {session_access_token} and apikey: {SUPABASE_ANON_KEY}
+
+UI Layout Summary
+
+┌─────────────────────────────────────┐
+│         AI Audio Studio             │
+│   Text-to-Speech, Voice Cloning...  │
+├─────────────────────────────────────┤
+│  [Wallet Card: ₹balance + prices]   │
+├─────────────────────────────────────┤
+│ [TTS][Convert][Clone][SFX][Isolate][Music][Img+Music]  ← 7 tabs
+├─────────────────────────────────────┤
+│  ┌──────────┐  ┌──────────┐         │
+│  │  Form    │  │  Result  │         │  ← 2-column grid per tab
+│  │  Card    │  │  Card    │         │
+│  └──────────┘  └──────────┘         │
+└─────────────────────────────────────┘
+On mobile: tabs stack as a scrollable row, form/result cards stack vertically.
+
+
+
+
+
