@@ -57,6 +57,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/playfair-display": "^0.4.2",
+    "date-fns": "^3.6.0",
     "expo-av": "~16.0.8",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.21",
