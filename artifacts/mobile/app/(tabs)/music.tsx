@@ -80,7 +80,18 @@ async function downloadToDevice(dataUri: string, filename: string): Promise<void
 
   const { status } = await MediaLibrary.requestPermissionsAsync();
   if (status !== 'granted') {
-    Alert.alert('Permission Required', 'Please allow access to your media library to save files.');
+    throw new Error('media_library_permission_denied');
+  }
+
+  if (dataUri.startsWith('file://')) {
+    await MediaLibrary.saveToLibraryAsync(dataUri);
+    return;
+  }
+
+  if (dataUri.startsWith('http://') || dataUri.startsWith('https://')) {
+    const tempPath = (FileSystem.cacheDirectory ?? '') + filename;
+    await FileSystem.downloadAsync(dataUri, tempPath);
+    await MediaLibrary.saveToLibraryAsync(tempPath);
     return;
   }
 
@@ -103,8 +114,7 @@ async function downloadUrlToDevice(url: string, filename: string): Promise<void>
 
   const { status } = await MediaLibrary.requestPermissionsAsync();
   if (status !== 'granted') {
-    Alert.alert('Permission Required', 'Please allow access to your media library to save files.');
-    return;
+    throw new Error('media_library_permission_denied');
   }
 
   const tempPath = (FileSystem.cacheDirectory ?? '') + filename;
@@ -198,8 +208,11 @@ function AudioPlayerCard({ title, audioUri, badge }: { title: string; audioUri: 
       await downloadToDevice(audioUri, `wishme_audio_${Date.now()}.${ext}`);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
-    } catch {
-      Alert.alert('Save Failed', 'Could not save the audio. Please try again.');
+    } catch (err) {
+      const msg = err instanceof Error && err.message === 'media_library_permission_denied'
+        ? 'Please allow media library access to save audio to your device.'
+        : 'Could not save the audio. Please try again.';
+      Alert.alert('Save Failed', msg);
     }
   };
 
@@ -739,8 +752,11 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
       await downloadToDevice(audioUrl, `wishme_audio_${Date.now()}.${ext}`);
       setAudioSaved(true);
       setTimeout(() => setAudioSaved(false), 2500);
-    } catch {
-      Alert.alert('Save Failed', 'Could not save the audio. Please try again.');
+    } catch (err) {
+      const msg = err instanceof Error && err.message === 'media_library_permission_denied'
+        ? 'Please allow media library access to save audio to your device.'
+        : 'Could not save the audio. Please try again.';
+      Alert.alert('Save Failed', msg);
     }
   };
 
@@ -750,7 +766,7 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
         await buildMp4ViaCanvas(imgBase64, audioUrl);
       } else if (videoUrl) {
         const filename = `wishme_video_${Date.now()}.mp4`;
-        if (videoUrl.startsWith('data:')) {
+        if (videoUrl.startsWith('data:') || videoUrl.startsWith('file://')) {
           await downloadToDevice(videoUrl, filename);
         } else {
           await downloadUrlToDevice(videoUrl, filename);
@@ -760,8 +776,11 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
       }
       setVideoSaved(true);
       setTimeout(() => setVideoSaved(false), 2500);
-    } catch {
-      Alert.alert('Save Failed', 'Could not save the video. Please try again.');
+    } catch (err) {
+      const msg = err instanceof Error && err.message === 'media_library_permission_denied'
+        ? 'Please allow media library access to save video to your device.'
+        : 'Could not save the video. Please try again.';
+      Alert.alert('Save Failed', msg);
     }
   };
 
