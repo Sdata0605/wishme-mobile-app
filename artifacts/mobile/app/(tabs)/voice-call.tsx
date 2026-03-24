@@ -17,7 +17,8 @@ import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { Celebrity, useCelebrities } from '@/hooks/useCelebrities';
+import { Celebrity } from '@/hooks/useCelebrities';
+import { useVoiceCallCelebrities } from '@/hooks/useVoiceCallCelebrities';
 
 const { width: W } = Dimensions.get('window');
 const CARD_W = (W - 52) / 2;
@@ -729,7 +730,7 @@ export default function VoiceCallScreen() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = insets.bottom + 24;
 
-  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
+  const { celebrities, loading, error, refetch } = useVoiceCallCelebrities();
 
   const [step, setStep] = useState<1 | 2>(1);
   const [search, setSearch] = useState('');
