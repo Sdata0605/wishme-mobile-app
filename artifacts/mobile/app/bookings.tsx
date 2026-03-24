@@ -75,7 +75,6 @@ function useRealtimeBookings(profileId: string | null, accessToken: string | nul
     } catch {}
 
     return () => {
-      closed = true;
       if (heartbeat) clearInterval(heartbeat);
       ws?.close();
     };
@@ -304,7 +303,7 @@ function BookingAudioPlayer({ audioUrl, colors }: { audioUrl: string | null; col
         )}
       </TouchableOpacity>
       <View style={s.audioBar}>
-        <View style={[s.audioProgress, { backgroundColor: '#FF6B33', width: `${progress * 100}%` as any }]} />
+        <View style={[s.audioProgress, { backgroundColor: '#FF6B33', width: `${progress * 100}%` }]} />
       </View>
       <Text style={[s.audioDuration, { color: colors.mutedForeground }]}>
         {duration > 0 ? `${fmtMs(position)} / ${fmtMs(duration)}` : audioUrl ? '--:--' : 'N/A'}
