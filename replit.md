@@ -111,7 +111,7 @@ Key screens:
 - `app/(auth)/verify-otp.tsx` — 6-digit OTP verification
 - `app/(tabs)/index.tsx` — Home (banners, quick actions, celebrity grid, video cards, how-it-works)
 - `app/(tabs)/celebrities.tsx` — Browse/search/filter celebrity grid
-- `app/(tabs)/music.tsx` — AI Music Studio with waveform animation
+- `app/(tabs)/music.tsx` — AI Music Studio: 7 real-API tabs (TTS, Convert, Clone, SFX, Isolate, Music, Img+Music) with expo-av playback/recording, expo-document-picker, expo-file-system/legacy, real wallet deduction, real DB inserts
 - `app/(tabs)/voice-call.tsx` — Live celebrity voice calls
 - `app/(tabs)/profile.tsx` — User profile, wallet, stats, settings
 - `app/celebrity/[id].tsx` — Celebrity detail with reviews + booking
