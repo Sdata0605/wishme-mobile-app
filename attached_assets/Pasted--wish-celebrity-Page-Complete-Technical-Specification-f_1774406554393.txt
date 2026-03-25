@@ -1,0 +1,590 @@
+/wish-celebrity Page — Complete Technical Specification for Replit Mobile App
+Purpose
+This is a 3-step fan-to-celebrity greeting card flow: Browse celebrities → Fill wish details & pay → AI generates card → Fan approves & sends card to celebrity via DM. The celebrity is the recipient of the wish (e.g., "Happy Birthday, Shah Rukh Khan!"), and the fan is the sender.
+
+FLOW OVERVIEW
+
+Step 1: /wish-celebrity (WishACelebrity.tsx)
+  Browse & search celebrities → sorted by subscription status
+  ├── Subscribed celebrity → "Wish Now" → /wish-booking/:celebrityId
+  └── Unsubscribed celebrity → "Subscribe to Wish" → /celebrity/:id (profile page)
+
+Step 2: /wish-booking/:celebrityId (WishBooking.tsx)
+  Fill form (occasion, name, message, AI prompt)
+  → Get AI suggestions (optional)
+  → Proceed to Payment (wallet or Razorpay)
+  → On success → /wish-confirmation/:orderId
+
+Step 3: /wish-confirmation/:orderId (WishConfirmation.tsx)
+  Auto-generates AI greeting card
+  → User reviews card image
+  → "Regenerate" or "Approve & Send"
+  → Sends card as DM to celebrity
+  → Redirects to /wish-congratulations?orderId=...
+STEP 1: Celebrity Listing (/wish-celebrity)
+File: src/pages/WishACelebrity.tsx
+
+API Calls
+1. Fetch all active celebrities
+
+GET /rest/v1/celebrities?is_active=eq.true&order=name.asc
+Headers: apikey, Authorization: Bearer <access_token>
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "name": "Hari Raj Shetty",
+    "category": "Actor",
+    "image_url": "https://...",
+    "location": "Mumbai",
+    "rating": 4.5,
+    "review_count": 12,
+    "is_verified": true,
+    "is_active": true,
+    "service_prices": { "general_wish": 5000, "video_wish": 2000 }
+  }
+]
+2. Fetch user's active subscriptions
+
+GET /rest/v1/celebrity_favorites?user_id=eq.{profile.id}&status=eq.active&select=celebrity_id
+Headers: apikey, Authorization: Bearer <access_token>
+Response:
+
+
+[
+  { "celebrity_id": "uuid-1" },
+  { "celebrity_id": "uuid-2" }
+]
+UI Sections
+Section	Condition	Action Button
+Subscribed Celebrities	celebrity_id exists in celebrity_favorites	"Wish Now" → /wish-booking/:id
+Browse More Celebrities	Not subscribed	"Subscribe to Wish" → /celebrity/:id
+Components Used
+AuthenticatedLayout — page wrapper with sidebar
+Card, CardContent — celebrity cards
+Input — search bar with Search icon
+Badge — "Verified" badge
+Button — "Wish Now" (primary) / "Subscribe to Wish" (outline)
+Icons: Heart, Search, Star, CheckCircle, Lock from lucide-react
+Client-Side Logic
+Search filter: matches name or category (case-insensitive)
+Sorting: subscribed celebrities appear first
+Auth gate: redirects to /auth if not logged in
+STEP 2: Wish Booking Form (/wish-booking/:celebrityId)
+File: src/pages/WishBooking.tsx
+
+API Calls
+1. Fetch celebrity details
+
+GET /rest/v1/celebrities?id=eq.{celebrityId}&select=*
+Headers: apikey, Authorization
+2. Get AI message suggestions (optional)
+
+POST /functions/v1/generate-message-suggestions
+Headers: apikey, Authorization
+Body:
+{
+  "celebrityName": "Hari Raj Shetty",
+  "occasionType": "Birthday",
+  "recipientName": "Fan Name"
+}
+Response:
+{
+  "suggestions": [
+    "Happy Birthday! Wishing you joy...",
+    "Many happy returns of the day..."
+  ]
+}
+3. Get AI card prompt suggestions (optional)
+
+POST /functions/v1/suggest-greeting-card-prompts
+Headers: apikey, Authorization
+Body:
+{
+  "celebrityName": "Hari Raj Shetty",
+  "occasionType": "Birthday",
+  "recipientName": "Fan Name",
+  "message": "Happy birthday!"
+}
+Response:
+{
+  "prompts": [
+    "A vibrant birthday card with golden confetti...",
+    "An elegant card with roses and warm tones..."
+  ]
+}
+4. Create wish order (wallet payment)
+
+POST /rest/v1/wish_celebrity_orders
+Body:
+{
+  "user_id": "profile-uuid",
+  "celebrity_id": "celebrity-uuid",
+  "occasion_type": "Birthday",
+  "recipient_name": "Fan Name",
+  "message": "Happy birthday to you!",
+  "card_prompt": "A colorful birthday card with balloons",
+  "amount_paid": 4250,
+  "discount_percentage": 15,
+  "discount_amount": 750,
+  "payment_method": "wallet",
+  "payment_status": "completed",
+  "status": "pending"
+}
+5. Deduct wallet balance
+
+POST /rest/v1/wallet_transactions
+Body:
+{
+  "user_id": "profile-uuid",
+  "amount": 4250,
+  "transaction_type": "booking",
+  "status": "completed",
+  "description": "Wish order #uuid for Hari Raj Shetty - Birthday",
+  "transaction_details": {
+    "base_price": 5000,
+    "discount_percentage": 15,
+    "discount_amount": 750,
+    "plan": "premium"
+  }
+}
+Note: The update_wallet_balance DB trigger automatically deducts from profiles.wallet_balance.
+
+6. Razorpay payment flow (alternative)
+
+POST /functions/v1/create-razorpay-order
+Body:
+{
+  "amount": 4250,
+  "currency": "INR",
+  "receipt": "WISH-{orderId}",
+  "notes": { "orderId": "uuid", "orderType": "wish" }
+}
+Response:
+{
+  "id": "order_xxxxx",
+  "key_id": "rzp_live_xxxxx"
+}
+After Razorpay checkout success:
+
+POST /functions/v1/verify-razorpay-payment
+Body:
+{
+  "razorpay_payment_id": "pay_xxxxx",
+  "razorpay_order_id": "order_xxxxx",
+  "razorpay_signature": "signature_hash",
+  "orderId": "wish-order-uuid",
+  "orderType": "wish"
+}
+Form Fields
+Field	Type	Required	Source
+Occasion	Select dropdown	Yes	Hardcoded list: Birthday, Anniversary, Wedding, Congratulations, Get Well Soon, Thank You, Good Luck, Graduation
+Your Name	Text input	Yes	User types
+Message	Textarea + Voice input	Yes	User types or uses AI suggestions
+AI Card Prompt	Textarea + Voice input	Yes	User types or uses AI prompt suggestions
+Pricing Logic
+Base price: celebrity.service_prices.general_wish (default 5000)
+Discount: from usePlanDiscount() hook based on user's plan (basic/premium/elite)
+Final price: basePrice - (basePrice * discountPercentage / 100)
+Components Used
+Card, CardHeader, CardTitle, CardContent
+Input, Label, Textarea, Select/SelectContent/SelectItem
+Badge — clickable AI suggestion chips
+Button — "Get AI Suggestions", "Suggest Prompts", "Proceed to Payment"
+VoiceMessageInput — speech-to-text for message and prompt fields
+PaymentInstructionModal — payment method selection dialog
+Alert — discount notice
+Skeleton — wallet balance loading state
+Icons: Loader2, Sparkles, RefreshCw, BadgePercent
+Error Handling
+Wallet payment failure → auto-deletes the created order (rollback)
+Razorpay failure → order stays with payment_status: "pending"
+STEP 3: Confirmation & Card Generation (/wish-confirmation/:orderId)
+File: src/pages/WishConfirmation.tsx
+
+API Calls
+1. Fetch order with celebrity join
+
+GET /rest/v1/wish_celebrity_orders?id=eq.{orderId}&select=*,celebrities(id,name,image_url,category)
+2. Generate AI greeting card
+
+POST /functions/v1/generate-wish-celebrity-card
+Body:
+{ "orderId": "uuid" }
+Response:
+{
+  "greeting_text": "Happy Birthday, Hari Raj Shetty! ...",
+  "card_image_url": "https://storage.../card.png"
+}
+The edge function:
+
+Fetches order + celebrity data from DB
+Calls Lovable AI Gateway to generate greeting text (Gemini)
+Calls Lovable AI Gateway to generate card image (uses celebrity's real photo)
+Uploads image to Supabase Storage
+Updates wish_celebrity_orders with generated_card_image_url and greeting_text
+3. Approve & send wish to celebrity
+
+POST /functions/v1/send-wish-to-celebrity
+Body:
+{ "orderId": "uuid" }
+Response:
+{
+  "success": true,
+  "message": "Greeting card sent successfully to celebrity",
+  "conversation_id": "uuid"
+}
+This edge function:
+
+Validates card is generated and not already sent
+Finds or creates a conversations row between user and celebrity
+Inserts greeting card message into messages table (from user to celebrity)
+Inserts AI-generated thank-you DM from celebrity back to user
+Updates order: card_approved: true, status: "sent", completed_at: timestamp
+UI Sections
+Section	Content
+Payment success banner	Green confirmation message
+Celebrity info	Avatar + name + category
+Order details	Occasion, recipient, message, card prompt
+Greeting card preview	Generated card image
+Actions	"Regenerate Card" / "Approve & Send" buttons
+After sending → redirects to /wish-congratulations?orderId=...
+
+DATABASE TABLE: wish_celebrity_orders
+
+{
+  "id": "uuid (PK, auto)",
+  "user_id": "uuid (FK → profiles.id)",
+  "celebrity_id": "uuid (FK → celebrities.id)",
+  "occasion_type": "string",
+  "recipient_name": "string",
+  "message": "string",
+  "card_prompt": "string",
+  "amount_paid": "integer",
+  "discount_percentage": "integer",
+  "discount_amount": "integer",
+  "payment_method": "wallet | razorpay",
+  "payment_status": "pending | completed",
+  "status": "pending | sent | completed",
+  "generated_card_image_url": "string | null",
+  "greeting_text": "string | null",
+  "card_approved": "boolean",
+  "completed_at": "timestamp | null",
+  "created_at": "timestamp",
+  "updated_at": "timestamp"
+}
+COMPLETE EDGE FUNCTIONS USED
+Function	Method	Purpose
+generate-message-suggestions	POST	AI message suggestions
+suggest-greeting-card-prompts	POST	AI card prompt suggestions
+create-razorpay-order	POST	Create Razorpay payment order
+verify-razorpay-payment	POST	Verify Razorpay signature
+generate-wish-celebrity-card	POST	Generate AI greeting card image
+send-wish-to-celebrity	POST	Send card as DM + thank-you reply
+MOBILE APP IMPLEMENTATION NOTES
+Auth: Every API call needs Authorization: Bearer <access_token> and apikey: <anon_key>
+Voice Input: Uses browser SpeechRecognition API — on mobile use native speech-to-text SDK
+Razorpay: Use Razorpay mobile SDK (React Native / Flutter) instead of browser checkout
+Image Display: generated_card_image_url is a full HTTPS URL from Supabase Storage
+Wallet trigger: The DB trigger update_wallet_balance auto-deducts balance on wallet_transactions insert — no manual balance update needed
+Subscription gate: Users MUST have an active celebrity_favorites record to access "Wish Now" — enforce this in mobile too
+Now I have all the information needed. This is a research/documentation request, not an implementation task, so I'll provide the detailed specification directly without a plan.
+
+/wish-celebrity Page — Complete Technical Specification for Replit Mobile App
+Purpose
+This is a 3-step fan-to-celebrity greeting card flow: Browse celebrities → Fill wish details & pay → AI generates card → Fan approves & sends card to celebrity via DM. The celebrity is the recipient of the wish (e.g., "Happy Birthday, Shah Rukh Khan!"), and the fan is the sender.
+
+FLOW OVERVIEW
+
+Step 1: /wish-celebrity (WishACelebrity.tsx)
+  Browse & search celebrities → sorted by subscription status
+  ├── Subscribed celebrity → "Wish Now" → /wish-booking/:celebrityId
+  └── Unsubscribed celebrity → "Subscribe to Wish" → /celebrity/:id (profile page)
+
+Step 2: /wish-booking/:celebrityId (WishBooking.tsx)
+  Fill form (occasion, name, message, AI prompt)
+  → Get AI suggestions (optional)
+  → Proceed to Payment (wallet or Razorpay)
+  → On success → /wish-confirmation/:orderId
+
+Step 3: /wish-confirmation/:orderId (WishConfirmation.tsx)
+  Auto-generates AI greeting card
+  → User reviews card image
+  → "Regenerate" or "Approve & Send"
+  → Sends card as DM to celebrity
+  → Redirects to /wish-congratulations?orderId=...
+STEP 1: Celebrity Listing (/wish-celebrity)
+File: src/pages/WishACelebrity.tsx
+
+API Calls
+1. Fetch all active celebrities
+
+GET /rest/v1/celebrities?is_active=eq.true&order=name.asc
+Headers: apikey, Authorization: Bearer <access_token>
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "name": "Hari Raj Shetty",
+    "category": "Actor",
+    "image_url": "https://...",
+    "location": "Mumbai",
+    "rating": 4.5,
+    "review_count": 12,
+    "is_verified": true,
+    "is_active": true,
+    "service_prices": { "general_wish": 5000, "video_wish": 2000 }
+  }
+]
+2. Fetch user's active subscriptions
+
+GET /rest/v1/celebrity_favorites?user_id=eq.{profile.id}&status=eq.active&select=celebrity_id
+Headers: apikey, Authorization: Bearer <access_token>
+Response:
+
+
+[
+  { "celebrity_id": "uuid-1" },
+  { "celebrity_id": "uuid-2" }
+]
+UI Sections
+Section	Condition	Action Button
+Subscribed Celebrities	celebrity_id exists in celebrity_favorites	"Wish Now" → /wish-booking/:id
+Browse More Celebrities	Not subscribed	"Subscribe to Wish" → /celebrity/:id
+Components Used
+AuthenticatedLayout — page wrapper with sidebar
+Card, CardContent — celebrity cards
+Input — search bar with Search icon
+Badge — "Verified" badge
+Button — "Wish Now" (primary) / "Subscribe to Wish" (outline)
+Icons: Heart, Search, Star, CheckCircle, Lock from lucide-react
+Client-Side Logic
+Search filter: matches name or category (case-insensitive)
+Sorting: subscribed celebrities appear first
+Auth gate: redirects to /auth if not logged in
+STEP 2: Wish Booking Form (/wish-booking/:celebrityId)
+File: src/pages/WishBooking.tsx
+
+API Calls
+1. Fetch celebrity details
+
+GET /rest/v1/celebrities?id=eq.{celebrityId}&select=*
+Headers: apikey, Authorization
+2. Get AI message suggestions (optional)
+
+POST /functions/v1/generate-message-suggestions
+Headers: apikey, Authorization
+Body:
+{
+  "celebrityName": "Hari Raj Shetty",
+  "occasionType": "Birthday",
+  "recipientName": "Fan Name"
+}
+Response:
+{
+  "suggestions": [
+    "Happy Birthday! Wishing you joy...",
+    "Many happy returns of the day..."
+  ]
+}
+3. Get AI card prompt suggestions (optional)
+
+POST /functions/v1/suggest-greeting-card-prompts
+Headers: apikey, Authorization
+Body:
+{
+  "celebrityName": "Hari Raj Shetty",
+  "occasionType": "Birthday",
+  "recipientName": "Fan Name",
+  "message": "Happy birthday!"
+}
+Response:
+{
+  "prompts": [
+    "A vibrant birthday card with golden confetti...",
+    "An elegant card with roses and warm tones..."
+  ]
+}
+4. Create wish order (wallet payment)
+
+POST /rest/v1/wish_celebrity_orders
+Body:
+{
+  "user_id": "profile-uuid",
+  "celebrity_id": "celebrity-uuid",
+  "occasion_type": "Birthday",
+  "recipient_name": "Fan Name",
+  "message": "Happy birthday to you!",
+  "card_prompt": "A colorful birthday card with balloons",
+  "amount_paid": 4250,
+  "discount_percentage": 15,
+  "discount_amount": 750,
+  "payment_method": "wallet",
+  "payment_status": "completed",
+  "status": "pending"
+}
+5. Deduct wallet balance
+
+POST /rest/v1/wallet_transactions
+Body:
+{
+  "user_id": "profile-uuid",
+  "amount": 4250,
+  "transaction_type": "booking",
+  "status": "completed",
+  "description": "Wish order #uuid for Hari Raj Shetty - Birthday",
+  "transaction_details": {
+    "base_price": 5000,
+    "discount_percentage": 15,
+    "discount_amount": 750,
+    "plan": "premium"
+  }
+}
+Note: The update_wallet_balance DB trigger automatically deducts from profiles.wallet_balance.
+
+6. Razorpay payment flow (alternative)
+
+POST /functions/v1/create-razorpay-order
+Body:
+{
+  "amount": 4250,
+  "currency": "INR",
+  "receipt": "WISH-{orderId}",
+  "notes": { "orderId": "uuid", "orderType": "wish" }
+}
+Response:
+{
+  "id": "order_xxxxx",
+  "key_id": "rzp_live_xxxxx"
+}
+After Razorpay checkout success:
+
+POST /functions/v1/verify-razorpay-payment
+Body:
+{
+  "razorpay_payment_id": "pay_xxxxx",
+  "razorpay_order_id": "order_xxxxx",
+  "razorpay_signature": "signature_hash",
+  "orderId": "wish-order-uuid",
+  "orderType": "wish"
+}
+Form Fields
+Field	Type	Required	Source
+Occasion	Select dropdown	Yes	Hardcoded list: Birthday, Anniversary, Wedding, Congratulations, Get Well Soon, Thank You, Good Luck, Graduation
+Your Name	Text input	Yes	User types
+Message	Textarea + Voice input	Yes	User types or uses AI suggestions
+AI Card Prompt	Textarea + Voice input	Yes	User types or uses AI prompt suggestions
+Pricing Logic
+Base price: celebrity.service_prices.general_wish (default 5000)
+Discount: from usePlanDiscount() hook based on user's plan (basic/premium/elite)
+Final price: basePrice - (basePrice * discountPercentage / 100)
+Components Used
+Card, CardHeader, CardTitle, CardContent
+Input, Label, Textarea, Select/SelectContent/SelectItem
+Badge — clickable AI suggestion chips
+Button — "Get AI Suggestions", "Suggest Prompts", "Proceed to Payment"
+VoiceMessageInput — speech-to-text for message and prompt fields
+PaymentInstructionModal — payment method selection dialog
+Alert — discount notice
+Skeleton — wallet balance loading state
+Icons: Loader2, Sparkles, RefreshCw, BadgePercent
+Error Handling
+Wallet payment failure → auto-deletes the created order (rollback)
+Razorpay failure → order stays with payment_status: "pending"
+STEP 3: Confirmation & Card Generation (/wish-confirmation/:orderId)
+File: src/pages/WishConfirmation.tsx
+
+API Calls
+1. Fetch order with celebrity join
+
+GET /rest/v1/wish_celebrity_orders?id=eq.{orderId}&select=*,celebrities(id,name,image_url,category)
+2. Generate AI greeting card
+
+POST /functions/v1/generate-wish-celebrity-card
+Body:
+{ "orderId": "uuid" }
+Response:
+{
+  "greeting_text": "Happy Birthday, Hari Raj Shetty! ...",
+  "card_image_url": "https://storage.../card.png"
+}
+The edge function:
+
+Fetches order + celebrity data from DB
+Calls Lovable AI Gateway to generate greeting text (Gemini)
+Calls Lovable AI Gateway to generate card image (uses celebrity's real photo)
+Uploads image to Supabase Storage
+Updates wish_celebrity_orders with generated_card_image_url and greeting_text
+3. Approve & send wish to celebrity
+
+POST /functions/v1/send-wish-to-celebrity
+Body:
+{ "orderId": "uuid" }
+Response:
+{
+  "success": true,
+  "message": "Greeting card sent successfully to celebrity",
+  "conversation_id": "uuid"
+}
+This edge function:
+
+Validates card is generated and not already sent
+Finds or creates a conversations row between user and celebrity
+Inserts greeting card message into messages table (from user to celebrity)
+Inserts AI-generated thank-you DM from celebrity back to user
+Updates order: card_approved: true, status: "sent", completed_at: timestamp
+UI Sections
+Section	Content
+Payment success banner	Green confirmation message
+Celebrity info	Avatar + name + category
+Order details	Occasion, recipient, message, card prompt
+Greeting card preview	Generated card image
+Actions	"Regenerate Card" / "Approve & Send" buttons
+After sending → redirects to /wish-congratulations?orderId=...
+
+DATABASE TABLE: wish_celebrity_orders
+
+{
+  "id": "uuid (PK, auto)",
+  "user_id": "uuid (FK → profiles.id)",
+  "celebrity_id": "uuid (FK → celebrities.id)",
+  "occasion_type": "string",
+  "recipient_name": "string",
+  "message": "string",
+  "card_prompt": "string",
+  "amount_paid": "integer",
+  "discount_percentage": "integer",
+  "discount_amount": "integer",
+  "payment_method": "wallet | razorpay",
+  "payment_status": "pending | completed",
+  "status": "pending | sent | completed",
+  "generated_card_image_url": "string | null",
+  "greeting_text": "string | null",
+  "card_approved": "boolean",
+  "completed_at": "timestamp | null",
+  "created_at": "timestamp",
+  "updated_at": "timestamp"
+}
+COMPLETE EDGE FUNCTIONS USED
+Function	Method	Purpose
+generate-message-suggestions	POST	AI message suggestions
+suggest-greeting-card-prompts	POST	AI card prompt suggestions
+create-razorpay-order	POST	Create Razorpay payment order
+verify-razorpay-payment	POST	Verify Razorpay signature
+generate-wish-celebrity-card	POST	Generate AI greeting card image
+send-wish-to-celebrity	POST	Send card as DM + thank-you reply
+MOBILE APP IMPLEMENTATION NOTES
+Auth: Every API call needs Authorization: Bearer <access_token> and apikey: <anon_key>
+Voice Input: Uses browser SpeechRecognition API — on mobile use native speech-to-text SDK
+Razorpay: Use Razorpay mobile SDK (React Native / Flutter) instead of browser checkout
+Image Display: generated_card_image_url is a full HTTPS URL from Supabase Storage
+Wallet trigger: The DB trigger update_wallet_balance auto-deducts balance on wallet_transactions insert — no manual balance update needed
+Subscription gate: Users MUST have an active celebrity_favorites record to access "Wish Now" — enforce this in mobile too
+
+
+
+

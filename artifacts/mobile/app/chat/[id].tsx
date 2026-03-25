@@ -8,6 +8,7 @@ import {
   Alert,
   Animated,
   AppState,
+  Dimensions,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -269,7 +270,11 @@ function MessageBubble({
         )}
         {parsed.type === 'card' && parsed.url && (
           <View style={mb.cardWrap}>
-            <Image source={{ uri: parsed.url }} style={mb.cardImg} contentFit="cover" />
+            <Image
+              source={{ uri: parsed.url }}
+              style={[mb.cardImg, { width: Math.min(Dimensions.get('window').width * 0.75, 320) }]}
+              contentFit="cover"
+            />
             <TouchableOpacity
               style={mb.cardLink}
               onPress={() => WebBrowser.openBrowserAsync(parsed.url!)}
@@ -300,7 +305,7 @@ const mb = StyleSheet.create({
   text: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
   time: { fontSize: 11, fontFamily: 'Inter_400Regular', marginHorizontal: 4 },
   cardWrap: { gap: 8 },
-  cardImg: { width: 220, height: 160, borderRadius: 10 },
+  cardImg: { height: 180, borderRadius: 10 },
   cardLink: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   cardLinkText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   aiBadge: {
