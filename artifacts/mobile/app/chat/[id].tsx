@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
+  AppState,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -464,12 +465,28 @@ export default function ChatScreen() {
     setLoading(true);
     bootstrap().finally(() => setLoading(false));
 
-    pollRef.current = setInterval(() => {
-      fetchNewMessages();
-    }, 5000);
+    const startPolling = () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+      pollRef.current = setInterval(fetchNewMessages, 5000);
+    };
+
+    const stopPolling = () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+
+    startPolling();
+
+    const appStateSub = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') startPolling();
+      else stopPolling();
+    });
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      stopPolling();
+      appStateSub.remove();
       if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       if (recordTimerRef.current) clearInterval(recordTimerRef.current);
       recordingRef.current?.stopAndUnloadAsync().catch(() => {});
@@ -660,26 +677,33 @@ export default function ChatScreen() {
     const path = `${profileId}/${fileName}`;
 
     try {
-      const formData = new FormData();
-      formData.append('', {
-        uri,
-        name: fileName,
-        type: 'audio/m4a',
-      } as unknown as Blob);
-
-      const uploadRes = await fetch(`${SUPABASE_URL}/storage/v1/object/voice-notes/${path}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          apikey: SUPABASE_ANON_KEY,
-          'x-upsert': 'true',
-        },
-        body: formData,
+      // Read file as base64, then convert to Blob for binary PUT upload
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
       });
+      const dataUriResponse = await fetch(`data:audio/m4a;base64,${base64}`);
+      const blob = await dataUriResponse.blob();
+
+      const uploadRes = await fetch(
+        `${SUPABASE_URL}/storage/v1/object/voice-notes/${path}`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            apikey: SUPABASE_ANON_KEY,
+            'Content-Type': 'audio/m4a',
+            'x-upsert': 'true',
+          },
+          body: blob,
+        },
+      );
 
       if (!uploadRes.ok) {
         const errText = await uploadRes.text().catch(() => '');
-        Alert.alert('Upload Failed', `Could not upload voice note (${uploadRes.status}). ${errText || 'Please try again.'}`);
+        Alert.alert(
+          'Upload Failed',
+          `Could not upload voice note (${uploadRes.status}). ${errText || 'Please try again.'}`,
+        );
         return;
       }
 
