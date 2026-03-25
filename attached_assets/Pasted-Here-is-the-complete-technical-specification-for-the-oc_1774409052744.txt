@@ -1,0 +1,131 @@
+Here is the complete technical specification for the /occasions page (and its child /occasions/:occasionId/book page) for your Replit mobile app integration:
+
+/occasions Page — Full Technical Specification
+Purpose
+A browsing page where authenticated users discover upcoming occasions (Diwali, Christmas, birthdays, etc.) and tap through to book a personalized AI-generated celebrity video or greeting card for that occasion. It is a free service — no wallet charge on this flow.
+
+Database Table
+occasions
+
+Column	Type	Description
+id	uuid (PK)	Occasion ID
+name	text	e.g. "Diwali 2026"
+description	text	Short description
+date	date	Occasion date
+image_url	text	Banner image URL
+is_active	boolean	Only active ones are shown
+is_featured	boolean	Highlighted in featured section
+occasion_bookings (created when user books)
+
+Column	Type	Description
+id	uuid (PK)	Booking ID
+user_id	uuid (FK → profiles)	Who booked
+occasion_id	uuid (FK → occasions)	Which occasion
+celebrity_id	uuid (FK → celebrities)	Selected celebrity
+booking_type	text	"video" or "greeting_card"
+recipient_name	text	Required
+recipient_email	text	Optional
+recipient_phone	text	Optional
+message	text	User's personalized message
+price	integer	From celebrity.service_prices.general_wish (usually 0)
+status	text	"pending" → "processing" → "completed"
+ai_generated_content	text	AI script/card content stored here
+API Endpoints
+1. Fetch Active Occasions (Listing Page)
+GET /rest/v1/occasions?is_active=eq.true&order=date.asc
+Authorization: Bearer <user_jwt>
+apikey: <SUPABASE_ANON_KEY>
+Response: Array of Occasion objects.
+
+2. Fetch Single Occasion (Booking Page)
+GET /rest/v1/occasions?id=eq.<occasionId>&select=*
+3. Fetch Subscribed Celebrities (Booking Page)
+GET /rest/v1/celebrities?is_active=eq.true&is_verified=eq.true&id=in.(<comma_separated_favorite_ids>)&select=id,name,image_url,category,service_prices
+The favorite IDs come from:
+
+GET /rest/v1/celebrity_favorites?user_id=eq.<profile_id>&status=eq.active&select=celebrity_id
+4. Submit Booking
+POST /rest/v1/occasion_bookings
+Body: {
+  "user_id": "<profile_id>",
+  "occasion_id": "<occasionId>",
+  "celebrity_id": "<selected_celebrity_id>",
+  "booking_type": "video" | "greeting_card",
+  "recipient_name": "...",
+  "recipient_email": "...",       // optional
+  "recipient_phone": "...",       // optional
+  "message": "...",
+  "price": 0,
+  "status": "pending"
+}
+5. Trigger AI Video Generation
+POST /functions/v1/generate-occasion-video
+Authorization: Bearer <user_jwt>
+Body: {
+  "bookingId": "<booking_id>",
+  "occasionName": "Diwali 2026",
+  "recipientName": "Rahul",
+  "message": "Happy Diwali!",
+  "celebrityId": "<celebrity_id>"
+}
+This Edge Function fetches celebrity bio, calls Google Gemini 2.0 Flash to generate a TTS-friendly script, stores it in occasion_bookings.ai_generated_content, and sets status to "processing".
+
+6. Trigger Greeting Card Generation
+POST /functions/v1/generate-greeting-card
+Authorization: Bearer <user_jwt>
+Body: {
+  "bookingId": "<booking_id>",
+  "occasionName": "...",
+  "recipientName": "...",
+  "message": "...",
+  "celebrityId": "<celebrity_id>"
+}
+Page Sections & UI Components
+Section 1: /occasions — Listing Page
+Section	Component	Behavior
+Hero	Text block	Title + subtitle, gradient text
+Featured Occasions	Card grid (2-col on desktop)	Only shown if any is_featured=true. Image with gradient overlay, name, description, date, "Book Now" button
+All Occasions	Card grid (3-4 col desktop, 1 col mobile)	Image, title, description (2-line clamp), date with Calendar icon, "Book for Free" button
+Info Banner	Gradient card	Static promotional text
+Navigation: Tapping any card or button calls navigate(/occasions/<id>/book).
+
+Section 2: /occasions/:occasionId/book — Booking Form
+Access Gate: Requires authentication AND at least one active celebrity_favorites entry. If no subscriptions, shows a lock screen with "Browse & Subscribe to Celebrities" CTA → /following.
+
+Section	Component	Details
+Booking Type	RadioGroup (2 options)	"AI Video" (Video icon) or "Greeting Card" (Image icon). Visual card-style radio buttons
+Celebrity Selection	Image grid (2-col mobile, 4-col desktop)	Shows only subscribed celebrities. Tap to select (border highlight)
+Recipient Details	Input + Textarea form	recipientName (required), recipientEmail (optional), recipientPhone (optional), message (required, 4-row textarea)
+Submit	Button	"Create Booking" with Loader2 spinner while submitting
+Complete Data Flow
+
+1. User opens /occasions
+2. App fetches: GET occasions WHERE is_active=true ORDER BY date ASC
+3. User taps an occasion card
+4. Navigate to /occasions/<id>/book
+5. App fetches in parallel:
+   a. GET occasions WHERE id=<occasionId>          → occasion details
+   b. GET celebrity_favorites WHERE user_id=<me>    → my subscription IDs
+   c. GET celebrities WHERE id IN (<favorite_ids>)  → celebrity cards
+6. If no favorites → show subscription gate → redirect to /following
+7. User selects:
+   - Booking type (video or greeting_card)
+   - Celebrity (from subscribed list)
+   - Fills recipient details + message
+8. Submit → INSERT into occasion_bookings (status: "pending")
+9. Based on booking_type:
+   - "video"         → POST /functions/v1/generate-occasion-video
+   - "greeting_card"  → POST /functions/v1/generate-greeting-card
+10. Edge Function:
+    - Fetches celebrity name/bio from DB
+    - Calls Google Gemini API to generate script/card
+    - Updates occasion_bookings with ai_generated_content
+    - Sets status to "processing"
+11. Toast "Success" → navigate to /dashboard
+Mobile Integration Notes
+No payment required — price is typically 0 (from service_prices.general_wish), so no wallet/Razorpay flow needed
+Subscription gate is critical — always check celebrity_favorites before showing the booking form
+Image lazy loading — use native lazy image loading for the occasion cards
+Date formatting — Featured cards use { month: "long", day: "numeric", year: "numeric" }, regular cards use { month: "short", day: "numeric" }
+AI generation is async — after booking submission, the Edge Function runs in the background. Poll occasion_bookings by ID to check when status changes from "processing" to "completed"
+Admin manages occasions via /admin/occasions using the AdminOccasions page (CRUD on the occasions table with is_active and is_featured toggles)
