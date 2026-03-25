@@ -1,0 +1,222 @@
+/occasion-wishes Page — Full Technical Specification for Replit Mobile App
+Purpose
+Lets authenticated users send free-text wish messages to their subscribed (favorite) celebrities on upcoming occasions (birthdays, anniversaries, etc.). If the celebrity has AI auto-reply enabled, the user receives an instant AI-generated personalized reply from the celebrity.
+
+Database Tables Used
+1. celebrity_favorites (subscription gate)
+
+
+{
+  "id": "uuid",
+  "user_id": "uuid (profile.id)",
+  "celebrity_id": "uuid",
+  "status": "active | inactive",
+  "price_paid": "integer",
+  "created_at": "timestamp"
+}
+2. celebrities (celebrity info)
+
+
+{
+  "id": "uuid",
+  "name": "string",
+  "image_url": "string",
+  "category": "string",
+  "bio": "string",
+  "is_active": "boolean"
+}
+3. celebrity_occasions (celebrity events)
+
+
+{
+  "id": "uuid",
+  "celebrity_id": "uuid",
+  "occasion_name": "string (e.g. 'Birthday 2026')",
+  "occasion_type": "string ('birthday' | 'anniversary' | 'other')",
+  "occasion_date": "date (YYYY-MM-DD)",
+  "is_public": "boolean",
+  "auto_reply_enabled": "boolean"
+}
+4. occasion_wishes (user wishes)
+
+
+{
+  "id": "uuid",
+  "user_id": "uuid (profile.id)",
+  "celebrity_id": "uuid",
+  "occasion_id": "uuid (FK → celebrity_occasions.id)",
+  "message": "string (user's wish text)",
+  "reply_message": "string | null (AI-generated reply)",
+  "reply_sent_at": "timestamp | null",
+  "created_at": "timestamp"
+}
+API Endpoints
+1. Get User's Subscribed Celebrity IDs
+GET /rest/v1/celebrity_favorites
+  ?select=celebrity_id
+  &user_id=eq.{profile.id}
+  &status=eq.active
+Headers: Authorization: Bearer {session.access_token}, apikey: {anon_key}
+Response:
+
+
+[
+  { "celebrity_id": "uuid-1" },
+  { "celebrity_id": "uuid-2" }
+]
+2. Get Celebrity Details (only subscribed ones)
+GET /rest/v1/celebrities
+  ?select=id,name,image_url,category
+  &id=in.("uuid-1","uuid-2")
+  &is_active=eq.true
+Response:
+
+
+[
+  { "id": "uuid-1", "name": "Shah Rukh Khan", "image_url": "https://...", "category": "Actor" }
+]
+3. Get Upcoming Occasions for Subscribed Celebrities
+GET /rest/v1/celebrity_occasions
+  ?select=*,celebrities:celebrity_id(id,name,image_url,category)
+  &celebrity_id=in.("uuid-1","uuid-2")
+  &is_public=eq.true
+  &occasion_date=gte.2026-03-25
+  &order=occasion_date.asc
+Response:
+
+
+[
+  {
+    "id": "occ-uuid",
+    "celebrity_id": "uuid-1",
+    "occasion_name": "Birthday 2026",
+    "occasion_type": "birthday",
+    "occasion_date": "2026-11-02",
+    "auto_reply_enabled": true,
+    "is_public": true,
+    "celebrities": {
+      "id": "uuid-1",
+      "name": "Shah Rukh Khan",
+      "image_url": "https://...",
+      "category": "Actor"
+    }
+  }
+]
+4. Get User's Sent Wishes (History)
+GET /rest/v1/occasion_wishes
+  ?select=*,celebrity_occasions!inner(*,celebrities:celebrity_id(id,name,image_url,category))
+  &user_id=eq.{profile.id}
+  &order=created_at.desc
+  &limit=20
+Response:
+
+
+[
+  {
+    "id": "wish-uuid",
+    "celebrity_id": "uuid-1",
+    "occasion_id": "occ-uuid",
+    "message": "Happy birthday! You are an inspiration!",
+    "reply_message": "Thank you so much for the lovely wishes! Your support means the world to me.",
+    "reply_sent_at": "2026-03-25T10:30:00Z",
+    "created_at": "2026-03-25T10:29:00Z",
+    "celebrity_occasions": {
+      "id": "occ-uuid",
+      "occasion_name": "Birthday 2026",
+      "occasion_type": "birthday",
+      "auto_reply_enabled": true,
+      "celebrities": {
+        "id": "uuid-1",
+        "name": "Shah Rukh Khan",
+        "image_url": "https://...",
+        "category": "Actor"
+      }
+    }
+  }
+]
+5. Send a Wish (Insert)
+POST /rest/v1/occasion_wishes
+Headers: Authorization, apikey, Content-Type: application/json, Prefer: return=representation
+Body:
+{
+  "user_id": "profile-uuid",
+  "celebrity_id": "celeb-uuid",
+  "occasion_id": "occasion-uuid",
+  "message": "Happy birthday! You inspire millions!"
+}
+Response: The inserted row as JSON.
+
+6. Generate AI Auto-Reply (Edge Function)
+Only called if auto_reply_enabled === true on the occasion.
+
+POST /functions/v1/generate-occasion-auto-reply
+Headers: Authorization: Bearer {session.access_token}, apikey: {anon_key}
+Body:
+{
+  "wish_id": "wish-uuid",
+  "celebrity_id": "celeb-uuid",
+  "occasion_name": "Birthday 2026",
+  "user_message": "Happy birthday! You inspire millions!"
+}
+Response:
+
+
+{
+  "reply": "Thank you so much! Your love means everything to me. Keep smiling!",
+  "message": "Auto-reply generated and sent successfully"
+}
+What the edge function does internally:
+
+Fetches celebrity name, category, bio from celebrities table
+Calls Lovable AI Gateway (https://ai.gateway.lovable.dev/v1/chat/completions) with Gemini model
+Uses celebrity persona as system prompt to generate an in-character reply
+Updates occasion_wishes row with reply_message and reply_sent_at
+Complete Data Flow
+
+Page Load:
+  1. useAuth() → get profile.id
+  2. useCelebrityFavorites() → GET celebrity_favorites → array of celebrity_ids
+  3. If favorites.length === 0 → show "No Favorites" empty state → navigate to /favorites
+  4. GET celebrities WHERE id IN (favorites) AND is_active = true
+  5. GET celebrity_occasions WHERE celebrity_id IN (favorites) AND is_public = true AND occasion_date >= today
+  6. GET occasion_wishes WHERE user_id = profile.id (last 20)
+
+Send Wish:
+  1. User selects celebrity from dropdown (filtered to subscribed only)
+  2. User selects occasion from dropdown (filtered to selected celebrity's upcoming occasions)
+  3. User types message (max ~500 chars)
+  4. Click "Send Wish"
+  5. INSERT into occasion_wishes
+  6. If occasion.auto_reply_enabled === true:
+     → POST /functions/v1/generate-occasion-auto-reply
+     → AI generates reply in celebrity's persona
+     → Updates occasion_wishes.reply_message + reply_sent_at
+  7. Reset form, refetch all data
+  8. User sees wish in "My Wishes" tab with reply (if auto-reply was enabled)
+UI Components and Layout
+Section	Component	Description
+Auth Gate	Full-screen message + Login button	Shown if user not logged in
+Empty State	Heart icon + "No Favorites" + Browse button	Shown if user has no subscriptions
+Page Header	Gradient text heading	"Occasion Wishes" title + subtitle
+Tab Bar	Tabs with 2 tabs	"Send Wish" and "My Wishes"
+Send Wish Form	Card containing form	Celebrity dropdown, Occasion dropdown, Textarea, Send button
+Celebrity Dropdown	Select	Shows subscribed celebrities as "Name - Category"
+Occasion Dropdown	Select (conditional)	Only appears after celebrity selected; shows "Name - Date 🤖"
+AI Badge	Info banner	Blue banner with Sparkles icon when auto-reply is enabled
+Message Input	Textarea (5 rows)	With character counter "X / 500"
+Send Button	Button (full width)	Disabled until all 3 fields filled
+Wish History Cards	List of Card components	Each shows celebrity avatar, name, occasion icon, wish text, reply (if any)
+Status Badge	Badge	"Replied" (green) or "Sent" (gray)
+Reply Block	Highlighted div	Shows AI reply with Sparkles icon, celebrity name, and timestamp
+Key Mobile Implementation Notes
+Subscription Gate: User MUST have active celebrity_favorites entries to use this page. No subscriptions = empty state redirecting to browse celebrities.
+
+Free Feature: No payment required to send wishes. This is a fan engagement feature.
+
+AI Auto-Reply is Instant: When auto_reply_enabled is true, the edge function is called immediately after insert. The reply appears after page data refresh (~2-3 seconds).
+
+Occasion Filtering: Only shows occasions with occasion_date >= today and is_public = true. Past occasions are excluded.
+
+Cascading Dropdowns: Occasion dropdown only appears after celebrity is selected, and filters to that celebrity's occasions only.
+
+No Real-Time: This page does NOT use Supabase Realtime. Data is fetched on load and after each send action.
