@@ -1,0 +1,127 @@
+image-promotions Page — Full Technical Specification for Mobile App
+Purpose
+Allows authenticated users to generate AI-powered promotional images featuring celebrities they are subscribed to. Users provide a concept description, optional branding details, and an optional reference image. The system uses Gemini AI to generate a styled marketing image. Users pay from their wallet balance.
+
+Authentication & Access Gate
+Auth required: User must be logged in (redirect to /auth if not).
+Subscription gate: User must have at least one active celebrity subscription (celebrity_favorites with status = 'active'). If zero favorites, show a locked screen directing them to /following to subscribe first.
+Database Tables Used
+image_promotions — main order table
+
+Column	Type	Notes
+id	uuid (PK)	Auto-generated
+user_id	uuid (FK → profiles.id)	The buyer's profile ID
+celebrity_id	uuid (FK → celebrities.id)	Selected celebrity
+concept	text	User's promotion concept (max 500 chars)
+branding_details	text	Optional branding info (max 300 chars)
+price_paid	integer	Amount charged in ₹
+generated_image_url	text	Base64 data URL of the generated image
+status	text	pending → completed or failed
+error_message	text	Set on failure
+completed_at	timestamptz	When generation finished
+created_at	timestamptz	Auto
+platform_settings — pricing config
+
+Key: image_promotion_price, default value: 25
+wallet_transactions — payment deduction
+
+A DB trigger (update_wallet_balance) automatically deducts from profiles.wallet_balance when a completed image_promotion transaction is inserted.
+API Endpoints
+1. Load Pricing
+GET /rest/v1/platform_settings?setting_key=eq.image_promotion_price&select=setting_value
+Headers: apikey, Authorization
+2. Load User's Subscribed Celebrities (for dropdown)
+GET /rest/v1/celebrities?is_active=eq.true&avatar_trained=eq.true&id=in.({favorite_ids})&select=id,name,category,image_url&order=name
+Headers: apikey, Authorization
+Where favorite_ids comes from the celebrity_favorites table filtered by current user with status = 'active'.
+
+3. Load Generation History
+GET /rest/v1/image_promotions?user_id=eq.{profile_id}&select=*&order=created_at.desc&limit=50
+Headers: apikey, Authorization
+4. Generate Image (Edge Function)
+POST /functions/v1/generate-image-promotion
+Headers: Authorization: Bearer {access_token}, Content-Type: application/json
+Body:
+{
+  "celebrityId": "uuid",
+  "concept": "string (max 500 chars)",
+  "brandingDetails": "string (max 300 chars, optional)",
+  "referenceImageUrl": "base64 data URL or null",
+  "referenceImageSource": "upload" | "none"
+}
+Response (success):
+
+
+{
+  "success": true,
+  "generation": {
+    "id": "uuid",
+    "generated_image_url": "data:image/png;base64,...",
+    "status": "completed",
+    "concept": "...",
+    "celebrity_id": "...",
+    "price_paid": 25
+  }
+}
+Response (error):
+
+
+{ "error": "Insufficient wallet balance. Need ₹25, have ₹10" }
+Edge Function Internal Flow:
+
+Authenticate user via JWT token
+Fetch user profile and wallet balance
+Fetch price from platform_settings
+Check wallet balance ≥ price
+Fetch celebrity name and category
+Insert image_promotions row with status: 'pending'
+Build prompt: "Create a professional promotional image featuring {name} ({category}). Concept: {concept}. Branding: {branding}."
+If reference image provided, send as multimodal content (text + image_url)
+Call Lovable AI Gateway:
+POST https://ai.gateway.lovable.dev/v1/chat/completions
+model: google/gemini-2.5-flash-image-preview
+modalities: ["image", "text"]
+Extract choices[0].message.images[0].image_url.url (base64)
+Update image_promotions row → status: 'completed', save generated_image_url
+Insert wallet_transactions (type: image_promotion, status: completed) — DB trigger deducts balance
+Return generation object
+Plan Discount System
+usePlanDiscount hook fetches the user's plan from profiles.plan and the discount from plans.service_discount_percentage
+Final price = basePrice - (basePrice × discountPercentage / 100)
+Display both original and discounted price if applicable
+UI Sections (Top to Bottom)
+Section 1: Header
+Title: "AI Image Promotions"
+Subtitle text
+Section 2: Stats Cards (3-column grid)
+Card	Data Source
+Wallet Balance (₹)	useWalletBalance hook → profiles.wallet_balance
+Today's Generations	Count of history items where created_at is today
+Completed	Count of history items where status === 'completed'
+Section 3: Free Period Notice
+Green alert banner with promotional text
+Section 4: Generator Form (left column)
+Celebrity Select: Dropdown of subscribed celebrities with trained avatars
+Reference Image Tabs: "Upload Reference" (file input → base64) or "AI Only"
+Concept Textarea: Required, 500 char limit with counter
+Branding Details Textarea: Optional, 300 char limit with counter
+Pricing Display: Shows base price, discount %, and final price
+Generate Button: Disabled if generating, insufficient balance, or no celebrity selected
+Section 5: Preview (right column)
+Shows the generated image with Download button after successful generation
+Placeholder icon when no current generation
+Section 6: Generation History (full width)
+Grid of past generations (3 columns on desktop, 1 on mobile)
+Each card shows: thumbnail image, status badge (green/red/yellow), date, concept text (2-line clamp), download button
+Mobile Implementation Notes
+Image handling: Generated images are base64 data URLs (1-5MB). Cache locally and implement lazy loading for the history grid.
+File upload: Use native image picker. Convert to base64 before sending.
+Wallet validation: Check balance client-side before calling the edge function. The server also validates.
+Loading state: Generation takes 10-30 seconds. Show a spinner and disable the button.
+Download: On mobile, use native share sheet or save-to-gallery instead of anchor download.
+Subscription gate: Must check celebrity_favorites status before allowing access to this feature.
+Environment Variables (Edge Function)
+Secret	Purpose
+LOVABLE_API_KEY	Authenticates with Lovable AI Gateway for Gemini image generation
+SUPABASE_URL	Supabase project URL
+SUPABASE_SERVICE_ROLE_KEY	Server-side DB access
