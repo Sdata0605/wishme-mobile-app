@@ -1,0 +1,188 @@
+/greeting-cards Page - Complete Technical Specification
+Purpose
+Lets authenticated users generate AI-powered greeting card images with personalized text for occasions (Birthday, Anniversary, etc.). Users provide a prompt describing the card design, optionally upload a reference image, and the AI (Gemini) generates both the card image and greeting text. Cards cost wallet credits and can be saved to a personal library for reuse.
+
+Authentication
+Required: Yes. Redirects to /auth if not logged in.
+Auth method: Supabase JWT via supabase.auth.getUser() and supabase.auth.getSession()
+The user's profile.id (not auth.uid()) is used for all DB queries.
+Database Tables
+greeting_card_generations
+Column	Type	Description
+id	uuid	Primary key
+user_id	uuid	FK to profiles.id
+original_prompt	text	User's raw prompt
+refined_prompt	text	AI-refined prompt (if opted in)
+occasion_name	text	e.g. "Birthday"
+recipient_name	text	e.g. "Sarah"
+generated_image_url	text	Base64 data URL of generated card image
+greeting_text	text	AI-generated greeting message
+reference_image_url	text	Base64 of uploaded reference image
+reference_image_source	text	'upload', 'library', or 'none'
+prompt_refinement_used	boolean	Whether AI prompt refinement was used
+saved_to_library	boolean	Whether user saved this card
+amount_charged	integer	Price paid (after discount)
+status	text	'processing', 'completed', 'failed'
+error_message	text	Error details if failed
+completed_at	timestamptz	When generation completed
+created_at	timestamptz	Record creation time
+platform_settings (read only)
+setting_key = 'greeting_card_price' → setting_value = base price as string (e.g. "2")
+plans (read only)
+Queried by name = profile.plan to get service_discount_percentage
+wallet_transactions (insert)
+transaction_type: 'greeting_card_generation'
+amount: final price after discount
+transaction_details: JSON with generation_id, occasion, recipient, discount info
+API Endpoints
+1. Load Pricing
+GET /rest/v1/platform_settings?select=setting_value&setting_key=eq.greeting_card_price
+Headers: Authorization: Bearer <jwt>, apikey: <anon_key>
+Response: { "setting_value": "2" }
+2. Load Plan Discount
+GET /rest/v1/plans?select=service_discount_percentage&name=eq.<plan_name>
+Response: { "service_discount_percentage": 10 }
+Price calculation: finalPrice = Math.round(basePrice * (1 - discount / 100))
+
+3. Load Generation History
+GET /rest/v1/greeting_card_generations?select=*&user_id=eq.<profile_id>&order=created_at.desc&limit=30
+Response: Array of generation records
+4. Generate Greeting Card (Main Action)
+POST /functions/v1/generate-greeting-card-ai
+Headers: Authorization: Bearer <jwt>
+Body: {
+  "prompt": "A colorful birthday card with balloons",
+  "occasionName": "Birthday",
+  "recipientName": "Sarah",
+  "senderName": "John",
+  "refinePrompt": true,              // optional, triggers AI prompt improvement
+  "referenceImageUrl": "data:image/jpeg;base64,...",  // optional base64 image
+  "referenceImageSource": "upload"    // "upload", "library", or "none"
+}
+Success Response (200):
+
+
+{
+  "success": true,
+  "generation": {
+    "id": "uuid",
+    "generated_image_url": "data:image/png;base64,...",
+    "greeting_text": "Dear Sarah, wishing you the happiest birthday...",
+    "refined_prompt": "A vibrant birthday celebration card..."
+  },
+  "discount_applied": 10,
+  "amount_charged": 2
+}
+Error Responses:
+
+401: Unauthorized
+400: { "error": "Insufficient wallet balance", "required": 2, "available": 0 }
+429: Rate limit
+402: AI credits exhausted
+500: Generation failed
+5. Save/Unsave to Library
+PATCH /rest/v1/greeting_card_generations?id=eq.<generation_id>
+Body: { "saved_to_library": true }
+Edge Function Internal Flow (generate-greeting-card-ai)
+The function performs 6 sequential steps:
+
+
+Step 1: Auth + Profile lookup
+  → Verify JWT → Get profiles row (id, wallet_balance, plan)
+
+Step 2: Price calculation
+  → Read platform_settings for base price
+  → Read plans table for discount percentage
+  → Calculate final price, check wallet balance
+
+Step 3: Create generation record (status: 'processing')
+  → INSERT into greeting_card_generations
+
+Step 4: Optional prompt refinement (if refinePrompt=true)
+  → POST to Lovable AI Gateway (model: gemini-2.5-flash)
+  → System prompt: "You are an expert at refining image generation prompts..."
+  → UPDATE generation record with refined_prompt
+
+Step 5: Generate card image
+  → POST to Lovable AI Gateway (model: gemini-2.5-flash-image-preview)
+  → If reference image provided:
+      Content = [text_instruction, image_url] (multimodal)
+      Prompt mandates image as "MAIN FOCAL POINT"
+  → If no reference image:
+      Content = text-only prompt
+  → Request includes: modalities: ["image", "text"]
+  → Response: choices[0].message.images[0].image_url.url (base64)
+
+Step 6: Generate greeting text
+  → POST to Lovable AI Gateway (model: gemini-2.5-flash)
+  → System: "Write warm, heartfelt messages, 2-3 sentences"
+  → Fallback text if API fails
+
+Step 7: Finalize
+  → UPDATE generation record (status: 'completed', image URL, text)
+  → UPDATE profiles.wallet_balance (deduct)
+  → INSERT wallet_transactions (type: 'greeting_card_generation')
+AI Gateway Details:
+
+Base URL: https://ai.gateway.lovable.dev/v1/chat/completions
+Auth: Authorization: Bearer <LOVABLE_API_KEY>
+Image generation model: google/gemini-2.5-flash-image-preview
+Text model: google/gemini-2.5-flash
+Image response path: choices[0].message.images[0].image_url.url
+UI Sections (Top to Bottom)
+1. Header Stats Row (3 cards)
+Card	Data Source	Display
+Wallet Balance	useWalletBalance() hook → profiles.wallet_balance	₹{balance} + "Add Funds" button → /wallet
+Today's Generations	Client-side filter on history by today's date	Count
+Saved to Library	Client-side filter saved_to_library === true	Count
+2. Discount Notice
+If discountPercentage > 0: Green alert showing plan name and savings
+If no discount: Muted alert prompting upgrade with link to /plan
+3. Generator Form (Card component)
+Image Source Tabs (3 tabs):
+
+Upload: File input for reference image → converts to base64 via FileReader
+Library: Grid of previously saved cards (click to select as reference)
+AI Only: No reference image, fully AI-generated
+Form Fields:
+
+Occasion (Select dropdown, 12 predefined options)
+Recipient Name (text input)
+Sender Name (text input, required)
+Prompt (textarea, 500 char limit with counter)
+Refine with AI (checkbox, recommended)
+Generate Button: Shows price, strikethrough if discounted. Disabled if fields empty or insufficient balance.
+
+4. Current Generation Preview
+Shows after successful generation
+Full-width card image with gradient text overlay (greeting text)
+Action buttons: Download, Save/Remove from Library
+If refined prompt was used, shows it in an Alert
+5. History Gallery
+Grid: 2 columns mobile, 4 columns desktop
+Each card: image thumbnail (h-48), hover overlay with occasion/recipient/date
+Star icon top-right to toggle library save
+Click card to set as current generation (preview it)
+UI Components Used
+AuthenticatedLayout (wrapper with sidebar)
+Card, CardHeader, CardContent, CardTitle, CardDescription
+Button (default, outline, link variants)
+Input, Textarea, Label
+Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+Checkbox
+Tabs, TabsList, TabsTrigger, TabsContent
+Alert, AlertDescription
+Badge
+Icons from lucide-react: Loader, Wallet, Send, Download, Star, StarOff, Upload, Image, Sparkles, AlertCircle, BadgePercent
+Occasions List (Hardcoded)
+
+["Birthday", "Anniversary", "Wedding", "Graduation", "New Year", "Christmas",
+ "Valentine's Day", "Mother's Day", "Father's Day", "Thank You", "Congratulations", "Get Well Soon"]
+Mobile App Implementation Notes
+Image handling: All images are base64 data URLs. Generated cards can be very large (1-5MB base64 strings). Cache locally and implement lazy loading.
+Reference image upload: Use native camera/gallery picker, convert to base64 before sending.
+Download: On mobile, save the base64 image to the device photo library instead of using anchor download.
+Library feature: The "Library" tab lets users reuse previously generated cards as reference images for new generations. Query saved_to_library = true from history.
+Wallet check: Always verify balance client-side before calling the edge function. The server also validates.
+Timeout: Image generation can take 15-30 seconds. Show a persistent loading state.
+Error handling: Handle 429 (rate limit) and 402 (credits exhausted) specifically with user-friendly messages.

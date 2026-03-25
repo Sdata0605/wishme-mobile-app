@@ -1,0 +1,390 @@
+/business Page — Complete Technical Specification for Replit Mobile App
+1. Purpose
+The /business page is a marketing/landing page for business users. It showcases celebrity-powered marketing services (endorsements, brand activations, social media campaigns, product launches) with pricing tiers and testimonials. This is a static informational page — it has no API calls, no database queries, and no Edge Functions. All content is hardcoded in the component.
+
+2. Route & Authentication
+
+Route:        /business
+Component:    src/pages/Business.tsx
+Auth Required: No (page renders for everyone)
+Layout:       AuthenticatedLayout (shows sidebar only if user is logged in)
+
+// From App.tsx
+<Route path="/business" element={<Business />} />
+3. Data — All Hardcoded (No API)
+This page uses zero API endpoints. All data is defined as static arrays inside the component file.
+
+3.1 Business Features Array
+
+[
+  {
+    "icon": "Video",
+    "title": "Celebrity Endorsements",
+    "description": "Get authentic video testimonials from celebrities to boost your brand credibility and reach."
+  },
+  {
+    "icon": "Target",
+    "title": "Brand Activations",
+    "description": "Custom promotional campaigns with celebrities tailored to your brand's unique needs."
+  },
+  {
+    "icon": "Users",
+    "title": "Social Media Campaigns",
+    "description": "Leverage celebrity influence across all social platforms for maximum engagement."
+  },
+  {
+    "icon": "TrendingUp",
+    "title": "Product Launches",
+    "description": "Make your product launch memorable with celebrity involvement and endorsements."
+  }
+]
+3.2 Pricing Tiers Array
+
+[
+  {
+    "name": "Starter",
+    "price": "₹25,000",
+    "description": "Perfect for small businesses",
+    "features": [
+      "1 Celebrity Video",
+      "15-day license",
+      "Social media rights",
+      "Basic support"
+    ]
+  },
+  {
+    "name": "Growth",
+    "price": "₹75,000",
+    "description": "Ideal for growing brands",
+    "features": [
+      "3 Celebrity Videos",
+      "30-day license",
+      "Extended social rights",
+      "Priority support",
+      "Campaign consultation"
+    ]
+  },
+  {
+    "name": "Enterprise",
+    "price": "Custom",
+    "description": "For large-scale campaigns",
+    "features": [
+      "Unlimited videos",
+      "Extended licensing",
+      "Multi-platform rights",
+      "Dedicated account manager",
+      "Custom contracts"
+    ]
+  }
+]
+3.3 Testimonials Array
+
+[
+  {
+    "company": "TechStart Solutions",
+    "quote": "Our product launch video with a tech influencer increased our pre-orders by 300%.",
+    "industry": "Technology"
+  },
+  {
+    "company": "Fashion Forward",
+    "quote": "Celebrity endorsement helped us reach 2M+ potential customers in just one week.",
+    "industry": "Fashion"
+  },
+  {
+    "company": "Fitness Pro",
+    "quote": "Working with fitness celebrities transformed our brand perception completely.",
+    "industry": "Health & Fitness"
+  }
+]
+4. Page Sections (Top to Bottom)
+
+┌─────────────────────────────────────────┐
+│  HERO SECTION                           │
+│  Badge "For Business" + headline +      │
+│  gradient text + CTA buttons            │
+├─────────────────────────────────────────┤
+│  FEATURES SECTION (4 cards)             │
+│  "Why Choose Celebrity Marketing?"      │
+│  4x Card grid with icons                │
+├─────────────────────────────────────────┤
+│  HOW IT WORKS (4 steps)                 │
+│  Submit Brief → Choose Celebrity →      │
+│  Approve Content → Launch Campaign      │
+├─────────────────────────────────────────┤
+│  PRICING SECTION (3 tiers)              │
+│  Starter / Growth (popular) / Enterprise│
+│  Each with features list + CTA button   │
+├─────────────────────────────────────────┤
+│  TESTIMONIALS SECTION (3 cards)         │
+│  Company name + 5-star rating + quote   │
+├─────────────────────────────────────────┤
+│  CTA SECTION (gradient background)      │
+│  "Ready to Transform Your Marketing?"   │
+│  Two buttons: Campaign + Consultation   │
+└─────────────────────────────────────────┘
+5. Mobile vs Desktop Rendering
+The page has two completely separate layouts using CSS display toggling:
+
+Viewport	CSS Class	Layout
+Mobile (<768px)	md:hidden	Compact cards, 2-column grid for features, stacked pricing
+Desktop (>=768px)	hidden md:block	Full sections with max-w-7xl containers, 4-column grids
+Mobile-Specific Differences
+Features: grid-cols-2 (2x2 grid) instead of grid-cols-4
+Pricing: Stacked vertically, only shows first 2 features per tier
+Hero: Single full-width CTA button instead of two side-by-side
+No testimonials section on mobile
+No "How It Works" section on mobile
+No final CTA section on mobile
+6. UI Components Used
+Component	Source	Usage
+Button	@/components/ui/button	CTA buttons throughout
+Card, CardContent, CardHeader, CardTitle, CardDescription	@/components/ui/card	Feature cards, pricing cards, testimonial cards
+Badge	@/components/ui/badge	"For Business" tag, "Most Popular" on Growth tier, industry tags
+AuthenticatedLayout	@/components/layout/AuthenticatedLayout	Page wrapper with optional sidebar
+useAuth	@/hooks/useAuth	Checks if user is logged in (sidebar visibility only)
+Icons Used (from lucide-react)
+Briefcase — Business badge icon
+Users — Social media campaigns
+TrendingUp — Product launches
+Star — Feature list bullets + review stars
+Video — Celebrity endorsements
+Clock — (imported but unused)
+Target — Brand activations
+MessageSquare — (imported but unused)
+7. Hooks & Auth
+
+const { user } = useAuth();
+// Only used to determine: <AuthenticatedLayout showSidebar={!!user}>
+// If logged in → show sidebar. If not → no sidebar.
+No other hooks. No state management. No useEffect. No data fetching.
+
+8. Styling Patterns
+Pattern	CSS Classes
+Gradient text	bg-gradient-primary bg-clip-text text-transparent
+Section backgrounds	Alternating bg-muted/30 and default
+Card hover	hover:shadow-card transition-all duration-300
+Icon containers	w-16 h-16 rounded-2xl bg-gradient-primary with group-hover:scale-110
+CTA section	bg-gradient-primary text-primary-foreground (full gradient background)
+Popular pricing	border-primary shadow-card with absolute-positioned "Most Popular" badge
+Mobile cards	mobile-card class (custom class from global CSS)
+9. Mobile App Implementation Notes for Replit
+What to Build
+This is a pure static marketing screen. No backend integration needed.
+
+Recommended Approach
+Create a single scrollable screen with sections
+Hardcode all data (features, pricing, testimonials) as constants
+Use native card components for each section
+"Start Your Campaign" and "Schedule Consultation" buttons should navigate to a contact/inquiry form (not implemented in web app yet — buttons currently do nothing)
+"Get Started" on pricing cards also has no action — consider linking to a contact form or WhatsApp
+Button Actions (Currently No-Op)
+All buttons on this page are non-functional — they render but have no onClick handlers. In the mobile app, you could:
+
+"Start Your Campaign" → Open a contact form or WhatsApp link
+"Schedule Consultation" → Open calendar booking or email
+"Get Started" (pricing) → Navigate to a checkout or inquiry page
+"View Success Stories" → Scroll to testimonials section
+No API Integration Required
+
+Supabase calls:     0
+Edge Functions:     0
+Database tables:    0
+Payment:            None
+Authentication:     Optional (only affects sidebar visibility)
+/business Page — Complete Technical Specification for Replit Mobile App
+1. Purpose
+The /business page is a marketing/landing page for business users. It showcases celebrity-powered marketing services (endorsements, brand activations, social media campaigns, product launches) with pricing tiers and testimonials. This is a static informational page — it has no API calls, no database queries, and no Edge Functions. All content is hardcoded in the component.
+
+2. Route & Authentication
+
+Route:        /business
+Component:    src/pages/Business.tsx
+Auth Required: No (page renders for everyone)
+Layout:       AuthenticatedLayout (shows sidebar only if user is logged in)
+
+// From App.tsx
+<Route path="/business" element={<Business />} />
+3. Data — All Hardcoded (No API)
+This page uses zero API endpoints. All data is defined as static arrays inside the component file.
+
+3.1 Business Features Array
+
+[
+  {
+    "icon": "Video",
+    "title": "Celebrity Endorsements",
+    "description": "Get authentic video testimonials from celebrities to boost your brand credibility and reach."
+  },
+  {
+    "icon": "Target",
+    "title": "Brand Activations",
+    "description": "Custom promotional campaigns with celebrities tailored to your brand's unique needs."
+  },
+  {
+    "icon": "Users",
+    "title": "Social Media Campaigns",
+    "description": "Leverage celebrity influence across all social platforms for maximum engagement."
+  },
+  {
+    "icon": "TrendingUp",
+    "title": "Product Launches",
+    "description": "Make your product launch memorable with celebrity involvement and endorsements."
+  }
+]
+3.2 Pricing Tiers Array
+
+[
+  {
+    "name": "Starter",
+    "price": "₹25,000",
+    "description": "Perfect for small businesses",
+    "features": [
+      "1 Celebrity Video",
+      "15-day license",
+      "Social media rights",
+      "Basic support"
+    ]
+  },
+  {
+    "name": "Growth",
+    "price": "₹75,000",
+    "description": "Ideal for growing brands",
+    "features": [
+      "3 Celebrity Videos",
+      "30-day license",
+      "Extended social rights",
+      "Priority support",
+      "Campaign consultation"
+    ]
+  },
+  {
+    "name": "Enterprise",
+    "price": "Custom",
+    "description": "For large-scale campaigns",
+    "features": [
+      "Unlimited videos",
+      "Extended licensing",
+      "Multi-platform rights",
+      "Dedicated account manager",
+      "Custom contracts"
+    ]
+  }
+]
+3.3 Testimonials Array
+
+[
+  {
+    "company": "TechStart Solutions",
+    "quote": "Our product launch video with a tech influencer increased our pre-orders by 300%.",
+    "industry": "Technology"
+  },
+  {
+    "company": "Fashion Forward",
+    "quote": "Celebrity endorsement helped us reach 2M+ potential customers in just one week.",
+    "industry": "Fashion"
+  },
+  {
+    "company": "Fitness Pro",
+    "quote": "Working with fitness celebrities transformed our brand perception completely.",
+    "industry": "Health & Fitness"
+  }
+]
+4. Page Sections (Top to Bottom)
+
+┌─────────────────────────────────────────┐
+│  HERO SECTION                           │
+│  Badge "For Business" + headline +      │
+│  gradient text + CTA buttons            │
+├─────────────────────────────────────────┤
+│  FEATURES SECTION (4 cards)             │
+│  "Why Choose Celebrity Marketing?"      │
+│  4x Card grid with icons                │
+├─────────────────────────────────────────┤
+│  HOW IT WORKS (4 steps)                 │
+│  Submit Brief → Choose Celebrity →      │
+│  Approve Content → Launch Campaign      │
+├─────────────────────────────────────────┤
+│  PRICING SECTION (3 tiers)              │
+│  Starter / Growth (popular) / Enterprise│
+│  Each with features list + CTA button   │
+├─────────────────────────────────────────┤
+│  TESTIMONIALS SECTION (3 cards)         │
+│  Company name + 5-star rating + quote   │
+├─────────────────────────────────────────┤
+│  CTA SECTION (gradient background)      │
+│  "Ready to Transform Your Marketing?"   │
+│  Two buttons: Campaign + Consultation   │
+└─────────────────────────────────────────┘
+5. Mobile vs Desktop Rendering
+The page has two completely separate layouts using CSS display toggling:
+
+Viewport	CSS Class	Layout
+Mobile (<768px)	md:hidden	Compact cards, 2-column grid for features, stacked pricing
+Desktop (>=768px)	hidden md:block	Full sections with max-w-7xl containers, 4-column grids
+Mobile-Specific Differences
+Features: grid-cols-2 (2x2 grid) instead of grid-cols-4
+Pricing: Stacked vertically, only shows first 2 features per tier
+Hero: Single full-width CTA button instead of two side-by-side
+No testimonials section on mobile
+No "How It Works" section on mobile
+No final CTA section on mobile
+6. UI Components Used
+Component	Source	Usage
+Button	@/components/ui/button	CTA buttons throughout
+Card, CardContent, CardHeader, CardTitle, CardDescription	@/components/ui/card	Feature cards, pricing cards, testimonial cards
+Badge	@/components/ui/badge	"For Business" tag, "Most Popular" on Growth tier, industry tags
+AuthenticatedLayout	@/components/layout/AuthenticatedLayout	Page wrapper with optional sidebar
+useAuth	@/hooks/useAuth	Checks if user is logged in (sidebar visibility only)
+Icons Used (from lucide-react)
+Briefcase — Business badge icon
+Users — Social media campaigns
+TrendingUp — Product launches
+Star — Feature list bullets + review stars
+Video — Celebrity endorsements
+Clock — (imported but unused)
+Target — Brand activations
+MessageSquare — (imported but unused)
+7. Hooks & Auth
+
+const { user } = useAuth();
+// Only used to determine: <AuthenticatedLayout showSidebar={!!user}>
+// If logged in → show sidebar. If not → no sidebar.
+No other hooks. No state management. No useEffect. No data fetching.
+
+8. Styling Patterns
+Pattern	CSS Classes
+Gradient text	bg-gradient-primary bg-clip-text text-transparent
+Section backgrounds	Alternating bg-muted/30 and default
+Card hover	hover:shadow-card transition-all duration-300
+Icon containers	w-16 h-16 rounded-2xl bg-gradient-primary with group-hover:scale-110
+CTA section	bg-gradient-primary text-primary-foreground (full gradient background)
+Popular pricing	border-primary shadow-card with absolute-positioned "Most Popular" badge
+Mobile cards	mobile-card class (custom class from global CSS)
+9. Mobile App Implementation Notes for Replit
+What to Build
+This is a pure static marketing screen. No backend integration needed.
+
+Recommended Approach
+Create a single scrollable screen with sections
+Hardcode all data (features, pricing, testimonials) as constants
+Use native card components for each section
+"Start Your Campaign" and "Schedule Consultation" buttons should navigate to a contact/inquiry form (not implemented in web app yet — buttons currently do nothing)
+"Get Started" on pricing cards also has no action — consider linking to a contact form or WhatsApp
+Button Actions (Currently No-Op)
+All buttons on this page are non-functional — they render but have no onClick handlers. In the mobile app, you could:
+
+"Start Your Campaign" → Open a contact form or WhatsApp link
+"Schedule Consultation" → Open calendar booking or email
+"Get Started" (pricing) → Navigate to a checkout or inquiry page
+"View Success Stories" → Scroll to testimonials section
+No API Integration Required
+
+Supabase calls:     0
+Edge Functions:     0
+Database tables:    0
+Payment:            None
+Authentication:     Optional (only affects sidebar visibility)
+
+
+
+
