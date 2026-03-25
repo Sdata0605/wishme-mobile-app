@@ -1,0 +1,144 @@
+Here is the complete technical specification for the /referrals page for Replit mobile app integration.
+
+/referrals Page - Technical Specification
+Purpose
+Displays the authenticated user's referral program dashboard: their unique referral code/URL, commission rates based on their plan tier, earnings stats (total, pending), and a transaction history table showing every L1/L2 commission earned.
+
+Authentication Requirement
+User must be logged in. The page uses AuthenticatedLayout which wraps content with Header, Footer, UserSidebar, and MobileBottomNav.
+
+Database Tables Used
+1. profiles (read)
+
+Fields used: id, referral_code, referral_url, plan, referred_by, first_name, last_name, email
+The logged-in user's profile provides the referral code and plan name
+2. plans (read)
+
+Fields used: name, referral_commission_l1, referral_commission_l2
+Fetched by matching profile.plan to get commission percentages
+3. referral_transactions (read)
+
+Fields: id, referrer_id, referred_id, booking_id, commission_level (1 or 2), commission_amount, status ("completed" or "pending"), created_at, order_type
+Filtered by referrer_id = profile.id
+4. profiles (read again for referred users)
+
+Fetches names/emails of referred users to display in the history table
+API Endpoints (All Supabase REST)
+1. Fetch commission rates
+
+GET /rest/v1/plans
+  ?select=name,referral_commission_l1,referral_commission_l2
+  &name=eq.{profile.plan}
+Headers: Authorization: Bearer {session_token}, apikey: {anon_key}
+Response example:
+
+
+[{"name": "premium", "referral_commission_l1": 10, "referral_commission_l2": 5}]
+2. Fetch referral transactions
+
+GET /rest/v1/referral_transactions
+  ?select=*
+  &referrer_id=eq.{profile.id}
+  &order=created_at.desc
+Response: Array of transaction objects with commission_level, commission_amount, status, referred_id, created_at
+
+3. Fetch direct referrals (users who signed up with this user's code)
+
+GET /rest/v1/profiles
+  ?select=id,first_name,last_name,email,created_at
+  &referred_by=eq.{profile.id}
+4. Fetch referred user details (for display in table)
+
+GET /rest/v1/profiles
+  ?select=id,first_name,last_name,email
+  &id=in.({comma_separated_ids})
+Commission Rate Tiers (from plans table)
+Plan	L1 Commission	L2 Commission
+Basic	5%	0%
+Premium	10%	5%
+Elite	15%	10%
+L1: Direct referral's transactions earn you this %
+L2: Your referral's referral's transactions earn you this %
+Commissions are calculated server-side via DB triggers (not client-side)
+Data Flow
+
+Page Load
+  ├─ useAuth() → get profile (id, referral_code, referral_url, plan)
+  ├─ fetchCommissionRates()
+  │    └─ GET plans where name = profile.plan
+  │    └─ setState: commissionRates {l1, l2, planName}
+  └─ fetchReferralData()
+       ├─ GET referral_transactions where referrer_id = profile.id
+       ├─ GET profiles where referred_by = profile.id (direct referrals count)
+       ├─ Collect all unique referred_ids from both queries
+       ├─ GET profiles where id IN (all_referred_ids) → user details map
+       ├─ Calculate stats:
+       │    totalReferrals = count of direct referrals
+       │    totalEarnings = sum(amount) where status = 'completed'
+       │    pendingEarnings = sum(amount) where status = 'pending'
+       │    level1Count = count where commission_level = 1
+       │    level2Count = count where commission_level = 2
+       └─ setState: transactions, referredUsers map, stats
+UI Components & Sections
+1. Page Header
+
+Title: "Referral Program"
+Subtitle text explaining the program
+2. Stats Cards (4-column grid, stacks on mobile)
+
+Total Referrals: Users icon (blue), count of direct referrals, sub-text showing L1/L2 transaction counts
+Total Earnings: DollarSign icon (green), ₹ formatted amount
+Pending: TrendingUp icon (orange), ₹ formatted pending amount
+Commission Rates: Shows "L1: X% | L2: Y%", plan name with Sparkles icon, "Upgrade" link to /plan
+3. Referral Links Card
+
+Share2 icon in header
+Referral Code field: Read-only Input with Copy button
+Referral URL field: Read-only Input with Copy button
+Both use navigator.clipboard.writeText() with toast confirmation
+Info box: Explains L1/L2 mechanics with current rates, link to upgrade plan
+4. Referral History Table
+
+Empty state: Users icon with "No referrals yet" message
+Table columns:
+Date: toLocaleDateString() formatted
+Referred User: Name + email from referredUsers map
+Level: Badge (default variant for L1, secondary for L2)
+Commission: ₹ formatted, green text
+Status: Badge (default for completed, secondary otherwise)
+5. Loading State
+
+Centered spinner animation while data loads
+UI Component Library (shadcn/ui)
+Card, CardHeader, CardTitle, CardContent
+Button (variant="outline" for copy buttons)
+Input (readOnly for referral code/URL)
+Badge (for level and status indicators)
+Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+Icons (lucide-react)
+Copy, Share2, Users, TrendingUp, DollarSign, Sparkles
+Backend Commission Processing (Important for Mobile)
+Commissions are NOT calculated client-side. They are processed by PostgreSQL triggers on these tables:
+
+Trigger	Table	Fires When
+process_referral_commissions	bookings	status → completed/confirmed
+process_plan_referral_commission	profiles	plan upgrades (basic→premium/elite)
+process_music_generation_referral_commission	music_generations	status → completed
+process_voice_call_referral_commission	voice_call_wishes	call_status → completed
+process_photo_wish_referral_commission	photo_wishes	status → completed
+process_celebrity_favorite_referral_commission	celebrity_favorites	status → active
+process_image_promotion_referral_commission	image_promotions	status → completed
+process_wish_celebrity_referral_commission	wish_celebrity_orders	status → completed
+Each trigger:
+
+Looks up referred_by from the paying user's profile
+Gets the referrer's plan to determine L1/L2 rates
+Inserts into referral_transactions with appropriate commission_level and order_type
+Inserts a wallet_transactions row (which triggers update_wallet_balance to credit the wallet)
+Mobile App Notes
+Clipboard: Use native clipboard API (e.g., expo-clipboard or react-native-clipboard) for copy buttons
+Share: Consider adding native share sheet (share referral URL via WhatsApp, SMS, etc.) instead of just copy
+No writes: This page is read-only. All commission calculations happen via server-side triggers
+Currency: All amounts are in INR (₹), stored as integers (no decimals)
+Real-time updates: Not implemented currently; data is fetched on page load only. Consider adding pull-to-refresh on mobile
+Plan upgrade CTA: Link to plan selection page for users wanting higher commission rates
