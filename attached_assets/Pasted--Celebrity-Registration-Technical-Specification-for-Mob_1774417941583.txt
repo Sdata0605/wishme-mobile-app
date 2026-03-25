@@ -1,0 +1,175 @@
+
+Celebrity Registration — Technical Specification for Mobile App Integration
+Overview
+Celebrity registration is a two-step process:
+
+The /auth page has a "Celebrity" tab that links to /celebrity-signup
+The /celebrity-signup page contains the full application form
+Applications go into a celebrity_applications table with status pending
+An admin manually reviews and creates the celebrity account — there is NO auto-account creation
+Authentication Requirement
+None. Celebrity signup does NOT require the user to be logged in. It's a public form.
+
+Database Table
+celebrity_applications
+Column	Type	Required	Description
+id	uuid	auto	Primary key
+first_name	text	yes	Applicant's first name
+last_name	text	yes	Applicant's last name
+email	text	yes	Contact email (checked for duplicates)
+phone	text	yes	Phone number
+date_of_birth	date	no	Date of birth
+stage_name	text	yes	How fans know them
+category	text	yes	Currently hardcoded to "Actor/Actress"
+bio	text	yes	Professional bio
+portfolio_link	text	no	Link to work samples
+social_media	jsonb	no	Social media handles object
+status	text	auto	pending / approved / rejected
+created_at	timestamptz	auto	Submission time
+celebrity_categories (lookup table for dropdown)
+Column	Type	Description
+id	uuid	Primary key
+name	text	Category name (e.g. "Actor", "Singer")
+is_active	boolean	Whether to show in dropdown
+API Endpoints
+1. Fetch Categories (on page load)
+GET /rest/v1/celebrity_categories
+  ?select=id,name
+  &is_active=eq.true
+  &order=name.asc
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Response:
+
+
+[
+  { "id": "uuid-1", "name": "Actor/Actress" },
+  { "id": "uuid-2", "name": "Singer" },
+  { "id": "uuid-3", "name": "Comedian" }
+]
+2. Check Existing Application (before submit)
+GET /rest/v1/celebrity_applications
+  ?select=id,status
+  &email=eq.{email}
+Response (if exists):
+
+
+{ "id": "uuid", "status": "pending" }
+Handle by status:
+
+pending → Show "You already have a pending application"
+approved → Show "You already have an approved account. Please sign in."
+rejected → Show "Your application was rejected. Contact support."
+3. Submit Application
+POST /rest/v1/celebrity_applications
+
+Body:
+{
+  "first_name": "Priya",
+  "last_name": "Sharma",
+  "email": "priya@example.com",
+  "phone": "+91 9876543210",
+  "date_of_birth": "1992-05-15",
+  "stage_name": "Priya Star",
+  "category": "Actor/Actress",
+  "bio": "Professional actress with 8 years of experience...",
+  "portfolio_link": "https://portfolio.com/priya",
+  "social_media": {
+    "instagram": "@priyastar",
+    "youtube": "Priya Star Official",
+    "twitter": "@priyastar92",
+    "tiktok": "@priyastar",
+    "facebook": "",
+    "linkedin": "",
+    "website": "https://priyastar.com",
+    "other": ""
+  }
+}
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Content-Type: application/json
+Prefer: return=minimal
+Success: HTTP 201 Created Error: HTTP 409 if RLS/unique constraint fails
+
+Data Flow
+
+User taps "Celebrity" tab on /auth
+  └─> Sees CTA button "Register as Celebrity"
+       └─> Navigates to /celebrity-signup
+
+/celebrity-signup loads
+  └─> GET celebrity_categories (for dropdown)
+  └─> Renders form
+
+User fills form and taps Submit
+  └─> Client validates required fields
+  └─> GET celebrity_applications?email=eq.{email}
+       ├─ If exists → show error toast, stop
+       └─ If not exists:
+            └─> POST celebrity_applications (insert row)
+                 ├─ Success → toast "Application submitted!"
+                 │            → redirect to / after 2 seconds
+                 └─ Error → toast error message
+
+Admin reviews application later (separate admin flow)
+  └─> Creates auth user + profile + celebrities row manually
+Form Fields (for mobile app)
+Section 1: Personal Information
+Field	Input Type	ID (mobile)	Required	Placeholder
+First Name	text	mobileFirstName	yes	"Your first name"
+Last Name	text	mobileLastName	yes	"Your last name"
+Email	email	mobileEmail	yes	"your@email.com"
+Phone	tel	mobilePhone	yes	"+91 98765 43210"
+Date of Birth	date	mobileDob	yes	(date picker)
+Section 2: Professional Info
+Field	Input Type	ID (mobile)	Required	Placeholder
+Stage Name	text	mobileStageName	yes	"How fans know you"
+Category	Select dropdown	—	yes	Categories from DB
+Professional Bio	textarea	mobileBio	yes	"Tell us about your career..."
+Key Achievements	textarea	mobileAchievements	no	"Awards, recognitions..."
+Section 3: Social Media (all optional on mobile)
+Field	Input Type	Icon	Placeholder
+Instagram	text	Instagram icon	"Instagram @username"
+YouTube	text	YouTube icon	"YouTube channel"
+Twitter	text	Twitter icon	"Twitter @username"
+Desktop form also has: TikTok, Facebook, LinkedIn, Website, Other
+
+Section 4: Verification
+Field	Input Type	ID (mobile)	Required
+Portfolio Link	text	mobilePortfolio	no
+ID Document Upload	file (UI only)	—	no
+Agree to Terms	checkbox	mobileTerms	yes
+Agree to Background Check	checkbox	mobileBackground	yes
+UI Components Used
+Input (text, email, tel, date) — shadcn/ui
+Textarea — shadcn/ui
+Select, SelectContent, SelectItem, SelectTrigger, SelectValue — shadcn/ui
+Checkbox — shadcn/ui (native HTML checkboxes used via getElementById)
+Button — shadcn/ui
+Card, CardContent, CardHeader, CardTitle — shadcn/ui
+Label — shadcn/ui
+Icons: Star, Upload, Instagram, Youtube, Twitter, CheckCircle, TrendingUp, Users — lucide-react
+toast from sonner for notifications
+Validation Rules (Client-Side)
+Required fields before submit:
+
+firstName — non-empty
+lastName — non-empty
+email — non-empty
+phone — non-empty
+stageName — non-empty
+bio — non-empty
+termsChecked — must be true
+backgroundChecked — must be true
+If any missing → toast.error('Please fill in all required fields and accept the terms')
+
+Mobile Integration Notes
+No auth token needed: This is a public endpoint. Use only apikey header.
+Duplicate check: Always check existing applications by email before inserting.
+social_media field: Send as a JSON object, not individual columns.
+Category dropdown: Fetch from celebrity_categories table. Currently the submitted value is hardcoded to "Actor/Actress" in web — for mobile, send the actual selected category value.
+File upload: The ID document upload field exists in the UI but is NOT actually processed in the current implementation. It's decorative. Skip for mobile MVP.
+Post-submit flow: After successful submission, the admin reviews and manually creates the celebrity account. There is no automated approval.
+The Auth page Celebrity tab: On the /auth page, the Celebrity tab simply shows a button linking to /celebrity-signup. In the mobile app, you can either embed the form directly or navigate to a registration screen.
