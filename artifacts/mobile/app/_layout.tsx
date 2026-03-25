@@ -49,6 +49,7 @@ function RootLayoutNav() {
       <Stack.Screen name="referrals" />
       <Stack.Screen name="commission" />
       <Stack.Screen name="occasions" />
+      <Stack.Screen name="occasion-book/[id]" />
       <Stack.Screen name="occasion-alerts" />
       <Stack.Screen name="occasion-wishes" />
       <Stack.Screen name="settings" />
