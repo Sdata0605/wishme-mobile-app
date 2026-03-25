@@ -1,0 +1,436 @@
+/plan Page — Complete Technical Specification for Mobile App Integration
+Purpose
+The /plan page is a subscription plan selection and upgrade dashboard where authenticated users choose between three tiers: Basic (₹50), Premium (₹499), and Elite (₹999). Each plan unlocks different service discount percentages, referral commission rates, and platform features. The selected plan is stored on the user's profiles.plan column and affects pricing, referral earnings, and feature access across the entire platform.
+
+Authentication
+Requires authenticated user. Redirects to /auth if not logged in. Uses useAuth() hook for user, profile, and updateProfile.
+
+Database Tables
+plans table
+Column	Type	Description
+id	uuid	Primary key
+name	text	basic, premium, or elite
+price	integer	Plan price in INR (50, 499, 999)
+original_price	integer (nullable)	Original price before discount (for strikethrough display)
+discount_percentage	integer	Plan purchase discount %
+features	jsonb	Array of feature strings
+referral_commission_l1	integer	Level 1 referral commission %
+referral_commission_l2	integer	Level 2 referral commission %
+service_discount_percentage	integer	Discount % on all platform services
+is_popular	boolean	Highlights the plan card
+is_active	boolean	Whether plan is available for selection
+profiles table (relevant columns)
+Column	Type	Description
+plan	user_plan enum	basic, premium, or elite
+referred_by	uuid (nullable)	Profile ID of referrer
+Plan Comparison Matrix
+Feature	Basic (₹50)	Premium (₹499)	Elite (₹999)
+Service Discount	0%	10%	15%
+Referral L1 Commission	5%	10%	15% (highest tier from DB)
+Referral L2 Commission	0%	5%	10% (highest tier from DB)
+Is Popular	No	Yes (highlighted)	No
+Access to Wishes	Yes	Yes	Yes
+Access to Business	Yes	Yes	Yes
+Access to AI Music	Yes	Yes	Yes
+Priority Support	No	Yes	Yes
+VIP Celebrity Events	No	No	Yes
+API Endpoints
+1. Fetch Active Plans
+GET /rest/v1/plans
+  ?select=*
+  &is_active=eq.true
+  &order=price.asc
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_jwt}
+Response (JSON array):
+
+
+[
+  {
+    "id": "uuid-basic",
+    "name": "basic",
+    "price": 50,
+    "original_price": 50,
+    "discount_percentage": 0,
+    "features": [
+      "Access to Create Wish",
+      "Business Promotions",
+      "Create AI Music",
+      "Basic customer support",
+      "5% referral commission (Level 1 only)"
+    ],
+    "referral_commission_l1": 5,
+    "referral_commission_l2": 0,
+    "service_discount_percentage": 0,
+    "is_popular": false,
+    "is_active": true
+  },
+  {
+    "id": "uuid-premium",
+    "name": "premium",
+    "price": 499,
+    "original_price": 555,
+    "discount_percentage": 10,
+    "features": [
+      "Everything in Basic",
+      "10% discount on all services",
+      "Priority customer support",
+      "Advanced analytics",
+      "10% referral commission (Level 1)",
+      "5% referral commission (Level 2)",
+      "Exclusive celebrity access"
+    ],
+    "referral_commission_l1": 10,
+    "referral_commission_l2": 5,
+    "service_discount_percentage": 10,
+    "is_popular": true,
+    "is_active": true
+  },
+  {
+    "id": "uuid-elite",
+    "name": "elite",
+    "price": 999,
+    "original_price": 999,
+    "discount_percentage": 15,
+    "features": [
+      "Everything in Premium",
+      "15% discount on all services",
+      "Dedicated account manager",
+      "Custom celebrity requests",
+      "Advanced referral tracking",
+      "Monthly strategy calls",
+      "VIP celebrity events access"
+    ],
+    "referral_commission_l1": 15,
+    "referral_commission_l2": 10,
+    "service_discount_percentage": 15,
+    "is_popular": false,
+    "is_active": true
+  }
+]
+2. Update User Plan (Select/Upgrade)
+PATCH /rest/v1/profiles
+  ?id=eq.{profile_id}
+
+Body: { "plan": "premium" }
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_jwt}
+This is done via updateProfile({ plan: 'premium' }) which internally calls supabase.from('profiles').update({ plan }).eq('id', profile.id).
+
+Data Flow
+
+Page Load
+  └─> Check auth (redirect to /auth if no user)
+       └─> GET plans (is_active=true, order by price)
+            └─> Filter available plans based on current profile.plan
+            └─> Render plan cards
+
+Plan Selection
+  └─> User taps "Select {Plan}"
+       └─> PATCH profiles.plan = '{planName}'
+            └─> DB Trigger: process_plan_referral_commission() fires
+            │     └─> If user has referred_by AND upgrading from basic to premium/elite:
+            │          └─> Calculate L1 commission (referrer's plan rate * plan price)
+            │          └─> INSERT into referral_transactions (L1)
+            │          └─> INSERT into wallet_transactions (L1 credit)
+            │          └─> If L1 referrer also has referred_by:
+            │               └─> Calculate L2 commission
+            │               └─> INSERT into referral_transactions (L2)
+            │               └─> INSERT into wallet_transactions (L2 credit)
+            └─> Toast "Plan Updated!"
+            └─> Navigate to home "/"
+Scenarios
+Scenario 1: User Purchases Basic Plan (₹50)
+profiles.plan = 'basic'
+Service discount: 0% — pays full price on all services (greeting cards, photo wishes, voice calls, image promotions, music, bookings)
+Referral earnings: 5% Level 1 only. If user refers someone who buys a ₹499 premium plan, user earns ₹24 (5% of 499). No Level 2 earnings.
+On /plan page: Sees all 3 plans. Can upgrade to Premium or Elite.
+Platform-wide effect: usePlanDiscount() returns discountPercentage: 0, so getDiscountedPrice(100) returns 100.
+Scenario 2: User Purchases Premium Plan (₹499)
+profiles.plan = 'premium'
+Service discount: 10% — a ₹100 greeting card costs ₹90, a ₹200 photo wish costs ₹180.
+Referral earnings: 10% Level 1 + 5% Level 2. If user refers UserB who buys Elite (₹999), user earns ₹99 L1. If UserB then refers UserC who buys Premium (₹499), user earns ₹24 L2.
+On /plan page: Sees only Premium (as "Current Plan", disabled) and Elite (can upgrade).
+DB Trigger fires: process_plan_referral_commission() checks if OLD.plan = 'basic' and NEW.plan = 'premium' → calculates referral commissions for the person who referred this user.
+Platform-wide effect: usePlanDiscount() returns discountPercentage: 10. All Edge Functions (generate-greeting-card-ai, generate-photo-wish, etc.) also look up the user's plan to apply the discount server-side before deducting from wallet.
+Scenario 3: User Purchases Elite Plan (₹999)
+profiles.plan = 'elite'
+Service discount: 15% — a ₹100 greeting card costs ₹85.
+Referral earnings: Highest rates (15% L1 + 10% L2 from DB).
+On /plan page: Sees only Elite card with "Current Plan" button (disabled). Header shows "Congratulations! You're already on our highest plan."
+DB Trigger fires: Same as above but with NEW.plan = 'elite'.
+Platform-wide effect: usePlanDiscount() returns discountPercentage: 15. Maximum savings across all services.
+Scenario 4: User Skips Plan Selection (No Plan / Default Basic)
+When a user signs up, profiles.plan defaults to 'basic' (set by DB default or signup flow).
+The PlanSelectionModal component can appear post-signup with canSkip={true} — if user clicks "Skip for now", the modal closes and user remains on basic.
+Effect: 0% discount, 5% L1 referral only. All services work but at full price.
+Upgrade path: User can visit /plan from sidebar anytime to upgrade.
+How Service Discounts Execute (End-to-End)
+Client-side (display): usePlanDiscount() hook fetches plans.service_discount_percentage where name = profile.plan. Shows original + discounted price in UI.
+
+Server-side (enforcement): Each Edge Function (e.g., generate-greeting-card-ai) independently:
+
+Fetches user's profiles.plan
+Looks up plans.service_discount_percentage for that plan
+Calculates: finalPrice = basePrice * (1 - discount/100)
+Deducts finalPrice from wallet (not the UI-displayed price, preventing client-side manipulation)
+Wallet deduction: INSERT INTO wallet_transactions (user_id, amount, transaction_type, status, description) with the discounted amount.
+
+How Referral Commissions Execute on Plan Upgrade
+The PostgreSQL trigger process_plan_referral_commission() fires on UPDATE of profiles:
+
+
+Condition: OLD.plan = 'basic' AND NEW.plan IN ('premium', 'elite')
+
+Steps:
+1. Get plan price from plans table
+2. Find L1 referrer (profiles.referred_by)
+3. Look up referrer's plan → get their L1 commission rate
+4. Calculate: L1_commission = plan_price * L1_rate / 100
+5. INSERT referral_transactions (L1)
+6. INSERT wallet_transactions (credit to referrer)
+7. Find L2 referrer (referrer's referred_by)
+8. Repeat for L2 if exists
+Example: UserA (Premium plan, 10% L1) referred UserB. UserB upgrades from Basic to Premium (₹499):
+
+UserA earns: ₹499 * 10% = ₹49 L1 commission
+If UserA was referred by UserC (Elite, 10% L2): UserC earns ₹499 * 10% = ₹49 L2 commission
+UI Components Used
+AuthenticatedLayout — page wrapper with sidebar
+Card, CardHeader, CardTitle, CardDescription, CardContent (shadcn/ui)
+Button, Badge (shadcn/ui)
+Icons: Star (Basic), Zap (Premium), Crown (Elite), CheckCircle, Gift, Loader2 (lucide-react)
+useToast for success/error notifications
+Plan Filtering Logic (Client-Side)
+
+// Users can only see plans at or above their current tier
+if (profile.plan === 'basic')   → show all 3 plans
+if (profile.plan === 'premium') → show premium + elite only
+if (profile.plan === 'elite')   → show elite only (with "Current Plan" disabled)
+Mobile Integration Notes
+No payment gateway: Currently, plan selection is a direct profile update (no Razorpay payment). The plan price is informational — the actual payment flow is not enforced in this page. For mobile, you may want to add Razorpay/payment before updating the plan.
+Plan modal: PlanSelectionModal exists as a reusable dialog for post-signup flows. On mobile, render this as a full-screen modal or bottom sheet.
+Discount propagation: After plan change, all subsequent API calls will automatically use the new discount rate because Edge Functions fetch the plan server-side on every request.
+Downgrade not supported: The filtering logic only allows upgrades (basic→premium→elite), never downgrades.
+/plan Page — Complete Technical Specification for Mobile App Integration
+Purpose
+The /plan page is a subscription plan selection and upgrade dashboard where authenticated users choose between three tiers: Basic (₹50), Premium (₹499), and Elite (₹999). Each plan unlocks different service discount percentages, referral commission rates, and platform features. The selected plan is stored on the user's profiles.plan column and affects pricing, referral earnings, and feature access across the entire platform.
+
+Authentication
+Requires authenticated user. Redirects to /auth if not logged in. Uses useAuth() hook for user, profile, and updateProfile.
+
+Database Tables
+plans table
+Column	Type	Description
+id	uuid	Primary key
+name	text	basic, premium, or elite
+price	integer	Plan price in INR (50, 499, 999)
+original_price	integer (nullable)	Original price before discount (for strikethrough display)
+discount_percentage	integer	Plan purchase discount %
+features	jsonb	Array of feature strings
+referral_commission_l1	integer	Level 1 referral commission %
+referral_commission_l2	integer	Level 2 referral commission %
+service_discount_percentage	integer	Discount % on all platform services
+is_popular	boolean	Highlights the plan card
+is_active	boolean	Whether plan is available for selection
+profiles table (relevant columns)
+Column	Type	Description
+plan	user_plan enum	basic, premium, or elite
+referred_by	uuid (nullable)	Profile ID of referrer
+Plan Comparison Matrix
+Feature	Basic (₹50)	Premium (₹499)	Elite (₹999)
+Service Discount	0%	10%	15%
+Referral L1 Commission	5%	10%	15% (highest tier from DB)
+Referral L2 Commission	0%	5%	10% (highest tier from DB)
+Is Popular	No	Yes (highlighted)	No
+Access to Wishes	Yes	Yes	Yes
+Access to Business	Yes	Yes	Yes
+Access to AI Music	Yes	Yes	Yes
+Priority Support	No	Yes	Yes
+VIP Celebrity Events	No	No	Yes
+API Endpoints
+1. Fetch Active Plans
+GET /rest/v1/plans
+  ?select=*
+  &is_active=eq.true
+  &order=price.asc
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_jwt}
+Response (JSON array):
+
+
+[
+  {
+    "id": "uuid-basic",
+    "name": "basic",
+    "price": 50,
+    "original_price": 50,
+    "discount_percentage": 0,
+    "features": [
+      "Access to Create Wish",
+      "Business Promotions",
+      "Create AI Music",
+      "Basic customer support",
+      "5% referral commission (Level 1 only)"
+    ],
+    "referral_commission_l1": 5,
+    "referral_commission_l2": 0,
+    "service_discount_percentage": 0,
+    "is_popular": false,
+    "is_active": true
+  },
+  {
+    "id": "uuid-premium",
+    "name": "premium",
+    "price": 499,
+    "original_price": 555,
+    "discount_percentage": 10,
+    "features": [
+      "Everything in Basic",
+      "10% discount on all services",
+      "Priority customer support",
+      "Advanced analytics",
+      "10% referral commission (Level 1)",
+      "5% referral commission (Level 2)",
+      "Exclusive celebrity access"
+    ],
+    "referral_commission_l1": 10,
+    "referral_commission_l2": 5,
+    "service_discount_percentage": 10,
+    "is_popular": true,
+    "is_active": true
+  },
+  {
+    "id": "uuid-elite",
+    "name": "elite",
+    "price": 999,
+    "original_price": 999,
+    "discount_percentage": 15,
+    "features": [
+      "Everything in Premium",
+      "15% discount on all services",
+      "Dedicated account manager",
+      "Custom celebrity requests",
+      "Advanced referral tracking",
+      "Monthly strategy calls",
+      "VIP celebrity events access"
+    ],
+    "referral_commission_l1": 15,
+    "referral_commission_l2": 10,
+    "service_discount_percentage": 15,
+    "is_popular": false,
+    "is_active": true
+  }
+]
+2. Update User Plan (Select/Upgrade)
+PATCH /rest/v1/profiles
+  ?id=eq.{profile_id}
+
+Body: { "plan": "premium" }
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_jwt}
+This is done via updateProfile({ plan: 'premium' }) which internally calls supabase.from('profiles').update({ plan }).eq('id', profile.id).
+
+Data Flow
+
+Page Load
+  └─> Check auth (redirect to /auth if no user)
+       └─> GET plans (is_active=true, order by price)
+            └─> Filter available plans based on current profile.plan
+            └─> Render plan cards
+
+Plan Selection
+  └─> User taps "Select {Plan}"
+       └─> PATCH profiles.plan = '{planName}'
+            └─> DB Trigger: process_plan_referral_commission() fires
+            │     └─> If user has referred_by AND upgrading from basic to premium/elite:
+            │          └─> Calculate L1 commission (referrer's plan rate * plan price)
+            │          └─> INSERT into referral_transactions (L1)
+            │          └─> INSERT into wallet_transactions (L1 credit)
+            │          └─> If L1 referrer also has referred_by:
+            │               └─> Calculate L2 commission
+            │               └─> INSERT into referral_transactions (L2)
+            │               └─> INSERT into wallet_transactions (L2 credit)
+            └─> Toast "Plan Updated!"
+            └─> Navigate to home "/"
+Scenarios
+Scenario 1: User Purchases Basic Plan (₹50)
+profiles.plan = 'basic'
+Service discount: 0% — pays full price on all services (greeting cards, photo wishes, voice calls, image promotions, music, bookings)
+Referral earnings: 5% Level 1 only. If user refers someone who buys a ₹499 premium plan, user earns ₹24 (5% of 499). No Level 2 earnings.
+On /plan page: Sees all 3 plans. Can upgrade to Premium or Elite.
+Platform-wide effect: usePlanDiscount() returns discountPercentage: 0, so getDiscountedPrice(100) returns 100.
+Scenario 2: User Purchases Premium Plan (₹499)
+profiles.plan = 'premium'
+Service discount: 10% — a ₹100 greeting card costs ₹90, a ₹200 photo wish costs ₹180.
+Referral earnings: 10% Level 1 + 5% Level 2. If user refers UserB who buys Elite (₹999), user earns ₹99 L1. If UserB then refers UserC who buys Premium (₹499), user earns ₹24 L2.
+On /plan page: Sees only Premium (as "Current Plan", disabled) and Elite (can upgrade).
+DB Trigger fires: process_plan_referral_commission() checks if OLD.plan = 'basic' and NEW.plan = 'premium' → calculates referral commissions for the person who referred this user.
+Platform-wide effect: usePlanDiscount() returns discountPercentage: 10. All Edge Functions (generate-greeting-card-ai, generate-photo-wish, etc.) also look up the user's plan to apply the discount server-side before deducting from wallet.
+Scenario 3: User Purchases Elite Plan (₹999)
+profiles.plan = 'elite'
+Service discount: 15% — a ₹100 greeting card costs ₹85.
+Referral earnings: Highest rates (15% L1 + 10% L2 from DB).
+On /plan page: Sees only Elite card with "Current Plan" button (disabled). Header shows "Congratulations! You're already on our highest plan."
+DB Trigger fires: Same as above but with NEW.plan = 'elite'.
+Platform-wide effect: usePlanDiscount() returns discountPercentage: 15. Maximum savings across all services.
+Scenario 4: User Skips Plan Selection (No Plan / Default Basic)
+When a user signs up, profiles.plan defaults to 'basic' (set by DB default or signup flow).
+The PlanSelectionModal component can appear post-signup with canSkip={true} — if user clicks "Skip for now", the modal closes and user remains on basic.
+Effect: 0% discount, 5% L1 referral only. All services work but at full price.
+Upgrade path: User can visit /plan from sidebar anytime to upgrade.
+How Service Discounts Execute (End-to-End)
+Client-side (display): usePlanDiscount() hook fetches plans.service_discount_percentage where name = profile.plan. Shows original + discounted price in UI.
+
+Server-side (enforcement): Each Edge Function (e.g., generate-greeting-card-ai) independently:
+
+Fetches user's profiles.plan
+Looks up plans.service_discount_percentage for that plan
+Calculates: finalPrice = basePrice * (1 - discount/100)
+Deducts finalPrice from wallet (not the UI-displayed price, preventing client-side manipulation)
+Wallet deduction: INSERT INTO wallet_transactions (user_id, amount, transaction_type, status, description) with the discounted amount.
+
+How Referral Commissions Execute on Plan Upgrade
+The PostgreSQL trigger process_plan_referral_commission() fires on UPDATE of profiles:
+
+
+Condition: OLD.plan = 'basic' AND NEW.plan IN ('premium', 'elite')
+
+Steps:
+1. Get plan price from plans table
+2. Find L1 referrer (profiles.referred_by)
+3. Look up referrer's plan → get their L1 commission rate
+4. Calculate: L1_commission = plan_price * L1_rate / 100
+5. INSERT referral_transactions (L1)
+6. INSERT wallet_transactions (credit to referrer)
+7. Find L2 referrer (referrer's referred_by)
+8. Repeat for L2 if exists
+Example: UserA (Premium plan, 10% L1) referred UserB. UserB upgrades from Basic to Premium (₹499):
+
+UserA earns: ₹499 * 10% = ₹49 L1 commission
+If UserA was referred by UserC (Elite, 10% L2): UserC earns ₹499 * 10% = ₹49 L2 commission
+UI Components Used
+AuthenticatedLayout — page wrapper with sidebar
+Card, CardHeader, CardTitle, CardDescription, CardContent (shadcn/ui)
+Button, Badge (shadcn/ui)
+Icons: Star (Basic), Zap (Premium), Crown (Elite), CheckCircle, Gift, Loader2 (lucide-react)
+useToast for success/error notifications
+Plan Filtering Logic (Client-Side)
+
+// Users can only see plans at or above their current tier
+if (profile.plan === 'basic')   → show all 3 plans
+if (profile.plan === 'premium') → show premium + elite only
+if (profile.plan === 'elite')   → show elite only (with "Current Plan" disabled)
+Mobile Integration Notes
+No payment gateway: Currently, plan selection is a direct profile update (no Razorpay payment). The plan price is informational — the actual payment flow is not enforced in this page. For mobile, you may want to add Razorpay/payment before updating the plan.
+Plan modal: PlanSelectionModal exists as a reusable dialog for post-signup flows. On mobile, render this as a full-screen modal or bottom sheet.
+Discount propagation: After plan change, all subsequent API calls will automatically use the new discount rate because Edge Functions fetch the plan server-side on every request.
+Downgrade not supported: The filtering logic only allows upgrades (basic→premium→elite), never downgrades.

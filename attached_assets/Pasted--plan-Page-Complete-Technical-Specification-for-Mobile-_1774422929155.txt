@@ -1,0 +1,290 @@
+/plan Page — Complete Technical Specification for Mobile App
+1. Purpose
+The Plan page is a subscription management screen where authenticated users view, compare, and upgrade between three membership tiers: Basic, Premium, and Elite. Each plan unlocks platform-wide service discounts and higher referral commission rates. Plans are a one-time purchase (not recurring).
+
+2. Authentication
+Requires authenticated user. Redirects to /auth if not logged in.
+
+3. Database Schema
+plans table
+Column	Type	Description
+id	uuid	Primary key
+name	text	basic, premium, or elite
+price	integer	Plan price in INR (e.g. 50, 499, 999)
+original_price	integer (nullable)	Strikethrough price for showing discount
+discount_percentage	integer	Display discount (e.g. 50%)
+features	jsonb	Array of feature strings
+referral_commission_l1	integer	Level 1 referral %
+referral_commission_l2	integer	Level 2 referral %
+service_discount_percentage	integer	Discount on all services (0%, 10%, 15%)
+is_popular	boolean	Highlights the card with border + scale
+is_active	boolean	Only active plans are shown
+profiles table (relevant columns)
+Column	Type	Description
+id	uuid	Profile ID (primary user identifier)
+plan	enum (basic, premium, elite)	User's current plan
+referred_by	uuid (nullable)	FK to referrer's profile
+wallet_balance	integer	Current wallet balance
+4. The Three Plans — Detailed Comparison
+Feature	Basic (₹50)	Premium (₹499)	Elite (₹999)
+Service Discount	0%	10%	15%
+Referral L1 Commission	5%	10%	15%
+Referral L2 Commission	2%	5%	7%
+is_popular	false	true	false
+Icon	Star	Zap (lightning)	Crown
+How service discounts work platform-wide:
+Basic user pays full price for everything (bookings, greeting cards, photo wishes, voice calls, UGC videos, image promotions, music generation)
+Premium user gets 10% off every service. E.g., a ₹500 booking costs ₹450
+Elite user gets 15% off every service. E.g., a ₹500 booking costs ₹425
+The discount is calculated by the usePlanDiscount hook:
+
+
+getDiscountedPrice(basePrice) = Math.round(basePrice * (1 - discountPercentage / 100))
+How referral commissions work:
+When a referred user completes any paid transaction (booking, wish order, photo wish, voice call, music, UGC, image promotion, or plan upgrade), PostgreSQL triggers automatically calculate and distribute commissions:
+
+L1: Direct referrer gets their plan's L1 percentage of the transaction amount
+L2: The referrer's referrer gets their plan's L2 percentage
+Example: Elite user refers User B, who books ₹1000 service → Elite user earns ₹150 (15% L1). If Elite user was referred by User A (Premium), User A earns ₹50 (5% L2).
+
+5. API Endpoints
+5.1 Fetch All Active Plans
+GET /rest/v1/plans?is_active=eq.true&order=price.asc&select=*
+
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_jwt}
+Response (JSON array):
+
+
+[
+  {
+    "id": "uuid-1",
+    "name": "basic",
+    "price": 50,
+    "original_price": 100,
+    "discount_percentage": 50,
+    "features": [
+      "Access to all celebrities",
+      "Basic referral program (5% L1)",
+      "Standard support",
+      "Personalized video messages"
+    ],
+    "referral_commission_l1": 5,
+    "referral_commission_l2": 2,
+    "service_discount_percentage": 0,
+    "is_popular": false,
+    "is_active": true
+  },
+  {
+    "id": "uuid-2",
+    "name": "premium",
+    "price": 499,
+    "original_price": 999,
+    "discount_percentage": 50,
+    "features": [
+      "Everything in Basic",
+      "10% discount on all services",
+      "Enhanced referral program (10% L1, 5% L2)",
+      "Priority support",
+      "Early access to new features"
+    ],
+    "referral_commission_l1": 10,
+    "referral_commission_l2": 5,
+    "service_discount_percentage": 10,
+    "is_popular": true,
+    "is_active": true
+  },
+  {
+    "id": "uuid-3",
+    "name": "elite",
+    "price": 999,
+    "original_price": 1999,
+    "discount_percentage": 50,
+    "features": [
+      "Everything in Premium",
+      "15% discount on all services",
+      "Maximum referral earnings (15% L1, 7% L2)",
+      "VIP support",
+      "Exclusive celebrity access",
+      "Custom greeting cards"
+    ],
+    "referral_commission_l1": 15,
+    "referral_commission_l2": 7,
+    "service_discount_percentage": 15,
+    "is_popular": false,
+    "is_active": true
+  }
+]
+5.2 Update User Plan (Current Implementation)
+PATCH /rest/v1/profiles?id=eq.{profile_id}
+
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_jwt}
+  Content-Type: application/json
+
+Body:
+  { "plan": "premium" }
+IMPORTANT NOTE FOR MOBILE APP: The current web implementation updates the plan directly without payment. For the mobile app, you should add a Razorpay payment step before updating the profile. The correct flow is:
+
+6. Recommended Payment Flow for Mobile App (Razorpay)
+The web app currently skips payment for plan purchases. For the mobile app, implement this flow:
+
+Step 1: Create Razorpay Order
+POST /functions/v1/create-razorpay-order
+
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_jwt}
+  Content-Type: application/json
+
+Body:
+{
+  "amount": 499,
+  "currency": "INR",
+  "receipt": "PLAN_PREMIUM_1234567890",
+  "notes": {
+    "type": "plan_purchase",
+    "plan_name": "premium",
+    "user_id": "{profile_id}"
+  }
+}
+Response:
+
+
+{
+  "id": "order_ABC123XYZ",
+  "entity": "order",
+  "amount": 49900,
+  "amount_paid": 0,
+  "amount_due": 49900,
+  "currency": "INR",
+  "receipt": "PLAN_PREMIUM_1234567890",
+  "status": "created",
+  "key_id": "rzp_live_xxxxx"
+}
+Note: amount in response is in paise (multiplied by 100).
+
+Step 2: Open Razorpay Checkout (Native SDK)
+For React Native / Flutter, use the Razorpay native SDK:
+
+
+{
+  key: response.key_id,           // "rzp_live_xxxxx"
+  amount: response.amount,        // 49900 (paise)
+  currency: "INR",
+  name: "Wish Me",
+  description: "Premium Plan Purchase",
+  order_id: response.id,          // "order_ABC123XYZ"
+  prefill: {
+    email: user.email,
+    contact: profile.phone
+  },
+  theme: { color: "#6366f1" }
+}
+Step 3: Verify Payment
+POST /functions/v1/verify-razorpay-payment
+
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_jwt}
+  Content-Type: application/json
+
+Body:
+{
+  "razorpay_payment_id": "pay_ABC123",
+  "razorpay_order_id": "order_ABC123XYZ",
+  "razorpay_signature": "hex_signature_string",
+  "orderType": "plan"
+}
+Response:
+
+
+{ "success": true, "message": "Payment verified successfully" }
+Step 4: Update Profile Plan
+Only after payment verification succeeds:
+
+PATCH /rest/v1/profiles?id=eq.{profile_id}
+Body: { "plan": "premium" }
+7. User Scenarios
+Scenario A: New user (no plan / basic by default)
+Sees all 3 plan cards
+Can select any plan
+After selecting, profile.plan updates
+All services charge full price (0% discount)
+Referral commissions: 5% L1, 2% L2
+Scenario B: User purchases Premium (₹499)
+Now sees only Premium and Elite cards (Basic is filtered out)
+Premium button shows "Current Plan" (disabled)
+All services get 10% discount automatically via usePlanDiscount hook
+Referral commissions upgrade: 10% L1, 5% L2
+Trigger fires: process_plan_referral_commission() — if user was referred, the referrer gets L1 commission on ₹499, and referrer's referrer gets L2
+Scenario C: User upgrades to Elite (₹999)
+Now sees only Elite card
+Header shows "Congratulations! You're already on our highest plan"
+All services get 15% discount
+Referral commissions: 15% L1, 7% L2
+Same referral trigger fires on the ₹999 amount
+Scenario D: User skips plan selection (from modal)
+PlanSelectionModal with canSkip={true} shows "Skip for now" button
+User stays on default basic plan
+Gets 0% discount, 5%/2% referral rates
+Can upgrade anytime from /plan page or sidebar
+8. Automatic Referral Commission on Plan Upgrade (PostgreSQL Trigger)
+The trigger process_plan_referral_commission() fires on UPDATE of profiles when plan changes from basic to premium or elite:
+
+Looks up profiles.referred_by to find L1 referrer
+Gets the referrer's plan tier to determine their commission rates
+Calculates plan_price * L1_rate / 100
+Inserts into referral_transactions and wallet_transactions
+Repeats for L2 (referrer's referrer)
+Example: User upgrades to Premium (₹499), referred by Elite user:
+
+Elite referrer earns: ₹499 * 15% = ₹74 (L1)
+If Elite user was referred by a Premium user: ₹499 * 5% = ₹24 (L2)
+9. Plan Selection Modal (Secondary Entry Point)
+The PlanSelectionModal component is shown as a dialog (not a page) in certain flows:
+
+After first sign-up (optional, with skip)
+Shows compact version with top 3 features only
+Same API calls and flow as the /plan page
+canSkip prop controls whether user can dismiss without selecting
+10. How Discounts Apply Across the Platform
+The usePlanDiscount hook is used on every payment page:
+
+
+// Any service page (booking, greeting card, UGC, etc.)
+const { discountPercentage, getDiscountedPrice } = usePlanDiscount();
+
+const basePrice = 500;  // From celebrity or platform_settings
+const finalPrice = getDiscountedPrice(basePrice);  // 450 for Premium, 425 for Elite
+Pages that use plan discounts:
+
+/booking (CheckoutStep)
+/wish-booking (WishBooking)
+/wish-celebrity-occasion (WishCelebrityOccasion)
+/greeting-cards (GreetingCards)
+/image-promotions (ImagePromotions)
+/ugc-videos (UGCVideos)
+/ugc-ads (UGCAds)
+/voice-call-wish (VoiceCallWish)
+/photo-wish (PhotoWish)
+11. UI Components Used
+Component	Source	Usage
+Card, CardHeader, CardContent, CardTitle, CardDescription	shadcn/ui	Plan cards
+Button	shadcn/ui	Select/Current Plan CTA
+Badge	shadcn/ui	"Most Popular", service discount, referral %
+Loader2	lucide-react	Loading spinner
+Star, Zap, Crown	lucide-react	Plan tier icons
+CheckCircle	lucide-react	Feature list checkmarks
+Gift	lucide-react	"Refer & Earn" button icon
+AuthenticatedLayout	custom	Page wrapper with sidebar
+Dialog (in modal variant)	shadcn/ui	PlanSelectionModal
+12. Mobile Integration Notes
+Add Razorpay before profile update: The web app currently updates the plan directly. For mobile, integrate the Razorpay native SDK between plan selection and profile update (see Section 6).
+Plan filtering: Only show plans >= user's current plan. Use the filter logic: if current is premium, show premium + elite only.
+Downgrade prevention: There is no downgrade flow. Once upgraded, the user cannot go back.
+Wallet alternative: You could also allow wallet payment for plans — deduct from wallet_balance and insert a wallet_transactions record with transaction_type: 'plan_purchase' before updating the profile.
+The features column is JSONB — parse it as a string array for display.
+Referral trigger is automatic: No client-side code needed for commission distribution. The PostgreSQL trigger handles everything when profiles.plan is updated.

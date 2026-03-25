@@ -1,0 +1,343 @@
+/plan — Plan Upgrade Flow: Complete Technical Specification for Mobile App
+Current Implementation Status
+IMPORTANT: The current web app does NOT require Razorpay payment for plan upgrades — it directly updates profiles.plan via a simple PATCH. For the mobile app, you MUST add payment before the profile update. Here's how to build it properly.
+
+Plan Upgrade Flow for Mobile App (Recommended)
+Step-by-Step Sequence
+
+User taps "Select Premium/Elite"
+  └─> Step 1: Create Razorpay Order
+       POST /functions/v1/create-razorpay-order
+       └─> Step 2: Open Razorpay Native SDK
+            └─> Step 3: On Payment Success → Verify Signature
+                 POST /functions/v1/verify-razorpay-payment
+                 └─> Step 4: On Verification Success → Update Profile
+                      PATCH /rest/v1/profiles?id=eq.{profile_id}
+                      Body: { "plan": "premium" }
+                      └─> Step 5: Insert wallet_transaction record
+                           POST /rest/v1/wallet_transactions
+                           └─> Step 6: Show success, navigate to home
+API Calls in Detail
+Step 1: Create Razorpay Order
+Endpoint: POST /functions/v1/create-razorpay-order
+
+Request:
+
+
+{
+  "amount": 499,
+  "currency": "INR",
+  "receipt": "plan_upgrade_USERID_1711234567",
+  "notes": {
+    "user_id": "uuid-of-user",
+    "type": "plan_upgrade",
+    "plan_name": "premium"
+  }
+}
+Response (200):
+
+
+{
+  "id": "order_PxyzAbcDef12345",
+  "entity": "order",
+  "amount": 49900,
+  "amount_paid": 0,
+  "currency": "INR",
+  "receipt": "plan_upgrade_USERID_1711234567",
+  "status": "created",
+  "key_id": "rzp_live_xxxxxxxx"
+}
+Note: amount in response is in paise (×100). The Edge Function converts automatically.
+
+Step 2: Open Razorpay SDK
+Use the native Razorpay Flutter/React Native SDK with these options:
+
+
+{
+  "key": "response.key_id",
+  "amount": 49900,
+  "currency": "INR",
+  "name": "WishMe",
+  "description": "Premium Plan Upgrade",
+  "order_id": "order_PxyzAbcDef12345",
+  "prefill": {
+    "name": "User Full Name",
+    "email": "user@email.com",
+    "contact": "9876543210"
+  },
+  "theme": {
+    "color": "#8B5CF6"
+  }
+}
+Step 3: Verify Payment
+Endpoint: POST /functions/v1/verify-razorpay-payment
+
+Request:
+
+
+{
+  "razorpay_order_id": "order_PxyzAbcDef12345",
+  "razorpay_payment_id": "pay_AbcXyz789",
+  "razorpay_signature": "hex_signature_string"
+}
+Response (200):
+
+
+{
+  "success": true,
+  "message": "Payment verified successfully"
+}
+Response (500 — invalid signature):
+
+
+{
+  "error": "Invalid payment signature"
+}
+Step 4: Update Profile Plan
+Only after verification succeeds.
+
+Endpoint: PATCH /rest/v1/profiles?id=eq.{profile_id}
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_jwt}
+Content-Type: application/json
+Prefer: return=minimal
+Request Body:
+
+
+{
+  "plan": "premium"
+}
+Step 5: Record Transaction
+Endpoint: POST /rest/v1/wallet_transactions
+
+Request:
+
+
+{
+  "user_id": "uuid-of-user",
+  "transaction_type": "plan_purchase",
+  "amount": 499,
+  "status": "completed",
+  "payment_method": "razorpay",
+  "transaction_details": {
+    "razorpay_order_id": "order_PxyzAbcDef12345",
+    "razorpay_payment_id": "pay_AbcXyz789",
+    "plan_name": "premium"
+  }
+}
+Plan Prices & What Each Unlocks
+Field	Basic	Premium	Elite
+Price	₹50	₹499	₹999
+Service Discount	0%	10%	15%
+Referral L1 Commission	5%	10%	15%
+Referral L2 Commission	0%	5%	10%
+Upgrade Filtering Logic
+The mobile app should only show plans equal to or higher than the user's current plan:
+
+
+if profile.plan == "basic"    → show Basic, Premium, Elite
+if profile.plan == "premium"  → show Premium, Elite
+if profile.plan == "elite"    → show Elite only (with "Current Plan" label)
+Users with profile.plan == null (skipped plan selection) are treated as having no plan — show all 3 plans.
+
+Referral Commission Trigger (Automatic)
+When profiles.plan is updated, a PostgreSQL trigger (process_plan_referral_commission) automatically:
+
+Checks if the user has referred_by set
+Looks up the referrer's plan tier
+Calculates L1 commission: plan_price × referrer_l1_percentage
+Credits referral_transactions for L1 referrer
+If L1 referrer also has referred_by, calculates L2 commission
+Credits referral_transactions for L2 referrer
+You don't need to implement this in the mobile app — it's all server-side.
+
+Error Handling Scenarios
+Scenario	Handle
+Razorpay order creation fails	Show error toast, don't proceed
+User cancels payment	Reset UI, no changes made
+Payment fails	Show response.error.description from Razorpay
+Signature verification fails	Show "Payment verification failed", don't update plan
+Profile update fails after payment	Critical — retry the PATCH, or log for manual resolution
+Mobile-Specific Notes
+Razorpay SDK: Use razorpay_flutter (Flutter) or react-native-razorpay (React Native) — NOT the web checkout.js
+No downgrade: Never allow changing from a higher plan to a lower one
+Null plan users: If profile.plan is null, treat as "no plan" — all features work but with 0% discount and lowest referral rates
+Receipt format: Keep under 40 characters: plan_{userId_first8}_{timestamp}
+Idempotency: If the app crashes between payment verification and profile update, check on next launch if there's a completed wallet_transaction with plan_purchase type but the profile still shows the old plan — then retry the PATCH
+/plan — Plan Upgrade Flow: Complete Technical Specification for Mobile App
+Current Implementation Status
+IMPORTANT: The current web app does NOT require Razorpay payment for plan upgrades — it directly updates profiles.plan via a simple PATCH. For the mobile app, you MUST add payment before the profile update. Here's how to build it properly.
+
+Plan Upgrade Flow for Mobile App (Recommended)
+Step-by-Step Sequence
+
+User taps "Select Premium/Elite"
+  └─> Step 1: Create Razorpay Order
+       POST /functions/v1/create-razorpay-order
+       └─> Step 2: Open Razorpay Native SDK
+            └─> Step 3: On Payment Success → Verify Signature
+                 POST /functions/v1/verify-razorpay-payment
+                 └─> Step 4: On Verification Success → Update Profile
+                      PATCH /rest/v1/profiles?id=eq.{profile_id}
+                      Body: { "plan": "premium" }
+                      └─> Step 5: Insert wallet_transaction record
+                           POST /rest/v1/wallet_transactions
+                           └─> Step 6: Show success, navigate to home
+API Calls in Detail
+Step 1: Create Razorpay Order
+Endpoint: POST /functions/v1/create-razorpay-order
+
+Request:
+
+
+{
+  "amount": 499,
+  "currency": "INR",
+  "receipt": "plan_upgrade_USERID_1711234567",
+  "notes": {
+    "user_id": "uuid-of-user",
+    "type": "plan_upgrade",
+    "plan_name": "premium"
+  }
+}
+Response (200):
+
+
+{
+  "id": "order_PxyzAbcDef12345",
+  "entity": "order",
+  "amount": 49900,
+  "amount_paid": 0,
+  "currency": "INR",
+  "receipt": "plan_upgrade_USERID_1711234567",
+  "status": "created",
+  "key_id": "rzp_live_xxxxxxxx"
+}
+Note: amount in response is in paise (×100). The Edge Function converts automatically.
+
+Step 2: Open Razorpay SDK
+Use the native Razorpay Flutter/React Native SDK with these options:
+
+
+{
+  "key": "response.key_id",
+  "amount": 49900,
+  "currency": "INR",
+  "name": "WishMe",
+  "description": "Premium Plan Upgrade",
+  "order_id": "order_PxyzAbcDef12345",
+  "prefill": {
+    "name": "User Full Name",
+    "email": "user@email.com",
+    "contact": "9876543210"
+  },
+  "theme": {
+    "color": "#8B5CF6"
+  }
+}
+Step 3: Verify Payment
+Endpoint: POST /functions/v1/verify-razorpay-payment
+
+Request:
+
+
+{
+  "razorpay_order_id": "order_PxyzAbcDef12345",
+  "razorpay_payment_id": "pay_AbcXyz789",
+  "razorpay_signature": "hex_signature_string"
+}
+Response (200):
+
+
+{
+  "success": true,
+  "message": "Payment verified successfully"
+}
+Response (500 — invalid signature):
+
+
+{
+  "error": "Invalid payment signature"
+}
+Step 4: Update Profile Plan
+Only after verification succeeds.
+
+Endpoint: PATCH /rest/v1/profiles?id=eq.{profile_id}
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_jwt}
+Content-Type: application/json
+Prefer: return=minimal
+Request Body:
+
+
+{
+  "plan": "premium"
+}
+Step 5: Record Transaction
+Endpoint: POST /rest/v1/wallet_transactions
+
+Request:
+
+
+{
+  "user_id": "uuid-of-user",
+  "transaction_type": "plan_purchase",
+  "amount": 499,
+  "status": "completed",
+  "payment_method": "razorpay",
+  "transaction_details": {
+    "razorpay_order_id": "order_PxyzAbcDef12345",
+    "razorpay_payment_id": "pay_AbcXyz789",
+    "plan_name": "premium"
+  }
+}
+Plan Prices & What Each Unlocks
+Field	Basic	Premium	Elite
+Price	₹50	₹499	₹999
+Service Discount	0%	10%	15%
+Referral L1 Commission	5%	10%	15%
+Referral L2 Commission	0%	5%	10%
+Upgrade Filtering Logic
+The mobile app should only show plans equal to or higher than the user's current plan:
+
+
+if profile.plan == "basic"    → show Basic, Premium, Elite
+if profile.plan == "premium"  → show Premium, Elite
+if profile.plan == "elite"    → show Elite only (with "Current Plan" label)
+Users with profile.plan == null (skipped plan selection) are treated as having no plan — show all 3 plans.
+
+Referral Commission Trigger (Automatic)
+When profiles.plan is updated, a PostgreSQL trigger (process_plan_referral_commission) automatically:
+
+Checks if the user has referred_by set
+Looks up the referrer's plan tier
+Calculates L1 commission: plan_price × referrer_l1_percentage
+Credits referral_transactions for L1 referrer
+If L1 referrer also has referred_by, calculates L2 commission
+Credits referral_transactions for L2 referrer
+You don't need to implement this in the mobile app — it's all server-side.
+
+Error Handling Scenarios
+Scenario	Handle
+Razorpay order creation fails	Show error toast, don't proceed
+User cancels payment	Reset UI, no changes made
+Payment fails	Show response.error.description from Razorpay
+Signature verification fails	Show "Payment verification failed", don't update plan
+Profile update fails after payment	Critical — retry the PATCH, or log for manual resolution
+Mobile-Specific Notes
+Razorpay SDK: Use razorpay_flutter (Flutter) or react-native-razorpay (React Native) — NOT the web checkout.js
+No downgrade: Never allow changing from a higher plan to a lower one
+Null plan users: If profile.plan is null, treat as "no plan" — all features work but with 0% discount and lowest referral rates
+Receipt format: Keep under 40 characters: plan_{userId_first8}_{timestamp}
+Idempotency: If the app crashes between payment verification and profile update, check on next launch if there's a completed wallet_transaction with plan_purchase type but the profile still shows the old plan — then retry the PATCH
+
+
+
+
+Se

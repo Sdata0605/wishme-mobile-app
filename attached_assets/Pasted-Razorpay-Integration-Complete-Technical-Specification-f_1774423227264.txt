@@ -1,0 +1,279 @@
+Razorpay Integration — Complete Technical Specification for Mobile App
+Overview
+Razorpay is used across the entire WishMe platform for all monetary transactions. There are two Edge Functions that handle the server-side logic, and the client uses the Razorpay Web SDK (which you'll replace with the native mobile SDK).
+
+Supabase Secrets Required
+RAZORPAY_KEY_ID     → Your Razorpay API Key ID (starts with rzp_live_ or rzp_test_)
+RAZORPAY_KEY_SECRET → Your Razorpay API Key Secret
+Both are already configured in the Supabase project.
+
+Edge Function 1: create-razorpay-order
+URL: POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/create-razorpay-order
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_jwt}
+Content-Type: application/json
+Request Payload:
+
+
+{
+  "amount": 499,
+  "currency": "INR",
+  "receipt": "wallet_<profile_id>_<timestamp>",
+  "notes": {
+    "user_id": "<profile_id>",
+    "type": "wallet_deposit"
+  }
+}
+IMPORTANT: amount is in rupees (integer). The Edge Function multiplies by 100 internally to convert to paise for Razorpay API. The receipt field is auto-truncated to 40 chars if too long.
+
+Response (Success — 200):
+
+
+{
+  "id": "order_PxxxxxxxxxxxxxxX",
+  "entity": "order",
+  "amount": 49900,
+  "amount_paid": 0,
+  "amount_due": 49900,
+  "currency": "INR",
+  "receipt": "wallet_abc123_1234567890",
+  "status": "created",
+  "key_id": "rzp_live_xxxxxxxxxxxx"
+}
+Response (Error — 500):
+
+
+{
+  "error": "Razorpay credentials not found"
+}
+What it does internally:
+
+Reads RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET from env
+Truncates receipt to 40 chars max (Razorpay limit)
+Calls https://api.razorpay.com/v1/orders with Basic Auth
+Returns the order object + key_id for client SDK initialization
+Edge Function 2: verify-razorpay-payment
+URL: POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/verify-razorpay-payment
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_jwt}
+Content-Type: application/json
+Request Payload (for bookings):
+
+
+{
+  "razorpay_payment_id": "pay_PxxxxxxxxxxxxxxX",
+  "razorpay_order_id": "order_PxxxxxxxxxxxxxxX",
+  "razorpay_signature": "hex_signature_string",
+  "booking_id": "<uuid>",
+  "orderType": "booking"
+}
+Request Payload (for wish celebrity orders):
+
+
+{
+  "razorpay_payment_id": "pay_PxxxxxxxxxxxxxxX",
+  "razorpay_order_id": "order_PxxxxxxxxxxxxxxX",
+  "razorpay_signature": "hex_signature_string",
+  "orderId": "<uuid>",
+  "orderType": "wish"
+}
+Request Payload (for wallet deposit — no booking/order ID):
+
+
+{
+  "razorpay_payment_id": "pay_PxxxxxxxxxxxxxxX",
+  "razorpay_order_id": "order_PxxxxxxxxxxxxxxX",
+  "razorpay_signature": "hex_signature_string"
+}
+Response (Success — 200):
+
+
+{
+  "success": true,
+  "message": "Payment verified successfully"
+}
+Response (Error — 500):
+
+
+{
+  "error": "Invalid payment signature"
+}
+What it does internally:
+
+Reads RAZORPAY_KEY_SECRET from env
+Computes HMAC-SHA256 of {razorpay_order_id}|{razorpay_payment_id} using the secret
+Compares computed hex signature with razorpay_signature
+If orderType === "wish": Updates wish_celebrity_orders → payment_status = "completed"
+If orderType === "booking": Logs verification only (booking stays pending for admin approval)
+Returns success/failure
+All Payment Scenarios in the Platform
+Scenario 1: Wallet Deposit (Add Money)
+
+User enters amount (min ₹100)
+  → POST create-razorpay-order { amount, currency:"INR", receipt:"wallet_<id>_<ts>" }
+  → Open Razorpay SDK with returned order_id + key_id
+  → On success callback:
+      → POST verify-razorpay-payment { razorpay_payment_id, razorpay_order_id, razorpay_signature }
+      → INSERT wallet_transactions { user_id, amount, transaction_type:"deposit", status:"completed", payment_method:"razorpay", transaction_details:{razorpay_order_id, razorpay_payment_id} }
+      → DB trigger auto-updates profiles.wallet_balance
+Scenario 2: Celebrity Booking (Video/Ad/Wish)
+
+Create booking record with status:"pending"
+  → POST create-razorpay-order { amount:totalAmount, receipt:"booking_<id>", notes:{booking_id, celebrity_id, service_type} }
+  → Open Razorpay SDK
+  → On success:
+      → POST verify-razorpay-payment { razorpay_payment_id, razorpay_order_id, razorpay_signature, booking_id }
+      → Booking stays "pending" — admin must approve
+      → Navigate to /booking-summary
+Scenario 3: Wish Celebrity Order
+
+Create wish_celebrity_orders record with payment_status:"pending"
+  → POST create-razorpay-order { amount, receipt:"wish_<id>", notes:{order_id, celebrity_id} }
+  → Open Razorpay SDK
+  → On success:
+      → POST verify-razorpay-payment { razorpay_payment_id, razorpay_order_id, razorpay_signature, orderId, orderType:"wish" }
+      → DB updates wish_celebrity_orders.payment_status = "completed"
+Scenario 4: Plan Purchase / Upgrade
+
+  → POST create-razorpay-order { amount:planPrice, receipt:"plan_<id>_<ts>", notes:{user_id, plan_name} }
+  → Open Razorpay SDK
+  → On success:
+      → POST verify-razorpay-payment { ... }
+      → PATCH profiles { plan: "premium" }
+      → INSERT wallet_transactions { transaction_type:"plan_purchase", ... }
+      → DB trigger process_plan_referral_commission auto-distributes L1/L2 commissions
+Scenario 5: Celebrity Subscription (Following/Favorites)
+
+  → POST create-razorpay-order { amount:subscriptionPrice, receipt:"sub_<id>", notes:{celebrity_id} }
+  → Open Razorpay SDK
+  → On success:
+      → POST verify-razorpay-payment { ... }
+      → INSERT celebrity_favorites + wallet_transactions
+      → processSubscription() handles commission + email notification
+Scenario 6: UGC Video / UGC Ad Generation
+
+  → POST create-razorpay-order { amount:price, receipt:"ugc_<id>" }
+  → Open Razorpay SDK
+  → On success:
+      → POST verify-razorpay-payment { ... }
+      → processGeneration() creates DB record + invokes AI Edge Function
+Razorpay SDK Configuration (Web — Replace with Native)
+On web, the Razorpay checkout script is loaded in index.html:
+
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+The SDK is initialized with these options:
+
+
+{
+  key: orderData.key_id,        // From create-razorpay-order response
+  amount: orderData.amount,      // In paise (returned by Razorpay)
+  currency: orderData.currency,  // "INR"
+  name: "WishMe",               // or "Celebrity Booking"
+  description: "Add money to wallet",  // Context-specific
+  order_id: orderData.id,        // "order_Pxxxx..."
+  handler: function(response) {
+    // response.razorpay_payment_id
+    // response.razorpay_order_id  
+    // response.razorpay_signature
+    // → Send these 3 to verify-razorpay-payment
+  },
+  prefill: {
+    name: "User Name",
+    email: "user@email.com",
+    contact: "9876543210"
+  },
+  theme: {
+    color: "#8B5CF6"   // Purple brand color
+  }
+}
+Mobile Native SDK Replacement
+For Flutter:
+
+# pubspec.yaml
+dependencies:
+  razorpay_flutter: ^1.3.7
+
+Razorpay razorpay = Razorpay();
+razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, (PaymentSuccessResponse response) {
+  // response.paymentId  → razorpay_payment_id
+  // response.orderId    → razorpay_order_id
+  // response.signature  → razorpay_signature
+  // Call verify-razorpay-payment with these
+});
+razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, handleError);
+
+var options = {
+  'key': keyId,           // From create-razorpay-order response
+  'amount': amount,       // In paise
+  'currency': 'INR',
+  'name': 'WishMe',
+  'order_id': orderId,    // From create-razorpay-order response
+  'prefill': {'contact': phone, 'email': email},
+  'theme': {'color': '#8B5CF6'}
+};
+razorpay.open(options);
+For React Native:
+
+npm install react-native-razorpay
+
+import RazorpayCheckout from 'react-native-razorpay';
+
+RazorpayCheckout.open({
+  key: keyId,
+  amount: amount,
+  currency: 'INR',
+  name: 'WishMe',
+  order_id: orderId,
+  prefill: { email, contact: phone, name },
+  theme: { color: '#8B5CF6' }
+}).then((data) => {
+  // data.razorpay_payment_id
+  // data.razorpay_order_id
+  // data.razorpay_signature
+  // → verify-razorpay-payment
+}).catch((error) => {
+  // Handle failure
+});
+Complete Mobile Payment Flow (Step by Step)
+
+1. User triggers payment (buy plan, add wallet, book celebrity, etc.)
+
+2. App calls: POST /functions/v1/create-razorpay-order
+   Body: { amount (rupees), currency:"INR", receipt:"<context>_<id>", notes:{...} }
+   
+3. Edge Function returns: { id:"order_xxx", amount:49900, key_id:"rzp_xxx" }
+
+4. App opens native Razorpay SDK with key_id + order_id + amount
+
+5. User completes payment in Razorpay UI (UPI/Card/NetBanking)
+
+6. SDK returns: { razorpay_payment_id, razorpay_order_id, razorpay_signature }
+
+7. App calls: POST /functions/v1/verify-razorpay-payment
+   Body: { razorpay_payment_id, razorpay_order_id, razorpay_signature, 
+           booking_id/orderId (optional), orderType (optional) }
+
+8. Edge Function verifies HMAC-SHA256 signature server-side
+   → If valid: updates relevant DB table, returns { success: true }
+   → If invalid: returns 500 { error: "Invalid payment signature" }
+
+9. App performs post-payment action:
+   - Wallet: INSERT wallet_transactions (type:"deposit")
+   - Booking: Navigate to summary (stays "pending" for admin)
+   - Wish: Order auto-marked "completed" by verify function
+   - Plan: PATCH profiles.plan + INSERT wallet_transactions
+   - Subscription: INSERT celebrity_favorites + process commission
+Important Notes for Mobile
+Amount units: Send amount in rupees to create-razorpay-order. It converts to paise internally. The Razorpay SDK receives paise from the response.
+Receipt max length: 40 characters. Use short IDs like W${timestamp}.
+Signature verification: NEVER skip this step. Always call verify-razorpay-payment before marking any transaction as complete.
+Wallet auto-update: The DB trigger update_wallet_balance() automatically updates profiles.wallet_balance when a wallet_transactions row with status:'completed' is inserted. You don't need to manually update the balance.
+Idempotency: If the app crashes after payment but before verification, implement retry logic. Store razorpay_order_id locally and retry verification on next app open.
+Test mode: Use rzp_test_ keys for development. Switch to rzp_live_ for production.
