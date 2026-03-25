@@ -168,7 +168,7 @@ export default function CelebritySignupScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const scrollRef = useRef<ScrollView>(null);
-  const { sendCelebOtp, applyCelebrityWithAuth } = useAuth();
+  const { sendCelebOtp, applyCelebrityWithAuth, checkCelebrityStatus } = useAuth();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [catLoading, setCatLoading] = useState(true);
@@ -259,6 +259,19 @@ export default function CelebritySignupScreen() {
     }
     setErrors({});
     setLoading(true);
+
+    const { status: existingStatus } = await checkCelebrityStatus(email.trim().toLowerCase());
+    if (existingStatus) {
+      setLoading(false);
+      const msgs: Record<string, string> = {
+        pending: 'You already have a pending application under review. Our team will contact you within 3–5 business days.',
+        approved: 'An account already exists for this email. Please sign in to access your celebrity dashboard.',
+        rejected: 'A previous application for this email was rejected. Please contact support to appeal.',
+      };
+      setSubmitError(msgs[existingStatus] ?? 'An application already exists for this email address.');
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      return;
+    }
 
     const { error } = await sendCelebOtp(email.trim().toLowerCase());
     setLoading(false);
