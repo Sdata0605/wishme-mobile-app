@@ -48,6 +48,29 @@ export interface CelebrityApplyData {
   portfolio: string;
 }
 
+export interface CelebrityFormData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  date_of_birth: string | null;
+  stage_name: string;
+  category: string;
+  bio: string;
+  achievements: string;
+  portfolio_link: string | null;
+  social_media: {
+    instagram: string;
+    youtube: string;
+    twitter: string;
+    tiktok: string;
+    facebook: string;
+    linkedin: string;
+    website: string;
+    other: string;
+  };
+}
+
 interface AuthContextValue {
   user: User | null;
   session: Session | null;
@@ -70,6 +93,12 @@ interface AuthContextValue {
   forgotPasswordByPhone: (phone: string) => Promise<{ error: string | null }>;
   applyCelebrity: (data: CelebrityApplyData) => Promise<{ error: string | null }>;
   checkCelebrityStatus: (email: string) => Promise<{ status: string | null; error: string | null }>;
+  sendCelebOtp: (email: string) => Promise<{ error: string | null }>;
+  applyCelebrityWithAuth: (
+    data: CelebrityFormData,
+    password: string,
+    otp: string,
+  ) => Promise<{ error: string | null }>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -490,6 +519,102 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const sendCelebOtp = useCallback(async (email: string): Promise<{ error: string | null }> => {
+    try {
+      const res = await supabaseFetch('/functions/v1/send-email-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+      if (!res.ok) {
+        if (res.status === 429) {
+          let retryAfter = 60;
+          try {
+            const body = await res.json() as Record<string, unknown>;
+            retryAfter = (body.retryAfter ?? body.retry_after ?? 60) as number;
+          } catch {}
+          return { error: `Too many attempts. Please wait ${retryAfter} seconds before trying again.` };
+        }
+        const msg = await parseApiError(res);
+        return { error: msg };
+      }
+      return { error: null };
+    } catch {
+      return { error: 'Network error. Please check your connection.' };
+    }
+  }, []);
+
+  const applyCelebrityWithAuth = useCallback(async (
+    data: CelebrityFormData,
+    password: string,
+    otp: string,
+  ): Promise<{ error: string | null }> => {
+    try {
+      const verifyRes = await supabaseFetch('/functions/v1/verify-email-otp', {
+        method: 'POST',
+        body: JSON.stringify({ email: data.email, otp }),
+      });
+      if (!verifyRes.ok) {
+        const msg = await parseApiError(verifyRes);
+        const lower = msg.toLowerCase();
+        if (lower.includes('expir')) return { error: 'This code has expired. Please request a new one.' };
+        if (lower.includes('invalid') || lower.includes('incorrect') || lower.includes('wrong'))
+          return { error: 'Invalid code. Please check your email and try again.' };
+        return { error: msg };
+      }
+
+      const signupRes = await supabaseFetch('/auth/v1/signup', {
+        method: 'POST',
+        body: JSON.stringify({
+          email: data.email,
+          password,
+          data: {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            phone: data.phone,
+            role: 'celebrity_pending',
+            member_since: new Date().toISOString().split('T')[0],
+          },
+        }),
+      });
+      if (!signupRes.ok) {
+        const msg = await parseApiError(signupRes);
+        if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists'))
+          return { error: 'An account with this email already exists. Please sign in instead.' };
+        return { error: msg };
+      }
+      const signupData = await signupRes.json() as Record<string, unknown>;
+
+      let accessToken: string | null = null;
+      if (signupData.access_token) {
+        accessToken = signupData.access_token as string;
+      } else {
+        const loginRes = await supabaseFetch('/auth/v1/token?grant_type=password', {
+          method: 'POST',
+          body: JSON.stringify({ email: data.email, password }),
+        });
+        if (loginRes.ok) {
+          const ld = await loginRes.json() as Record<string, unknown>;
+          accessToken = (ld.access_token as string) ?? null;
+        }
+      }
+
+      const appRes = await supabaseFetch(
+        '/rest/v1/celebrity_applications',
+        {
+          method: 'POST',
+          headers: { Prefer: 'return=minimal' } as Record<string, string>,
+          body: JSON.stringify(data),
+        },
+        accessToken,
+      );
+      if (appRes.status === 201 || appRes.ok) return { error: null };
+      const appMsg = await parseApiError(appRes);
+      return { error: appMsg || 'Failed to submit application. Please try again.' };
+    } catch {
+      return { error: 'Network error. Please check your connection.' };
+    }
+  }, []);
+
   const checkCelebrityStatus = useCallback(async (
     email: string,
   ): Promise<{ status: string | null; error: string | null }> => {
@@ -523,6 +648,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         forgotPasswordByPhone,
         applyCelebrity,
         checkCelebrityStatus,
+        sendCelebOtp,
+        applyCelebrityWithAuth,
       }}
     >
       {children}

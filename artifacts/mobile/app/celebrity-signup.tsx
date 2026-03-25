@@ -17,12 +17,40 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/Icon';
-import { supabaseFetch, parseApiError } from '@/constants/supabase';
+import { supabaseFetch } from '@/constants/supabase';
+import { useAuth } from '@/context/AuthContext';
+import type { CelebrityFormData } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 
 interface Category {
   id: string;
   name: string;
+}
+
+function getPasswordStrength(pw: string) {
+  const checks = [
+    pw.length >= 8,
+    /[A-Z]/.test(pw),
+    /[a-z]/.test(pw),
+    /[0-9]/.test(pw),
+    /[^A-Za-z0-9]/.test(pw),
+  ];
+  return { checks, score: checks.filter(Boolean).length };
+}
+
+const CHECK_LABELS = ['Min. 8 characters', 'Uppercase letter', 'Lowercase letter', 'Number', 'Special character'];
+const STRENGTH_COLORS = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#22C55E'];
+
+function generatePassword(): string {
+  const upper = 'ABCDEFGHIJKLMNPQRSTUVWXYZ';
+  const lower = 'abcdefghijkmnpqrstuvwxyz';
+  const digits = '23456789';
+  const special = '@#!$%&*';
+  const all = upper + lower + digits + special;
+  const rand = (s: string) => s[Math.floor(Math.random() * s.length)];
+  let pw = rand(upper) + rand(lower) + rand(digits) + rand(special);
+  for (let i = 0; i < 8; i++) pw += rand(all);
+  return pw.split('').sort(() => Math.random() - 0.5).join('');
 }
 
 function InputField({
@@ -140,10 +168,12 @@ export default function CelebritySignupScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const scrollRef = useRef<ScrollView>(null);
+  const { sendCelebOtp, applyCelebrityWithAuth } = useAuth();
 
   const [categories, setCategories] = useState<Category[]>([]);
   const [catLoading, setCatLoading] = useState(true);
 
+  const [step, setStep] = useState<'form' | 'otp'>('form');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -160,15 +190,31 @@ export default function CelebritySignupScreen() {
   const [termsAgreed, setTermsAgreed] = useState(false);
   const [backgroundAgreed, setBackgroundAgreed] = useState(false);
 
+  const [password, setPassword] = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+
+  const [otp, setOtp] = useState('');
+  const [resendCountdown, setResendCountdown] = useState(0);
+
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [apiError, setApiError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+
+  const strength = getPasswordStrength(password);
 
   useEffect(() => {
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (resendCountdown <= 0) return;
+    const timer = setTimeout(() => setResendCountdown((n) => n - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
 
   const fetchCategories = async () => {
     setCatLoading(true);
@@ -195,13 +241,16 @@ export default function CelebritySignupScreen() {
     if (!stageName.trim()) e.stageName = 'Stage name is required';
     if (!category) e.category = 'Please select a category';
     if (!bio.trim()) e.bio = 'Professional bio is required';
+    if (!password) e.password = 'Password is required';
+    else if (strength.score < 5) e.password = 'Password must pass all 5 strength checks';
+    if (password !== confirmPw) e.confirmPw = 'Passwords do not match';
     if (!termsAgreed) e.terms = 'You must agree to the Terms of Service';
     if (!backgroundAgreed) e.background = 'You must consent to background verification';
     return e;
   };
 
-  const handleSubmit = async () => {
-    setApiError('');
+  const handleContinue = async () => {
+    setSubmitError('');
     const e = validate();
     if (Object.keys(e).length > 0) {
       setErrors(e);
@@ -211,81 +260,68 @@ export default function CelebritySignupScreen() {
     setErrors({});
     setLoading(true);
 
-    try {
-      const checkRes = await supabaseFetch(
-        `/rest/v1/celebrity_applications?select=id,status&email=eq.${encodeURIComponent(email.trim())}&limit=1`,
-        {},
-        null,
-      );
-      if (checkRes.ok) {
-        const existing = await checkRes.json() as Array<{ id: string; status: string }>;
-        if (existing && existing.length > 0) {
-          const status = existing[0].status;
-          const msgs: Record<string, string> = {
-            pending: 'You already have a pending application under review.',
-            approved: 'You already have an approved account. Please sign in.',
-            rejected: 'Your application was previously rejected. Please contact support.',
-          };
-          setApiError(msgs[status] ?? 'An application already exists for this email.');
-          setLoading(false);
-          scrollRef.current?.scrollTo({ y: 0, animated: true });
-          return;
-        }
-      }
-
-      const payload = {
-        first_name: firstName.trim(),
-        last_name: lastName.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim(),
-        date_of_birth: dob.trim() || null,
-        stage_name: stageName.trim(),
-        category,
-        bio: bio.trim(),
-        portfolio_link: portfolioLink.trim() || null,
-        social_media: {
-          instagram: instagram.trim() || '',
-          youtube: youtube.trim() || '',
-          twitter: twitter.trim() || '',
-          tiktok: '',
-          facebook: '',
-          linkedin: '',
-          website: '',
-          other: '',
-        },
-      };
-
-      const res = await supabaseFetch(
-        '/rest/v1/celebrity_applications',
-        {
-          method: 'POST',
-          headers: { Prefer: 'return=minimal' } as Record<string, string>,
-          body: JSON.stringify(payload),
-        },
-        null,
-      );
-
-      if (res.status === 201 || res.ok) {
-        setSubmitted(true);
-      } else {
-        const msg = await parseApiError(res);
-        setApiError(msg || 'Failed to submit application. Please try again.');
-        scrollRef.current?.scrollTo({ y: 0, animated: true });
-      }
-    } catch {
-      setApiError('Network error. Please check your connection and try again.');
-      scrollRef.current?.scrollTo({ y: 0, animated: true });
-    }
+    const { error } = await sendCelebOtp(email.trim().toLowerCase());
     setLoading(false);
+    if (error) {
+      setSubmitError(error);
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      return;
+    }
+    setOtp('');
+    setResendCountdown(30);
+    setStep('otp');
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+  };
+
+  const handleResend = async () => {
+    if (resendCountdown > 0) return;
+    setSubmitError('');
+    setLoading(true);
+    const { error } = await sendCelebOtp(email.trim().toLowerCase());
+    setLoading(false);
+    if (error) { setSubmitError(error); return; }
+    setResendCountdown(30);
+  };
+
+  const handleVerify = async () => {
+    setSubmitError('');
+    if (otp.length < 6) { setSubmitError('Please enter the 6-digit code.'); return; }
+    setLoading(true);
+
+    const formData: CelebrityFormData = {
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      date_of_birth: dob.trim() || null,
+      stage_name: stageName.trim(),
+      category,
+      bio: bio.trim(),
+      achievements: achievements.trim(),
+      portfolio_link: portfolioLink.trim() || null,
+      social_media: {
+        instagram: instagram.trim(),
+        youtube: youtube.trim(),
+        twitter: twitter.trim(),
+        tiktok: '',
+        facebook: '',
+        linkedin: '',
+        website: '',
+        other: '',
+      },
+    };
+
+    const { error } = await applyCelebrityWithAuth(formData, password, otp.trim());
+    setLoading(false);
+    if (error) { setSubmitError(error); return; }
+    setSubmitted(true);
   };
 
   if (submitted) {
     return (
       <View style={[cs.container, { backgroundColor: colors.background }]}>
         <View style={[cs.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Icon name="arrow-left" size={22} color={colors.foreground} />
-          </TouchableOpacity>
+          <View style={{ width: 22 }} />
           <Text style={[cs.headerTitle, { color: colors.foreground }]}>Celebrity Registration</Text>
           <View style={{ width: 22 }} />
         </View>
@@ -299,16 +335,106 @@ export default function CelebritySignupScreen() {
             </View>
             <Text style={[cs.successTitle, { color: '#22C55E' }]}>Application Submitted!</Text>
             <Text style={[cs.successSub, { color: colors.mutedForeground }]}>
-              Thank you {firstName}! Your application is under review. Our team will verify your details and get back to you within 3–5 business days.
+              Your account has been created and your application is under review. Our team will verify your details within 3–5 business days.
             </Text>
           </LinearGradient>
           <TouchableOpacity
             style={[cs.backBtn, { backgroundColor: colors.primary }]}
             onPress={() => router.replace('/(auth)' as never)}
           >
-            <Text style={cs.backBtnText}>Back to Sign In</Text>
+            <Text style={cs.backBtnText}>Go to Sign In</Text>
           </TouchableOpacity>
         </View>
+      </View>
+    );
+  }
+
+  if (step === 'otp') {
+    return (
+      <View style={[cs.container, { backgroundColor: colors.background }]}>
+        <View style={[cs.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => { setStep('form'); setSubmitError(''); }}>
+            <Icon name="arrow-left" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+          <Text style={[cs.headerTitle, { color: colors.foreground }]}>Verify Email</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <ScrollView
+          contentContainerStyle={{ padding: 24, paddingBottom: insets.bottom + 40 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={{ alignItems: 'center', paddingVertical: 20, gap: 12 }}>
+            <LinearGradient
+              colors={['#FF6B33', '#B44CFF']}
+              style={[cs.otpIconCircle]}
+            >
+              <Icon name="mail" size={32} color="#fff" />
+            </LinearGradient>
+            <Text style={[cs.otpTitle, { color: colors.foreground }]}>Check Your Email</Text>
+            <Text style={[cs.otpSub, { color: colors.mutedForeground }]}>
+              We sent a 6-digit verification code to{'\n'}
+              <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>{email}</Text>
+            </Text>
+            <TouchableOpacity onPress={() => { setStep('form'); setSubmitError(''); }}>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular', textDecorationLine: 'underline' }}>
+                Change email address
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[cs.otpBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[cs.otpLabel, { color: colors.foreground }]}>Enter 6-digit code</Text>
+            <TextInput
+              style={[cs.otpInput, { backgroundColor: colors.input, borderColor: submitError ? colors.destructive : colors.border, color: colors.foreground }]}
+              value={otp}
+              onChangeText={(t) => { setOtp(t.replace(/\D/g, '').slice(0, 6)); setSubmitError(''); }}
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="000000"
+              placeholderTextColor={colors.mutedForeground}
+            />
+            {submitError ? (
+              <View style={[cs.errorBannerSmall, { backgroundColor: colors.destructive + '20', borderColor: colors.destructive + '40' }]}>
+                <Icon name="alert-circle" size={14} color={colors.destructive} />
+                <Text style={[cs.errorBannerText, { color: colors.destructive }]}>{submitError}</Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={handleVerify}
+              disabled={loading || otp.length < 6}
+              style={({ pressed }) => [{ opacity: pressed || loading || otp.length < 6 ? 0.7 : 1, marginTop: 16 }]}
+            >
+              <LinearGradient
+                colors={['#FF6B33', '#B44CFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={cs.gradBtn}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={cs.gradBtnText}>Verify & Create Account</Text>
+                )}
+              </LinearGradient>
+            </Pressable>
+
+            <TouchableOpacity
+              onPress={handleResend}
+              disabled={resendCountdown > 0 || loading}
+              style={[cs.resendBtn, { opacity: resendCountdown > 0 ? 0.5 : 1 }]}
+            >
+              <Icon name="refresh-cw" size={14} color={colors.mutedForeground} />
+              <Text style={[cs.resendText, { color: colors.mutedForeground }]}>
+                {resendCountdown > 0 ? `Resend code in ${resendCountdown}s` : 'Resend Code'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[cs.note, { color: colors.mutedForeground, marginTop: 24 }]}>
+            After verification, your Supabase account will be created with the role celebrity_pending. Our team will approve your application within 3–5 business days.
+          </Text>
+        </ScrollView>
       </View>
     );
   }
@@ -352,10 +478,10 @@ export default function CelebritySignupScreen() {
           </View>
         </LinearGradient>
 
-        {apiError ? (
+        {submitError ? (
           <View style={[cs.errorBanner, { backgroundColor: colors.destructive + '20', borderColor: colors.destructive + '40' }]}>
             <Icon name="alert-circle" size={16} color={colors.destructive} />
-            <Text style={[cs.errorBannerText, { color: colors.destructive }]}>{apiError}</Text>
+            <Text style={[cs.errorBannerText, { color: colors.destructive }]}>{submitError}</Text>
           </View>
         ) : null}
 
@@ -363,35 +489,13 @@ export default function CelebritySignupScreen() {
 
         <View style={cs.row}>
           <View style={{ flex: 1 }}>
-            <InputField
-              icon="user"
-              placeholder="First Name"
-              value={firstName}
-              onChangeText={setFirstName}
-              error={errors.firstName}
-              autoCapitalize="words"
-            />
+            <InputField icon="user" placeholder="First Name" value={firstName} onChangeText={setFirstName} error={errors.firstName} autoCapitalize="words" />
           </View>
           <View style={{ flex: 1 }}>
-            <InputField
-              icon="user"
-              placeholder="Last Name"
-              value={lastName}
-              onChangeText={setLastName}
-              error={errors.lastName}
-              autoCapitalize="words"
-            />
+            <InputField icon="user" placeholder="Last Name" value={lastName} onChangeText={setLastName} error={errors.lastName} autoCapitalize="words" />
           </View>
         </View>
-
-        <InputField
-          icon="mail"
-          placeholder="Email address"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          error={errors.email}
-        />
+        <InputField icon="mail" placeholder="Email address" value={email} onChangeText={setEmail} keyboardType="email-address" error={errors.email} />
         <InputField
           icon="phone"
           placeholder="+91 98765 43210"
@@ -400,23 +504,76 @@ export default function CelebritySignupScreen() {
           keyboardType="phone-pad"
           error={errors.phone}
         />
+        <InputField icon="calendar" placeholder="Date of Birth (DD/MM/YYYY)" value={dob} onChangeText={setDob} />
+
+        <SectionHeader icon="lock" title="Create Password" />
+
         <InputField
-          icon="calendar"
-          placeholder="Date of Birth (DD/MM/YYYY)"
-          value={dob}
-          onChangeText={setDob}
+          icon="lock"
+          placeholder="Create Password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPw}
+          error={errors.password}
+          rightElement={
+            <TouchableOpacity onPress={() => setShowPw(!showPw)}>
+              <Icon name={showPw ? 'eye' : 'eye-off'} size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          }
+        />
+
+        {password.length > 0 && (
+          <View style={{ marginBottom: 14 }}>
+            <View style={cs.strengthBars}>
+              {[0, 1, 2, 3, 4].map((i) => (
+                <View
+                  key={i}
+                  style={[
+                    cs.strengthBar,
+                    { backgroundColor: i < strength.score ? STRENGTH_COLORS[strength.score - 1] : colors.muted },
+                  ]}
+                />
+              ))}
+            </View>
+            <Text style={[cs.strengthLabel, { color: strength.score < 3 ? colors.destructive : strength.score < 5 ? '#F59E0B' : '#22C55E' }]}>
+              {['', 'Very Weak', 'Weak', 'Fair', 'Strong', 'Very Strong'][strength.score]}
+            </Text>
+            <View style={cs.checks}>
+              {CHECK_LABELS.map((label, i) => (
+                <View key={label} style={cs.checkRow}>
+                  <Icon name={strength.checks[i] ? 'check-circle' : 'circle'} size={13} color={strength.checks[i] ? '#22C55E' : colors.mutedForeground} />
+                  <Text style={[cs.checkText, { color: strength.checks[i] ? colors.foreground : colors.mutedForeground }]}>{label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={[cs.genPwBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
+          onPress={() => { const p = generatePassword(); setPassword(p); setConfirmPw(p); }}
+        >
+          <Icon name="sparkles" size={14} color={colors.primary} />
+          <Text style={[cs.genPwText, { color: colors.primary }]}>Generate Strong Password</Text>
+        </TouchableOpacity>
+
+        <InputField
+          icon="lock"
+          placeholder="Confirm Password"
+          value={confirmPw}
+          onChangeText={setConfirmPw}
+          secureTextEntry={!showConfirmPw}
+          error={errors.confirmPw}
+          rightElement={
+            <TouchableOpacity onPress={() => setShowConfirmPw(!showConfirmPw)}>
+              <Icon name={showConfirmPw ? 'eye' : 'eye-off'} size={18} color={colors.mutedForeground} />
+            </TouchableOpacity>
+          }
         />
 
         <SectionHeader icon="briefcase" title="Professional Details" />
 
-        <InputField
-          icon="star"
-          placeholder="Stage Name / Screen Name"
-          value={stageName}
-          onChangeText={setStageName}
-          error={errors.stageName}
-          autoCapitalize="words"
-        />
+        <InputField icon="star" placeholder="Stage Name / Screen Name" value={stageName} onChangeText={setStageName} error={errors.stageName} autoCapitalize="words" />
 
         {catLoading ? (
           <View style={[cs.inputRow, { backgroundColor: colors.input, borderColor: colors.border, borderWidth: 1.5, marginBottom: 14 }]}>
@@ -426,48 +583,21 @@ export default function CelebritySignupScreen() {
         ) : (
           <>
             <TouchableOpacity
-              style={[
-                cs.inputRow,
-                { backgroundColor: colors.input, borderColor: errors.category ? colors.destructive : colors.border, borderWidth: 1.5, marginBottom: errors.category ? 4 : 14 },
-              ]}
+              style={[cs.inputRow, { backgroundColor: colors.input, borderColor: errors.category ? colors.destructive : colors.border, borderWidth: 1.5, marginBottom: errors.category ? 4 : 14 }]}
               onPress={() => setShowCategoryPicker(true)}
             >
               <Icon name="briefcase" size={18} color={colors.mutedForeground} />
-              <Text
-                style={[
-                  cs.input,
-                  { color: category ? colors.foreground : colors.mutedForeground, fontFamily: 'Inter_400Regular', lineHeight: 48 },
-                ]}
-              >
+              <Text style={[cs.input, { color: category ? colors.foreground : colors.mutedForeground, fontFamily: 'Inter_400Regular', lineHeight: 48 }]}>
                 {category || 'Select Category'}
               </Text>
               <Icon name="chevron-down" size={18} color={colors.mutedForeground} />
             </TouchableOpacity>
-            {errors.category ? (
-              <Text style={[cs.errorText, { color: colors.destructive, marginBottom: 10 }]}>{errors.category}</Text>
-            ) : null}
+            {errors.category ? <Text style={[cs.errorText, { color: colors.destructive, marginBottom: 10 }]}>{errors.category}</Text> : null}
           </>
         )}
 
-        <InputField
-          placeholder="Professional Bio — tell us about your career, experience, and what makes you unique..."
-          value={bio}
-          onChangeText={setBio}
-          multiline
-          numberOfLines={4}
-          icon="edit-2"
-          error={errors.bio}
-          autoCapitalize="sentences"
-        />
-        <InputField
-          placeholder="Key Achievements (awards, recognitions, milestones) — optional"
-          value={achievements}
-          onChangeText={setAchievements}
-          multiline
-          numberOfLines={3}
-          icon="award"
-          autoCapitalize="sentences"
-        />
+        <InputField placeholder="Professional Bio — tell us about your career and what makes you unique..." value={bio} onChangeText={setBio} multiline numberOfLines={4} icon="edit-2" error={errors.bio} autoCapitalize="sentences" />
+        <InputField placeholder="Key Achievements (awards, recognitions) — optional" value={achievements} onChangeText={setAchievements} multiline numberOfLines={3} icon="award" autoCapitalize="sentences" />
 
         <View style={[cs.earningNote, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
           <Icon name="trending-up" size={18} color={colors.primary} />
@@ -485,58 +615,35 @@ export default function CelebritySignupScreen() {
           placeholder="Instagram @username"
           value={instagram}
           onChangeText={setInstagram}
-          leftElement={
-            <View style={{ marginRight: 10 }}>
-              <Icon name="instagram" size={18} color="#E1306C" />
-            </View>
-          }
+          leftElement={<View style={{ marginRight: 10 }}><Icon name="instagram" size={18} color="#E1306C" /></View>}
         />
         <InputField
           placeholder="YouTube channel URL or name"
           value={youtube}
           onChangeText={setYoutube}
-          leftElement={
-            <View style={{ marginRight: 10 }}>
-              <Icon name="youtube" size={18} color="#FF0000" />
-            </View>
-          }
+          leftElement={<View style={{ marginRight: 10 }}><Icon name="youtube" size={18} color="#FF0000" /></View>}
         />
         <InputField
           placeholder="Twitter/X @username"
           value={twitter}
           onChangeText={setTwitter}
-          leftElement={
-            <View style={{ marginRight: 10 }}>
-              <Icon name="twitter" size={18} color="#1DA1F2" />
-            </View>
-          }
+          leftElement={<View style={{ marginRight: 10 }}><Icon name="twitter" size={18} color="#1DA1F2" /></View>}
         />
 
         <SectionHeader icon="shield" title="Verification" />
 
-        <InputField
-          icon="link"
-          placeholder="Portfolio / Website URL (optional)"
-          value={portfolioLink}
-          onChangeText={setPortfolioLink}
-          keyboardType="url"
-        />
+        <InputField icon="link" placeholder="Portfolio / Website URL (optional)" value={portfolioLink} onChangeText={setPortfolioLink} keyboardType="url" />
 
         <View style={[cs.uploadBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
           <Icon name="upload" size={24} color={colors.mutedForeground} />
           <Text style={[cs.uploadText, { color: colors.mutedForeground }]}>Government ID Upload</Text>
-          <Text style={[cs.uploadSub, { color: colors.mutedForeground }]}>Aadhaar / PAN / Passport (JPG, PNG, PDF) — optional for now</Text>
+          <Text style={[cs.uploadSub, { color: colors.mutedForeground }]}>Aadhaar / PAN / Passport — optional for now</Text>
         </View>
 
         <SectionHeader icon="check-circle" title="Terms & Consent" />
 
         <TouchableOpacity style={cs.checkboxRow} onPress={() => setTermsAgreed(!termsAgreed)}>
-          <View
-            style={[
-              cs.checkbox,
-              { borderColor: termsAgreed ? colors.primary : errors.terms ? colors.destructive : colors.border, backgroundColor: termsAgreed ? colors.primary : 'transparent' },
-            ]}
-          >
+          <View style={[cs.checkbox, { borderColor: termsAgreed ? colors.primary : errors.terms ? colors.destructive : colors.border, backgroundColor: termsAgreed ? colors.primary : 'transparent' }]}>
             {termsAgreed && <Icon name="check" size={12} color="#fff" />}
           </View>
           <Text style={[cs.checkboxText, { color: colors.foreground }]}>
@@ -546,17 +653,10 @@ export default function CelebritySignupScreen() {
             <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>Creator Guidelines</Text>
           </Text>
         </TouchableOpacity>
-        {errors.terms ? (
-          <Text style={[cs.errorText, { color: colors.destructive, marginBottom: 8 }]}>{errors.terms}</Text>
-        ) : null}
+        {errors.terms ? <Text style={[cs.errorText, { color: colors.destructive, marginBottom: 8 }]}>{errors.terms}</Text> : null}
 
         <TouchableOpacity style={cs.checkboxRow} onPress={() => setBackgroundAgreed(!backgroundAgreed)}>
-          <View
-            style={[
-              cs.checkbox,
-              { borderColor: backgroundAgreed ? colors.primary : errors.background ? colors.destructive : colors.border, backgroundColor: backgroundAgreed ? colors.primary : 'transparent' },
-            ]}
-          >
+          <View style={[cs.checkbox, { borderColor: backgroundAgreed ? colors.primary : errors.background ? colors.destructive : colors.border, backgroundColor: backgroundAgreed ? colors.primary : 'transparent' }]}>
             {backgroundAgreed && <Icon name="check" size={12} color="#fff" />}
           </View>
           <Text style={[cs.checkboxText, { color: colors.foreground }]}>
@@ -565,12 +665,10 @@ export default function CelebritySignupScreen() {
             {' '}as part of the onboarding process
           </Text>
         </TouchableOpacity>
-        {errors.background ? (
-          <Text style={[cs.errorText, { color: colors.destructive, marginBottom: 8 }]}>{errors.background}</Text>
-        ) : null}
+        {errors.background ? <Text style={[cs.errorText, { color: colors.destructive, marginBottom: 8 }]}>{errors.background}</Text> : null}
 
         <Pressable
-          onPress={handleSubmit}
+          onPress={handleContinue}
           disabled={loading}
           style={({ pressed }) => [{ opacity: pressed || loading ? 0.7 : 1, marginTop: 20 }]}
         >
@@ -583,20 +681,16 @@ export default function CelebritySignupScreen() {
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={cs.gradBtnText}>Submit Application</Text>
+              <>
+                <Icon name="mail" size={16} color="#fff" />
+                <Text style={[cs.gradBtnText, { marginLeft: 8 }]}>Continue to Verification</Text>
+              </>
             )}
           </LinearGradient>
         </Pressable>
 
-        {apiError ? (
-          <View style={[cs.errorBanner, { backgroundColor: colors.destructive + '20', borderColor: colors.destructive + '40', marginTop: 12 }]}>
-            <Icon name="alert-circle" size={16} color={colors.destructive} />
-            <Text style={[cs.errorBannerText, { color: colors.destructive }]}>{apiError}</Text>
-          </View>
-        ) : null}
-
         <Text style={[cs.note, { color: colors.mutedForeground }]}>
-          After submission, our team will review your application within 3–5 business days. You'll receive an email notification when your account is approved.
+          We'll send a verification code to your email to confirm your identity before creating your account.
         </Text>
       </ScrollView>
 
@@ -651,6 +745,15 @@ const cs = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 16,
   },
+  errorBannerSmall: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 8,
+  },
   errorBannerText: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', lineHeight: 18 },
   sectionRow: {
     flexDirection: 'row',
@@ -673,6 +776,24 @@ const cs = StyleSheet.create({
   },
   input: { flex: 1, fontSize: 14, height: 52 },
   errorText: { fontSize: 11, fontFamily: 'Inter_400Regular', marginBottom: 4 },
+  strengthBars: { flexDirection: 'row', gap: 4, marginBottom: 4 },
+  strengthBar: { flex: 1, height: 4, borderRadius: 2 },
+  strengthLabel: { fontSize: 12, fontFamily: 'Inter_600SemiBold', marginBottom: 6 },
+  checks: { gap: 4 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  checkText: { fontSize: 11, fontFamily: 'Inter_400Regular' },
+  genPwBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    alignSelf: 'flex-start',
+    marginBottom: 14,
+  },
+  genPwText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
   earningNote: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -712,6 +833,7 @@ const cs = StyleSheet.create({
     paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    flexDirection: 'row',
   },
   gradBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   note: {
@@ -763,4 +885,39 @@ const cs = StyleSheet.create({
   successSub: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
   backBtn: { paddingHorizontal: 40, paddingVertical: 14, borderRadius: 9999 },
   backBtnText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  otpIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  otpTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', textAlign: 'center' },
+  otpSub: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
+  otpBox: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 24,
+    gap: 0,
+  },
+  otpLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 12, textAlign: 'center' },
+  otpInput: {
+    fontSize: 28,
+    fontFamily: 'Inter_700Bold',
+    textAlign: 'center',
+    letterSpacing: 12,
+    borderRadius: 16,
+    borderWidth: 2,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+  },
+  resendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginTop: 16,
+    paddingVertical: 8,
+  },
+  resendText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
 });
