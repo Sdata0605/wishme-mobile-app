@@ -1,0 +1,187 @@
+Here is the complete technical specification of the /photo-wish page for your Replit mobile app integration.
+
+Photo Wish Page — Complete Technical Specification for Replit
+Purpose
+The Photo Wish feature lets users upload a personal photo, then uses AI (Gemini 2.5 Flash Image Preview) to overlay stylized wish text directly onto the image — creating a personalized greeting image. Users pay per generation from their wallet balance, with plan-based discounts.
+
+Database Table: photo_wishes
+
+{
+  "id": "uuid (PK, auto-generated)",
+  "user_id": "uuid (FK → profiles.id)",
+  "original_image_url": "text (truncated base64 reference)",
+  "edited_image_url": "text (base64 data URL of generated image)",
+  "occasion": "text",
+  "recipient_name": "text",
+  "wish_message": "text",
+  "sender_name": "text (nullable)",
+  "text_style": "text (default: 'elegant')",
+  "amount_charged": "numeric",
+  "status": "text ('completed' | 'failed' | 'pending')",
+  "completed_at": "timestamptz (nullable)",
+  "created_at": "timestamptz (auto)"
+}
+Also reads from:
+
+platform_settings — key photo_wish_price for dynamic pricing
+profiles — wallet_balance for payment, plan for discount calculation
+wallet_transactions — records deductions
+API Endpoints
+1. Fetch Pricing
+GET /rest/v1/platform_settings?setting_key=eq.photo_wish_price&select=setting_value
+Authorization: Bearer <user_jwt>
+apikey: <anon_key>
+Response:
+
+
+{ "setting_value": "99" }
+2. Fetch History
+GET /rest/v1/photo_wishes?user_id=eq.<profile_id>&order=created_at.desc&limit=20&select=*
+Authorization: Bearer <user_jwt>
+apikey: <anon_key>
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "original_image_url": "data:image/jpeg;base64,/9j/4AAQ...(truncated)",
+    "edited_image_url": "data:image/png;base64,iVBOR...",
+    "occasion": "Birthday",
+    "recipient_name": "Priya",
+    "wish_message": "Happy Birthday dear!",
+    "sender_name": "Rahul",
+    "text_style": "elegant",
+    "amount_charged": 99,
+    "status": "completed",
+    "completed_at": "2026-03-25T10:30:00Z",
+    "created_at": "2026-03-25T10:29:45Z"
+  }
+]
+3. Generate Photo Wish (Edge Function)
+POST /functions/v1/generate-photo-wish
+Authorization: Bearer <user_jwt>
+apikey: <anon_key>
+Content-Type: application/json
+Request Payload:
+
+
+{
+  "originalImageBase64": "data:image/jpeg;base64,/9j/4AAQSkZJRg...",
+  "occasion": "Birthday",
+  "recipientName": "Priya",
+  "wishMessage": "Wishing you the happiest birthday! May all your dreams come true.",
+  "senderName": "Rahul",
+  "textStyle": "elegant"
+}
+textStyle options: "elegant" | "playful" | "modern" | "classic" | "festive"
+
+Success Response (200):
+
+
+{
+  "success": true,
+  "photoWishId": "uuid",
+  "editedImageUrl": "data:image/png;base64,iVBORw0KGgo...",
+  "amountCharged": 99
+}
+Error Responses:
+
+
+// 400 - Insufficient balance
+{
+  "error": "Insufficient wallet balance",
+  "currentBalance": 50,
+  "required": 99
+}
+
+// 400 - Missing fields
+{ "error": "Missing required fields" }
+
+// 400 - No profile
+{ "error": "User profile not found. Please complete your profile first." }
+
+// 429 - Rate limited
+{ "error": "Rate limit exceeded. Please try again later." }
+
+// 500 - AI failed
+{ "error": "Failed to generate: AI content policy restriction" }
+Data Flow
+
+1. Page Load
+   ├── Fetch platform_settings → photo_wish_price → set basePrice
+   ├── Fetch user plan → calculate discount → discountedPrice
+   └── Fetch photo_wishes (user_id = profile.id, limit 20) → history
+
+2. Image Upload (client-side only)
+   ├── User picks image file (max 10MB, image/* only)
+   ├── Compress via Canvas API (max 1200px width, 80% JPEG quality)
+   └── Store compressed base64 data URL in React state
+
+3. Generate Photo Wish
+   ├── Validate: image + occasion + recipientName + wishMessage
+   ├── Check: walletBalance >= discountedPrice
+   ├── POST /functions/v1/generate-photo-wish
+   │   ├── Edge function verifies JWT → gets user
+   │   ├── Fetches profile by user_id → checks wallet_balance
+   │   ├── Calls Lovable AI Gateway (Gemini 2.5 Flash Image Preview)
+   │   │   └── Sends image + text overlay prompt with style instructions
+   │   ├── Extracts generated image from response.choices[0].message.images[0]
+   │   ├── INSERT into photo_wishes (status: completed)
+   │   ├── UPDATE profiles SET wallet_balance = balance - price
+   │   ├── INSERT wallet_transactions (type: photo_wish, amount: -price)
+   │   └── Returns { success, photoWishId, editedImageUrl, amountCharged }
+   └── Frontend displays generated image in preview panel
+
+4. Download
+   └── Create <a> element with href=base64_data_url, trigger click
+UI Components Used
+Component	Library	Usage
+AuthenticatedLayout	Custom	Page wrapper with sidebar/nav
+Card, CardContent, CardHeader, CardTitle, CardDescription	shadcn/ui	Stats cards, form card, preview card, history cards
+Tabs, TabsList, TabsTrigger, TabsContent	shadcn/ui	"Create" / "History" tabs
+Button	shadcn/ui	Generate, download, add funds, clear image
+Input	shadcn/ui	Recipient name, sender name
+Textarea	shadcn/ui	Wish message
+Select, SelectTrigger, SelectValue, SelectContent, SelectItem	shadcn/ui	Occasion picker (15 options)
+Label	shadcn/ui	Form field labels
+Badge	shadcn/ui	Status badge on history items
+PricingDisplay	Custom (discount-badge)	Shows base price, discount %, final price
+Loader2, Upload, ImageIcon, Download, Sparkles, Wand2, History, X, Wallet, Send, Star	lucide-react	Icons throughout
+toast	sonner	Success/error notifications
+Layout Structure
+
+┌─────────────────────────────────────────┐
+│ Header: "Photo Wish" + description      │
+├───────────┬───────────┬─────────────────┤
+│ Wallet ₹  │ Today's   │ Total Created   │
+│ Balance   │ Gens      │ count           │
+├───────────┴───────────┴─────────────────┤
+│ [Create Tab] [History Tab]              │
+├─────────────────┬───────────────────────┤
+│ CREATE TAB:     │                       │
+│ ┌─────────────┐ │ ┌───────────────────┐ │
+│ │ Upload Zone │ │ │ Preview Panel     │ │
+│ │ Occasion    │ │ │                   │ │
+│ │ Recipient   │ │ │ Generated image   │ │
+│ │ Message     │ │ │ or placeholder    │ │
+│ │ Sender      │ │ │                   │ │
+│ │ Text Style  │ │ │ [Download]        │ │
+│ │ Pricing     │ │ │                   │ │
+│ │ [Generate]  │ │ └───────────────────┘ │
+│ └─────────────┘ │                       │
+├─────────────────┴───────────────────────┤
+│ HISTORY TAB:                            │
+│ Grid of cards (2-3 cols) with:          │
+│ - Generated image thumbnail             │
+│ - Status badge + date                   │
+│ - Recipient name + occasion             │
+│ - Download button                       │
+└─────────────────────────────────────────┘
+Mobile-Specific Notes for Replit
+Image compression is critical — compress client-side to max 1200px width before sending. The base64 payload can be very large otherwise and will cause timeouts.
+The generated image is returned as a base64 data URL — not a remote URL. Store/cache it locally on the device.
+Text styles are processed server-side via AI prompt engineering — the client just sends the style ID string.
+Wallet check happens both client-side (to disable button) and server-side (edge function validates before charging).
+The edge function uses LOVABLE_API_KEY to call the AI gateway — this is a server-side secret, never exposed to the client.
+Plan discounts are calculated client-side using the usePlanDiscount hook which reads profiles.plan and plans.photo_wish_discount from the database.
