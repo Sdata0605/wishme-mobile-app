@@ -39,7 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'music-2', label: 'AI Music', route: '/(tabs)/music' },
   { icon: 'image', label: 'Photo Wish', route: '/photo-wish' },
   { icon: 'star', label: 'Wish a Celebrity', route: '/wish-celebrity' },
-  { icon: 'video', label: 'Wish a Friend', route: '/(tabs)/celebrities' },
+  { icon: 'video', label: 'Wish a Friend', route: '/wish-friend' },
   { icon: 'briefcase', label: 'For Business', route: '/for-business' },
   { icon: 'mail', label: 'Greeting Cards', route: '/greeting-cards' },
   { icon: 'zap', label: 'Image Promotions', route: '/image-promotions' },

@@ -42,6 +42,7 @@ function RootLayoutNav() {
       <Stack.Screen name="loved-ones" />
       <Stack.Screen name="photo-wish" />
       <Stack.Screen name="wish-celebrity" />
+      <Stack.Screen name="wish-friend" />
       <Stack.Screen name="for-business" />
       <Stack.Screen name="greeting-cards" />
       <Stack.Screen name="image-promotions" />
