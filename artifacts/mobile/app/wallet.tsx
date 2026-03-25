@@ -1,7 +1,5 @@
-import * as Linking from 'expo-linking';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -108,7 +106,15 @@ function AddMoneyTab({ balance, profileId, colors, session, user, onSuccess }: A
     try {
       const orderRes = await supabaseFetch(
         '/functions/v1/create-razorpay-order',
-        { method: 'POST', body: JSON.stringify({ amount: numAmount }) },
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            amount: numAmount,
+            currency: 'INR',
+            receipt: `wall_${profileId.slice(0, 8)}_${Date.now()}`.slice(0, 40),
+            notes: { user_id: profileId, type: 'wallet_deposit' },
+          }),
+        },
         session.access_token,
       );
       if (!orderRes.ok) {
@@ -148,6 +154,8 @@ function AddMoneyTab({ balance, profileId, colors, session, user, onSuccess }: A
         }
       };
 
+      const prefillName = user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : '';
+
       if (Platform.OS === 'web') {
         await loadRazorpayScript();
         const rzp = new window.Razorpay({
@@ -158,7 +166,7 @@ function AddMoneyTab({ balance, profileId, colors, session, user, onSuccess }: A
           name: 'WishMe',
           description: 'Wallet Recharge',
           prefill: {
-            name: user ? `${user.firstName} ${user.lastName}` : '',
+            name: prefillName,
             email: user?.email ?? '',
             contact: user?.phone ?? '',
           },
@@ -169,43 +177,52 @@ function AddMoneyTab({ balance, profileId, colors, session, user, onSuccess }: A
         });
         rzp.open();
       } else {
-        const callbackBase = Linking.createURL('payment/callback');
-        const html = `<!DOCTYPE html><html><body style="margin:0;background:#fff;">
-<script src="https://checkout.razorpay.com/v1/checkout.js"><\/script>
-<script>
-var rzp = new Razorpay({
-  key: "${order.key_id}",
-  amount: "${order.amount}",
-  currency: "${order.currency ?? 'INR'}",
-  order_id: "${order.id}",
-  name: "WishMe",
-  description: "Wallet Recharge",
-  prefill: { name: "${user ? `${user.firstName} ${user.lastName}` : ''}", email: "${user?.email ?? ''}", contact: "${user?.phone ?? ''}" },
-  theme: { color: "#FF6B33" },
-  handler: function(r) {
-    window.location.href = "${callbackBase}?payment_id=" + r.razorpay_payment_id + "&order_id=" + r.razorpay_order_id + "&signature=" + r.razorpay_signature;
-  },
-  modal: { ondismiss: function() { window.location.href = "${callbackBase}?cancelled=1"; } }
-});
-rzp.open();
-<\/script></body></html>`;
-
-        const dataUri = `data:text/html;charset=utf-8,${encodeURIComponent(html)}`;
-        const result = await WebBrowser.openAuthSessionAsync(dataUri, callbackBase);
-
-        if (result.type === 'success' && result.url) {
-          const parsed = Linking.parse(result.url);
-          const qp = parsed.queryParams ?? {};
-          const paymentId = qp['payment_id'] as string | undefined;
-          const orderId = qp['order_id'] as string | undefined;
-          const signature = qp['signature'] as string | undefined;
-          if (paymentId && orderId && signature) {
-            await verifyAndCredit(paymentId, orderId, signature);
+        type RazorpayModule = { open: (opts: Record<string, unknown>) => Promise<{ razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }> };
+        let razorpayModule: RazorpayModule | null = null;
+        try {
+          const mod = require('react-native-razorpay') as { default?: RazorpayModule } & RazorpayModule;
+          const candidate = mod.default ?? mod;
+          if (candidate && typeof candidate.open === 'function') {
+            razorpayModule = candidate;
           }
+        } catch {
+          // native module not linked
+        }
+
+        if (!razorpayModule) {
+          setPaying(false);
+          Alert.alert(
+            'Native Checkout Not Available',
+            'Razorpay native checkout requires a custom development build (not Expo Go). Please use the production app.',
+            [{ text: 'OK' }],
+          );
+          return;
+        }
+
+        const data = await razorpayModule.open({
+          key: order.key_id,
+          amount: String(order.amount),
+          currency: order.currency ?? 'INR',
+          order_id: order.id,
+          name: 'WishMe',
+          description: 'Wallet Recharge',
+          prefill: {
+            name: prefillName,
+            email: user?.email ?? '',
+            contact: user?.phone ?? '',
+          },
+          theme: { color: '#FF6B33' },
+        });
+
+        if (data?.razorpay_payment_id) {
+          await verifyAndCredit(data.razorpay_payment_id, data.razorpay_order_id, data.razorpay_signature);
         }
       }
     } catch (err) {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      const errMsg = (err as Record<string, string>)?.description ?? 'Something went wrong. Please try again.';
+      if (!errMsg.toLowerCase().includes('cancel')) {
+        Alert.alert('Payment Error', errMsg);
+      }
     } finally {
       setPaying(false);
     }
