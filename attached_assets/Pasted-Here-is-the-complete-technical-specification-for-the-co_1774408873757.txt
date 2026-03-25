@@ -1,0 +1,161 @@
+Here is the complete technical specification for the /commission page for your Replit mobile app integration:
+
+/commission Page — Full Technical Specification
+Purpose
+A unified commission earnings dashboard where users can view both referral commissions (earned by referring other users) and celebrity booking commissions (earned by celebrities from completed bookings). Includes TDS (Tax Deducted at Source) breakdowns and date filtering.
+
+Authentication
+Requires login. Uses useAuth() hook to get profile.id.
+Wrapped in AuthenticatedLayout.
+Database Tables Used
+1. referral_transactions — Referral commission records
+
+Column	Type	Description
+id	uuid	Primary key
+referrer_id	uuid	The user who earned the commission (= profile.id)
+referred_id	uuid	The user who was referred
+booking_id	uuid	Related booking/order ID
+commission_level	integer	1 = direct referral, 2 = second-level
+commission_amount	integer	Amount earned in INR
+status	text	completed or pending
+order_type	text	booking, photo_wish, voice_call_wish, music_generation, image_promotion, celebrity_favorite, wish_celebrity_order
+created_at	timestamptz	When commission was created
+2. celebrity_wallet_transactions — Celebrity earning records
+
+Column	Type	Description
+id	uuid	Primary key
+celebrity_id	uuid	The celebrity's profile ID
+booking_id	uuid	Related booking ID
+transaction_type	text	earning, withdrawal, etc.
+amount	numeric	Net amount after TDS
+gross_amount	numeric	Amount before TDS
+tds_percentage	numeric	TDS rate (10% or 20%)
+tds_amount	numeric	TDS deducted
+commission_percentage	integer	Celebrity's commission rate (default 70%)
+description	text	Human-readable description
+status	text	completed
+created_at	timestamptz	Transaction date
+API Endpoints (All Supabase REST)
+Endpoint 1 — Fetch Referral Commissions
+
+GET /rest/v1/referral_transactions
+  ?referrer_id=eq.{profile.id}
+  &status=eq.completed
+  &order=created_at.desc
+  &created_at=gte.{startDate}    (optional)
+  &created_at=lte.{endDate}      (optional)
+
+Headers:
+  Authorization: Bearer {session.access_token}
+  apikey: {SUPABASE_ANON_KEY}
+Endpoint 2 — Fetch Celebrity Earnings
+
+GET /rest/v1/celebrity_wallet_transactions
+  ?celebrity_id=eq.{profile.id}
+  &transaction_type=eq.earning
+  &order=created_at.desc
+  &created_at=gte.{startDate}    (optional)
+  &created_at=lte.{endDate}      (optional)
+
+Headers:
+  Authorization: Bearer {session.access_token}
+  apikey: {SUPABASE_ANON_KEY}
+Data Flow
+
+Page Load
+  ├── useAuth() → get profile.id
+  ├── GET referral_transactions (filtered by referrer_id, status=completed)
+  ├── GET celebrity_wallet_transactions (filtered by celebrity_id, transaction_type=earning)
+  │
+  ├── Client-side calculations:
+  │   ├── totalReferralEarned = SUM(referral_transactions.commission_amount)
+  │   ├── totalCelebrityEarned = SUM(celebrity_wallet_transactions.amount)
+  │   └── totalTdsDeducted = SUM(celebrity_wallet_transactions.tds_amount)
+  │
+  └── Render: Summary Cards + Celebrity Earnings List + Referral Commissions List
+
+Date Filter Applied
+  ├── User sets startDate and/or endDate
+  ├── useEffect triggers re-fetch with .gte() / .lte() filters
+  └── Totals recalculated from filtered results
+
+Clear Filters
+  ├── Reset startDate and endDate to ""
+  ├── Re-fetch both queries without date filters
+  └── Recalculate totals
+UI Sections
+Section 1 — Header
+
+Title: "Commission Earnings" with TrendingUp icon
+Subtitle text
+Section 2 — Summary Cards (3-column grid)
+
+Card	Data Source	Color
+Total Earned	totalReferralEarned + totalCelebrityEarned	Green gradient
+Referral Commissions	totalReferralEarned	Primary gradient
+TDS Deducted	totalTdsDeducted	Red gradient
+All values formatted as ₹{amount.toLocaleString()}
+
+Section 3 — Date Filter Card
+
+Two date Input fields (Start Date, End Date)
+"Clear Filters" Button
+Filtering is automatic via useEffect watching startDate and endDate
+Section 4 — Celebrity Earnings List (only shown if data exists)
+
+Each item is a bordered card showing:
+"Booking Commission" label + status Badge
+2x2 grid: Gross Amount, TDS (with percentage), Net Amount, Date
+Optional description text
+Date formatted with date-fns format(date, 'PP')
+Section 5 — Referral Commissions List (only shown if data exists)
+
+Each item shows:
+"Level {1|2} Referral Commission" label
+Date formatted with format(date, 'PPp')
+Amount in green: +₹{amount}
+Status Badge
+Section 6 — Empty State
+
+Shown when both lists are empty
+TrendingUp icon + "No commission earnings yet"
+Backend Logic (How Commissions Are Created)
+Commissions are not created by this page. They are generated automatically by PostgreSQL triggers:
+
+Trigger Function	Fires On	Creates
+process_referral_commissions()	bookings status → completed/confirmed	L1 + L2 referral_transactions + wallet_transactions
+process_photo_wish_referral_commission()	photo_wishes status → completed	L1 + L2 referral_transactions
+process_voice_call_referral_commission()	voice_call_wishes call_status → completed	L1 + L2 referral_transactions
+process_music_generation_referral_commission()	music_generations status → completed	L1 + L2 referral_transactions
+process_image_promotion_referral_commission()	image_promotions status → completed	L1 + L2 referral_transactions
+process_celebrity_favorite_referral_commission()	celebrity_favorites status → active	L1 + L2 referral_transactions
+process_wish_celebrity_referral_commission()	wish_celebrity_orders status → completed	L1 + L2 referral_transactions
+calculate_booking_commission()	bookings status → confirmed/completed	celebrity_wallet_transactions (with TDS)
+calculate_celebrity_commission_with_tds()	celebrity_wallet_transactions INSERT	Auto-calculates TDS fields if not pre-set
+Commission rates are pulled from the plans table based on the referrer's plan tier:
+
+Basic: L1 = 5%, L2 = 0%
+Premium: L1 = 10%, L2 = 5%
+Elite: L1 = 15%, L2 = 10%
+TDS rates are from platform_settings:
+
+PAN verified: 10%
+PAN not verified: 20%
+UI Components Used
+Component	Source
+Card, CardContent, CardHeader, CardTitle, CardDescription	shadcn/ui
+Badge	shadcn/ui
+Button	shadcn/ui
+Input	shadcn/ui (type="date")
+Label	shadcn/ui
+TrendingUp, Calendar, Filter, DollarSign	lucide-react
+format()	date-fns
+AuthenticatedLayout	Custom wrapper
+Mobile App Implementation Notes
+Both user types see this page — regular users see referral commissions only; celebrities see both sections
+Date filtering: Use native date pickers, trigger re-fetch on change
+Pull-to-refresh: Recommended for mobile to re-fetch commission data
+No write operations: This page is read-only; all data is created by backend triggers
+Currency: All amounts are in INR (₹), stored as integers (paise not used — values are in whole rupees)
+TDS display: Show the percentage alongside the deducted amount for transparency
+Empty state: Handle gracefully when user has no commissions yet
