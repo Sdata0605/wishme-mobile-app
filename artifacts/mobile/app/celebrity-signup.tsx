@@ -29,7 +29,7 @@ interface Category {
 
 function getPasswordStrength(pw: string) {
   const checks = [
-    pw.length >= 8,
+    pw.length >= 12,
     /[A-Z]/.test(pw),
     /[a-z]/.test(pw),
     /[0-9]/.test(pw),
@@ -38,7 +38,7 @@ function getPasswordStrength(pw: string) {
   return { checks, score: checks.filter(Boolean).length };
 }
 
-const CHECK_LABELS = ['Min. 8 characters', 'Uppercase letter', 'Lowercase letter', 'Number', 'Special character'];
+const CHECK_LABELS = ['Min. 12 characters', 'Uppercase letter', 'Lowercase letter', 'Number', 'Special character'];
 const STRENGTH_COLORS = ['#EF4444', '#F97316', '#EAB308', '#22C55E', '#22C55E'];
 
 function generatePassword(): string {
@@ -49,7 +49,7 @@ function generatePassword(): string {
   const all = upper + lower + digits + special;
   const rand = (s: string) => s[Math.floor(Math.random() * s.length)];
   let pw = rand(upper) + rand(lower) + rand(digits) + rand(special);
-  for (let i = 0; i < 8; i++) pw += rand(all);
+  for (let i = 0; i < 12; i++) pw += rand(all);
   return pw.split('').sort(() => Math.random() - 0.5).join('');
 }
 
