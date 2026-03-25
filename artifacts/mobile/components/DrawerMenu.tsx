@@ -48,6 +48,7 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'trending-up', label: 'Commission', route: '/commission' },
   { icon: 'gift', label: 'Occasions', route: '/occasions' },
   { icon: 'bell', label: 'Occasion Alerts', route: '/occasion-alerts' },
+  { icon: 'award', label: 'My Plan', route: '/select-plan' },
 ];
 
 function NavRow({ item, onPress }: { item: NavItem; onPress: () => void }) {

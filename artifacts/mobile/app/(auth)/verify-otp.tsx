@@ -72,7 +72,7 @@ export default function VerifyOtpScreen() {
       return;
     }
     setVerified(true);
-    setTimeout(() => router.replace('/(tabs)'), 1200);
+    setTimeout(() => router.replace('/select-plan?source=signup'), 1200);
   };
 
   const handleResend = async () => {
