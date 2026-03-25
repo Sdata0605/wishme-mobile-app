@@ -1,0 +1,99 @@
+/occasion-alerts Page — Technical Specification for Mobile App Integration
+Purpose
+The Occasion Alerts page is a reminder management dashboard where users track upcoming special dates (birthdays, anniversaries, festivals) for their loved ones and followed celebrities. Users can enable/disable per-alert notifications and see which alerts have auto-send configured.
+
+Authentication
+Requires authenticated user. The page uses profile.id (not auth.uid()) for all queries.
+
+Database Table
+occasion_alerts
+Column	Type	Description
+id	uuid	Primary key
+user_id	uuid	References profiles.id
+occasion_name	text	e.g. "Birthday", "Anniversary"
+occasion_type	text	Category label
+occasion_date	date	The event date
+alert_enabled	boolean	Whether notifications are on
+auto_send_enabled	boolean	Whether auto-send wish is on
+alert_days_before	integer	Days before to trigger alert
+loved_one_id	uuid (nullable)	FK to loved_ones
+celebrity_id	uuid (nullable)	FK to celebrities
+API Endpoints (Supabase REST)
+1. Fetch All Alerts
+GET /rest/v1/occasion_alerts
+  ?select=*,loved_ones(first_name,last_name),celebrities!occasion_alerts_celebrity_id_fkey(name)
+  &user_id=eq.{profile.id}
+  &order=occasion_date.asc
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_jwt}
+Response: Array of alert objects with joined loved_ones and celebrities names.
+
+2. Toggle Alert On/Off
+PATCH /rest/v1/occasion_alerts
+  ?id=eq.{alertId}
+
+Body: { "alert_enabled": true/false }
+Headers: Same as above.
+
+Data Flow
+
+Page Load
+  └─> Check profile.id exists
+       └─> GET occasion_alerts with joins
+            └─> Split into upcomingAlerts (date >= today)
+            │   and pastAlerts (date < today)
+            └─> Render stats + alert cards
+
+Toggle Alert
+  └─> PATCH occasion_alerts.alert_enabled
+       └─> Update local state optimistically
+       └─> Show toast confirmation
+UI Sections
+1. Stats Bar (3 cards)
+Upcoming: Count of alerts where occasion_date >= today
+This Week: Count where occasion_date is within 7 days
+Auto-Send Enabled: Count where auto_send_enabled = true
+2. Upcoming Occasions List
+Each card shows:
+
+Icon: Heart (loved one) or Star (celebrity)
+Person name: From joined loved_ones.first_name + last_name or celebrities.name
+Status badge: Color-coded by urgency
+Red "Today!" if 0 days
+Red "{n} days" if within alert_days_before
+Default "{n} days" if within 30 days
+Outline with formatted date if further out
+Toggle switch: Enable/disable the alert
+Details: "Alert {n} days before" + formatted date
+Auto-send badge: If auto_send_enabled = true
+3. Past Occasions Grid
+2-column grid of simplified cards
+Shows person name, occasion name, date
+"Past" badge, 75% opacity
+4. Empty State
+Bell icon + "No occasion alerts set up yet"
+CTA button: "Add Loved Ones" → navigates to /loved-ones
+UI Components Used
+Card, CardContent, CardHeader, CardTitle, CardDescription (shadcn/ui)
+Button, Badge, Switch (shadcn/ui)
+Icons: Bell, Calendar, Heart, Star (lucide-react)
+AuthenticatedLayout with sidebar
+useToast for notifications
+date-fns: format for date display
+Alert Status Logic (Client-Side)
+
+function getAlertStatus(occasionDate, alertDaysBefore) {
+  const daysUntil = Math.ceil((occasionDate - today) / 86400000);
+  if (daysUntil < 0)                    → { label: "Past",     variant: "secondary" }
+  if (daysUntil === 0)                   → { label: "Today!",   variant: "destructive" }
+  if (daysUntil <= alertDaysBefore)      → { label: "{n} days", variant: "destructive" }
+  if (daysUntil <= 30)                   → { label: "{n} days", variant: "default" }
+  else                                   → { label: "MMM dd, yyyy", variant: "outline" }
+}
+Mobile Integration Notes
+Data creation: Alerts are created from the /loved-ones page (when adding occasions to a loved one) or from celebrity event subscriptions — NOT from this page directly. This page is read + toggle only.
+Push notifications: The alert_days_before field is meant for server-side scheduled notification triggers. Implement a background job or push notification scheduler that checks occasion_date - alert_days_before daily.
+Auto-send: When auto_send_enabled = true, the backend should automatically trigger a wish (greeting card or video) on the occasion date without user intervention.
+Real-time: No real-time subscriptions on this page. Simple fetch-on-load pattern. Implement pull-to-refresh on mobile.
