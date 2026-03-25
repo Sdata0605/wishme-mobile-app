@@ -1,0 +1,314 @@
+/loved-ones Page — Complete Technical Specification
+Purpose
+The Loved Ones page is a contact management system where users store their friends, family, and other important people along with their special occasions (birthdays, anniversaries, etc.). It serves as the foundation for the Occasion Alerts and Occasion Wishes features — users add loved ones here, then the platform can remind them and help send wishes on those dates.
+
+Database Table: loved_ones
+Column	Type	Nullable	Default	Description
+id	uuid	NO	gen_random_uuid()	Primary key
+user_id	uuid	NO	—	References profiles.id
+first_name	text	NO	—	Required
+last_name	text	YES	—	Optional
+email	text	YES	—	Contact email
+phone	text	YES	—	Contact phone
+date_of_birth	date	YES	—	For birthday countdown
+relationship	text	YES	—	Family/Friend/Partner/Colleague/Other
+notes	text	YES	—	Free text
+import_source	text	YES	—	'manual', 'gmail', 'facebook', 'phone'
+occasions	jsonb	YES	'[]'::jsonb	Array of occasion objects
+created_at	timestamptz	YES	now()	Auto
+updated_at	timestamptz	YES	now()	Auto
+Occasions JSONB format (stored inside the occasions column):
+
+
+[
+  {
+    "name": "Birthday",
+    "date": "2026-05-15",
+    "type": "Birthday"
+  },
+  {
+    "name": "Wedding Anniversary",
+    "date": "2026-08-22",
+    "type": "Anniversary"
+  }
+]
+API Endpoints (All via Supabase REST SDK)
+Base URL: https://eqikeuqwbphwongtfzhe.supabase.co Auth Header: Authorization: Bearer <user_access_token> + apikey: <anon_key>
+
+1. Fetch All Loved Ones
+GET /rest/v1/loved_ones?user_id=eq.{profile_id}&order=first_name.asc&select=*
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "first_name": "Priya",
+    "last_name": "Sharma",
+    "email": "priya@example.com",
+    "phone": "+919876543210",
+    "date_of_birth": "1995-03-15",
+    "relationship": "Friend",
+    "notes": "Loves flowers",
+    "import_source": "manual",
+    "occasions": [
+      { "name": "Birthday", "date": "2026-03-15", "type": "Birthday" }
+    ],
+    "created_at": "2026-03-20T10:00:00Z",
+    "updated_at": "2026-03-20T10:00:00Z"
+  }
+]
+2. Add New Loved One
+POST /rest/v1/loved_ones
+Content-Type: application/json
+Payload:
+
+
+{
+  "user_id": "profile-uuid",
+  "first_name": "Priya",
+  "last_name": "Sharma",
+  "email": "priya@example.com",
+  "phone": "+919876543210",
+  "date_of_birth": "1995-03-15",
+  "relationship": "Friend",
+  "notes": "Loves flowers",
+  "import_source": "manual"
+}
+3. Update Loved One
+PATCH /rest/v1/loved_ones?id=eq.{loved_one_id}
+Payload (partial update):
+
+
+{
+  "first_name": "Priya",
+  "last_name": "Sharma Updated",
+  "phone": "+919876543211"
+}
+4. Delete Loved One
+DELETE /rest/v1/loved_ones?id=eq.{loved_one_id}
+5. Update Occasions (JSONB column)
+PATCH /rest/v1/loved_ones?id=eq.{loved_one_id}
+Payload:
+
+
+{
+  "occasions": [
+    { "name": "Birthday", "date": "2026-03-15", "type": "Birthday" },
+    { "name": "Anniversary", "date": "2026-08-22", "type": "Anniversary" }
+  ]
+}
+Data Flow
+
+1. Page loads → useAuth() provides profile.id
+2. fetchLovedOnes() → SELECT * FROM loved_ones WHERE user_id = profile.id ORDER BY first_name
+3. Parse occasions JSONB → cast to Occasion[] array
+4. Display cards in 1/2/3-column grid
+
+Add/Edit:
+  User clicks "Add Loved One" or Edit icon
+  → Dialog opens with form
+  → On submit: INSERT or UPDATE to loved_ones table
+  → Re-fetch list
+
+Delete:
+  User clicks trash icon → confirm dialog
+  → DELETE from loved_ones → re-fetch
+
+Manage Occasions:
+  User clicks "Manage Occasions" button on card
+  → Second dialog opens showing existing occasions
+  → Add/remove occasions in local state
+  → On save: PATCH loved_ones SET occasions = [new array]
+  → Re-fetch list
+
+Birthday Countdown:
+  Client-side calculation only (no API)
+  → getUpcomingBirthday(dob) returns days until next birthday
+  → Shows red badge if ≤7 days, default badge if ≤30 days
+UI Components Used
+Component	Library	Usage
+AuthenticatedLayout	Custom	Page wrapper with sidebar/header
+Card, CardHeader, CardContent, CardTitle, CardDescription	shadcn/ui	Contact cards + import section
+Button	shadcn/ui	Add, Edit, Delete, Cancel, Save actions
+Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger	shadcn/ui	Add/Edit form modal + Occasions modal
+Input	shadcn/ui	Text fields (name, email, phone, date)
+Label	shadcn/ui	Form field labels
+Textarea	shadcn/ui	Notes field
+Select, SelectContent, SelectItem, SelectTrigger, SelectValue	shadcn/ui	Relationship dropdown + Occasion type
+Badge	shadcn/ui	Relationship tag, occasion chips, birthday countdown
+Heart, Plus, Edit, Trash2, Calendar, Mail, Phone, Upload	lucide-react	Icons
+Relationship Dropdown Options
+"Family", "Friend", "Partner", "Colleague", "Other"
+
+Occasion Type Options
+"Birthday", "Anniversary", "Wedding", "Festival", "Other"
+
+Key Mobile App Considerations
+No edge functions used — all operations are direct Supabase REST CRUD
+RLS enforced — users can only see/edit their own loved_ones rows (filtered by user_id)
+Occasions stored as JSONB inside the row, not a separate table — so add/remove is a single PATCH
+Birthday countdown is client-side math — calculate days from date_of_birth to today
+Import buttons are disabled placeholders — not yet functional, can be omitted in mobile v1
+The occasions column connects to the Occasion Alerts page (/occasion-alerts) which reads loved_ones.occasions to create alert reminders
+Here is the complete technical documentation for the /loved-ones page for your Replit mobile app integration:
+
+/loved-ones Page — Complete Technical Specification
+Purpose
+The Loved Ones page is a contact management system where users store their friends, family, and other important people along with their special occasions (birthdays, anniversaries, etc.). It serves as the foundation for the Occasion Alerts and Occasion Wishes features — users add loved ones here, then the platform can remind them and help send wishes on those dates.
+
+Database Table: loved_ones
+Column	Type	Nullable	Default	Description
+id	uuid	NO	gen_random_uuid()	Primary key
+user_id	uuid	NO	—	References profiles.id
+first_name	text	NO	—	Required
+last_name	text	YES	—	Optional
+email	text	YES	—	Contact email
+phone	text	YES	—	Contact phone
+date_of_birth	date	YES	—	For birthday countdown
+relationship	text	YES	—	Family/Friend/Partner/Colleague/Other
+notes	text	YES	—	Free text
+import_source	text	YES	—	'manual', 'gmail', 'facebook', 'phone'
+occasions	jsonb	YES	'[]'::jsonb	Array of occasion objects
+created_at	timestamptz	YES	now()	Auto
+updated_at	timestamptz	YES	now()	Auto
+Occasions JSONB format (stored inside the occasions column):
+
+
+[
+  {
+    "name": "Birthday",
+    "date": "2026-05-15",
+    "type": "Birthday"
+  },
+  {
+    "name": "Wedding Anniversary",
+    "date": "2026-08-22",
+    "type": "Anniversary"
+  }
+]
+API Endpoints (All via Supabase REST SDK)
+Base URL: https://eqikeuqwbphwongtfzhe.supabase.co Auth Header: Authorization: Bearer <user_access_token> + apikey: <anon_key>
+
+1. Fetch All Loved Ones
+GET /rest/v1/loved_ones?user_id=eq.{profile_id}&order=first_name.asc&select=*
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "first_name": "Priya",
+    "last_name": "Sharma",
+    "email": "priya@example.com",
+    "phone": "+919876543210",
+    "date_of_birth": "1995-03-15",
+    "relationship": "Friend",
+    "notes": "Loves flowers",
+    "import_source": "manual",
+    "occasions": [
+      { "name": "Birthday", "date": "2026-03-15", "type": "Birthday" }
+    ],
+    "created_at": "2026-03-20T10:00:00Z",
+    "updated_at": "2026-03-20T10:00:00Z"
+  }
+]
+2. Add New Loved One
+POST /rest/v1/loved_ones
+Content-Type: application/json
+Payload:
+
+
+{
+  "user_id": "profile-uuid",
+  "first_name": "Priya",
+  "last_name": "Sharma",
+  "email": "priya@example.com",
+  "phone": "+919876543210",
+  "date_of_birth": "1995-03-15",
+  "relationship": "Friend",
+  "notes": "Loves flowers",
+  "import_source": "manual"
+}
+3. Update Loved One
+PATCH /rest/v1/loved_ones?id=eq.{loved_one_id}
+Payload (partial update):
+
+
+{
+  "first_name": "Priya",
+  "last_name": "Sharma Updated",
+  "phone": "+919876543211"
+}
+4. Delete Loved One
+DELETE /rest/v1/loved_ones?id=eq.{loved_one_id}
+5. Update Occasions (JSONB column)
+PATCH /rest/v1/loved_ones?id=eq.{loved_one_id}
+Payload:
+
+
+{
+  "occasions": [
+    { "name": "Birthday", "date": "2026-03-15", "type": "Birthday" },
+    { "name": "Anniversary", "date": "2026-08-22", "type": "Anniversary" }
+  ]
+}
+Data Flow
+
+1. Page loads → useAuth() provides profile.id
+2. fetchLovedOnes() → SELECT * FROM loved_ones WHERE user_id = profile.id ORDER BY first_name
+3. Parse occasions JSONB → cast to Occasion[] array
+4. Display cards in 1/2/3-column grid
+
+Add/Edit:
+  User clicks "Add Loved One" or Edit icon
+  → Dialog opens with form
+  → On submit: INSERT or UPDATE to loved_ones table
+  → Re-fetch list
+
+Delete:
+  User clicks trash icon → confirm dialog
+  → DELETE from loved_ones → re-fetch
+
+Manage Occasions:
+  User clicks "Manage Occasions" button on card
+  → Second dialog opens showing existing occasions
+  → Add/remove occasions in local state
+  → On save: PATCH loved_ones SET occasions = [new array]
+  → Re-fetch list
+
+Birthday Countdown:
+  Client-side calculation only (no API)
+  → getUpcomingBirthday(dob) returns days until next birthday
+  → Shows red badge if ≤7 days, default badge if ≤30 days
+UI Components Used
+Component	Library	Usage
+AuthenticatedLayout	Custom	Page wrapper with sidebar/header
+Card, CardHeader, CardContent, CardTitle, CardDescription	shadcn/ui	Contact cards + import section
+Button	shadcn/ui	Add, Edit, Delete, Cancel, Save actions
+Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger	shadcn/ui	Add/Edit form modal + Occasions modal
+Input	shadcn/ui	Text fields (name, email, phone, date)
+Label	shadcn/ui	Form field labels
+Textarea	shadcn/ui	Notes field
+Select, SelectContent, SelectItem, SelectTrigger, SelectValue	shadcn/ui	Relationship dropdown + Occasion type
+Badge	shadcn/ui	Relationship tag, occasion chips, birthday countdown
+Heart, Plus, Edit, Trash2, Calendar, Mail, Phone, Upload	lucide-react	Icons
+Relationship Dropdown Options
+"Family", "Friend", "Partner", "Colleague", "Other"
+
+Occasion Type Options
+"Birthday", "Anniversary", "Wedding", "Festival", "Other"
+
+Key Mobile App Considerations
+No edge functions used — all operations are direct Supabase REST CRUD
+RLS enforced — users can only see/edit their own loved_ones rows (filtered by user_id)
+Occasions stored as JSONB inside the row, not a separate table — so add/remove is a single PATCH
+Birthday countdown is client-side math — calculate days from date_of_birth to today
+Import buttons are disabled placeholders — not yet functional, can be omitted in mobile v1
+The occasions column connects to the Occasion Alerts page (/occasion-alerts) which reads loved_ones.occasions to create alert reminders
+
+
+
+

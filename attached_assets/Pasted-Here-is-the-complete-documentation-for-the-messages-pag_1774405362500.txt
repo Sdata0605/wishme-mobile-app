@@ -1,0 +1,291 @@
+Here is the complete documentation for the /messages page for your Replit mobile app integration:
+
+/messages Page — Complete Documentation for Mobile App Integration
+Purpose
+The Messages page is a real-time 1-on-1 chat system between users and celebrities. Users can view all their conversations, search by celebrity name, select a conversation, read message history with pagination, and send text/voice/emoji messages. Celebrity replies are AI-generated automatically via the celebrity-conversation-auto-reply Edge Function.
+
+Database Tables
+conversations table:
+
+
+{
+  "id": "uuid",
+  "user_id": "uuid (references profiles.id)",
+  "celebrity_id": "uuid (references celebrities.id)",
+  "created_at": "timestamp",
+  "last_message_at": "timestamp",
+  "unread_count_user": "integer (default 0)",
+  "unread_count_celebrity": "integer (default 0)",
+  "message_count": "integer (default 0)",
+  "is_closed": "boolean (default false)",
+  "closed_reason": "text (nullable)",
+  "closed_at": "timestamp (nullable)"
+}
+messages table:
+
+
+{
+  "id": "uuid",
+  "conversation_id": "uuid (references conversations.id)",
+  "sender_id": "uuid (references profiles.id)",
+  "sender_type": "'user' | 'celebrity'",
+  "message_text": "text",
+  "is_read": "boolean (default false)",
+  "is_ai_generated": "boolean (default false)",
+  "created_at": "timestamp",
+  "conversation_message_number": "integer (nullable)"
+}
+API Endpoints (All via Supabase Client SDK)
+1. Fetch Conversations List
+GET /rest/v1/conversations?select=*,celebrity:celebrities!conversations_celebrity_id_fkey(id,name,image_url),user:profiles!conversations_user_id_fkey(id,first_name,last_name,avatar_url)&user_id=eq.{profileId}&order=last_message_at.desc
+Headers:
+
+
+{
+  "apikey": "SUPABASE_ANON_KEY",
+  "Authorization": "Bearer USER_ACCESS_TOKEN"
+}
+Response:
+
+
+[
+  {
+    "id": "conv-uuid",
+    "user_id": "profile-uuid",
+    "celebrity_id": "celeb-uuid",
+    "last_message_at": "2026-03-25T10:00:00Z",
+    "unread_count_user": 2,
+    "unread_count_celebrity": 0,
+    "message_count": 45,
+    "is_closed": false,
+    "celebrity": {
+      "id": "celeb-uuid",
+      "name": "Hari Raj Shetty",
+      "image_url": "https://example.com/avatar.jpg"
+    },
+    "user": {
+      "id": "profile-uuid",
+      "first_name": "John",
+      "last_name": "Doe",
+      "avatar_url": null
+    }
+  }
+]
+2. Fetch Last Message Per Conversation
+GET /rest/v1/messages?select=message_text,sender_type&conversation_id=eq.{convId}&order=created_at.desc&limit=1
+Response:
+
+
+{
+  "message_text": "Thank you for your wishes!",
+  "sender_type": "celebrity"
+}
+3. Fetch Messages (Paginated, Latest 50)
+GET /rest/v1/messages?select=*&conversation_id=eq.{convId}&order=created_at.asc&limit=50
+Response:
+
+
+[
+  {
+    "id": "msg-uuid",
+    "conversation_id": "conv-uuid",
+    "sender_id": "profile-uuid",
+    "sender_type": "user",
+    "message_text": "Hi! I'm a huge fan!",
+    "is_read": true,
+    "is_ai_generated": false,
+    "created_at": "2026-03-25T09:00:00Z",
+    "conversation_message_number": 1
+  },
+  {
+    "id": "msg-uuid-2",
+    "conversation_id": "conv-uuid",
+    "sender_id": "celeb-profile-uuid",
+    "sender_type": "celebrity",
+    "message_text": "Thank you so much! 🌟",
+    "is_read": false,
+    "is_ai_generated": true,
+    "created_at": "2026-03-25T09:01:00Z",
+    "conversation_message_number": 2
+  }
+]
+4. Fetch Older Messages (Pagination)
+GET /rest/v1/messages?select=*&conversation_id=eq.{convId}&created_at=lt.{oldestMessageTimestamp}&order=created_at.desc&limit=30
+Then reverse the returned array to get chronological order and prepend to existing messages.
+
+5. Send Message
+POST /rest/v1/messages
+Request Body:
+
+
+{
+  "conversation_id": "conv-uuid",
+  "sender_id": "profile-uuid",
+  "sender_type": "user",
+  "message_text": "Hello! Love your work!",
+  "is_read": false,
+  "is_ai_generated": false
+}
+6. Update Conversation After Sending
+PATCH /rest/v1/conversations?id=eq.{convId}
+Body:
+
+
+{
+  "last_message_at": "2026-03-25T10:05:00Z"
+}
+Then increment unread_count_celebrity:
+
+PATCH /rest/v1/conversations?id=eq.{convId}
+Body: { "unread_count_celebrity": currentCount + 1 }
+7. Trigger AI Auto-Reply (Edge Function)
+POST /functions/v1/celebrity-conversation-auto-reply
+Headers:
+
+
+{
+  "Authorization": "Bearer USER_ACCESS_TOKEN",
+  "apikey": "SUPABASE_ANON_KEY"
+}
+Request Body:
+
+
+{
+  "conversationId": "conv-uuid",
+  "userMessage": "Hello! Love your work!"
+}
+Response:
+
+
+{
+  "success": true,
+  "reply": "Thank you so much for your kind words! 🌟"
+}
+The reply is also automatically inserted into the messages table by the edge function with sender_type: 'celebrity' and is_ai_generated: true.
+
+8. Mark Conversation as Read
+PATCH /rest/v1/conversations?id=eq.{convId}
+Body: { "unread_count_user": 0 }
+PATCH /rest/v1/messages?conversation_id=eq.{convId}&is_read=eq.false
+Body: { "is_read": true }
+9. Fetch Conversation Metadata
+GET /rest/v1/conversations?select=message_count,is_closed&id=eq.{convId}
+10. Fetch Message Limit Setting
+GET /rest/v1/platform_settings?select=setting_value&setting_key=eq.conversation_message_limit
+Response:
+
+
+{ "setting_value": "200" }
+Real-Time Subscriptions
+Subscribe to two Supabase Realtime channels:
+
+Channel 1 — Conversation list updates:
+
+
+{
+  "channel": "conversations-changes",
+  "event": "*",
+  "schema": "public",
+  "table": "conversations",
+  "filter": "user_id=eq.{profileId}"
+}
+On any event → refetch conversations list.
+
+Channel 2 — New messages (global):
+
+
+{
+  "channel": "messages-updates",
+  "event": "INSERT",
+  "schema": "public",
+  "table": "messages"
+}
+On INSERT → refetch conversations list (updates last message preview).
+
+Channel 3 — Messages within active conversation:
+
+
+{
+  "channel": "messages-{conversationId}",
+  "event": "INSERT",
+  "schema": "public",
+  "table": "messages",
+  "filter": "conversation_id=eq.{conversationId}"
+}
+On INSERT → append new message to chat, remove optimistic messages (prefixed temp-), clear typing indicator.
+
+Data Flow
+User opens /messages
+  → useConversations hook fires
+  → Fetches conversations with celebrity join
+  → For each conversation, fetches last message
+  → Subscribes to realtime channels
+  → Renders conversation list
+
+User taps a conversation
+  → setSelectedConversationId(id)
+  → markAsRead(id) → resets unread_count_user to 0
+  → useMessages hook fires for that conversation
+  → Fetches message_count, is_closed from conversations table
+  → Fetches message_limit from platform_settings
+  → Fetches latest 50 messages
+  → Subscribes to realtime for that conversation_id
+  → Renders chat view
+
+User scrolls to top
+  → IntersectionObserver detects top sentinel
+  → fetchOlderMessages() loads 30 more (before oldest timestamp)
+  → Prepends to message list
+  → Preserves scroll position (no jump)
+
+User sends message
+  → Optimistic UI: temp message added instantly
+  → INSERT into messages table
+  → UPDATE conversations.last_message_at
+  → INCREMENT conversations.unread_count_celebrity
+  → Show typing indicator
+  → Invoke celebrity-conversation-auto-reply edge function
+  → AI reply arrives via realtime INSERT event
+  → Typing indicator cleared
+  → Fallback: if no realtime event in 8s, refetch messages
+
+Message with greeting card image
+  → Message text contains [Greeting Card: https://...]
+  → MessageBubble parses and renders inline <img>
+UI Components Used
+Component	Purpose
+AuthenticatedLayout	Page wrapper with sidebar/nav
+Card	Container for desktop split view
+ScrollArea	Scrollable conversation list (desktop)
+Input	Search box + message text input
+Button	Send, back, explore celebrities
+Avatar / AvatarImage / AvatarFallback	Celebrity & user profile pics
+Badge	Unread message count indicator
+ConversationList	Renders list of conversations with last message preview
+ChatView	Full chat interface with header, messages, input
+MessageBubble	Individual message with avatar, text, timestamp, AI badge
+TypingIndicator	Animated dots when celebrity AI is generating reply
+EmojiPickerButton	Emoji selector for message input
+VoiceMessageInput	Speech-to-text voice input button
+Search icon	Search input decoration
+MessageCircle icon	Empty state icon
+Send icon	Send button icon
+ArrowLeft icon	Back button (mobile)
+Sparkles icon	Quick action buttons
+Bot icon	AI-generated message badge
+Mobile vs Desktop Layout
+Mobile: Full-screen toggle — shows either conversation list OR chat view (not both). Chat view uses fixed inset-0 positioning with z-50. Back button returns to list.
+
+Desktop: 12-column grid split — 4 columns for conversation list, 8 columns for chat view. Both visible simultaneously. Fixed height of 700px.
+
+Key Features for Mobile App
+Optimistic UI — Messages appear instantly before server confirmation
+Infinite scroll up — Loads older messages in batches of 30
+Scroll position preservation — No jump when older messages load
+Smart auto-scroll — Only scrolls to bottom if user is already at bottom
+Message limit enforcement — Conversations auto-close at configurable limit (default 200)
+AI auto-reply — Celebrity responses generated automatically via Gemini
+Typing indicator — Shows while AI generates response (20s safety timeout)
+Inline media — Greeting card images rendered inside message bubbles
+Voice input — Speech-to-text for composing messages
+Emoji picker — Insert emojis at cursor position
