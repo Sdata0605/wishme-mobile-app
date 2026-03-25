@@ -506,6 +506,20 @@ const ICONS = {
       <Circle cx={15} cy={9} r={1.5} stroke={c} strokeWidth={sw} fill={c} />
     </Svg>
   ),
+  target: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Circle cx={12} cy={12} r={10} {...p(c)} />
+      <Circle cx={12} cy={12} r={6} {...p(c)} />
+      <Circle cx={12} cy={12} r={2} {...p(c)} />
+    </Svg>
+  ),
+  layers: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Polygon points="12,2 2,7 12,12 22,7 12,2" {...p(c)} />
+      <Polyline points="2,17 12,22 22,17" {...p(c)} />
+      <Polyline points="2,12 12,17 22,12" {...p(c)} />
+    </Svg>
+  ),
 } satisfies Record<string, RenderFn>;
 
 const ALIASES = {
