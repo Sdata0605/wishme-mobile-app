@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -16,35 +16,69 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 import { useCelebrities, type Celebrity } from '@/hooks/useCelebrities';
+import { useAuth } from '@/context/AuthContext';
+import { supabaseFetch } from '@/constants/supabase';
 
 export default function WishCelebrityScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { session, user } = useAuth();
   const [search, setSearch] = useState('');
   const [toast, setToast] = useState('');
+  const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
+  const [subLoading, setSubLoading] = useState(false);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const { celebrities, loading, error, refetch } = useCelebrities({ limit: 30 });
 
-  const filtered = celebrities.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const fetchSubscriptions = useCallback(async () => {
+    if (!session?.access_token || !user?.profileId) return;
+    setSubLoading(true);
+    try {
+      const res = await supabaseFetch(
+        `/rest/v1/celebrity_favorites?user_id=eq.${user.profileId}&status=eq.active&select=celebrity_id`,
+        {},
+        session.access_token,
+      );
+      if (res.ok) {
+        const rows = await res.json() as Array<{ celebrity_id: string }>;
+        setSubscribedIds(new Set(rows.map(r => r.celebrity_id)));
+      }
+    } catch {}
+    setSubLoading(false);
+  }, [session, user]);
+
+  useEffect(() => {
+    fetchSubscriptions();
+  }, [fetchSubscriptions]);
+
+  const isSubscribed = (celeb: Celebrity): boolean => {
+    if (celeb.subscription?.is_enabled !== undefined) {
+      return subscribedIds.has(celeb.id);
+    }
+    return subscribedIds.has(celeb.id);
+  };
+
+  const sortedFiltered = celebrities
+    .filter(c =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.category.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      const aS = subscribedIds.has(a.id) ? 0 : 1;
+      const bS = subscribedIds.has(b.id) ? 0 : 1;
+      return aS - bS;
+    });
+
+  const pairs: (Celebrity | null)[][] = [];
+  for (let i = 0; i < sortedFiltered.length; i += 2) {
+    pairs.push([sortedFiltered[i] ?? null, sortedFiltered[i + 1] ?? null]);
+  }
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => setToast(''), 2500);
   };
-
-  const isSubscribed = (celeb: Celebrity, index: number): boolean => {
-    if (celeb.subscription) return celeb.subscription.is_enabled;
-    return index < 3;
-  };
-
-  const pairs: (Celebrity | null)[][] = [];
-  for (let i = 0; i < filtered.length; i += 2) {
-    pairs.push([filtered[i] ?? null, filtered[i + 1] ?? null]);
-  }
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
@@ -57,14 +91,12 @@ export default function WishCelebrityScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
-        {/* Hero */}
         <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
           <Icon name="star" size={28} color="#fff" />
           <Text style={s.heroTitle}>Wish Your Favorite Celebrity</Text>
           <Text style={s.heroSub}>Send a heartfelt message to your favourite star</Text>
         </LinearGradient>
 
-        {/* Search */}
         <View style={[s.searchWrap, { backgroundColor: colors.input, borderColor: colors.border }]}>
           <Icon name="search" size={18} color={colors.mutedForeground} />
           <TextInput
@@ -81,16 +113,14 @@ export default function WishCelebrityScreen() {
           )}
         </View>
 
-        {/* Loading */}
-        {loading && (
+        {(loading || subLoading) && (
           <View style={s.loadingWrap}>
             <ActivityIndicator size="large" color={colors.primary} />
             <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Loading celebrities...</Text>
           </View>
         )}
 
-        {/* Error */}
-        {!loading && error && (
+        {!loading && !subLoading && error && (
           <View style={s.errorWrap}>
             <Icon name="alert-circle" size={36} color={colors.primary} />
             <Text style={[s.errorTitle, { color: colors.foreground }]}>Could not load celebrities</Text>
@@ -100,14 +130,13 @@ export default function WishCelebrityScreen() {
           </View>
         )}
 
-        {/* Grid */}
-        {!loading && !error && (
+        {!loading && !subLoading && !error && (
           <View style={s.grid}>
             {pairs.map((pair, ri) => (
               <View key={ri} style={s.gridRow}>
                 {pair.map((celeb, ci) => {
                   if (!celeb) return <View key={ci} style={s.gridCell} />;
-                  const subscribed = isSubscribed(celeb, ri * 2 + ci);
+                  const subscribed = isSubscribed(celeb);
                   return (
                     <View key={celeb.id} style={[s.gridCell, s.celebCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                       <View style={s.imgWrap}>
@@ -132,17 +161,20 @@ export default function WishCelebrityScreen() {
                       {subscribed ? (
                         <TouchableOpacity
                           style={s.sendWishBtn}
-                          onPress={() => router.push({ pathname: '/booking/[id]', params: { id: celeb.id } } as never)}
+                          onPress={() => router.push({ pathname: '/wish-booking/[id]', params: { id: celeb.id } } as never)}
                           activeOpacity={0.85}
                         >
                           <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.sendWishGrad}>
-                            <Text style={s.sendWishText}>Send Wish</Text>
+                            <Text style={s.sendWishText}>Wish Now</Text>
                           </LinearGradient>
                         </TouchableOpacity>
                       ) : (
-                        <TouchableOpacity style={[s.subscribeBtn, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={() => showToast(`Subscribe to ${celeb.name} to send wishes`)}>
+                        <TouchableOpacity
+                          style={[s.subscribeBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
+                          onPress={() => router.push({ pathname: '/celebrity/[id]', params: { id: celeb.id } } as never)}
+                        >
                           <Icon name="lock" size={12} color={colors.mutedForeground} />
-                          <Text style={[s.subscribeBtnText, { color: colors.mutedForeground }]}>Subscribe First</Text>
+                          <Text style={[s.subscribeBtnText, { color: colors.mutedForeground }]}>Subscribe to Wish</Text>
                         </TouchableOpacity>
                       )}
                     </View>
@@ -154,7 +186,6 @@ export default function WishCelebrityScreen() {
         )}
       </ScrollView>
 
-      {/* Toast */}
       {toast.length > 0 && (
         <View style={s.toast} pointerEvents="none">
           <Text style={s.toastText}>{toast}</Text>
