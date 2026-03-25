@@ -53,6 +53,7 @@ function RootLayoutNav() {
       <Stack.Screen name="occasion-alerts" />
       <Stack.Screen name="occasion-wishes" />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="celebrity-signup" />
       <Stack.Screen name="celebrity-dashboard" />
       <Stack.Screen name="+not-found" />
     </Stack>

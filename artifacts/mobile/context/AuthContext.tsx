@@ -480,7 +480,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           headers: { Prefer: 'return=minimal' } as Record<string, string>,
           body: JSON.stringify(data),
         },
-        sessionRef.current?.access_token,
+        null,
       );
       if (res.status === 201 || res.ok) return { error: null };
       const msg = await parseApiError(res);

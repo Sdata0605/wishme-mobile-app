@@ -16,7 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth, type CelebrityApplyData } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Icon, type IconName } from '@/components/Icon';
 
@@ -433,265 +433,146 @@ function CategoryPickerModal({
   );
 }
 
-type AppStatus = 'pending' | 'approved' | 'rejected' | null;
+type StatusResult = 'pending' | 'approved' | 'rejected' | null;
 
-function CelebrityTab() {
+function CelebrityTab({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
   const { colors } = useTheme();
-  const { applyCelebrity, checkCelebrityStatus } = useAuth();
+  const { checkCelebrityStatus } = useAuth();
 
-  const [appStatus, setAppStatus] = useState<AppStatus>(null);
-  const [statusChecking, setStatusChecking] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [dob, setDob] = useState('');
-  const [stageName, setStageName] = useState('');
-  const [category, setCategory] = useState('');
-  const [bio, setBio] = useState('');
-  const [achievements, setAchievements] = useState('');
-  const [instagram, setInstagram] = useState('');
-  const [youtube, setYoutube] = useState('');
-  const [twitter, setTwitter] = useState('');
-  const [portfolio, setPortfolio] = useState('');
-  const [termsAgreed, setTermsAgreed] = useState(false);
-  const [backgroundAgreed, setBackgroundAgreed] = useState(false);
-  const [showPicker, setShowPicker] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const [submitLoading, setSubmitLoading] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showStatusCheck, setShowStatusCheck] = useState(false);
+  const [statusEmail, setStatusEmail] = useState('');
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusResult, setStatusResult] = useState<StatusResult>(null);
+  const [statusError, setStatusError] = useState('');
 
-  useEffect(() => {
-    if (!submitted) return;
-    const timer = setTimeout(() => router.replace('/(tabs)'), 2000);
-    return () => clearTimeout(timer);
-  }, [submitted]);
-
-  useEffect(() => {
-    if (!email || !/\S+@\S+\.\S+/.test(email)) return;
-    const timer = setTimeout(async () => {
-      setStatusChecking(true);
-      const { status } = await checkCelebrityStatus(email);
-      setStatusChecking(false);
-      if (status) setAppStatus(status as AppStatus);
-    }, 800);
-    return () => clearTimeout(timer);
-  }, [email, checkCelebrityStatus]);
-
-  if (submitted) {
-    return (
-      <View style={[styles.statusCard, { backgroundColor: '#22C55E20' }]}>
-        <View style={[styles.iconCircle, { backgroundColor: '#22C55E30', marginBottom: 12 }]}>
-          <Icon name="check-circle" size={32} color="#22C55E" />
-        </View>
-        <Text style={{ fontSize: 18, fontFamily: 'Inter_700Bold', color: '#22C55E', marginBottom: 8 }}>Application Submitted!</Text>
-        <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, textAlign: 'center', lineHeight: 20 }}>
-          Your application is under review. We'll notify you within 3–5 business days.
-        </Text>
-      </View>
-    );
-  }
-
-  if (appStatus) {
-    const STATUS_MAP = {
-      pending: { color: '#F59E0B', icon: 'clock' as const, label: 'Under Review', msg: "Your application is currently under review. We'll notify you once it's processed." },
-      approved: { color: '#22C55E', icon: 'check-circle' as const, label: 'Application Approved!', msg: "Congratulations! Your celebrity account is active. Sign in to access your dashboard." },
-      rejected: { color: '#EF4444', icon: 'alert-circle' as const, label: 'Application Rejected', msg: "Your application did not meet our current requirements. You may reapply after 30 days." },
-    };
-    const s = STATUS_MAP[appStatus];
-    return (
-      <View>
-        <View style={[styles.statusCard, { backgroundColor: s.color + '15' }]}>
-          <View style={[styles.iconCircle, { backgroundColor: s.color + '25', marginBottom: 12 }]}>
-            <Icon name={s.icon} size={32} color={s.color} />
-          </View>
-          <Text style={{ fontSize: 18, fontFamily: 'Inter_700Bold', color: s.color, marginBottom: 8 }}>{s.label}</Text>
-          <Text style={{ fontSize: 13, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, textAlign: 'center', lineHeight: 20 }}>{s.msg}</Text>
-        </View>
-        <TouchableOpacity onPress={() => setAppStatus(null)} style={{ alignSelf: 'center', marginTop: 16, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Icon name="edit-2" size={13} color={colors.mutedForeground} />
-          <Text style={{ fontSize: 13, fontFamily: 'Inter_500Medium', color: colors.mutedForeground }}>Use a different account to apply</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  const handleSubmit = async () => {
-    const e: Record<string, string> = {};
-    if (!firstName.trim()) e.firstName = 'Required';
-    if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) e.email = 'Valid email required';
-    if (!category) e.category = 'Select a category';
-    if (!termsAgreed) e.terms = 'You must agree to Terms of Service';
-    if (!backgroundAgreed) e.background = 'You must consent to background verification';
-    if (Object.keys(e).length > 0) { setErrors(e); return; }
-
-    setSubmitLoading(true);
-    setSubmitError('');
-
-    const { status: existingStatus } = await checkCelebrityStatus(email);
-    if (existingStatus) {
-      setAppStatus(existingStatus as AppStatus);
-      setSubmitLoading(false);
+  const handleCheckStatus = async () => {
+    if (!statusEmail.trim() || !/\S+@\S+\.\S+/.test(statusEmail)) {
+      setStatusError('Please enter a valid email address');
       return;
     }
+    setStatusError('');
+    setStatusLoading(true);
+    const { status } = await checkCelebrityStatus(statusEmail.trim());
+    setStatusLoading(false);
+    setStatusResult(status as StatusResult);
+    if (!status) setStatusError('No application found for this email address.');
+  };
 
-    const payload: CelebrityApplyData = {
-      first_name: firstName,
-      last_name: lastName,
-      email,
-      phone,
-      dob,
-      stage_name: stageName,
-      category,
-      bio,
-      achievements,
-      instagram,
-      youtube,
-      twitter,
-      portfolio,
-    };
-    const { error } = await applyCelebrity(payload);
-    setSubmitLoading(false);
-    if (error) { setSubmitError(error); return; }
-    setSubmitted(true);
+  const STATUS_MAP: Record<string, { color: string; icon: 'clock' | 'check-circle' | 'alert-circle'; label: string; msg: string }> = {
+    pending: { color: '#F59E0B', icon: 'clock', label: 'Under Review', msg: "Your application is currently under review. We'll notify you once it's processed." },
+    approved: { color: '#22C55E', icon: 'check-circle', label: 'Application Approved!', msg: 'Congratulations! Your celebrity account is active. Sign in to access your dashboard.' },
+    rejected: { color: '#EF4444', icon: 'alert-circle', label: 'Application Rejected', msg: 'Your application did not meet our current requirements. You may reapply after 30 days.' },
   };
 
   return (
     <View>
-      <View style={[styles.heroBanner, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-        <Text style={[styles.heroBannerTitle, { color: colors.foreground }]}>Join WishMe as a Celebrity</Text>
-        <Text style={[styles.heroBannerSub, { color: colors.mutedForeground }]}>Share your talent and connect with fans across India</Text>
-        <View style={styles.benefitCards}>
-          {[
-            { icon: 'trending-up' as const, title: 'Earn Extra Income', desc: 'Set your own rates and get paid for every wish' },
-            { icon: 'heart' as const, title: 'Connect with Fans', desc: 'Build deeper bonds with your fan community' },
-            { icon: 'clock' as const, title: 'Flexible Schedule', desc: 'Work on your own time, at your convenience' },
-          ].map((b) => (
-            <View key={b.title} style={[styles.benefitCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <View style={[styles.benefitIcon, { backgroundColor: colors.primary + '15' }]}>
-                <Icon name={b.icon} size={18} color={colors.primary} />
-              </View>
-              <Text style={[styles.benefitTitle, { color: colors.foreground }]}>{b.title}</Text>
-              <Text style={[styles.benefitDesc, { color: colors.mutedForeground }]}>{b.desc}</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {submitError ? (
-        <View style={[styles.errorBanner, { backgroundColor: colors.destructive + '20' }]}>
-          <Text style={[styles.errorBannerText, { color: colors.destructive }]}>{submitError}</Text>
-        </View>
-      ) : null}
-
-      <SectionHeader icon="user" title="Personal Information" />
-      <View style={styles.row}>
-        <View style={{ flex: 1 }}>
-          <InputField icon="user" placeholder="First Name" value={firstName} onChangeText={setFirstName} error={errors.firstName} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <InputField icon="user" placeholder="Last Name" value={lastName} onChangeText={setLastName} />
-        </View>
-      </View>
-      <View style={{ position: 'relative' }}>
-        <InputField icon="mail" placeholder="Email address" value={email} onChangeText={setEmail} keyboardType="email-address" error={errors.email} />
-        {statusChecking && (
-          <ActivityIndicator size="small" color={colors.primary} style={{ position: 'absolute', right: 14, top: 14 }} />
-        )}
-      </View>
-      <InputField icon="phone" placeholder="Mobile number" value={phone} onChangeText={(t) => setPhone(t.replace(/\D/g, '').slice(0, 10))} keyboardType="number-pad" />
-      <InputField icon="calendar" placeholder="Date of Birth (DD/MM/YYYY)" value={dob} onChangeText={setDob} />
-
-      <SectionHeader icon="briefcase" title="Professional Details" />
-      <InputField icon="star" placeholder="Stage Name / Screen Name" value={stageName} onChangeText={setStageName} />
-
-      <TouchableOpacity
-        style={[styles.inputRow, { backgroundColor: colors.input, borderColor: errors.category ? colors.destructive : colors.border, borderWidth: 1.5, marginBottom: 4 }]}
-        onPress={() => setShowPicker(true)}
+      <LinearGradient
+        colors={['#FF6B33', '#B44CFF']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.celebHero}
       >
-        <Icon name="briefcase" size={18} color={colors.mutedForeground} />
-        <Text style={[styles.input, { color: category ? colors.foreground : colors.mutedForeground, fontFamily: 'Inter_400Regular', lineHeight: 48 }]}>
-          {category || 'Select Category'}
-        </Text>
-        <Icon name="chevron-down" size={18} color={colors.mutedForeground} />
-      </TouchableOpacity>
-      {errors.category ? <Text style={[styles.errorText, { color: colors.destructive, marginBottom: 10 }]}>{errors.category}</Text> : <View style={{ height: 14 }} />}
+        <Icon name="star" size={36} color="#fff" />
+        <Text style={styles.celebHeroTitle}>Join WishMe as a Celebrity</Text>
+        <Text style={styles.celebHeroSub}>Share your talent and connect with fans across India</Text>
+      </LinearGradient>
 
-      <InputField placeholder="Professional Bio" value={bio} onChangeText={setBio} multiline numberOfLines={4} icon="edit-2" />
-      <InputField placeholder="Key Achievements" value={achievements} onChangeText={setAchievements} multiline numberOfLines={3} icon="award" />
-
-      <SectionHeader icon="share-2" title="Social Media" />
-      <InputField
-        placeholder="Instagram handle (@username)"
-        value={instagram}
-        onChangeText={setInstagram}
-        leftElement={<View style={{ marginRight: 10 }}><Icon name="instagram" size={18} color="#E1306C" /></View>}
-      />
-      <InputField
-        placeholder="YouTube channel URL"
-        value={youtube}
-        onChangeText={setYoutube}
-        leftElement={<View style={{ marginRight: 10 }}><Icon name="youtube" size={18} color="#FF0000" /></View>}
-      />
-      <InputField
-        placeholder="Twitter/X handle (@username)"
-        value={twitter}
-        onChangeText={setTwitter}
-        leftElement={<View style={{ marginRight: 10 }}><Icon name="twitter" size={18} color="#1DA1F2" /></View>}
-      />
-
-      <View style={[styles.pricingNote, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-        <Icon name="trending-up" size={18} color={colors.primary} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.pricingNoteTitle, { color: colors.foreground }]}>Your Earning Potential</Text>
-          <Text style={[styles.pricingNoteText, { color: colors.mutedForeground }]}>
-            Set your own pricing for video wishes, voice calls, and live sessions. Top celebrities on WishMe earn ₹50,000+ monthly. You keep 80% of every booking.
-          </Text>
-        </View>
+      <View style={styles.benefitCards}>
+        {[
+          { icon: 'trending-up' as const, title: 'Earn Extra Income', desc: 'Set your own rates and get paid for every wish' },
+          { icon: 'heart' as const, title: 'Connect with Fans', desc: 'Build deeper bonds with your fan community' },
+          { icon: 'clock' as const, title: 'Flexible Schedule', desc: 'Work on your own time, at your convenience' },
+        ].map((b) => (
+          <View key={b.title} style={[styles.benefitCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={[styles.benefitIcon, { backgroundColor: colors.primary + '15' }]}>
+              <Icon name={b.icon} size={18} color={colors.primary} />
+            </View>
+            <Text style={[styles.benefitTitle, { color: colors.foreground }]}>{b.title}</Text>
+            <Text style={[styles.benefitDesc, { color: colors.mutedForeground }]}>{b.desc}</Text>
+          </View>
+        ))}
       </View>
 
-      <SectionHeader icon="shield" title="Verification" />
-      <InputField icon="link" placeholder="Portfolio / Website URL" value={portfolio} onChangeText={setPortfolio} keyboardType="url" />
-      <View style={[styles.uploadBox, { borderColor: colors.border, backgroundColor: colors.muted }]}>
-        <Icon name="upload" size={24} color={colors.mutedForeground} />
-        <Text style={[styles.uploadText, { color: colors.mutedForeground }]}>Tap to upload Government ID</Text>
-        <Text style={[styles.uploadSub, { color: colors.mutedForeground }]}>Aadhaar / PAN / Passport (JPG, PNG, PDF)</Text>
-      </View>
-
-      <SectionHeader icon="check-circle" title="Terms & Consent" />
-      <TouchableOpacity style={styles.checkboxRow} onPress={() => setTermsAgreed(!termsAgreed)}>
-        <View style={[styles.checkbox, { borderColor: termsAgreed ? colors.primary : colors.border, backgroundColor: termsAgreed ? colors.primary : 'transparent' }]}>
-          {termsAgreed && <Icon name="check" size={12} color="#fff" />}
-        </View>
-        <Text style={[styles.checkboxText, { color: colors.foreground }]}>
-          I agree to the <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>Terms of Service</Text> and <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>Creator Guidelines</Text>
-        </Text>
-      </TouchableOpacity>
-      {errors.terms ? <Text style={[styles.errorText, { color: colors.destructive, marginBottom: 8 }]}>{errors.terms}</Text> : null}
-
-      <TouchableOpacity style={styles.checkboxRow} onPress={() => setBackgroundAgreed(!backgroundAgreed)}>
-        <View style={[styles.checkbox, { borderColor: backgroundAgreed ? colors.primary : colors.border, backgroundColor: backgroundAgreed ? colors.primary : 'transparent' }]}>
-          {backgroundAgreed && <Icon name="check" size={12} color="#fff" />}
-        </View>
-        <Text style={[styles.checkboxText, { color: colors.foreground }]}>
-          I consent to <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>background verification</Text> as part of the onboarding process
-        </Text>
-      </TouchableOpacity>
-      {errors.background ? <Text style={[styles.errorText, { color: colors.destructive, marginBottom: 8 }]}>{errors.background}</Text> : null}
-
-      <Pressable onPress={handleSubmit} disabled={submitLoading} style={({ pressed }) => [{ opacity: pressed || submitLoading ? 0.7 : 1, marginTop: 16 }]}>
-        <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradBtn}>
-          {submitLoading ? <ActivityIndicator color="#fff" /> : <Text style={styles.gradBtnText}>Submit Application</Text>}
+      <Pressable
+        onPress={() => router.push('/celebrity-signup' as never)}
+        style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1, marginTop: 8 }]}
+      >
+        <LinearGradient
+          colors={['#FF6B33', '#B44CFF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.gradBtn}
+        >
+          <Icon name="star" size={18} color="#fff" />
+          <Text style={[styles.gradBtnText, { marginLeft: 8 }]}>Register as Celebrity</Text>
         </LinearGradient>
       </Pressable>
 
-      <CategoryPickerModal
-        visible={showPicker}
-        selected={category}
-        onSelect={setCategory}
-        onClose={() => setShowPicker(false)}
-      />
+      <TouchableOpacity
+        onPress={() => { setShowStatusCheck(!showStatusCheck); setStatusResult(null); setStatusError(''); setStatusEmail(''); }}
+        style={[styles.celebLink, { marginTop: 12 }]}
+      >
+        <Icon name="search" size={14} color={colors.mutedForeground} />
+        <Text style={[styles.celebLinkText, { color: colors.mutedForeground }]}>
+          Already applied? <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>Check status</Text>
+        </Text>
+      </TouchableOpacity>
+
+      {showStatusCheck && (
+        <View style={[styles.statusCheckBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[{ fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.foreground, marginBottom: 12 }]}>
+            Check Application Status
+          </Text>
+          <View style={[styles.inputRow, { backgroundColor: colors.input, borderColor: statusError && !statusResult ? colors.destructive : colors.border, borderWidth: 1.5, marginBottom: 8 }]}>
+            <Icon name="mail" size={18} color={colors.mutedForeground} />
+            <TextInput
+              style={[styles.input, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
+              placeholder="Your application email"
+              placeholderTextColor={colors.mutedForeground}
+              value={statusEmail}
+              onChangeText={(t) => { setStatusEmail(t); setStatusResult(null); setStatusError(''); }}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+          {statusError ? (
+            <Text style={[styles.errorText, { color: colors.destructive, marginBottom: 8 }]}>{statusError}</Text>
+          ) : null}
+          {statusResult ? (
+            <View style={[styles.statusCard, { backgroundColor: STATUS_MAP[statusResult].color + '15', marginTop: 8 }]}>
+              <Icon name={STATUS_MAP[statusResult].icon} size={24} color={STATUS_MAP[statusResult].color} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontFamily: 'Inter_700Bold', color: STATUS_MAP[statusResult].color, marginBottom: 2 }}>
+                  {STATUS_MAP[statusResult].label}
+                </Text>
+                <Text style={{ fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, lineHeight: 17 }}>
+                  {STATUS_MAP[statusResult].msg}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              onPress={handleCheckStatus}
+              disabled={statusLoading}
+              style={({ pressed }) => [{ opacity: pressed || statusLoading ? 0.7 : 1 }]}
+            >
+              <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.gradBtn, { height: 44 }]}>
+                {statusLoading
+                  ? <ActivityIndicator color="#fff" />
+                  : <Text style={styles.gradBtnText}>Check Status</Text>
+                }
+              </LinearGradient>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      <TouchableOpacity onPress={onSwitchToSignIn} style={[styles.celebLink, { marginTop: 16 }]}>
+        <Icon name="arrow-left" size={14} color={colors.mutedForeground} />
+        <Text style={[styles.celebLinkText, { color: colors.mutedForeground }]}>
+          Already have an account? <Text style={{ color: colors.primary, fontFamily: 'Inter_600SemiBold' }}>Sign In</Text>
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -747,7 +628,7 @@ export default function AuthScreen() {
           <View style={styles.formArea}>
             {activeTab === 'signin' && <SignInTab onSwitchToCelebrity={() => setActiveTab('celebrity')} />}
             {activeTab === 'signup' && <SignUpTab />}
-            {activeTab === 'celebrity' && <CelebrityTab />}
+            {activeTab === 'celebrity' && <CelebrityTab onSwitchToSignIn={() => setActiveTab('signin')} />}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -840,5 +721,9 @@ const styles = StyleSheet.create({
   pickerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', marginBottom: 16 },
   pickerItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, paddingHorizontal: 12, borderRadius: 10, marginBottom: 4 },
   pickerItemText: { fontSize: 15, fontFamily: 'Inter_400Regular' },
-  statusCard: { borderRadius: 16, padding: 24, alignItems: 'center', marginTop: 8 },
+  statusCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 12, padding: 14, marginTop: 4 },
+  celebHero: { borderRadius: 20, padding: 24, alignItems: 'center', gap: 10, marginBottom: 20 },
+  celebHeroTitle: { color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold', textAlign: 'center' },
+  celebHeroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 19 },
+  statusCheckBox: { borderWidth: 1, borderRadius: 16, padding: 16, marginTop: 8 },
 });
