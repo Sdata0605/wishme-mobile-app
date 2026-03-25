@@ -1,18 +1,28 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
+import * as MediaLibrary from 'expo-media-library';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  Alert,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { supabaseFetch } from '@/constants/supabase';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useWallet } from '@/hooks/useWallet';
 
 const OCCASIONS = [
   'Birthday', 'Anniversary', 'Wedding', 'Graduation', 'Baby Shower',
@@ -28,13 +38,6 @@ const TEXT_STYLES = [
   { id: 'festive', label: 'Festive', desc: 'Bold, celebratory with decorative accents' },
 ];
 
-const MOCK_HISTORY = [
-  { id: 'pw1', occasion: 'Birthday', recipient: 'Rahul Kumar', date: '2025-01-15', status: 'Completed' },
-  { id: 'pw2', occasion: 'Anniversary', recipient: 'Priya & Amit', date: '2025-01-08', status: 'Completed' },
-  { id: 'pw3', occasion: 'Wedding', recipient: 'Sneha Sharma', date: '2024-12-28', status: 'Processing' },
-  { id: 'pw4', occasion: 'Graduation', recipient: 'Aryan Mehta', date: '2024-12-10', status: 'Completed' },
-];
-
 const GRAD_COLORS: [string, string][] = [
   ['#FF6B33', '#E8527A'],
   ['#E8527A', '#B44CFF'],
@@ -42,32 +45,281 @@ const GRAD_COLORS: [string, string][] = [
   ['#22C55E', '#4B83FF'],
 ];
 
-const BASE_PRICE = 299;
-const DISCOUNT_PCT = 20;
-const FINAL_PRICE = Math.round(BASE_PRICE * (1 - DISCOUNT_PCT / 100));
+function showToast(msg: string) {
+  if (Platform.OS === 'android') {
+    ToastAndroid.show(msg, ToastAndroid.LONG);
+  } else {
+    Alert.alert('', msg);
+  }
+}
+
+function fmtDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch {
+    return iso.split('T')[0];
+  }
+}
+
+interface PhotoWishRecord {
+  id: string;
+  occasion: string;
+  recipient_name: string;
+  status: string;
+  created_at: string;
+  generated_image_url: string | null;
+}
 
 export default function PhotoWishScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { session, user } = useAuth();
+  const wallet = useWallet();
+
   const [tab, setTab] = useState<'create' | 'history'>('create');
+
   const [occasion, setOccasion] = useState('Birthday');
   const [showOccasions, setShowOccasions] = useState(false);
   const [recipient, setRecipient] = useState('');
   const [sender, setSender] = useState('');
   const [message, setMessage] = useState('');
   const [textStyle, setTextStyle] = useState('elegant');
-  const [hasImage, setHasImage] = useState(false);
+
+  const [pickedImageUri, setPickedImageUri] = useState<string | null>(null);
+  const [pickedImageBase64, setPickedImageBase64] = useState<string | null>(null);
+  const [pickedImageName, setPickedImageName] = useState<string>('photo.jpg');
+
   const [generating, setGenerating] = useState(false);
-  const [generated, setGenerated] = useState(false);
+  const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
+
+  const [basePrice, setBasePrice] = useState<number>(299);
+  const [discountPct, setDiscountPct] = useState<number>(0);
+  const [priceLoading, setPriceLoading] = useState(true);
+
+  const [history, setHistory] = useState<PhotoWishRecord[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
-  const generate = () => {
-    setGenerating(true);
-    setGenerated(false);
-    setTimeout(() => { setGenerating(false); setGenerated(true); }, 2200);
-  };
+  const finalPrice = Math.round(basePrice * (1 - discountPct / 100));
+  const discountAmt = basePrice - finalPrice;
 
-  const statusColor = (s: string) => s === 'Completed' ? '#22c55e' : s === 'Processing' ? '#FF6B33' : '#6b7280';
+  const todayCount = history.filter(h => {
+    const d = new Date(h.created_at);
+    const now = new Date();
+    return d.toDateString() === now.toDateString();
+  }).length;
+
+  useEffect(() => {
+    wallet.refetch();
+    fetchPrice();
+  }, []);
+
+  useEffect(() => {
+    if (wallet.profileId) {
+      fetchHistory();
+    }
+  }, [wallet.profileId]);
+
+  useEffect(() => {
+    if (tab === 'history' && wallet.profileId) {
+      fetchHistory();
+    }
+  }, [tab]);
+
+  const fetchPrice = useCallback(async () => {
+    setPriceLoading(true);
+    try {
+      const res = await supabaseFetch(
+        '/rest/v1/platform_settings?select=setting_value&setting_key=eq.photo_wish_price&limit=1',
+        {},
+        session?.access_token,
+      );
+      if (res.ok) {
+        const rows = await res.json() as Array<{ setting_value: string }>;
+        if (rows?.length) {
+          const v = parseFloat(rows[0].setting_value);
+          if (!isNaN(v)) setBasePrice(v);
+        }
+      }
+    } catch {}
+
+    if (session?.access_token && user?.id) {
+      try {
+        const profileRes = await supabaseFetch(
+          `/rest/v1/profiles?select=plan_discount&user_id=eq.${user.id}&limit=1`,
+          {},
+          session.access_token,
+        );
+        if (profileRes.ok) {
+          const rows = await profileRes.json() as Array<{ plan_discount?: number }>;
+          if (rows?.length && rows[0].plan_discount != null) {
+            setDiscountPct(rows[0].plan_discount);
+          }
+        }
+      } catch {}
+    }
+    setPriceLoading(false);
+  }, [session, user]);
+
+  const fetchHistory = useCallback(async () => {
+    if (!session?.access_token || !wallet.profileId) return;
+    setHistoryLoading(true);
+    try {
+      const res = await supabaseFetch(
+        `/rest/v1/photo_wishes?user_id=eq.${wallet.profileId}&order=created_at.desc&limit=20&select=*`,
+        {},
+        session.access_token,
+      );
+      if (res.ok) {
+        const rows = await res.json() as PhotoWishRecord[];
+        setHistory(rows ?? []);
+      }
+    } catch {}
+    setHistoryLoading(false);
+  }, [session, wallet.profileId]);
+
+  const pickImage = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      showToast('Permission to access photos is required.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: false,
+      quality: 1,
+    });
+    if (result.canceled || !result.assets?.length) return;
+
+    const asset = result.assets[0];
+    try {
+      const manipResult = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 1200 } }],
+        { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      );
+      setPickedImageUri(manipResult.uri);
+      setPickedImageBase64('data:image/jpeg;base64,' + manipResult.base64);
+      const filename = asset.fileName ?? asset.uri.split('/').pop() ?? 'photo.jpg';
+      setPickedImageName(filename);
+    } catch {
+      setPickedImageUri(asset.uri);
+      setPickedImageBase64(null);
+      const filename = asset.fileName ?? asset.uri.split('/').pop() ?? 'photo.jpg';
+      setPickedImageName(filename);
+    }
+  }, []);
+
+  const clearImage = useCallback(() => {
+    setPickedImageUri(null);
+    setPickedImageBase64(null);
+    setPickedImageName('photo.jpg');
+  }, []);
+
+  const generate = useCallback(async () => {
+    if (!pickedImageBase64) {
+      showToast('Please select a photo first.');
+      return;
+    }
+    if (!occasion) {
+      showToast('Please select an occasion.');
+      return;
+    }
+    if (!recipient.trim()) {
+      showToast('Please enter the recipient name.');
+      return;
+    }
+    if (!message.trim()) {
+      showToast('Please enter a wish message.');
+      return;
+    }
+    if (wallet.balance < finalPrice) {
+      showToast('Insufficient wallet balance. Please top up your wallet.');
+      return;
+    }
+    if (!session?.access_token) {
+      showToast('Please log in to continue.');
+      return;
+    }
+
+    setGenerating(true);
+    setGeneratedImageBase64(null);
+
+    try {
+      const res = await supabaseFetch(
+        '/functions/v1/generate-photo-wish',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            originalImageBase64: pickedImageBase64,
+            occasion,
+            recipientName: recipient.trim(),
+            wishMessage: message.trim(),
+            senderName: sender.trim(),
+            textStyle,
+          }),
+        },
+        session.access_token,
+      );
+
+      if (!res.ok) {
+        let errMsg = `Request failed (${res.status})`;
+        try {
+          const errData = await res.json() as Record<string, unknown>;
+          errMsg = (errData.error as string) || (errData.message as string) || errMsg;
+        } catch {}
+        showToast(errMsg);
+        setGenerating(false);
+        return;
+      }
+
+      const data = await res.json() as { editedImageUrl?: string; error?: string };
+      if (data.error) {
+        showToast(data.error);
+        setGenerating(false);
+        return;
+      }
+
+      if (data.editedImageUrl) {
+        setGeneratedImageBase64(data.editedImageUrl);
+        wallet.refetch();
+        fetchHistory();
+      }
+    } catch {
+      showToast('Network error. Please check your connection.');
+    }
+
+    setGenerating(false);
+  }, [pickedImageBase64, occasion, recipient, message, sender, textStyle, wallet, finalPrice, session, fetchHistory]);
+
+  const downloadImage = useCallback(async (base64DataUrl: string) => {
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        showToast('Permission to save photos is required.');
+        return;
+      }
+
+      const base64Data = base64DataUrl.startsWith('data:')
+        ? base64DataUrl.split(',')[1]
+        : base64DataUrl;
+
+      const fileUri = FileSystem.cacheDirectory + `photo_wish_${Date.now()}.jpg`;
+      await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const asset = await MediaLibrary.createAssetAsync(fileUri);
+      await MediaLibrary.createAlbumAsync('WishMe', asset, false);
+      showToast('Photo saved to your gallery!');
+    } catch {
+      showToast('Failed to save photo. Please try again.');
+    }
+  }, []);
+
+  const statusColor = (s: string) => s === 'completed' || s === 'Completed' ? '#22c55e' : s === 'processing' || s === 'Processing' ? '#FF6B33' : '#6b7280';
+  const statusLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
@@ -80,12 +332,11 @@ export default function PhotoWishScreen() {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
-        {/* Stats row */}
         <View style={s.statsRow}>
           {[
-            { label: 'Wallet Balance', value: '₹2,450', icon: 'credit-card' as const, color: '#4B83FF' },
-            { label: "Today's Generations", value: '3', icon: 'zap' as const, color: '#FF6B33' },
-            { label: 'Total Created', value: '47', icon: 'image' as const, color: '#B44CFF' },
+            { label: 'Wallet Balance', value: `₹${wallet.balance.toLocaleString('en-IN')}`, icon: 'credit-card' as const, color: '#4B83FF' },
+            { label: "Today's Generations", value: String(todayCount), icon: 'zap' as const, color: '#FF6B33' },
+            { label: 'Total Created', value: String(history.length), icon: 'image' as const, color: '#B44CFF' },
           ].map(st => (
             <View key={st.label} style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[s.statIcon, { backgroundColor: st.color + '20' }]}>
@@ -97,7 +348,6 @@ export default function PhotoWishScreen() {
           ))}
         </View>
 
-        {/* Tab pills */}
         <View style={[s.tabRow, { borderBottomColor: colors.border }]}>
           {(['create', 'history'] as const).map(t => (
             <TouchableOpacity key={t} style={s.tabPill} onPress={() => setTab(t)}>
@@ -111,20 +361,19 @@ export default function PhotoWishScreen() {
 
         {tab === 'create' ? (
           <View style={s.formWrap}>
-            {/* Image upload */}
-            {hasImage ? (
+            {pickedImageUri ? (
               <View style={[s.uploadedPreview, { backgroundColor: '#FF6B3315', borderColor: '#FF6B3340' }]}>
-                <Icon name="image" size={32} color="#FF6B33" />
-                <Text style={[s.uploadedText, { color: colors.foreground }]}>photo_wish.jpg</Text>
-                <TouchableOpacity onPress={() => setHasImage(false)}>
+                <Image source={{ uri: pickedImageUri }} style={s.uploadedThumb} resizeMode="cover" />
+                <Text style={[s.uploadedText, { color: colors.foreground }]} numberOfLines={1}>{pickedImageName}</Text>
+                <TouchableOpacity onPress={clearImage}>
                   <Icon name="x" size={18} color={colors.mutedForeground} />
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity style={[s.uploadZone, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={() => setHasImage(true)} activeOpacity={0.8}>
+              <TouchableOpacity style={[s.uploadZone, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={pickImage} activeOpacity={0.8}>
                 <Icon name="upload" size={32} color="#FF6B33" />
                 <Text style={[s.uploadTitle, { color: colors.foreground }]}>Upload Your Photo</Text>
-                <Text style={[s.uploadSub, { color: colors.mutedForeground }]}>Tap to choose from gallery or camera</Text>
+                <Text style={[s.uploadSub, { color: colors.mutedForeground }]}>Tap to choose from gallery</Text>
                 <View style={[s.uploadBtn, { backgroundColor: '#FF6B33' }]}>
                   <Icon name="camera" size={15} color="#fff" />
                   <Text style={s.uploadBtnText}>Choose Photo</Text>
@@ -132,7 +381,6 @@ export default function PhotoWishScreen() {
               </TouchableOpacity>
             )}
 
-            {/* Occasion */}
             <Text style={[s.label, { color: colors.foreground }]}>Occasion</Text>
             <TouchableOpacity style={[s.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setShowOccasions(o => !o)}>
               <Text style={[s.dropdownText, { color: colors.foreground }]}>{occasion}</Text>
@@ -151,18 +399,15 @@ export default function PhotoWishScreen() {
               </View>
             )}
 
-            {/* Names */}
             <Text style={[s.label, { color: colors.foreground }]}>Recipient Name</Text>
             <TextInput style={[s.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]} placeholder="Who is this for?" placeholderTextColor={colors.mutedForeground} value={recipient} onChangeText={setRecipient} />
 
             <Text style={[s.label, { color: colors.foreground }]}>Sender Name</Text>
             <TextInput style={[s.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]} placeholder="Your name" placeholderTextColor={colors.mutedForeground} value={sender} onChangeText={setSender} />
 
-            {/* Message */}
             <Text style={[s.label, { color: colors.foreground }]}>Wish Message</Text>
             <TextInput style={[s.textarea, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]} placeholder="Write a heartfelt message..." placeholderTextColor={colors.mutedForeground} value={message} onChangeText={setMessage} multiline numberOfLines={4} />
 
-            {/* Text Style */}
             <Text style={[s.label, { color: colors.foreground }]}>Text Style</Text>
             <View style={s.styleGrid}>
               {TEXT_STYLES.map(ts => (
@@ -173,46 +418,47 @@ export default function PhotoWishScreen() {
               ))}
             </View>
 
-            {/* Pricing */}
             <View style={[s.pricingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <Text style={[s.pricingTitle, { color: colors.foreground }]}>Pricing</Text>
-              <View style={s.pricingRow}>
-                <Text style={[s.pricingLabel, { color: colors.mutedForeground }]}>Base Price</Text>
-                <Text style={[s.pricingBase, { color: colors.mutedForeground }]}>₹{BASE_PRICE}</Text>
-              </View>
-              <View style={s.pricingRow}>
-                <View style={s.discountBadge}><Text style={s.discountText}>{DISCOUNT_PCT}% OFF</Text></View>
-                <Text style={[s.pricingDiscount, { color: '#22c55e' }]}>−₹{BASE_PRICE - FINAL_PRICE}</Text>
-              </View>
-              <View style={[s.pricingDivider, { backgroundColor: colors.border }]} />
-              <View style={s.pricingRow}>
-                <Text style={[s.pricingFinalLabel, { color: colors.foreground }]}>Total</Text>
-                <Text style={s.pricingFinal}>₹{FINAL_PRICE}</Text>
-              </View>
+              {priceLoading ? (
+                <Text style={[s.pricingLabel, { color: colors.mutedForeground }]}>Loading price...</Text>
+              ) : (
+                <>
+                  <View style={s.pricingRow}>
+                    <Text style={[s.pricingLabel, { color: colors.mutedForeground }]}>Base Price</Text>
+                    <Text style={[s.pricingBase, { color: colors.mutedForeground }]}>₹{basePrice}</Text>
+                  </View>
+                  {discountPct > 0 && (
+                    <View style={s.pricingRow}>
+                      <View style={s.discountBadge}><Text style={s.discountText}>{discountPct}% OFF</Text></View>
+                      <Text style={[s.pricingDiscount, { color: '#22c55e' }]}>−₹{discountAmt}</Text>
+                    </View>
+                  )}
+                  <View style={[s.pricingDivider, { backgroundColor: colors.border }]} />
+                  <View style={s.pricingRow}>
+                    <Text style={[s.pricingFinalLabel, { color: colors.foreground }]}>Total</Text>
+                    <Text style={s.pricingFinal}>₹{finalPrice}</Text>
+                  </View>
+                </>
+              )}
             </View>
 
-            {/* Generated preview */}
-            {generated && (
+            {generatedImageBase64 && (
               <View style={[s.previewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <LinearGradient colors={['#FF6B33', '#B44CFF']} style={s.previewImg}>
-                  <Text style={s.previewEmoji}>✨</Text>
-                  <Text style={s.previewMsg}>Your Photo Wish</Text>
-                  <Text style={s.previewSub}>{occasion} · {recipient || 'Recipient'}</Text>
-                </LinearGradient>
+                <Image
+                  source={{ uri: generatedImageBase64 }}
+                  style={s.previewImg}
+                  resizeMode="cover"
+                />
                 <View style={s.previewActions}>
-                  <TouchableOpacity style={[s.previewBtn, { backgroundColor: colors.muted }]}>
+                  <TouchableOpacity style={[s.previewBtn, { backgroundColor: colors.muted }]} onPress={() => downloadImage(generatedImageBase64)}>
                     <Icon name="download" size={15} color={colors.foreground} />
                     <Text style={[s.previewBtnText, { color: colors.foreground }]}>Download</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[s.previewBtn, { backgroundColor: colors.muted }]}>
-                    <Icon name="share-2" size={15} color={colors.foreground} />
-                    <Text style={[s.previewBtnText, { color: colors.foreground }]}>Share</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
 
-            {/* CTA */}
             <TouchableOpacity onPress={generate} disabled={generating} activeOpacity={0.85} style={{ opacity: generating ? 0.7 : 1 }}>
               <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.genBtn}>
                 <Icon name="image" size={18} color="#fff" />
@@ -222,36 +468,54 @@ export default function PhotoWishScreen() {
           </View>
         ) : (
           <View style={s.historyWrap}>
-            <Text style={[s.histCount, { color: colors.mutedForeground }]}>{MOCK_HISTORY.length} photo wishes created</Text>
-            <View style={s.histGrid}>
-              {MOCK_HISTORY.map((item, idx) => (
-                <View key={item.id} style={[s.histCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <LinearGradient colors={GRAD_COLORS[idx % GRAD_COLORS.length]} style={s.histThumb}>
-                    <Icon name="image" size={24} color="rgba(255,255,255,0.8)" />
-                  </LinearGradient>
-                  <View style={s.histInfo}>
-                    <View style={s.histBadgeRow}>
-                      <View style={[s.badge, { backgroundColor: '#FF6B3320' }]}>
-                        <Text style={[s.badgeText, { color: '#FF6B33' }]}>{item.occasion}</Text>
-                      </View>
-                      <View style={[s.badge, { backgroundColor: statusColor(item.status) + '20' }]}>
-                        <Text style={[s.badgeText, { color: statusColor(item.status) }]}>{item.status}</Text>
-                      </View>
-                    </View>
-                    <Text style={[s.histRecipient, { color: colors.foreground }]}>{item.recipient}</Text>
-                    <View style={s.histFooter}>
-                      <Text style={[s.histDate, { color: colors.mutedForeground }]}>{item.date}</Text>
-                      {item.status === 'Completed' && (
-                        <TouchableOpacity style={s.dlBtn}>
-                          <Icon name="download" size={13} color="#FF6B33" />
-                          <Text style={s.dlText}>Download</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
+            {historyLoading ? (
+              <Text style={[s.histCount, { color: colors.mutedForeground }]}>Loading history...</Text>
+            ) : (
+              <>
+                <Text style={[s.histCount, { color: colors.mutedForeground }]}>{history.length} photo {history.length === 1 ? 'wish' : 'wishes'} created</Text>
+                {history.length === 0 ? (
+                  <View style={[s.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                    <Icon name="image" size={32} color={colors.mutedForeground} />
+                    <Text style={[s.emptyTitle, { color: colors.foreground }]}>No photo wishes yet</Text>
+                    <Text style={[s.emptySub, { color: colors.mutedForeground }]}>Create your first photo wish to see it here</Text>
                   </View>
-                </View>
-              ))}
-            </View>
+                ) : (
+                  <View style={s.histGrid}>
+                    {history.map((item, idx) => (
+                      <View key={item.id} style={[s.histCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        {item.generated_image_url ? (
+                          <Image source={{ uri: item.generated_image_url }} style={s.histThumbImg} resizeMode="cover" />
+                        ) : (
+                          <LinearGradient colors={GRAD_COLORS[idx % GRAD_COLORS.length]} style={s.histThumb}>
+                            <Icon name="image" size={24} color="rgba(255,255,255,0.8)" />
+                          </LinearGradient>
+                        )}
+                        <View style={s.histInfo}>
+                          <View style={s.histBadgeRow}>
+                            <View style={[s.badge, { backgroundColor: '#FF6B3320' }]}>
+                              <Text style={[s.badgeText, { color: '#FF6B33' }]}>{item.occasion}</Text>
+                            </View>
+                            <View style={[s.badge, { backgroundColor: statusColor(item.status) + '20' }]}>
+                              <Text style={[s.badgeText, { color: statusColor(item.status) }]}>{statusLabel(item.status)}</Text>
+                            </View>
+                          </View>
+                          <Text style={[s.histRecipient, { color: colors.foreground }]}>{item.recipient_name}</Text>
+                          <View style={s.histFooter}>
+                            <Text style={[s.histDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
+                            {item.generated_image_url && (
+                              <TouchableOpacity style={s.dlBtn} onPress={() => downloadImage(item.generated_image_url!)}>
+                                <Icon name="download" size={13} color="#FF6B33" />
+                                <Text style={s.dlText}>Download</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
+            )}
           </View>
         )}
       </ScrollView>
@@ -278,7 +542,8 @@ const s = StyleSheet.create({
   uploadSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
   uploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 9999, marginTop: 4 },
   uploadBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  uploadedPreview: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 16, marginBottom: 8 },
+  uploadedPreview: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 12, borderWidth: 1, padding: 12, marginBottom: 8 },
+  uploadedThumb: { width: 52, height: 52, borderRadius: 8 },
   uploadedText: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium' },
   label: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginTop: 16, marginBottom: 8 },
   dropdown: { borderRadius: 12, borderWidth: 1.5, paddingHorizontal: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -304,10 +569,7 @@ const s = StyleSheet.create({
   pricingFinalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FF6B33' },
   previewCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginTop: 16 },
-  previewImg: { height: 160, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  previewEmoji: { fontSize: 28 },
-  previewMsg: { color: '#fff', fontSize: 18, fontFamily: 'PlayfairDisplay_700Bold' },
-  previewSub: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontFamily: 'Inter_400Regular' },
+  previewImg: { width: '100%', height: 220 },
   previewActions: { flexDirection: 'row', gap: 10, padding: 12 },
   previewBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 12, borderRadius: 10 },
   previewBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
@@ -318,6 +580,7 @@ const s = StyleSheet.create({
   histGrid: { gap: 12 },
   histCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden', flexDirection: 'row' },
   histThumb: { width: 90, alignItems: 'center', justifyContent: 'center' },
+  histThumbImg: { width: 90, height: 90 },
   histInfo: { flex: 1, padding: 12, gap: 6 },
   histBadgeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
@@ -327,4 +590,7 @@ const s = StyleSheet.create({
   histDate: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   dlBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dlText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#FF6B33' },
+  emptyState: { borderRadius: 16, borderWidth: 1, padding: 32, alignItems: 'center', gap: 10 },
+  emptyTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  emptySub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
 });
