@@ -81,7 +81,7 @@ const QUICK_ACTIONS: QuickAction[] = [
   { icon: 'mail', label: 'Greeting\nCards', route: '/greeting-cards', color: '#7B2FFF' },
   { icon: 'phone', label: 'Voice\nCall', route: '/(tabs)/voice-call', color: '#FF6B33' },
   { icon: 'message-circle', label: 'Messages', route: '/messages', color: '#22C55E', badge: 3 },
-  { icon: 'zap', label: 'Upgrade\nPlan', route: '/settings', color: '#FFB347' },
+  { icon: 'zap', label: 'Upgrade\nPlan', route: '/select-plan', color: '#FFB347' },
 ];
 
 const VIDEO_CARDS = [
