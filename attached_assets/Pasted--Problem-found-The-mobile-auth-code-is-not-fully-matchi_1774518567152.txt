@@ -1,0 +1,120 @@
+
+Problem found
+
+The mobile auth code is not fully matching the website auth flow. The main issue is not the celebrity email/password itself — it is the identity-resolution flow after login.
+
+Why it works on the website
+
+1. The website logs in with Supabase Auth normally.
+2. Then `src/hooks/useAuth.tsx` runs `ensureProfile(session.user)` on auth/session restore.
+3. That means the web app can auto-create or repair a missing `profiles` row.
+4. After that, the website fetches `profiles.id` and checks `celebrities.profile_id = profile.id`.
+5. If a celebrity row exists, it routes to `/celebrity-dashboard`.
+
+Why the mobile code is fragile
+
+In uploaded `AuthContext.tsx`:
+
+1. `login()` authenticates correctly with `/auth/v1/token`.
+2. It fetches the profile with:
+   `profiles?user_id=eq.${supaUser.id}`
+3. Then it checks celebrity access with:
+   `celebrities?profile_id=eq.${u.profileId}`
+
+The weak points are:
+
+- No profile auto-create/repair step exists in mobile.
+  - If the auth user exists but the `profiles` row is missing/incomplete, web still works because `ensureProfile()` repairs it.
+  - Mobile does not repair it, so `u.profileId` stays empty and celebrity lookup fails.
+
+- Role resolution is weaker than web.
+  - `buildUserFromSupabase()` trusts `user_metadata.role`.
+  - But many real celebrity accounts are identified by the `celebrities` table linked to `profiles.id`, not by auth metadata alone.
+
+- The mobile login does not normalize email before auth.
+  - Web does `trim().toLowerCase()`
+  - Mobile sends `email` exactly as typed.
+  - This can cause login mismatch in some cases.
+
+- The mobile code silently continues even when profile fetch fails.
+  - It logs the problem, but still returns a user object.
+  - That can make the app think login succeeded while celebrity detection fails.
+
+Exact conclusion
+
+The celebrity account can work on the website because the website has a post-login profile recovery flow (`ensureProfile`) that the mobile app does not have.
+
+So the likely real failure path is:
+
+```text
+Auth user exists and password is valid
+→ mobile token login succeeds
+→ mobile cannot find/fix the matching profiles row
+→ profileId remains empty or stale
+→ celebrities lookup by profile_id fails
+→ app does not recognize the user as a celebrity
+```
+
+Implementation plan
+
+1. Align mobile login with web login normalization
+   - In mobile `login()`, use `email.trim().toLowerCase()` before calling `/auth/v1/token`.
+
+2. Make profile resolution mandatory after login
+   - After successful token login, fetch the `profiles` row by `user_id`.
+   - If no profile is found, do not silently continue.
+   - Return a clear error like:
+     “Account exists in auth, but profile setup is incomplete.”
+
+3. Match website celebrity detection exactly
+   - Use `profiles.id` as the source of truth.
+   - Then query `celebrities.profile_id = profile.id`.
+   - Set celebrity access from that result, not from `user_metadata.role` alone.
+
+4. Hydrate role from database, not only auth metadata
+   - When profile is found, also copy `profile.role` into the local mobile user model.
+   - Keep the celebrity table check as the final routing authority.
+
+5. Add strict failure logs around the two critical steps
+   - Profile fetch result
+   - Celebrity fetch result
+   - Especially log when `profileId` is empty before querying celebrities
+
+Recommended files to update
+
+1. Mobile `AuthContext.tsx`
+   - Normalize email before login
+   - Make missing profile a hard failure
+   - Populate `role` from `profiles.role`
+   - Only return celebrity role after successful `celebrities` lookup
+
+2. Optional backend hardening
+   - Move profile auto-creation to the backend/database trigger so web and mobile behave the same
+   - This is the best long-term fix for the whole platform
+
+Technical note for Replit team
+
+Use the same identity chain as the web app:
+
+```text
+auth.users.id
+→ profiles.user_id
+→ profiles.id
+→ celebrities.profile_id
+```
+
+Do not rely on `auth.user_metadata.role` as the main source for celebrity login.
+
+What I would change next
+
+Phase 1: Mobile-only fix
+- Patch `AuthContext.tsx` to mirror the website flow exactly.
+
+Phase 2: Platform fix
+- Add backend profile auto-creation so both web and mobile always get a valid `profiles` row.
+
+Expected result after fix
+
+- The same celebrity credentials that work on web will resolve properly in mobile
+- Mobile will detect the celebrity by `profiles.id -> celebrities.profile_id`
+- Celebrity dashboard routing will become consistent with the website
