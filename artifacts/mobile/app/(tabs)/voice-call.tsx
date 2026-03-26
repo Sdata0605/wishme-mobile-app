@@ -497,7 +497,7 @@ function CallDetailsForm({
                 size={15}
                 color={callTiming === opt ? colors.primary : colors.mutedForeground}
               />
-              <Text style={[styles.timingBtnText, { color: callTiming === opt ? colors.primary : colors.mutedForeground }]}>
+              <Text numberOfLines={1} style={[styles.timingBtnText, { color: callTiming === opt ? colors.primary : colors.mutedForeground }]}>
                 {opt === 'now' ? 'Call Now' : 'Schedule for Later'}
               </Text>
             </TouchableOpacity>
@@ -883,9 +883,9 @@ const styles = StyleSheet.create({
   timingToggle: { flexDirection: 'row', gap: 10 },
   timingBtn: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5,
+    gap: 6, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, overflow: 'hidden',
   },
-  timingBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  timingBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', flexShrink: 1 },
 
   pickerDropdown: { borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
   timeDropdown: {},
