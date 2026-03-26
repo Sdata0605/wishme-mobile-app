@@ -217,13 +217,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       try {
         const celebRes = await supabaseFetch(
-          `/rest/v1/celebrities?select=id,status&user_id=eq.${supaUser.id}&limit=1`,
+          `/rest/v1/celebrities?select=id,status&profile_id=eq.${u.profileId}&status=eq.approved&limit=1`,
           {},
           newSession.access_token,
         );
         if (celebRes.ok) {
           const celebs = await celebRes.json() as Array<{ id: string; status: string }>;
-          if (celebs && celebs.length > 0 && celebs[0].status === 'approved') {
+          if (celebs && celebs.length > 0) {
             u = { ...u, role: 'celebrity' };
           }
         }
