@@ -3,7 +3,6 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback } from 'react';
 import {
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Switch,
@@ -15,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrity } from '@/hooks/useCelebrity';
 import { useWallet } from '@/hooks/useWallet';
 
 function ProfileItem({
@@ -45,11 +45,12 @@ function ProfileItem({
 }
 
 export default function ProfileScreen() {
-  const { user, logout, updateUser } = useAuth();
+  const { user, logout } = useAuth();
   const { colors, isDark, toggle } = useTheme();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { balance: liveBalance, refetch: refetchWallet } = useWallet();
+  const { isCelebrity, loading: celebrityLoading } = useCelebrity();
 
   useFocusEffect(useCallback(() => { refetchWallet(); }, [refetchWallet]));
 
@@ -133,17 +134,7 @@ export default function ProfileScreen() {
         <ProfileItem icon="help-circle" label="Help & Support" onPress={() => {}} />
       </View>
 
-      {/* Celebrity mode toggle */}
-      {user?.role === 'user' && (
-        <TouchableOpacity
-          style={[styles.celebModeBtn, { borderColor: colors.primary }]}
-          onPress={() => updateUser({ role: 'celebrity' })}
-        >
-          <Icon name="star" size={18} color={colors.primary} />
-          <Text style={[styles.celebModeTxt, { color: colors.primary }]}>Switch to Celebrity Mode</Text>
-        </TouchableOpacity>
-      )}
-      {user?.role === 'celebrity' && (
+      {!celebrityLoading && isCelebrity && (
         <View style={{ paddingHorizontal: 20 }}>
           <TouchableOpacity
             style={[styles.dashboardBtn]}
@@ -187,8 +178,6 @@ const styles = StyleSheet.create({
   profileItem: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderBottomWidth: 1 },
   profileItemIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   profileItemLabel: { flex: 1, fontSize: 14 },
-  celebModeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, margin: 20, marginBottom: 0, borderWidth: 1.5, borderRadius: 12, padding: 14 },
-  celebModeTxt: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   dashboardBtn: { marginBottom: 12 },
   dashboardBtnGrad: { height: 48, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   dashboardBtnText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_600SemiBold' },

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '@/context/AuthContext';
 import { useDrawer } from '@/context/DrawerContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrity } from '@/hooks/useCelebrity';
 import { Icon, type IconName } from './Icon';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -77,6 +78,7 @@ export function DrawerMenu({ children }: { children: React.ReactNode }) {
   const { animValue, isOpen, close } = useDrawer();
   const { colors } = useTheme();
   const { user, logout } = useAuth();
+  const { isCelebrity, loading: celebrityLoading } = useCelebrity();
   const insets = useSafeAreaInsets();
 
   const contentTranslateX = animValue.interpolate({
@@ -112,7 +114,7 @@ export function DrawerMenu({ children }: { children: React.ReactNode }) {
     setTimeout(() => router.replace('/(auth)'), 50);
   };
 
-  const navItems = user?.role === 'celebrity'
+  const navItems = !celebrityLoading && isCelebrity
     ? [...NAV_ITEMS, { icon: 'sparkles' as IconName, label: 'Celebrity Dashboard', route: '/celebrity-dashboard', highlight: true }]
     : NAV_ITEMS;
 
