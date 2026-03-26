@@ -26,24 +26,27 @@ import { useCelebrities } from '@/hooks/useCelebrities';
 const { width: W } = Dimensions.get('window');
 const DASH_PAGE_SIZE = 4;
 
-const BANNERS = [
+const BANNERS: { id: string; title: string; subtitle: string; colors: readonly [string, string, string]; route: Href }[] = [
   {
     id: '1',
     title: 'Get a Birthday Wish\nfrom Your Idol',
     subtitle: 'Starting from ₹999',
     colors: ['#FF6B33', '#E8527A', '#B44CFF'] as const,
+    route: '/wish-celebrity',
   },
   {
     id: '2',
     title: 'AI Music Studio\nNow Live!',
     subtitle: 'Generate songs in seconds',
     colors: ['#B44CFF', '#7B2FFF', '#4B0082'] as const,
+    route: '/(tabs)/music',
   },
   {
     id: '3',
     title: 'Book a Voice Call\nwith Celebrities',
     subtitle: 'Live 1-on-1 sessions',
     colors: ['#FF6B33', '#FF8C42', '#FFB347'] as const,
+    route: '/(tabs)/voice-call',
   },
 ];
 
@@ -212,7 +215,7 @@ export default function HomeScreen() {
               >
                 <Text style={styles.bannerTitle}>{item.title}</Text>
                 <Text style={styles.bannerSub}>{item.subtitle}</Text>
-                <TouchableOpacity style={styles.bannerBtn}>
+                <TouchableOpacity style={styles.bannerBtn} onPress={() => router.push(item.route)} activeOpacity={0.7}>
                   <Text style={styles.bannerBtnText}>Book Now →</Text>
                 </TouchableOpacity>
               </LinearGradient>
