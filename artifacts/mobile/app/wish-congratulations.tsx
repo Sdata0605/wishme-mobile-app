@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -19,11 +19,12 @@ import { supabaseFetch } from '@/constants/supabase';
 
 interface OrderSummary {
   id: string;
-  occasion: string;
+  occasion_type: string;
   recipient_name: string;
-  amount: number;
+  amount_paid: number;
   status: string;
   created_at: string;
+  conversation_id: string | null;
   celebrities: {
     name: string;
     category: string;
@@ -31,7 +32,7 @@ interface OrderSummary {
 }
 
 export default function WishCongratulationsScreen() {
-  const { orderId } = useLocalSearchParams<{ orderId: string }>();
+  const { orderId, conversationId } = useLocalSearchParams<{ orderId: string; conversationId?: string }>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
@@ -39,12 +40,14 @@ export default function WishCongratulationsScreen() {
 
   const [order, setOrder] = useState<OrderSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [countdown, setCountdown] = useState(10);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const loadOrder = useCallback(async () => {
     if (!orderId) { setLoading(false); return; }
     try {
       const res = await supabaseFetch(
-        `/rest/v1/wish_orders?id=eq.${orderId}&select=id,occasion,recipient_name,amount,status,created_at,celebrities(name,category)&limit=1`,
+        `/rest/v1/wish_celebrity_orders?id=eq.${orderId}&select=id,occasion_type,recipient_name,amount_paid,status,created_at,conversation_id,celebrities(name,category)&limit=1`,
         {},
         session?.access_token,
       );
@@ -60,11 +63,29 @@ export default function WishCongratulationsScreen() {
     loadOrder();
   }, [loadOrder]);
 
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          router.replace('/messages' as never);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
   const formatDate = (iso: string) => {
     try {
       return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
     } catch { return iso.slice(0, 10); }
   };
+
+  const convId = order?.conversation_id ?? conversationId;
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
@@ -104,7 +125,7 @@ export default function WishCongratulationsScreen() {
                 </View>
                 <View style={s.summaryRow}>
                   <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Occasion</Text>
-                  <Text style={[s.summaryValue, { color: colors.foreground }]}>{order.occasion}</Text>
+                  <Text style={[s.summaryValue, { color: colors.foreground }]}>{order.occasion_type}</Text>
                 </View>
                 <View style={s.summaryRow}>
                   <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Recipient</Text>
@@ -117,7 +138,7 @@ export default function WishCongratulationsScreen() {
                 <View style={[s.summaryRow, { borderBottomWidth: 0 }]}>
                   <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Amount Paid</Text>
                   <Text style={[s.summaryValue, { color: colors.primary, fontFamily: 'Inter_700Bold' }]}>
-                    ₹{order.amount.toLocaleString('en-IN')}
+                    ₹{order.amount_paid.toLocaleString('en-IN')}
                   </Text>
                 </View>
               </View>
@@ -139,19 +160,42 @@ export default function WishCongratulationsScreen() {
             </View>
           )}
 
+          <Text style={[s.countdownText, { color: colors.mutedForeground }]}>
+            Redirecting to messages in {countdown}s...
+          </Text>
+
+          {convId && (
+            <TouchableOpacity
+              style={[s.viewConvBtn, { borderColor: '#4B83FF', backgroundColor: '#4B83FF18' }]}
+              onPress={() => {
+                if (intervalRef.current) clearInterval(intervalRef.current);
+                router.push(('/chat/' + convId) as never);
+              }}
+            >
+              <Icon name="message-circle" size={16} color="#4B83FF" />
+              <Text style={[s.viewConvText, { color: '#4B83FF' }]}>View Conversation</Text>
+            </TouchableOpacity>
+          )}
+
           <GradientButton
             title="Back to Home"
-            onPress={() => router.replace('/(tabs)' as never)}
+            onPress={() => {
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              router.replace('/(tabs)' as never);
+            }}
             style={{ marginTop: 8 }}
             icon={<Icon name="home" size={18} color="#fff" />}
           />
 
           <TouchableOpacity
             style={[s.wishMoreBtn, { borderColor: colors.border }]}
-            onPress={() => router.replace('/wish-celebrity' as never)}
+            onPress={() => {
+              if (intervalRef.current) clearInterval(intervalRef.current);
+              router.push('/wish-orders' as never);
+            }}
           >
-            <Icon name="star" size={16} color={colors.primary} />
-            <Text style={[s.wishMoreText, { color: colors.primary }]}>Wish Another Celebrity</Text>
+            <Icon name="list" size={16} color={colors.primary} />
+            <Text style={[s.wishMoreText, { color: colors.primary }]}>View All My Wishes</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -177,6 +221,9 @@ const s = StyleSheet.create({
   statusCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 12, borderWidth: 1, padding: 14 },
   statusTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 4 },
   statusDesc: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 18 },
+  countdownText: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  viewConvBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderRadius: 9999, paddingVertical: 14, marginTop: 4 },
+  viewConvText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   wishMoreBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1.5, borderRadius: 9999, paddingVertical: 14, marginTop: 4 },
   wishMoreText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
 });

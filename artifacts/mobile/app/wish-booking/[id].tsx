@@ -135,7 +135,7 @@ export default function WishBookingScreen() {
     }
     setSuggestingMsg(true);
     try {
-      const res = await supabaseFetch('/functions/v1/suggest-wish-messages', {
+      const res = await supabaseFetch('/functions/v1/generate-message-suggestions', {
         method: 'POST',
         body: JSON.stringify({
           celebrity_name: celeb?.name,
@@ -160,7 +160,7 @@ export default function WishBookingScreen() {
     }
     setSuggestingPrompt(true);
     try {
-      const res = await supabaseFetch('/functions/v1/suggest-card-prompts', {
+      const res = await supabaseFetch('/functions/v1/suggest-greeting-card-prompts', {
         method: 'POST',
         body: JSON.stringify({
           celebrity_name: celeb?.name,
@@ -181,6 +181,7 @@ export default function WishBookingScreen() {
     if (!occasion) { showToast('Please select an occasion'); return; }
     if (!recipientName.trim()) { showToast('Please enter recipient name'); return; }
     if (!message.trim()) { showToast('Please enter a message'); return; }
+    if (!cardPrompt.trim()) { showToast('Please enter a card prompt'); return; }
     setPayError('');
     setPayModalVisible(true);
   };
@@ -188,18 +189,23 @@ export default function WishBookingScreen() {
   const discountAmt = planDiscountPct > 0 ? Math.round((basePrice * planDiscountPct) / 100) : 0;
   const finalPrice = basePrice - discountAmt;
 
-  const createWishOrder = async () => {
-    const res = await supabaseFetch('/rest/v1/wish_orders', {
+  const createWishOrder = async (paymentMethod: string, paymentStatus: string) => {
+    const res = await supabaseFetch('/rest/v1/wish_celebrity_orders', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
         user_id: profileId,
         celebrity_id: id,
-        occasion,
+        occasion_type: occasion,
         recipient_name: recipientName,
         message,
         card_prompt: cardPrompt,
-        amount: finalPrice,
+        card_generation_type: 'ai',
+        amount_paid: finalPrice,
+        discount_percentage: planDiscountPct,
+        discount_amount: discountAmt,
+        payment_method: paymentMethod,
+        payment_status: paymentStatus,
         status: 'pending',
       }),
     }, session?.access_token);
@@ -216,7 +222,7 @@ export default function WishBookingScreen() {
     setPaying(true);
     setPayError('');
     try {
-      const orderId = await createWishOrder();
+      const orderId = await createWishOrder('wallet', 'completed');
       const txRes = await supabaseFetch('/rest/v1/wallet_transactions', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' },
@@ -224,23 +230,31 @@ export default function WishBookingScreen() {
           user_id: profileId,
           amount: -finalPrice,
           type: 'debit',
+          transaction_type: 'booking',
           reference_id: orderId,
-          description: `Wish order for ${celeb?.name}`,
+          status: 'completed',
+          description: `Wish order #${orderId} for ${celeb?.name} - ${occasion}`,
+          transaction_details: {
+            base_price: basePrice,
+            discount_percentage: planDiscountPct,
+            discount_amount: discountAmt,
+            plan: planDiscountPct > 0 ? 'subscriber' : 'standard',
+          },
         }),
       }, session?.access_token);
 
       if (!txRes.ok) {
-        await supabaseFetch(`/rest/v1/wish_orders?id=eq.${orderId}`, {
+        await supabaseFetch(`/rest/v1/wish_celebrity_orders?id=eq.${orderId}`, {
           method: 'DELETE',
           headers: { Prefer: 'return=minimal' },
         }, session?.access_token).catch(() => {});
         throw new Error('Wallet transaction failed');
       }
 
-      await supabaseFetch(`/rest/v1/wish_orders?id=eq.${orderId}`, {
+      await supabaseFetch(`/rest/v1/wish_celebrity_orders?id=eq.${orderId}`, {
         method: 'PATCH',
         headers: { Prefer: 'return=minimal' },
-        body: JSON.stringify({ status: 'paid', payment_method: 'wallet' }),
+        body: JSON.stringify({ status: 'paid', payment_method: 'wallet', payment_status: 'completed' }),
       }, session?.access_token);
 
       setPayModalVisible(false);
@@ -256,15 +270,15 @@ export default function WishBookingScreen() {
     setPayError('');
     let wishOrderId: string | undefined;
     try {
-      wishOrderId = await createWishOrder();
+      wishOrderId = await createWishOrder('razorpay', 'pending');
 
       const rzpRes = await supabaseFetch('/functions/v1/create-razorpay-order', {
         method: 'POST',
         body: JSON.stringify({
           amount: finalPrice * 100,
           currency: 'INR',
-          receipt: `wish_${Date.now()}`,
-          notes: { wish_order_id: wishOrderId },
+          receipt: `WISH-${wishOrderId}`.slice(0, 40),
+          notes: { orderId: wishOrderId },
         }),
       }, session?.access_token);
 
@@ -279,15 +293,16 @@ export default function WishBookingScreen() {
             razorpay_payment_id: paymentId,
             razorpay_order_id: rzpOrderId,
             razorpay_signature: signature,
-            wish_order_id: wishOrderId,
+            orderId: wishOrderId,
+            orderType: 'wish',
           }),
         }, session?.access_token);
         if (!verifyRes.ok) throw new Error('Payment verification failed');
 
-        await supabaseFetch(`/rest/v1/wish_orders?id=eq.${wishOrderId}`, {
+        await supabaseFetch(`/rest/v1/wish_celebrity_orders?id=eq.${wishOrderId}`, {
           method: 'PATCH',
           headers: { Prefer: 'return=minimal' },
-          body: JSON.stringify({ status: 'paid', payment_method: 'razorpay' }),
+          body: JSON.stringify({ status: 'paid', payment_method: 'razorpay', payment_status: 'completed' }),
         }, session?.access_token);
 
         setPayModalVisible(false);
@@ -329,7 +344,7 @@ export default function WishBookingScreen() {
 
         if (!razorpayModule) {
           if (wishOrderId) {
-            await supabaseFetch(`/rest/v1/wish_orders?id=eq.${wishOrderId}`, {
+            await supabaseFetch(`/rest/v1/wish_celebrity_orders?id=eq.${wishOrderId}`, {
               method: 'DELETE',
               headers: { Prefer: 'return=minimal' },
             }, session?.access_token).catch(() => {});
@@ -363,7 +378,7 @@ export default function WishBookingScreen() {
       if (!errMsg.toLowerCase().includes('cancel')) {
         setPayError(errMsg);
       } else if (wishOrderId) {
-        await supabaseFetch(`/rest/v1/wish_orders?id=eq.${wishOrderId}`, {
+        await supabaseFetch(`/rest/v1/wish_celebrity_orders?id=eq.${wishOrderId}`, {
           method: 'DELETE',
           headers: { Prefer: 'return=minimal' },
         }, session?.access_token).catch(() => {});

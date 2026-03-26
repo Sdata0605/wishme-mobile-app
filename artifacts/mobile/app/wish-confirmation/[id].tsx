@@ -20,14 +20,16 @@ import { supabaseFetch } from '@/constants/supabase';
 
 interface WishOrder {
   id: string;
-  occasion: string;
+  occasion_type: string;
   recipient_name: string;
   message: string;
   card_prompt: string;
-  amount: number;
+  amount_paid: number;
+  payment_status: string;
   status: string;
-  card_image_url?: string;
+  generated_card_image_url?: string;
   greeting_text?: string;
+  generation_attempts?: number;
   celebrities: {
     id: string;
     name: string;
@@ -51,13 +53,14 @@ export default function WishConfirmationScreen() {
   const [genError, setGenError] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
+  const [regenerationCount, setRegenerationCount] = useState(0);
 
   const loadOrder = useCallback(async () => {
     if (!id) return;
     setOrderLoading(true);
     try {
       const res = await supabaseFetch(
-        `/rest/v1/wish_orders?id=eq.${id}&select=id,occasion,recipient_name,message,card_prompt,amount,status,card_image_url,greeting_text,celebrities(id,name,category,image_url)&limit=1`,
+        `/rest/v1/wish_celebrity_orders?id=eq.${id}&select=id,occasion_type,recipient_name,message,card_prompt,amount_paid,payment_status,status,generated_card_image_url,greeting_text,generation_attempts,celebrities(id,name,category,image_url)&limit=1`,
         {},
         session?.access_token,
       );
@@ -66,8 +69,9 @@ export default function WishConfirmationScreen() {
         if (rows?.length) {
           const o = rows[0];
           setOrder(o);
-          if (o.card_image_url) setCardImageUrl(o.card_image_url);
+          if (o.generated_card_image_url) setCardImageUrl(o.generated_card_image_url);
           if (o.greeting_text) setGreetingText(o.greeting_text);
+          setRegenerationCount(o.generation_attempts ?? 0);
         }
       }
     } catch {}
@@ -76,19 +80,13 @@ export default function WishConfirmationScreen() {
 
   const generateCard = useCallback(async () => {
     if (!id || !order) return;
+    if (regenerationCount >= 3) return;
     setGenerating(true);
     setGenError('');
     try {
       const res = await supabaseFetch('/functions/v1/generate-wish-celebrity-card', {
         method: 'POST',
-        body: JSON.stringify({
-          wish_order_id: id,
-          celebrity_name: order.celebrities?.name,
-          occasion: order.occasion,
-          recipient_name: order.recipient_name,
-          message: order.message,
-          card_prompt: order.card_prompt,
-        }),
+        body: JSON.stringify({ orderId: id }),
       }, session?.access_token);
 
       if (!res.ok) throw new Error('Card generation failed');
@@ -97,18 +95,19 @@ export default function WishConfirmationScreen() {
       const gText = data.greeting_text ?? null;
       if (imgUrl) setCardImageUrl(imgUrl);
       if (gText) setGreetingText(gText);
+      setRegenerationCount(prev => prev + 1);
     } catch (e: unknown) {
       setGenError(e instanceof Error ? e.message : 'Failed to generate card');
     }
     setGenerating(false);
-  }, [id, order, session]);
+  }, [id, order, session, regenerationCount]);
 
   useEffect(() => {
     loadOrder();
   }, [loadOrder]);
 
   useEffect(() => {
-    if (order && !order.card_image_url) {
+    if (order && order.payment_status === 'completed' && !order.generated_card_image_url) {
       generateCard();
     }
   }, [order]);
@@ -120,11 +119,7 @@ export default function WishConfirmationScreen() {
     try {
       const res = await supabaseFetch('/functions/v1/send-wish-to-celebrity', {
         method: 'POST',
-        body: JSON.stringify({
-          wish_order_id: id,
-          card_image_url: cardImageUrl,
-          greeting_text: greetingText,
-        }),
+        body: JSON.stringify({ orderId: id }),
       }, session?.access_token);
       if (!res.ok) throw new Error('Failed to send wish');
       router.replace({ pathname: '/wish-congratulations', params: { orderId: id } } as never);
@@ -139,6 +134,8 @@ export default function WishConfirmationScreen() {
       ? order.celebrities.image_url
       : `https://f005.backblazeb2.com/file/wishmetoday/${order.celebrities.image_url}`
     : null;
+
+  const maxRegenReached = regenerationCount >= 3;
 
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
@@ -179,7 +176,7 @@ export default function WishConfirmationScreen() {
                 <Text style={[s.celebCat, { color: colors.mutedForeground }]}>{order.celebrities.category}</Text>
               </View>
               <View style={s.amountTag}>
-                <Text style={s.amountText}>₹{order.amount.toLocaleString('en-IN')}</Text>
+                <Text style={s.amountText}>₹{order.amount_paid.toLocaleString('en-IN')}</Text>
               </View>
             </View>
           )}
@@ -187,7 +184,7 @@ export default function WishConfirmationScreen() {
           <View style={[s.orderInfo, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <View style={s.infoRow}>
               <Text style={[s.infoLabel, { color: colors.mutedForeground }]}>Occasion</Text>
-              <Text style={[s.infoValue, { color: colors.foreground }]}>{order.occasion}</Text>
+              <Text style={[s.infoValue, { color: colors.foreground }]}>{order.occasion_type}</Text>
             </View>
             <View style={s.infoRow}>
               <Text style={[s.infoLabel, { color: colors.mutedForeground }]}>Recipient</Text>
@@ -226,11 +223,18 @@ export default function WishConfirmationScreen() {
             </View>
           )}
 
+          {maxRegenReached && (
+            <View style={[s.maxRegenBanner, { backgroundColor: colors.muted }]}>
+              <Icon name="info" size={14} color={colors.mutedForeground} />
+              <Text style={[s.maxRegenText, { color: colors.mutedForeground }]}>Maximum regenerations reached (3/3)</Text>
+            </View>
+          )}
+
           <View style={s.actions}>
             <TouchableOpacity
-              style={[s.regenBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+              style={[s.regenBtn, { backgroundColor: colors.card, borderColor: colors.border, opacity: maxRegenReached || generating ? 0.5 : 1 }]}
               onPress={generateCard}
-              disabled={generating || sending}
+              disabled={generating || sending || maxRegenReached}
             >
               {generating ? (
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -289,6 +293,8 @@ const s = StyleSheet.create({
   greetingBox: { padding: 16 },
   greetingText: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 22, fontStyle: 'italic' },
   genErrorText: { color: '#EF4444', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 16 },
+  maxRegenBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, padding: 10, marginBottom: 12 },
+  maxRegenText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
   actions: { flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'center' },
   regenBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: 9999, paddingVertical: 12, paddingHorizontal: 16 },
   regenText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
