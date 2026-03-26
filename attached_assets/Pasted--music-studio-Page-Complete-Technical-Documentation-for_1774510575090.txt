@@ -1,0 +1,231 @@
+
+/music-studio Page — Complete Technical Documentation for Mobile App Replication
+Page Overview
+Route: /music-studio | Component: src/pages/MusicStudio.tsx (1746 lines) Wrapped in AuthenticatedLayout (standard sidebar + header). Redirects to /auth if not logged in. Dark theme background: #0A0E1A. All cards use #111827.
+
+Authentication & Initialization
+On mount, if profile.id exists:
+
+Fetches wallet balance: supabase.from('profiles').select('wallet_balance').eq('id', profile.id).single()
+Fetches voices via Edge Function (see Tab 6 below)
+Layout Structure
+Hero Header — Left-aligned large text: "Your Symphony, Powered by AI." with gradient italic styling.
+
+Wallet Card — Shows ₹{walletBalance} and cost breakdown for each service.
+
+Tab Navigation — 7 horizontally scrollable pill buttons (custom <button> elements controlling Radix Tabs via hidden TabsList):
+
+Tab Key	Label	Icon
+music-generation	Generate Song	Sparkles
+text-to-speech	TTS	Volume2
+voice-conversion	Voice Conversion	Mic
+sound-effects	SFX	Zap
+voice-clone	Clone	UserPlus
+audio-isolation	Isolate	FileAudio
+image-music	Img+Music	Image
+Active tab: orange pill bg-[#FF6B33] with glow shadow. Inactive: text-white/50.
+
+Pricing (Wallet Costs)
+Service	Cost (₹)
+TTS	50
+Voice Conversion	75
+Sound Effects	60
+Audio Isolation	40
+Instrumental	100
+Full Song (with lyrics)	150
+Voice Clone	150
+Image+Music (instrumental)	120
+Image+Music (with vocals)	150
+TAB 1: Generate Song (Music Generation)
+Purpose: Create full songs or instrumentals via Suno API.
+
+UI: Two-column layout (55/45). Left = form, Right = player/preview.
+
+Form Fields:
+
+Song Title (text input)
+Song Type toggle: "Full Song" / "Instrumental"
+Voice gender selector (Full Song only): Any / Male / Female
+Language selector (Full Song only): English, Hindi, Tamil, Telugu, Kannada, Malayalam, Punjabi, Bengali
+Lyrics textarea with monospace font (Full Song only) + "Generate Lyrics" button
+Description textarea (Instrumental only)
+Genre & Mood pills: bollywood, pop, romantic, happy, lofi, classical, hip-hop, r&b, edm, folk
+Right Column (Player):
+
+Empty state: gradient album art placeholder + decorative waveform + play controls
+Loading state: animated waveform + spinner + cycling progress messages
+Complete state: album art + song title + <audio> player (with filter: invert(1)) + Download MP3 button
+Data Flow:
+
+Step 1 — Generate Lyrics (optional)
+
+Endpoint: supabase.functions.invoke('generate-lyrics')
+Payload: { description: string, genre: string, mood: string, language: string }
+Response: { lyrics: string }
+Uses Gemini API (or Lovable AI Gateway fallback) server-side.
+
+Step 2 — Generate Music
+
+Endpoint: supabase.functions.invoke('generate-music')
+Payload: {
+  song_title: string,
+  genre: string,
+  mood: string,
+  prompt: string,          // description text
+  lyrics?: string,         // only for 'with_lyrics'
+  generation_type: 'with_lyrics' | 'instrumental',
+  voice_type: 'any' | 'male' | 'female',
+  language: string
+}
+Response: { generation_id: string, task_id: string }
+Server-side: Creates music_generations row, calls Suno API POST https://api.sunoapi.org/api/v1/generate with model: 'V4_5ALL', deducts wallet.
+
+Step 3 — Poll Status (every 5s, starting after 10s delay, max 60 attempts = 5min)
+
+Endpoint: supabase.functions.invoke('check-music-status')
+Payload: { generation_id: string }
+Response: {
+  status: 'completed' | 'failed' | 'processing',
+  song_url?: string,
+  download_url?: string,
+  error?: string,
+  message?: string
+}
+On completion: downloads audio from Suno, uploads to Backblaze B2, updates music_generations record. On failure: refunds wallet via wallet_transactions insert.
+
+DB Table: music_generations — columns: user_id, song_title, prompt, genre, mood, lyrics, status, generation_type, api_task_id, credits_used, price_paid, song_url, download_url
+
+TAB 2: Text to Speech (TTS)
+Purpose: Convert text to speech using ElevenLabs voices.
+
+UI: Two-column. Left = textarea + voice selector. Right = audio result.
+
+Data Flow:
+
+Endpoint: supabase.functions.invoke('elevenlabs-text-to-speech')
+Payload: { text: string, voiceId: string }
+Response: { success: boolean, audioUrl: string (base64 data URI), b2Url?: string }
+Server-side: Calls POST https://api.elevenlabs.io/v1/text-to-speech/{voiceId}, uploads to B2.
+
+DB Insert: tts_generations — { user_id, text, voice_id, voice_name, audio_url: b2Url || audioUrl, status: 'completed', credits_used: 50 }
+
+TAB 3: Voice Conversion (Speech-to-Speech)
+Purpose: Upload/record audio, convert to a different voice.
+
+UI: Two-column. Left = file upload OR AudioRecorderButton + voice selector. Right = result.
+
+Data Flow:
+
+Endpoint: supabase.functions.invoke('elevenlabs-speech-to-speech')
+Payload: { audioBase64: string (data URI), voiceId: string }
+Response: { success: boolean, audioUrl: string, b2Url?: string }
+Server-side: Calls POST https://api.elevenlabs.io/v1/speech-to-speech/{voiceId} with FormData.
+
+DB Insert: voice_conversion_generations — { user_id, original_file_name, target_voice_id, target_voice_name, audio_url, status: 'completed', credits_used: 75 }
+
+TAB 4: Sound Effects (SFX)
+Purpose: Generate sound effects from text descriptions.
+
+UI: Two-column. Left = description textarea + duration slider (1-22s). Right = result.
+
+Data Flow:
+
+Endpoint: supabase.functions.invoke('elevenlabs-sound-effects')
+Payload: { text: string, durationSeconds: number }
+Response: { success: boolean, audioUrl: string, b2Url?: string }
+Server-side: Calls POST https://api.elevenlabs.io/v1/sound-generation.
+
+DB Insert: sound_effect_generations — { user_id, description, duration_seconds, audio_url, status: 'completed', credits_used: 60 }
+
+TAB 5: Voice Clone
+Purpose: Clone user's voice for use in TTS and music.
+
+UI: Two-column. Left = file upload OR recorder + voice name + description. Right = info card + cloned voices list.
+
+Data Flow:
+
+Endpoint: supabase.functions.invoke('elevenlabs-clone-voice')
+Payload: { audioBase64: string, voiceName: string, voiceDescription?: string }
+Response: { success: boolean, voiceId: string }
+Server-side: Calls ElevenLabs voice cloning API, saves to user_cloned_voices table.
+
+After success: calls fetchVoices() to refresh the voice list. Cloned voices appear in TTS and Voice Conversion dropdowns with 🎤 prefix.
+
+TAB 6: Audio Isolation
+Purpose: Remove background noise from audio.
+
+UI: Two-column. Left = file upload. Right = result.
+
+Data Flow:
+
+Endpoint: supabase.functions.invoke('elevenlabs-audio-isolation')
+Payload: { audioBase64: string }
+Response: { success: boolean, audioUrl: string, b2Url?: string }
+DB Insert: audio_isolation_generations — { user_id, original_file_name, audio_url, status: 'completed', credits_used: 40 }
+
+TAB 7: Image + Music Video
+Purpose: Create a music video from an image + generated/uploaded audio, with optional AI vocals.
+
+UI: Two-column. Left = image upload + music source (generate/upload) + genre/mood/language selectors + lyrics textarea + duration slider. Right = video preview with play overlay + download button.
+
+Data Flow:
+
+Optional — Generate Lyrics:
+
+Endpoint: supabase.functions.invoke('generate-lyrics')
+Payload: { description: string, genre: string, mood: string, language: string }
+Response: { lyrics: string }
+Generate Music + Video:
+
+Endpoint: supabase.functions.invoke('elevenlabs-image-music-video')
+Payload: {
+  imageBase64: string,
+  musicDescription: string,
+  lyrics?: string,
+  genre: string,
+  mood: string,
+  language: string,
+  durationSeconds: number,
+  uploadedAudioBase64?: string   // if user uploaded their own audio
+}
+Response: { success: boolean, audioUrl: string, b2Url?: string, imageBase64: string, hasVocals: boolean }
+Server-side: If lyrics provided, calls ElevenLabs /v1/music/compose (vocals). Otherwise calls /v1/sound-generation (instrumental). Uploads to B2.
+
+DB Insert: image_music_generations — { user_id, image_url, audio_url, description, lyrics, genre, mood, duration_seconds, has_vocals, amount_charged, status: 'completed' }
+
+Video Creation (client-side only): Uses <canvas> + MediaRecorder API to combine the static image with audio into a .webm video for download. This is browser-only — for mobile app, you'd need a native video composition library.
+
+Voice Fetching (shared across all tabs)
+Endpoint: supabase.functions.invoke('get-user-voices')
+Response: {
+  premadeVoices: [{ voice_id, name, category: 'premade' }],
+  clonedVoices: [{ voice_id, name, category: 'cloned', description, created_at }],
+  totalCount: number
+}
+Fallback on 401: hardcoded list of 9 default ElevenLabs premade voices.
+
+Voice Preview: If a voice has preview_url, plays it directly. Otherwise generates a sample via elevenlabs-text-to-speech with text "Hello! This is how I sound...".
+
+Wallet Flow Pattern (all tabs)
+Check walletBalance >= cost client-side
+Optimistically deduct via updateWallet(-cost) (updates profiles.wallet_balance)
+Call Edge Function
+On success: save to DB table
+On failure: refund via updateWallet(+cost)
+For Music Generation specifically, the server handles wallet deduction, so the client just updates local state.
+
+Key Database Tables Used
+Table	Purpose
+profiles	Wallet balance
+music_generations	Suno song records
+tts_generations	TTS records
+voice_conversion_generations	Speech-to-speech records
+sound_effect_generations	SFX records
+audio_isolation_generations	Noise removal records
+image_music_generations	Image+music video records
+user_cloned_voices	Cloned voice metadata
+wallet_transactions	Financial audit trail
+Supabase Base URL
+https://eqikeuqwbphwongtfzhe.supabase.co
+
+All Edge Function calls use: {BASE_URL}/functions/v1/{function-name} Headers required: Authorization: Bearer {user_jwt}, apikey: {anon_key}, Content-Type: application/json

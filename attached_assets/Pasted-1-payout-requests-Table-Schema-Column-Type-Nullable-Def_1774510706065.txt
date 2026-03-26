@@ -1,0 +1,128 @@
+1. payout_requests Table Schema
+
+Column                | Type      | Nullable | Default
+----------------------|-----------|----------|------------------
+id                    | uuid      | NOT NULL | gen_random_uuid()
+celebrity_id          | uuid      | NOT NULL | FK → celebrities.id
+profile_id            | uuid      | NOT NULL | FK → profiles.id
+requested_amount      | integer   | NOT NULL |
+bank_name             | text      | NOT NULL |
+bank_account_number   | text      | NOT NULL |
+ifsc_code             | text      | NOT NULL |
+account_holder_name   | text      | NOT NULL |
+status                | text      | NOT NULL | 'pending'
+admin_notes           | text      | NULL     |
+processed_by          | uuid      | NULL     | FK → profiles.id
+processed_at          | timestamp | NULL     |
+requested_at          | timestamp | NOT NULL | now()
+Status values: pending, approved, processed, rejected
+
+Flow: Celebrity submits a withdrawal → available_balance is immediately deducted on the celebrities table → admin approves (marks processed) or rejects (restores available_balance).
+
+2. bank_details Table Schema
+
+Column              | Type      | Nullable | Default
+--------------------|-----------|----------|------------------
+id                  | uuid      | NOT NULL | gen_random_uuid()
+user_id             | uuid      | NOT NULL | FK → profiles.id
+bank_name           | text      | NOT NULL |
+account_holder_name | text      | NOT NULL |
+account_number      | text      | NOT NULL |
+ifsc_code           | text      | NOT NULL |
+account_type        | text      | NULL     | (e.g. 'savings', 'current')
+is_default          | boolean   | NULL     | false
+created_at          | timestamp | NOT NULL | now()
+updated_at          | timestamp | NOT NULL | now()
+Note: user_id references profiles.id (not auth.users.id). A user can have multiple bank accounts; one is marked is_default = true.
+
+3. service_prices JSONB Structure
+The celebrities.service_prices column is a JSONB object with this structure (all values in INR as integers):
+
+
+{
+  "general_wish": 5000,
+  "text_message": 500,
+  "image_promotion": 10000,
+  "video_promotion": 15000,
+  "ugc_ad": 20000,
+  "voice_call": 3000
+}
+Key definitions:
+
+general_wish — personalized video message price (the main/starting price shown on cards)
+text_message — text-based wish price
+image_promotion — AI image promotion with celebrity likeness
+video_promotion — AI video promotion price
+ugc_ad — UGC ad creation price
+voice_call — live/AI voice call price
+All keys are optional (may be missing or 0 if that service isn't offered by the celebrity). The admin panel and celebrity profile both read/write this same JSONB shape.
+
+Give this to Replit and they'll have everything needed to build the Wallet tab (withdrawal + bank selection + payout history) and the Profile/Pricing tab.
+
+Here's the complete information for Replit:
+
+1. payout_requests Table Schema
+
+Column                | Type      | Nullable | Default
+----------------------|-----------|----------|------------------
+id                    | uuid      | NOT NULL | gen_random_uuid()
+celebrity_id          | uuid      | NOT NULL | FK → celebrities.id
+profile_id            | uuid      | NOT NULL | FK → profiles.id
+requested_amount      | integer   | NOT NULL |
+bank_name             | text      | NOT NULL |
+bank_account_number   | text      | NOT NULL |
+ifsc_code             | text      | NOT NULL |
+account_holder_name   | text      | NOT NULL |
+status                | text      | NOT NULL | 'pending'
+admin_notes           | text      | NULL     |
+processed_by          | uuid      | NULL     | FK → profiles.id
+processed_at          | timestamp | NULL     |
+requested_at          | timestamp | NOT NULL | now()
+Status values: pending, approved, processed, rejected
+
+Flow: Celebrity submits a withdrawal → available_balance is immediately deducted on the celebrities table → admin approves (marks processed) or rejects (restores available_balance).
+
+2. bank_details Table Schema
+
+Column              | Type      | Nullable | Default
+--------------------|-----------|----------|------------------
+id                  | uuid      | NOT NULL | gen_random_uuid()
+user_id             | uuid      | NOT NULL | FK → profiles.id
+bank_name           | text      | NOT NULL |
+account_holder_name | text      | NOT NULL |
+account_number      | text      | NOT NULL |
+ifsc_code           | text      | NOT NULL |
+account_type        | text      | NULL     | (e.g. 'savings', 'current')
+is_default          | boolean   | NULL     | false
+created_at          | timestamp | NOT NULL | now()
+updated_at          | timestamp | NOT NULL | now()
+Note: user_id references profiles.id (not auth.users.id). A user can have multiple bank accounts; one is marked is_default = true.
+
+3. service_prices JSONB Structure
+The celebrities.service_prices column is a JSONB object with this structure (all values in INR as integers):
+
+
+{
+  "general_wish": 5000,
+  "text_message": 500,
+  "image_promotion": 10000,
+  "video_promotion": 15000,
+  "ugc_ad": 20000,
+  "voice_call": 3000
+}
+Key definitions:
+
+general_wish — personalized video message price (the main/starting price shown on cards)
+text_message — text-based wish price
+image_promotion — AI image promotion with celebrity likeness
+video_promotion — AI video promotion price
+ugc_ad — UGC ad creation price
+voice_call — live/AI voice call price
+All keys are optional (may be missing or 0 if that service isn't offered by the celebrity). The admin panel and celebrity profile both read/write this same JSONB shape.
+
+Give this to Replit and they'll have everything needed to build the Wallet tab (withdrawal + bank selection + payout history) and the Profile/Pricing tab.
+
+
+
+
+

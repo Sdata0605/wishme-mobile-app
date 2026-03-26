@@ -1,0 +1,181 @@
+elebrity vs Normal User Identification System
+Core Principle
+The platform does NOT rely on a single role field to determine if a user is a celebrity. Instead, it uses a dual-check system combining the profiles table and the celebrities table.
+
+Database Tables Involved
+1. profiles table (created for every registered user)
+
+id          → UUID (primary key)
+user_id     → UUID (references auth.users)
+role        → text ('user' | 'celebrity' | 'admin')
+email       → text
+first_name  → text
+last_name   → text
+plan        → text ('basic' | 'premium' | 'elite')
+is_active   → boolean
+2. celebrities table (created only when a celebrity application is approved)
+
+id          → UUID (primary key)
+profile_id  → UUID (references profiles.id)
+name        → text
+category_id → UUID
+is_active   → boolean
+rating      → numeric
+service_prices → JSONB
+Identification Logic
+The system checks if a row exists in the celebrities table where profile_id matches the logged-in user's profiles.id. This is the authoritative check — not the profiles.role field alone.
+
+Query used everywhere:
+
+
+const { data } = await supabase
+  .from('celebrities')
+  .select('id')
+  .eq('profile_id', profile.id)
+  .single();
+
+const isCelebrity = !!data;
+If data exists → user IS a celebrity.
+If data is null → user is a normal user.
+
+Where This Check Happens
+Location	File	Purpose
+User Sidebar	src/components/dashboard/UserSidebar.tsx	Shows/hides "Celebrity Dashboard" nav link
+Dashboard Switcher	src/components/dashboard/DashboardSwitcher.tsx	Shows/hides floating toggle button
+Header	src/components/Header.tsx	Shows celebrity-specific menu items
+Auth redirect	src/pages/Auth.tsx	After login, redirects celebrity to /celebrity-dashboard
+Celebrity Dashboard	src/pages/CelebrityDashboard.tsx	Access control — shows "Access Restricted" if not celebrity
+Auth Page Post-Login Flow
+After successful sign-in, Auth.tsx runs this exact sequence:
+
+
+// Step 1: Get the user's profile
+const { data: profileData } = await supabase
+  .from('profiles')
+  .select('role')
+  .eq('user_id', user.id)
+  .single();
+
+// Step 2: Check if they exist in celebrities table
+const { data: celebrityData } = await supabase
+  .from('celebrities')
+  .select('id')
+  .eq('profile_id', profileData.id)
+  .maybeSingle();
+
+// Step 3: Route accordingly
+if (profileData.role === 'admin') {
+  navigate('/admin');
+} else if (celebrityData) {
+  navigate('/celebrity-dashboard');
+} else {
+  navigate('/dashboard');
+}
+How a User Becomes a Celebrity
+1. User visits /celebrity-signup
+2. Fills application form → inserted into `celebrity_applications` table (status: 'pending')
+3. Admin reviews at /admin → AdminCelebrities page
+4. Admin clicks "Approve" which:
+   a. Creates a row in `celebrities` table with profile_id
+   b. Updates `profiles.role` to 'celebrity'
+   c. Updates `celebrity_applications.status` to 'approved'
+5. Next time user logs in, the celebrities table check returns data → identified as celebrity
+Key Takeaway for Mobile App
+Do NOT check profiles.role alone. Always query the celebrities table:
+
+
+SELECT id FROM celebrities WHERE profile_id = '{user_profile_id}' LIMIT 1;
+Row exists → celebrity (show celebrity dashboard, celebrity features)
+No row → normal user (show user dashboard only)
+The profiles.role field is a secondary indicator; the celebrities table row is the source of truth.
+
+Celebrity vs Normal User Identification System
+Core Principle
+The platform does NOT rely on a single role field to determine if a user is a celebrity. Instead, it uses a dual-check system combining the profiles table and the celebrities table.
+
+Database Tables Involved
+1. profiles table (created for every registered user)
+
+id          → UUID (primary key)
+user_id     → UUID (references auth.users)
+role        → text ('user' | 'celebrity' | 'admin')
+email       → text
+first_name  → text
+last_name   → text
+plan        → text ('basic' | 'premium' | 'elite')
+is_active   → boolean
+2. celebrities table (created only when a celebrity application is approved)
+
+id          → UUID (primary key)
+profile_id  → UUID (references profiles.id)
+name        → text
+category_id → UUID
+is_active   → boolean
+rating      → numeric
+service_prices → JSONB
+Identification Logic
+The system checks if a row exists in the celebrities table where profile_id matches the logged-in user's profiles.id. This is the authoritative check — not the profiles.role field alone.
+
+Query used everywhere:
+
+
+const { data } = await supabase
+  .from('celebrities')
+  .select('id')
+  .eq('profile_id', profile.id)
+  .single();
+
+const isCelebrity = !!data;
+If data exists → user IS a celebrity.
+If data is null → user is a normal user.
+
+Where This Check Happens
+Location	File	Purpose
+User Sidebar	src/components/dashboard/UserSidebar.tsx	Shows/hides "Celebrity Dashboard" nav link
+Dashboard Switcher	src/components/dashboard/DashboardSwitcher.tsx	Shows/hides floating toggle button
+Header	src/components/Header.tsx	Shows celebrity-specific menu items
+Auth redirect	src/pages/Auth.tsx	After login, redirects celebrity to /celebrity-dashboard
+Celebrity Dashboard	src/pages/CelebrityDashboard.tsx	Access control — shows "Access Restricted" if not celebrity
+Auth Page Post-Login Flow
+After successful sign-in, Auth.tsx runs this exact sequence:
+
+
+// Step 1: Get the user's profile
+const { data: profileData } = await supabase
+  .from('profiles')
+  .select('role')
+  .eq('user_id', user.id)
+  .single();
+
+// Step 2: Check if they exist in celebrities table
+const { data: celebrityData } = await supabase
+  .from('celebrities')
+  .select('id')
+  .eq('profile_id', profileData.id)
+  .maybeSingle();
+
+// Step 3: Route accordingly
+if (profileData.role === 'admin') {
+  navigate('/admin');
+} else if (celebrityData) {
+  navigate('/celebrity-dashboard');
+} else {
+  navigate('/dashboard');
+}
+How a User Becomes a Celebrity
+1. User visits /celebrity-signup
+2. Fills application form → inserted into `celebrity_applications` table (status: 'pending')
+3. Admin reviews at /admin → AdminCelebrities page
+4. Admin clicks "Approve" which:
+   a. Creates a row in `celebrities` table with profile_id
+   b. Updates `profiles.role` to 'celebrity'
+   c. Updates `celebrity_applications.status` to 'approved'
+5. Next time user logs in, the celebrities table check returns data → identified as celebrity
+Key Takeaway for Mobile App
+Do NOT check profiles.role alone. Always query the celebrities table:
+
+
+SELECT id FROM celebrities WHERE profile_id = '{user_profile_id}' LIMIT 1;
+Row exists → celebrity (show celebrity dashboard, celebrity features)
+No row → normal user (show user dashboard only)
+The profiles.role field is a secondary indicator; the celebrities table row is the source of truth.

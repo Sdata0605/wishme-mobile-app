@@ -1,0 +1,124 @@
+Here is the complete documentation for the /celebrity-dashboard page and celebrity identification system:
+
+1. How Celebrity vs Normal User is Identified
+The Core Check: celebrities Table Lookup
+The system does NOT rely on the profiles.role field alone. The definitive check is querying the celebrities table:
+
+
+SELECT id FROM celebrities WHERE profile_id = <profile.id> LIMIT 1
+If a row exists → user IS a celebrity
+If no row → user is a normal user
+This check happens in 3 places:
+
+A. DashboardSwitcher Component (src/components/dashboard/DashboardSwitcher.tsx)
+A floating button (fixed bottom-right, z-50) shown on both /dashboard and /celebrity-dashboard
+On mount, queries celebrities table with profile_id = profile.id
+If isCelebrity === true → renders a toggle button between "User Dashboard" and "Celebrity Dashboard"
+If not a celebrity → renders null (hidden)
+B. UserSidebar (src/components/dashboard/UserSidebar.tsx)
+Also queries celebrities table for profile_id = profile.id
+If celebrity → shows a "Celebrity Dashboard" nav link in the sidebar
+C. CelebrityDashboard Page Access Control (lines 94-121)
+Queries celebrities where profile_id = profile.id (or by id if admin is viewing)
+If no row found AND user is not admin → sets noCelebrityAccess = true → renders "Access Restricted" card with a "Go to Dashboard" button
+Admin Override
+If profile.role === 'admin', the user can access any celebrity's dashboard via ?celebrityId=<uuid> query param
+Admins see a dropdown to switch between celebrities
+2. Celebrity Dashboard Data Flow
+Authentication
+Uses useAuth() hook → provides user, profile, signOut, changePassword
+profile.id is the key identifier (UUID from profiles table)
+Initial Data Fetch (on mount)
+profile loaded → fetchCelebrityData() called
+                 ↓
+  Query: SELECT * FROM celebrities WHERE profile_id = profile.id
+                 ↓
+  If found → setCelebrity(data) → fetchStats(celebrity.id)
+  If not found → setNoCelebrityAccess(true)
+Stats Fetch (fetchStats)
+Query: SELECT celebrity_commission, status FROM bookings WHERE celebrity_id = <id>
+  ↓
+Filter completed → sum celebrity_commission → totalEarnings
+Filter pending/in_progress → sum → pendingEarnings
+Count all → totalBookings
+celebrity.rating → rating
+celebrity.review_count → reviewCount
+3. Supabase Tables Used
+Table	Purpose	Key Fields
+celebrities	Celebrity profile data	id, profile_id, name, category, bio, image_url, service_prices (JSONB), commission_percentage, consent_status, consent_photo_url, consent_video_url, available_balance, total_earnings, rating, review_count, social_media (JSONB), date_of_birth, anniversary_date, delivery_time
+profiles	User account data	id, user_id, email, first_name, last_name, phone, role, plan
+bookings	All service bookings	celebrity_id, celebrity_commission, status, service_type, final_price
+celebrity_wallet_transactions	Earnings transactions	celebrity_id, transaction_type, amount
+celebrity_reviews	User reviews	celebrity_id, rating, review_text
+celebrity_favorites	Subscriptions/followers	celebrity_id, user_id, status
+conversations / messages	Fan messages	celebrity_id, sender_id, message_text
+celebrity_events	Events management	celebrity_id, title, event_date, event_type
+celebrity_media	Media uploads	celebrity_id, media_url, media_type
+Supabase Storage Buckets
+celebrity-avatars — avatar photos (path: <celebrity-name>/avatar/<timestamp>-<filename>)
+promotional-content — promo photos/videos (path: <celebrity-name>/promotional/photo|video/<timestamp>-<filename>)
+4. UI Structure & 10 Tabs
+Header
+Gradient background (bg-gradient-primary)
+Shows celebrity name, admin badge if in view mode
+Desktop: Notifications, Settings, Sign Out buttons + admin celebrity selector dropdown
+Stats Row (5 cards, 2-col mobile / 5-col desktop)
+Stat	Icon	Color
+Total Earnings (₹)	DollarSign	green-500
+Pending (₹)	Wallet	orange-500
+Total Bookings	Users	blue-500
+Rating	Star	yellow-500
+Reviews	TrendingUp	purple-500
+Tab Components
+Tab	Component	Supabase Endpoint
+Content	Inline (avatar + promo upload)	celebrities update, Storage upload
+Wallet	<WalletTab>	celebrity_wallet_transactions, image_promotions, payout_requests, bank_details
+Messages	<MessagesTab>	conversations, messages (with realtime)
+Events	<CelebrityContentManager>	celebrity_events, celebrity_media
+Consent	<ConsentCapture>	celebrities (consent fields), Storage upload
+Bookings	<BookingsTab>	bookings, image_promotions (with realtime)
+Reviews	<ReviewsTab>	celebrity_reviews joined with profiles + bookings
+Followers	<FollowersTab>	celebrity_favorites joined with profiles (with realtime)
+TDS	<TDSReportsTab>	celebrity_wallet_transactions (filtered by financial year)
+Profile	Inline (read-only fields)	celebrities, profiles (display only)
+5. Key Component Props
+
+// WalletTab
+{ celebrityId: string; stats: { totalEarnings: number; pendingEarnings: number }; availableBalance: number }
+
+// BookingsTab, ReviewsTab, FollowersTab, MessagesTab
+{ celebrityId: string }
+
+// ConsentCapture
+{ celebrityId: string; onConsentSubmitted: () => void }
+
+// TDSReportsTab — no props (uses useAuth internally)
+6. File Upload Flow
+User clicks "Choose Photos" → hidden <input type="file"> triggered
+  ↓
+handleAvatarFiles(files) called
+  ↓
+For each file:
+  supabase.storage.from('celebrity-avatars').upload(path, file)
+  supabase.storage.from('celebrity-avatars').getPublicUrl(path)
+  ↓
+Update celebrities.image_url with first uploaded URL
+  ↓
+Refresh celebrity data via fetchCelebrityData()
+7. Consent Flow
+Celebrity visits Consent tab
+  ↓
+If consent_status NOT 'submitted' or 'approved':
+  → Show <ConsentCapture> component
+  → Celebrity takes photo + records video reading consent text
+  → Uploads to Storage → Updates celebrities table (consent_photo_url, consent_video_url, consent_status='submitted')
+  ↓
+If consent_status IS 'submitted' or 'approved':
+  → Show status badge + existing consent photo/video
+8. DashboardSwitcher — The Toggle Button
+Position: fixed bottom-36 md:bottom-20 right-4 md:right-6 z-50
+Only visible if user has a row in celebrities table
+On /celebrity-dashboard → shows "User Dashboard" button
+On /dashboard → shows "Celebrity Dashboard" button
+Simple navigate() call on click
+This is the complete architecture for replicating the celebrity dashboard in a mobile app.
