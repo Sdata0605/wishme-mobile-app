@@ -43,13 +43,44 @@ interface MusicResult {
   vocalsUrl?: string;
 }
 
-const MUSIC_TABS = ['TTS', 'Convert', 'Clone', 'SFX', 'Isolate', 'Music', 'Img+Music'];
-const MUSIC_GENRES = ['pop', 'rock', 'r&b', 'hip-hop', 'jazz', 'classical', 'electronic', 'country', 'folk', 'ambient'];
-const MUSIC_MOODS = ['happy', 'sad', 'energetic', 'calm', 'romantic', 'epic', 'melancholic', 'uplifting'];
+const MUSIC_TABS = [
+  { label: 'Generate Song', icon: 'sparkles' },
+  { label: 'TTS', icon: 'volume-2' },
+  { label: 'Voice Conversion', icon: 'mic' },
+  { label: 'SFX', icon: 'zap' },
+  { label: 'Clone', icon: 'user-plus' },
+  { label: 'Isolate', icon: 'file-audio' },
+  { label: 'Img+Music', icon: 'image' },
+];
+
+const GENERATE_SONG_GENRES = ['bollywood', 'pop', 'romantic', 'happy', 'lofi', 'classical', 'hip-hop', 'r&b', 'edm', 'folk'];
+const GENERATE_SONG_MOODS = ['happy', 'sad', 'energetic', 'calm', 'romantic', 'epic', 'melancholic', 'uplifting'];
+const SONG_LANGUAGES = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Punjabi', 'Bengali'];
 const IMG_MUSIC_GENRES = ['ambient', 'pop', 'classical', 'electronic', 'rock', 'r&b'];
 const IMG_MUSIC_MOODS = ['calm', 'happy', 'romantic', 'epic', 'sad', 'energetic'];
 
-const COSTS = { tts: 40, convert: 60, clone: 100, sfx: 50, isolate: 50, music_base: 80, music_cloned: 120, img_base: 100, img_vocals: 100 };
+const COSTS = {
+  tts: 50,
+  voiceConversion: 75,
+  sfx: 60,
+  audioIsolation: 40,
+  instrumental: 100,
+  fullSong: 150,
+  voiceClone: 150,
+  imgInstrumental: 120,
+  imgVocals: 150,
+};
+
+const PROGRESS_MESSAGES = [
+  'Composing your melody...',
+  'Arranging instruments...',
+  'Adding rhythm and beat...',
+  'Mixing tracks...',
+  'Applying AI magic...',
+  'Polishing the sound...',
+  'Almost there...',
+  'Finalizing your song...',
+];
 
 async function saveAudioToCache(dataUri: string): Promise<string> {
   const isMP3 = dataUri.startsWith('data:audio/mpeg');
@@ -167,8 +198,9 @@ function AudioPlayerCard({ title, audioUri, badge }: { title: string; audioUri: 
     setLoading(true);
     try {
       await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
-      const filePath = await saveAudioToCache(audioUri);
-      const { sound } = await Audio.Sound.createAsync({ uri: filePath }, { shouldPlay: true });
+      const isRemoteUrl = audioUri.startsWith('http://') || audioUri.startsWith('https://');
+      const uri = isRemoteUrl ? audioUri : await saveAudioToCache(audioUri);
+      const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
       sound.setOnPlaybackStatusUpdate(s => {
         if (!s.isLoaded) return;
         setPosition(s.positionMillis);
@@ -203,9 +235,13 @@ function AudioPlayerCard({ title, audioUri, badge }: { title: string; audioUri: 
 
   const saveAudio = async () => {
     try {
-      const isMP3 = audioUri.startsWith('data:audio/mpeg');
+      const isMP3 = audioUri.startsWith('data:audio/mpeg') || audioUri.endsWith('.mp3');
       const ext = isMP3 ? 'mp3' : audioUri.startsWith('data:audio/mp4') || audioUri.startsWith('data:audio/m4a') ? 'm4a' : 'wav';
-      await downloadToDevice(audioUri, `wishme_audio_${Date.now()}.${ext}`);
+      if (audioUri.startsWith('http://') || audioUri.startsWith('https://')) {
+        await downloadUrlToDevice(audioUri, `wishme_audio_${Date.now()}.${ext}`);
+      } else {
+        await downloadToDevice(audioUri, `wishme_audio_${Date.now()}.${ext}`);
+      }
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err) {
@@ -243,7 +279,7 @@ function AudioPlayerCard({ title, audioUri, badge }: { title: string; audioUri: 
           <Text style={[s.playerDuration, { flex: 1 }]}>{positionLabel} / {durationLabel}</Text>
           <TouchableOpacity style={s.dlBtn} onPress={saveAudio}>
             <Icon name={saved ? 'check' : 'download'} size={15} color="#fff" />
-            <Text style={s.dlText}>{saved ? 'Saved!' : 'Save'}</Text>
+            <Text style={s.dlText}>{saved ? 'Saved!' : 'Download MP3'}</Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -555,6 +591,34 @@ function ChipSelect({ options, value, onChange, activeColor = '#B44CFF' }: { opt
   );
 }
 
+function LanguageDropdown({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const { colors } = useTheme();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <View>
+      <TouchableOpacity style={[s.dropdown, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setOpen(o => !o)}>
+        <Text style={[s.dropdownText, { color: colors.foreground }]} numberOfLines={1}>{value}</Text>
+        <Icon name={open ? 'chevron-up' : 'chevron-down'} size={16} color={colors.mutedForeground} />
+      </TouchableOpacity>
+      {open && (
+        <View style={[s.dropdownList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          {SONG_LANGUAGES.map(lang => (
+            <TouchableOpacity
+              key={lang}
+              style={[s.dropdownItem, value === lang && { backgroundColor: '#FF6B3320' }]}
+              onPress={() => { onChange(lang); setOpen(false); }}
+            >
+              <Text style={[s.dropdownItemText, { color: value === lang ? '#FF6B33' : colors.foreground, flex: 1 }]}>{lang}</Text>
+              {value === lang && <Icon name="check" size={14} color="#FF6B33" />}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 function DurationSlider({ value, onChange, min = 1, max = 30, step = 1 }: { value: number; onChange: (v: number) => void; min?: number; max?: number; step?: number }) {
   const { colors } = useTheme();
   const pct = ((value - min) / (max - min)) * 100;
@@ -614,8 +678,14 @@ function InfoBox({ msg, color = '#B44CFF' }: { msg: string; color?: string }) {
 function WalletCard({ balance }: { balance: number }) {
   const { colors } = useTheme();
   const prices = [
-    ['TTS', '₹40'], ['Convert', '₹60'], ['Clone', '₹100'],
-    ['SFX', '₹50'], ['Isolate', '₹50'], ['Music', '₹80/₹120'], ['Img+Music', '₹100'],
+    ['TTS', `₹${COSTS.tts}`],
+    ['Voice Conversion', `₹${COSTS.voiceConversion}`],
+    ['SFX', `₹${COSTS.sfx}`],
+    ['Audio Isolation', `₹${COSTS.audioIsolation}`],
+    ['Instrumental', `₹${COSTS.instrumental}`],
+    ['Full Song', `₹${COSTS.fullSong}`],
+    ['Voice Clone', `₹${COSTS.voiceClone}`],
+    ['Img+Music', `₹${COSTS.imgInstrumental}/₹${COSTS.imgVocals}`],
   ];
   return (
     <View style={[s.walletCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -721,8 +791,9 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
       setLoading(true);
       try {
         await Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false });
-        const filePath = await saveAudioToCache(audioUrl);
-        const { sound } = await Audio.Sound.createAsync({ uri: filePath }, { shouldPlay: true });
+        const isRemoteUrl = audioUrl.startsWith('http://') || audioUrl.startsWith('https://');
+        const uri = isRemoteUrl ? audioUrl : await saveAudioToCache(audioUrl);
+        const { sound } = await Audio.Sound.createAsync({ uri }, { shouldPlay: true });
         sound.setOnPlaybackStatusUpdate(st => {
           if (st.isLoaded && st.didJustFinish) setPlaying(false);
         });
@@ -747,9 +818,13 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
 
   const saveAudio = async () => {
     try {
-      const isMP3 = audioUrl.startsWith('data:audio/mpeg');
+      const isMP3 = audioUrl.startsWith('data:audio/mpeg') || audioUrl.endsWith('.mp3');
       const ext = isMP3 ? 'mp3' : audioUrl.startsWith('data:audio/mp4') || audioUrl.startsWith('data:audio/m4a') ? 'm4a' : 'wav';
-      await downloadToDevice(audioUrl, `wishme_audio_${Date.now()}.${ext}`);
+      if (audioUrl.startsWith('http://') || audioUrl.startsWith('https://')) {
+        await downloadUrlToDevice(audioUrl, `wishme_audio_${Date.now()}.${ext}`);
+      } else {
+        await downloadToDevice(audioUrl, `wishme_audio_${Date.now()}.${ext}`);
+      }
       setAudioSaved(true);
       setTimeout(() => setAudioSaved(false), 2500);
     } catch (err) {
@@ -826,6 +901,257 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
   );
 }
 
+function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
+  const { colors } = useTheme();
+  const [songTitle, setSongTitle] = useState('');
+  const [songType, setSongType] = useState<'full' | 'instrumental'>('full');
+  const [voiceGender, setVoiceGender] = useState<'Any' | 'Male' | 'Female'>('Any');
+  const [language, setLanguage] = useState('English');
+  const [lyrics, setLyrics] = useState('');
+  const [description, setDescription] = useState('');
+  const [genre, setGenre] = useState(GENERATE_SONG_GENRES[0]);
+  const [mood, setMood] = useState(GENERATE_SONG_MOODS[0]);
+  const [gen, setGen] = useState(false);
+  const [lyricsGen, setLyricsGen] = useState(false);
+  const [err, setErr] = useState('');
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [progressMsg, setProgressMsg] = useState('');
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+  }, []);
+
+  const cost = songType === 'full' ? COSTS.fullSong : COSTS.instrumental;
+
+  const generateLyrics = async () => {
+    if (!songTitle.trim() && !description.trim()) { setErr('Enter a song title or description first.'); return; }
+    setErr(''); setLyricsGen(true);
+    try {
+      const res = await supabaseFetch('/functions/v1/generate-lyrics', {
+        method: 'POST',
+        body: JSON.stringify({ description: description.trim() || songTitle.trim(), genre, mood, language }),
+      }, ctx.session?.access_token);
+      const data = await res.json() as { lyrics?: string };
+      if (data.lyrics) setLyrics(data.lyrics);
+    } catch {}
+    setLyricsGen(false);
+  };
+
+  const startProgressCycling = () => {
+    setProgressMsg(PROGRESS_MESSAGES[0]);
+    let idx = 0;
+    progressTimerRef.current = setInterval(() => {
+      idx = (idx + 1) % PROGRESS_MESSAGES.length;
+      setProgressMsg(PROGRESS_MESSAGES[idx]);
+    }, 4000);
+  };
+
+  const stopProgressCycling = () => {
+    if (progressTimerRef.current) { clearInterval(progressTimerRef.current); progressTimerRef.current = null; }
+    setProgressMsg('');
+  };
+
+  const generate = async () => {
+    if (ctx.walletBalance < cost) { setErr(`Insufficient balance. You need ₹${cost}.`); return; }
+    setErr(''); setGen(true); setAudioUrl(null);
+    startProgressCycling();
+
+    try {
+      const payload: Record<string, unknown> = {
+        song_title: songTitle.trim() || 'Untitled',
+        song_type: songType,
+        genre,
+        mood,
+      };
+      if (songType === 'full') {
+        payload.voice_gender = voiceGender;
+        payload.language = language;
+        if (lyrics.trim()) payload.lyrics = lyrics.trim();
+      } else {
+        if (description.trim()) payload.description = description.trim();
+      }
+
+      const res = await supabaseFetch('/functions/v1/generate-music', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }, ctx.session?.access_token);
+
+      const data = await res.json() as { success: boolean; task_id?: string; audio_url?: string; error?: string };
+      if (!data.success) throw new Error(data.error ?? 'Generation failed');
+
+      if (data.audio_url) {
+        setAudioUrl(data.audio_url);
+        ctx.refreshWallet();
+        stopProgressCycling();
+        setGen(false);
+        return;
+      }
+
+      if (!data.task_id) throw new Error('No task ID returned');
+      const taskId = data.task_id;
+
+      await new Promise<void>(resolve => setTimeout(resolve, 10000));
+
+      let attempts = 0;
+      const maxAttempts = 60;
+
+      await new Promise<void>((resolve, reject) => {
+        pollingRef.current = setInterval(async () => {
+          attempts++;
+          try {
+            const statusRes = await supabaseFetch('/functions/v1/check-music-status', {
+              method: 'POST',
+              body: JSON.stringify({ task_id: taskId }),
+            }, ctx.session?.access_token);
+            const statusData = await statusRes.json() as { status: string; audio_url?: string; error?: string };
+            if (statusData.status === 'completed' && statusData.audio_url) {
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              pollingRef.current = null;
+              setAudioUrl(statusData.audio_url);
+              ctx.refreshWallet();
+              resolve();
+            } else if (statusData.status === 'failed') {
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              pollingRef.current = null;
+              reject(new Error(statusData.error ?? 'Music generation failed'));
+            } else if (attempts >= maxAttempts) {
+              if (pollingRef.current) clearInterval(pollingRef.current);
+              pollingRef.current = null;
+              reject(new Error('Generation timed out. Please try again.'));
+            }
+          } catch (e) {
+            if (pollingRef.current) clearInterval(pollingRef.current);
+            pollingRef.current = null;
+            reject(e);
+          }
+        }, 5000);
+      });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Generation failed');
+    } finally {
+      stopProgressCycling();
+      setGen(false);
+    }
+  };
+
+  return (
+    <View style={s.tabContent}>
+      <SL text="Song Title" />
+      <TextInput
+        style={[s.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
+        placeholder="e.g. Birthday Surprise"
+        placeholderTextColor={colors.mutedForeground}
+        value={songTitle}
+        onChangeText={setSongTitle}
+      />
+      <SL text="Song Type" />
+      <View style={[s.toggleRow, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+        {(['full', 'instrumental'] as const).map(opt => (
+          <TouchableOpacity key={opt} style={[s.toggleOpt, songType === opt && s.toggleOptActive]} onPress={() => setSongType(opt)}>
+            <Text style={[s.toggleOptText, { color: songType === opt ? '#fff' : colors.foreground }]}>
+              {opt === 'full' ? 'Full Song' : 'Instrumental'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      {songType === 'full' && (
+        <>
+          <SL text="Voice Gender" />
+          <View style={[s.toggleRow, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+            {(['Any', 'Male', 'Female'] as const).map(g => (
+              <TouchableOpacity key={g} style={[s.toggleOpt, voiceGender === g && s.toggleOptActive]} onPress={() => setVoiceGender(g)}>
+                <Text style={[s.toggleOptText, { color: voiceGender === g ? '#fff' : colors.foreground }]}>{g}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <SL text="Language" />
+          <LanguageDropdown value={language} onChange={setLanguage} />
+        </>
+      )}
+      <SL text="Genre" />
+      <ChipSelect options={GENERATE_SONG_GENRES} value={genre} onChange={setGenre} activeColor="#FF6B33" />
+      <SL text="Mood" />
+      <ChipSelect options={GENERATE_SONG_MOODS} value={mood} onChange={setMood} activeColor="#B44CFF" />
+      {songType === 'full' ? (
+        <>
+          <View style={s.lyricHeader}>
+            <SL text="Lyrics" />
+            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#FF6B33' }]} onPress={generateLyrics} disabled={lyricsGen}>
+              <Icon name="sparkles" size={13} color="#FF6B33" />
+              <Text style={[s.aiLyricsBtnText, { color: '#FF6B33' }]}>{lyricsGen ? 'Generating...' : 'Generate Lyrics'}</Text>
+            </TouchableOpacity>
+          </View>
+          <TextInput
+            style={[s.textarea, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace', minHeight: 120 }]}
+            placeholder="Enter lyrics or tap Generate Lyrics..."
+            placeholderTextColor={colors.mutedForeground}
+            value={lyrics}
+            onChangeText={setLyrics}
+            multiline
+            numberOfLines={6}
+          />
+        </>
+      ) : (
+        <>
+          <SL text="Description" />
+          <TextInput
+            style={[s.textarea, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
+            placeholder="Describe the instrumental track you want..."
+            placeholderTextColor={colors.mutedForeground}
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+          />
+        </>
+      )}
+      <ErrBox msg={err} />
+      <GenBtn label={`Generate Song (₹${cost})`} onPress={generate} generating={gen} />
+
+      {gen ? (
+        <View style={[s.resultPanel, s.resultPanelLoading, { backgroundColor: colors.card, borderColor: '#FF6B33' }]}>
+          <View style={s.waveRow}>
+            {Array.from({ length: 16 }).map((_, i) => (
+              <WaveformBar key={i} delay={i * 60} color="#FF6B33" active={true} />
+            ))}
+          </View>
+          <Text style={[s.generatingText, { color: colors.foreground }]}>{progressMsg || 'Starting generation...'}</Text>
+          <Text style={[s.generatingHint, { color: colors.mutedForeground }]}>This may take up to 5 minutes</Text>
+          <View style={[s.genSpinner, { borderColor: '#FF6B33' + '30', borderTopColor: '#FF6B33' }]} />
+        </View>
+      ) : audioUrl ? (
+        <View style={[s.resultPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <AudioPlayerCard title={songTitle || `${genre} ${songType === 'full' ? 'Song' : 'Instrumental'}`} audioUri={audioUrl} badge={songType === 'full' ? 'Full Song' : 'Instrumental'} />
+        </View>
+      ) : (
+        <View style={[s.resultPanel, s.resultPanelEmpty, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <LinearGradient colors={['#7B2FFF20', '#FF6B3320']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.resultEmptyGradient}>
+            <Icon name="music" size={32} color="#FF6B33" />
+            <Text style={[s.resultEmptyTitle, { color: colors.foreground }]}>Your song will appear here</Text>
+            <Text style={[s.resultEmptyHint, { color: colors.mutedForeground }]}>Fill in the details above and tap Generate Song</Text>
+            <View style={s.decorativeWaveRow}>
+              {Array.from({ length: 20 }).map((_, i) => (
+                <WaveformBar key={i} delay={i * 50} color={'#FF6B33'} active={false} />
+              ))}
+            </View>
+            <View style={s.resultControls}>
+              <View style={[s.resultControlBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Icon name="play" size={14} color={colors.mutedForeground} />
+              </View>
+              <View style={[s.resultControlBtn, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+                <Icon name="download" size={14} color={colors.mutedForeground} />
+              </View>
+            </View>
+          </LinearGradient>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function TTSTab({ ctx }: { ctx: MusicCtx }) {
   const { colors } = useTheme();
   const [voice, setVoice] = useState<VoiceItem | null>(null);
@@ -880,7 +1206,7 @@ function TTSTab({ ctx }: { ctx: MusicCtx }) {
   );
 }
 
-function ConvertTab({ ctx }: { ctx: MusicCtx }) {
+function VoiceConversionTab({ ctx }: { ctx: MusicCtx }) {
   const { colors } = useTheme();
   const [voice, setVoice] = useState<VoiceItem | null>(null);
   const [audioBase64, setAudioBase64] = useState<string | null>(null);
@@ -900,7 +1226,7 @@ function ConvertTab({ ctx }: { ctx: MusicCtx }) {
   const generate = async () => {
     if (!audioBase64) { setErr('Please upload or record audio.'); return; }
     if (!voice) { setErr('Please select a target voice.'); return; }
-    if (ctx.walletBalance < COSTS.convert) { setErr(`Insufficient balance. You need ₹${COSTS.convert}.`); return; }
+    if (ctx.walletBalance < COSTS.voiceConversion) { setErr(`Insufficient balance. You need ₹${COSTS.voiceConversion}.`); return; }
     setErr(''); setGen(true); setAudioUri(null);
     try {
       const res = await supabaseFetch('/functions/v1/elevenlabs-speech-to-speech', {
@@ -912,7 +1238,7 @@ function ConvertTab({ ctx }: { ctx: MusicCtx }) {
       await supabaseFetch('/rest/v1/voice_conversion_generations', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.profileId, original_file_name: audioFileName ?? 'audio.wav', target_voice_id: voice.voice_id, target_voice_name: voice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.convert }),
+        body: JSON.stringify({ user_id: ctx.profileId, original_file_name: audioFileName ?? 'audio.wav', target_voice_id: voice.voice_id, target_voice_name: voice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.voiceConversion }),
       }, ctx.session?.access_token);
       setAudioUri(data.audioUrl);
       ctx.refreshWallet();
@@ -930,67 +1256,8 @@ function ConvertTab({ ctx }: { ctx: MusicCtx }) {
       <SL text="Target Voice" />
       <VoiceSelect value={voice} onChange={setVoice} voices={ctx.voices} voicesLoading={ctx.voicesLoading} />
       <ErrBox msg={err} />
-      <GenBtn label={`Convert Voice (₹${COSTS.convert})`} onPress={generate} generating={gen} disabled={!audioBase64} />
+      <GenBtn label={`Convert Voice (₹${COSTS.voiceConversion})`} onPress={generate} generating={gen} disabled={!audioBase64} />
       {audioUri && <AudioPlayerCard title="Voice-Converted Audio" audioUri={audioUri} />}
-    </View>
-  );
-}
-
-function CloneTab({ ctx }: { ctx: MusicCtx }) {
-  const { colors } = useTheme();
-  const [audioBase64, setAudioBase64] = useState<string | null>(null);
-  const [audioFileName, setAudioFileName] = useState<string | null>(null);
-  const [voiceName, setVoiceName] = useState('');
-  const [voiceDesc, setVoiceDesc] = useState('');
-  const [gen, setGen] = useState(false);
-  const [done, setDone] = useState(false);
-  const [err, setErr] = useState('');
-
-  const handleAudio = (base64: string, name: string) => { setAudioBase64(base64); setAudioFileName(name); };
-
-  const generate = async () => {
-    if (!audioBase64) { setErr('Please upload or record a voice sample.'); return; }
-    if (!voiceName.trim()) { setErr('Please enter a voice name.'); return; }
-    if (ctx.walletBalance < COSTS.clone) { setErr(`Insufficient balance. You need ₹${COSTS.clone}.`); return; }
-    setErr(''); setGen(true); setDone(false);
-    try {
-      const res = await supabaseFetch('/functions/v1/elevenlabs-clone-voice', {
-        method: 'POST',
-        body: JSON.stringify({ audioBase64, voiceName: voiceName.trim(), voiceDescription: voiceDesc.trim() }),
-      }, ctx.session?.access_token);
-      const data = await res.json() as { success: boolean; voiceId?: string; error?: string };
-      if (!data.success) throw new Error(data.error ?? 'Cloning failed');
-      setDone(true);
-      ctx.onVoiceCloned();
-      ctx.refreshWallet();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Cloning failed');
-    } finally {
-      setGen(false);
-    }
-  };
-
-  return (
-    <View style={s.tabContent}>
-      <InfoBox msg="For best results, record 1–5 minutes of clear, natural speech." color="#FF6B33" />
-      <SL text="Upload or Record Voice Sample" />
-      <UploadOrRecord audioFileName={audioFileName} onAudio={handleAudio} onClear={() => { setAudioBase64(null); setAudioFileName(null); }} />
-      <SL text="Voice Name" />
-      <TextInput style={[s.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
-        placeholder="My Custom Voice" placeholderTextColor={colors.mutedForeground} value={voiceName} onChangeText={setVoiceName} />
-      <SL text="Description (optional)" />
-      <TextInput style={[s.textarea, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
-        placeholder="e.g. Deep male voice with a slight accent..." placeholderTextColor={colors.mutedForeground}
-        value={voiceDesc} onChangeText={setVoiceDesc} multiline numberOfLines={3} />
-      <ErrBox msg={err} />
-      <GenBtn label={`Clone Voice (₹${COSTS.clone})`} onPress={generate} generating={gen} disabled={!audioBase64} />
-      {done && (
-        <View style={[s.successCard, { backgroundColor: '#22c55e15', borderColor: '#22c55e40' }]}>
-          <View style={s.successIcon}><Icon name="check-circle" size={28} color="#22c55e" /></View>
-          <Text style={[s.successTitle, { color: '#22c55e' }]}>Voice Cloned!</Text>
-          <Text style={[s.successSub, { color: '#22c55e99' }]}>"{voiceName}" is ready to use in TTS, Convert, and Music tabs.</Text>
-        </View>
-      )}
     </View>
   );
 }
@@ -1043,6 +1310,65 @@ function SFXTab({ ctx }: { ctx: MusicCtx }) {
   );
 }
 
+function CloneTab({ ctx }: { ctx: MusicCtx }) {
+  const { colors } = useTheme();
+  const [audioBase64, setAudioBase64] = useState<string | null>(null);
+  const [audioFileName, setAudioFileName] = useState<string | null>(null);
+  const [voiceName, setVoiceName] = useState('');
+  const [voiceDesc, setVoiceDesc] = useState('');
+  const [gen, setGen] = useState(false);
+  const [done, setDone] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleAudio = (base64: string, name: string) => { setAudioBase64(base64); setAudioFileName(name); };
+
+  const generate = async () => {
+    if (!audioBase64) { setErr('Please upload or record a voice sample.'); return; }
+    if (!voiceName.trim()) { setErr('Please enter a voice name.'); return; }
+    if (ctx.walletBalance < COSTS.voiceClone) { setErr(`Insufficient balance. You need ₹${COSTS.voiceClone}.`); return; }
+    setErr(''); setGen(true); setDone(false);
+    try {
+      const res = await supabaseFetch('/functions/v1/elevenlabs-clone-voice', {
+        method: 'POST',
+        body: JSON.stringify({ audioBase64, voiceName: voiceName.trim(), voiceDescription: voiceDesc.trim() }),
+      }, ctx.session?.access_token);
+      const data = await res.json() as { success: boolean; voiceId?: string; error?: string };
+      if (!data.success) throw new Error(data.error ?? 'Cloning failed');
+      setDone(true);
+      ctx.onVoiceCloned();
+      ctx.refreshWallet();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Cloning failed');
+    } finally {
+      setGen(false);
+    }
+  };
+
+  return (
+    <View style={s.tabContent}>
+      <InfoBox msg="For best results, record 1–5 minutes of clear, natural speech." color="#FF6B33" />
+      <SL text="Upload or Record Voice Sample" />
+      <UploadOrRecord audioFileName={audioFileName} onAudio={handleAudio} onClear={() => { setAudioBase64(null); setAudioFileName(null); }} />
+      <SL text="Voice Name" />
+      <TextInput style={[s.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
+        placeholder="My Custom Voice" placeholderTextColor={colors.mutedForeground} value={voiceName} onChangeText={setVoiceName} />
+      <SL text="Description (optional)" />
+      <TextInput style={[s.textarea, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
+        placeholder="e.g. Deep male voice with a slight accent..." placeholderTextColor={colors.mutedForeground}
+        value={voiceDesc} onChangeText={setVoiceDesc} multiline numberOfLines={3} />
+      <ErrBox msg={err} />
+      <GenBtn label={`Clone Voice (₹${COSTS.voiceClone})`} onPress={generate} generating={gen} disabled={!audioBase64} />
+      {done && (
+        <View style={[s.successCard, { backgroundColor: '#22c55e15', borderColor: '#22c55e40' }]}>
+          <View style={s.successIcon}><Icon name="check-circle" size={28} color="#22c55e" /></View>
+          <Text style={[s.successTitle, { color: '#22c55e' }]}>Voice Cloned!</Text>
+          <Text style={[s.successSub, { color: '#22c55e99' }]}>"{voiceName}" is ready to use in TTS, Voice Conversion, and Generate Song tabs.</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function IsolateTab({ ctx }: { ctx: MusicCtx }) {
   const [audioBase64, setAudioBase64] = useState<string | null>(null);
   const [audioFileName, setAudioFileName] = useState<string | null>(null);
@@ -1054,7 +1380,7 @@ function IsolateTab({ ctx }: { ctx: MusicCtx }) {
 
   const generate = async () => {
     if (!audioBase64) { setErr('Please upload an audio file.'); return; }
-    if (ctx.walletBalance < COSTS.isolate) { setErr(`Insufficient balance. You need ₹${COSTS.isolate}.`); return; }
+    if (ctx.walletBalance < COSTS.audioIsolation) { setErr(`Insufficient balance. You need ₹${COSTS.audioIsolation}.`); return; }
     setErr(''); setGen(true); setAudioUri(null);
     try {
       const res = await supabaseFetch('/functions/v1/elevenlabs-audio-isolation', {
@@ -1066,7 +1392,7 @@ function IsolateTab({ ctx }: { ctx: MusicCtx }) {
       await supabaseFetch('/rest/v1/audio_isolation_generations', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.profileId, original_file_name: audioFileName ?? 'audio.wav', audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.isolate }),
+        body: JSON.stringify({ user_id: ctx.profileId, original_file_name: audioFileName ?? 'audio.wav', audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.audioIsolation }),
       }, ctx.session?.access_token);
       setAudioUri(data.audioUrl);
       ctx.refreshWallet();
@@ -1083,159 +1409,8 @@ function IsolateTab({ ctx }: { ctx: MusicCtx }) {
       <SL text="Upload Audio File" />
       <UploadOrRecord audioFileName={audioFileName} onAudio={handleAudio} onClear={() => { setAudioBase64(null); setAudioFileName(null); }} showRecorder={false} />
       <ErrBox msg={err} />
-      <GenBtn label={`Isolate Audio (₹${COSTS.isolate})`} onPress={generate} generating={gen} disabled={!audioBase64} />
+      <GenBtn label={`Isolate Audio (₹${COSTS.audioIsolation})`} onPress={generate} generating={gen} disabled={!audioBase64} />
       {audioUri && <AudioPlayerCard title="Isolated Audio" audioUri={audioUri} />}
-    </View>
-  );
-}
-
-function MusicTab({ ctx }: { ctx: MusicCtx }) {
-  const { colors } = useTheme();
-  const [title, setTitle] = useState('');
-  const [genre, setGenre] = useState(MUSIC_GENRES[0]);
-  const [mood, setMood] = useState(MUSIC_MOODS[0]);
-  const [desc, setDesc] = useState('');
-  const [lyrics, setLyrics] = useState('');
-  const [voiceType, setVoiceType] = useState<'instrumental' | 'ai' | 'cloned'>('instrumental');
-  const [clonedVoice, setClonedVoice] = useState<VoiceItem | null>(null);
-  const [gen, setGen] = useState(false);
-  const [lyricsGen, setLyricsGen] = useState(false);
-  const [result, setResult] = useState<MusicResult | null>(null);
-  const [err, setErr] = useState('');
-
-  useEffect(() => {
-    if (ctx.voices.clonedVoices.length && !clonedVoice) setClonedVoice(ctx.voices.clonedVoices[0]);
-  }, [ctx.voices]);
-
-  const cost = voiceType === 'cloned' ? COSTS.music_cloned : COSTS.music_base;
-  const showLyrics = voiceType === 'ai' || voiceType === 'cloned';
-  const hasClonedVoices = ctx.voices.clonedVoices.length > 0;
-
-  const generateLyrics = async () => {
-    if (!desc.trim() && !title.trim()) { setErr('Enter a description first to generate lyrics.'); return; }
-    setErr(''); setLyricsGen(true);
-    try {
-      const res = await supabaseFetch('/functions/v1/generate-lyrics', {
-        method: 'POST',
-        body: JSON.stringify({ description: desc.trim() || title.trim(), genre, mood }),
-      }, ctx.session?.access_token);
-      const data = await res.json() as { lyrics?: string };
-      if (data.lyrics) setLyrics(data.lyrics);
-    } catch {}
-    setLyricsGen(false);
-  };
-
-  const generate = async () => {
-    if (!desc.trim()) { setErr('Please enter a description.'); return; }
-    if (voiceType === 'cloned' && !clonedVoice) { setErr('Please select a cloned voice.'); return; }
-    if (ctx.walletBalance < cost) { setErr(`Insufficient balance. You need ₹${cost}.`); return; }
-    setErr(''); setGen(true); setResult(null);
-
-    try {
-      await supabaseFetch('/rest/v1/wallet_transactions', {
-        method: 'POST',
-        headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.profileId, transaction_type: 'debit', amount: cost, status: 'completed', payment_method: 'wallet', description: `AI Music: ${title || 'Untitled'} (${genre})` }),
-      }, ctx.session?.access_token);
-
-      let payload: Record<string, unknown> = { songTitle: title.trim() || 'Untitled', genre, mood, description: desc.trim() };
-      if (voiceType === 'instrumental') {
-        payload = { ...payload, isInstrumental: true };
-      } else if (voiceType === 'ai') {
-        payload = { ...payload, isInstrumental: false, lyrics };
-      } else {
-        payload = { ...payload, isInstrumental: false, lyrics, voiceId: clonedVoice?.voice_id, generateVocals: true };
-      }
-
-      const res = await supabaseFetch('/functions/v1/elevenlabs-generate-music', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }, ctx.session?.access_token);
-      const data = await res.json() as { success: boolean; twoTrack?: boolean; audioUrl?: string; instrumentalUrl?: string; vocalsUrl?: string; error?: string };
-      if (!data.success) throw new Error(data.error ?? 'Generation failed');
-
-      if (data.twoTrack) {
-        setResult({ twoTrack: true, instrumentalUrl: data.instrumentalUrl, vocalsUrl: data.vocalsUrl });
-      } else {
-        setResult({ twoTrack: false, audioUrl: data.audioUrl });
-      }
-      ctx.refreshWallet();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Generation failed');
-    } finally {
-      setGen(false);
-    }
-  };
-
-  const VOICE_TYPE_OPTS: Array<{ key: 'instrumental' | 'ai' | 'cloned'; label: string; cost: number }> = [
-    { key: 'instrumental', label: 'Instrumental', cost: COSTS.music_base },
-    { key: 'ai', label: 'AI Vocals', cost: COSTS.music_base },
-    { key: 'cloned', label: 'My Voice (Cloned)', cost: COSTS.music_cloned },
-  ];
-
-  return (
-    <View style={s.tabContent}>
-      <SL text="Song Title (optional)" />
-      <TextInput style={[s.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
-        placeholder="My Birthday Song" placeholderTextColor={colors.mutedForeground} value={title} onChangeText={setTitle} />
-      <SL text="Description" />
-      <TextInput style={[s.textarea, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
-        placeholder="A romantic song for an anniversary with classical elements..." placeholderTextColor={colors.mutedForeground}
-        value={desc} onChangeText={setDesc} multiline numberOfLines={3} />
-      <SL text="Genre" />
-      <ChipSelect options={MUSIC_GENRES} value={genre} onChange={setGenre} activeColor="#B44CFF" />
-      <SL text="Mood" />
-      <ChipSelect options={MUSIC_MOODS} value={mood} onChange={setMood} activeColor="#FF6B33" />
-      <SL text="Voice Type" />
-      <View style={s.radioGroup}>
-        {VOICE_TYPE_OPTS.map(opt => (
-          <TouchableOpacity key={opt.key} style={s.radioRow} onPress={() => setVoiceType(opt.key)}
-            disabled={opt.key === 'cloned' && !hasClonedVoices}>
-            <View style={[s.radioOuter, { borderColor: voiceType === opt.key ? '#B44CFF' : colors.border, opacity: opt.key === 'cloned' && !hasClonedVoices ? 0.4 : 1 }]}>
-              {voiceType === opt.key && <View style={s.radioInner} />}
-            </View>
-            <Text style={[s.radioText, { color: colors.foreground, opacity: opt.key === 'cloned' && !hasClonedVoices ? 0.4 : 1 }]}>
-              {opt.label} <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>₹{opt.cost}</Text>
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      {voiceType === 'cloned' && hasClonedVoices && (
-        <>
-          <SL text="Select Cloned Voice" />
-          <VoiceSelect
-            value={clonedVoice}
-            onChange={setClonedVoice}
-            voices={{ premadeVoices: [], clonedVoices: ctx.voices.clonedVoices }}
-            voicesLoading={ctx.voicesLoading}
-          />
-        </>
-      )}
-      {showLyrics && (
-        <>
-          <View style={s.lyricHeader}>
-            <SL text={voiceType === 'cloned' ? 'Lyrics (required)' : 'Lyrics (optional)'} />
-            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#B44CFF' }]} onPress={generateLyrics} disabled={lyricsGen}>
-              <Icon name="zap" size={13} color="#B44CFF" />
-              <Text style={s.aiLyricsBtnText}>{lyricsGen ? 'Generating...' : 'AI Generate'}</Text>
-            </TouchableOpacity>
-          </View>
-          <TextInput style={[s.textarea, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular', minHeight: 100 }]}
-            placeholder="Enter lyrics or use AI Generate..." placeholderTextColor={colors.mutedForeground}
-            value={lyrics} onChangeText={setLyrics} multiline numberOfLines={6} />
-        </>
-      )}
-      <ErrBox msg={err} />
-      <GenBtn label={`Generate Music (₹${cost})`} onPress={generate} generating={gen} />
-      {result && !result.twoTrack && result.audioUrl && (
-        <AudioPlayerCard title={title || `${mood} ${genre} song`} audioUri={result.audioUrl} />
-      )}
-      {result && result.twoTrack && (
-        <View style={{ gap: 12, marginTop: 16 }}>
-          {result.instrumentalUrl && <AudioPlayerCard title="Instrumental Track" audioUri={result.instrumentalUrl} badge="Instrumental" />}
-          {result.vocalsUrl && <AudioPlayerCard title="Vocals Track" audioUri={result.vocalsUrl} badge="Your Voice" />}
-        </View>
-      )}
     </View>
   );
 }
@@ -1273,7 +1448,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
   const generate = async () => {
     if (!imageBase64) { setErr('Please upload an image.'); return; }
     if (musicSource === 'upload' && !uploadedAudioBase64) { setErr('Please upload an audio file.'); return; }
-    const estimatedCost = lyrics.trim() ? COSTS.img_vocals : COSTS.img_base;
+    const estimatedCost = lyrics.trim() ? COSTS.imgVocals : COSTS.imgInstrumental;
     if (ctx.walletBalance < estimatedCost) { setErr(`Insufficient balance. You need ₹${estimatedCost}.`); return; }
     setErr(''); setGen(true); setResult(null);
     try {
@@ -1293,7 +1468,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
       const data = await res.json() as { success: boolean; audioUrl: string; videoUrl?: string; imageBase64?: string; hasVocals?: boolean; error?: string };
       if (!data.success || !data.audioUrl) throw new Error(data.error ?? 'Generation failed');
 
-      const amountCharged = data.hasVocals ? COSTS.img_vocals : COSTS.img_base;
+      const amountCharged = data.hasVocals ? COSTS.imgVocals : COSTS.imgInstrumental;
       await supabaseFetch('/rest/v1/image_music_generations', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
@@ -1377,7 +1552,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
         </>
       )}
       <ErrBox msg={err} />
-      <GenBtn label={`Create (₹${lyrics.trim() ? COSTS.img_vocals : COSTS.img_base})`} onPress={generate} generating={gen} disabled={!imageBase64} />
+      <GenBtn label={`Create (₹${lyrics.trim() ? COSTS.imgVocals : COSTS.imgInstrumental})`} onPress={generate} generating={gen} disabled={!imageBase64} />
       {result && (
         <ImgMusicResult
           audioUrl={result.audioUrl}
@@ -1417,12 +1592,12 @@ export default function MusicScreen() {
   };
 
   const TABS: React.ReactElement[] = [
+    <GenerateSongTab ctx={ctx} />,
     <TTSTab ctx={ctx} />,
-    <ConvertTab ctx={ctx} />,
-    <CloneTab ctx={ctx} />,
+    <VoiceConversionTab ctx={ctx} />,
     <SFXTab ctx={ctx} />,
+    <CloneTab ctx={ctx} />,
     <IsolateTab ctx={ctx} />,
-    <MusicTab ctx={ctx} />,
     <ImageMusicTab ctx={ctx} />,
   ];
 
@@ -1430,17 +1605,21 @@ export default function MusicScreen() {
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={[{ flex: 1 }, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
         <LinearGradient colors={['#7B2FFF', '#B44CFF', '#E8527A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.header, { paddingTop: topPad + 12 }]}>
-          <Text style={s.headerTitle}>AI Music Studio</Text>
-          <Text style={s.headerSub}>7 AI-powered audio tools in one place</Text>
+          <Text style={s.headerTagline}><Text style={s.headerTaglineItalic}>Your Symphony,{'\n'}Powered by AI.</Text></Text>
         </LinearGradient>
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
           <WalletCard balance={walletBalance} />
         </View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabBar} style={[s.tabBarWrap, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
           {MUSIC_TABS.map((tab, i) => (
-            <TouchableOpacity key={tab} style={[s.tabPill, activeTab === i && s.tabPillActive]} onPress={() => setActiveTab(i)}>
-              <Text style={[s.tabPillText, { color: activeTab === i ? '#B44CFF' : colors.mutedForeground }]}>{tab}</Text>
-              {activeTab === i && <View style={s.tabUnderline} />}
+            <TouchableOpacity
+              key={tab.label}
+              style={[s.tabPill, activeTab === i && s.tabPillActive]}
+              onPress={() => setActiveTab(i)}
+              activeOpacity={0.8}
+            >
+              <Icon name={tab.icon as Parameters<typeof Icon>[0]['name']} size={13} color={activeTab === i ? '#fff' : 'rgba(255,255,255,0.5)'} />
+              <Text style={[s.tabPillText, { color: activeTab === i ? '#fff' : 'rgba(255,255,255,0.5)' }]}>{tab.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
@@ -1452,8 +1631,8 @@ export default function MusicScreen() {
 
 const s = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 24 },
-  headerTitle: { fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', color: '#fff', marginBottom: 6 },
-  headerSub: { fontSize: 14, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.8)' },
+  headerTagline: { fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', color: '#fff', lineHeight: 34 },
+  headerTaglineItalic: { fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', fontStyle: 'italic', color: '#fff', lineHeight: 34 },
   walletCard: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 4, gap: 10 },
   walletRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   walletLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
@@ -1463,11 +1642,25 @@ const s = StyleSheet.create({
   priceChipName: { fontSize: 10, fontFamily: 'Inter_500Medium' },
   priceChipVal: { fontSize: 12, fontFamily: 'Inter_700Bold' },
   tabBarWrap: { borderBottomWidth: 1 },
-  tabBar: { paddingHorizontal: 16, paddingTop: 4, gap: 4 },
-  tabPill: { paddingHorizontal: 14, paddingVertical: 12, position: 'relative' },
-  tabPillActive: {},
-  tabPillText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  tabUnderline: { position: 'absolute', bottom: 0, left: 14, right: 14, height: 2, backgroundColor: '#B44CFF', borderRadius: 1 },
+  tabBar: { paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
+  tabPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 9999,
+    backgroundColor: 'transparent',
+  },
+  tabPillActive: {
+    backgroundColor: '#FF6B33',
+    shadowColor: '#FF6B33',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.55,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  tabPillText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   tabContent: { padding: 20, gap: 4 },
   sectionLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginTop: 16, marginBottom: 8 },
   chips: { gap: 8, paddingBottom: 4 },
@@ -1550,4 +1743,17 @@ const s = StyleSheet.create({
   imgMusicActions: { flexDirection: 'row', gap: 10, padding: 14, backgroundColor: '#1a1a2e' },
   actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12 },
   actionBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  generatingBox: { borderRadius: 16, borderWidth: 1, padding: 20, alignItems: 'center', gap: 8, marginTop: 8 },
+  generatingText: { fontSize: 14, fontFamily: 'Inter_500Medium', textAlign: 'center' },
+  generatingHint: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  resultPanel: { borderRadius: 16, borderWidth: 1, marginTop: 16, overflow: 'hidden' },
+  resultPanelEmpty: { minHeight: 200 },
+  resultPanelLoading: { padding: 24, alignItems: 'center', gap: 10 },
+  resultEmptyGradient: { flex: 1, minHeight: 200, alignItems: 'center', justifyContent: 'center', gap: 10, padding: 24 },
+  resultEmptyTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  resultEmptyHint: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  decorativeWaveRow: { flexDirection: 'row', alignItems: 'center', gap: 3, height: 36, opacity: 0.4, marginTop: 4 },
+  resultControls: { flexDirection: 'row', gap: 10, marginTop: 4 },
+  resultControlBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', opacity: 0.5 },
+  genSpinner: { width: 36, height: 36, borderRadius: 18, borderWidth: 3, marginTop: 4 },
 });

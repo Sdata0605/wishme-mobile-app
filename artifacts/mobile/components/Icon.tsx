@@ -520,11 +520,33 @@ const ICONS = {
       <Polyline points="2,12 12,17 22,12" {...p(c)} />
     </Svg>
   ),
+  'user-plus': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" {...p(c)} />
+      <Circle cx={8.5} cy={7} r={4} {...p(c)} />
+      <Line x1={20} y1={8} x2={20} y2={14} {...p(c)} />
+      <Line x1={23} y1={11} x2={17} y2={11} {...p(c)} />
+    </Svg>
+  ),
+  'file-audio': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" {...p(c)} />
+      <Polyline points="14,2 14,8 20,8" {...p(c)} />
+      <Path d="M10 13a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" {...p(c)} />
+      <Polyline points="10,15 10,11 14,10 14,13" {...p(c)} />
+    </Svg>
+  ),
+  sparkles: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" stroke={c} strokeWidth={sw} strokeLinecap={lc} strokeLinejoin={lj} fill={c} fillOpacity={0.15} />
+      <Path d="M5 3l.75 2.25L8 6.5l-2.25.75L5 9.5l-.75-2.25L2 6.5l2.25-.75L5 3z" stroke={c} strokeWidth={1.5} strokeLinecap={lc} strokeLinejoin={lj} fill={c} fillOpacity={0.2} />
+      <Path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75L19 14z" stroke={c} strokeWidth={1.5} strokeLinecap={lc} strokeLinejoin={lj} fill={c} fillOpacity={0.2} />
+    </Svg>
+  ),
 } satisfies Record<string, RenderFn>;
 
 const ALIASES = {
   'music-2': 'music',
-  'sparkles': 'zap',
   'wallet': 'credit-card',
   'mail-check': 'check-circle',
 } as const satisfies Record<string, keyof typeof ICONS>;
