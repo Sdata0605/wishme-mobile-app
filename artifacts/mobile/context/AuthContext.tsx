@@ -172,12 +172,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     password: string,
   ): Promise<{ error: string | null; role: 'user' | 'celebrity' | null }> => {
     try {
+      console.log('[LOGIN] Step 1: Calling Supabase auth for', email);
       const res = await supabaseFetch('/auth/v1/token?grant_type=password', {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
+      console.log('[LOGIN] Step 1 response status:', res.status);
       if (!res.ok) {
         const msg = await parseApiError(res);
+        console.log('[LOGIN] Step 1 FAILED - raw error:', msg);
         const friendly = msg.toLowerCase().includes('invalid')
           ? 'Incorrect email or password. Please try again.'
           : msg;
@@ -189,16 +192,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         refresh_token: data.refresh_token as string,
       };
       const supaUser = data.user as Record<string, unknown>;
+      console.log('[LOGIN] Step 1 OK - auth user id:', supaUser.id, 'email:', supaUser.email);
       let u = buildUserFromSupabase(supaUser, { email });
+      console.log('[LOGIN] Step 2: Initial user built - role from meta:', u.role, 'profileId:', u.profileId);
 
       try {
+        console.log('[LOGIN] Step 3: Fetching profile for user_id:', supaUser.id);
         const profileRes = await supabaseFetch(
           `/rest/v1/profiles?select=*&user_id=eq.${supaUser.id}&limit=1`,
           {},
           newSession.access_token,
         );
+        console.log('[LOGIN] Step 3 profile response status:', profileRes.status);
         if (profileRes.ok) {
           const profiles = await profileRes.json() as Array<Record<string, unknown>>;
+          console.log('[LOGIN] Step 3 profiles found:', profiles.length, profiles.length > 0 ? 'id=' + profiles[0].id : 'NONE');
           if (profiles && profiles.length > 0) {
             const p = profiles[0];
             u = {
@@ -211,32 +219,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               memberSince: (p.member_since as string) ?? u.memberSince,
               referralCode: (p.referral_code as string) ?? u.referralCode,
             };
+            console.log('[LOGIN] Step 3 profile applied - profileId:', u.profileId);
           }
+        } else {
+          const profileErr = await profileRes.text();
+          console.log('[LOGIN] Step 3 profile fetch NOT OK:', profileRes.status, profileErr);
         }
-      } catch {}
+      } catch (profileEx) {
+        console.log('[LOGIN] Step 3 profile fetch EXCEPTION:', profileEx);
+      }
 
       try {
+        console.log('[LOGIN] Step 4: Checking celebrities table for profileId:', u.profileId);
         const celebRes = await supabaseFetch(
-          `/rest/v1/celebrities?select=id,status&profile_id=eq.${u.profileId}&status=eq.approved&limit=1`,
+          `/rest/v1/celebrities?select=id,status&profile_id=eq.${u.profileId}&limit=1`,
           {},
           newSession.access_token,
         );
+        console.log('[LOGIN] Step 4 celeb response status:', celebRes.status);
         if (celebRes.ok) {
           const celebs = await celebRes.json() as Array<{ id: string; status: string }>;
+          console.log('[LOGIN] Step 4 celebrities found:', celebs.length, celebs.length > 0 ? JSON.stringify(celebs[0]) : 'NONE');
           if (celebs && celebs.length > 0) {
             u = { ...u, role: 'celebrity' };
+            console.log('[LOGIN] Step 4 role set to celebrity');
           }
+        } else {
+          const celebErr = await celebRes.text();
+          console.log('[LOGIN] Step 4 celeb fetch NOT OK:', celebRes.status, celebErr);
         }
-      } catch {}
+      } catch (celebEx) {
+        console.log('[LOGIN] Step 4 celeb fetch EXCEPTION:', celebEx);
+      }
 
+      console.log('[LOGIN] Step 5: Final user role:', u.role, '| Saving session & routing');
       setSession(newSession);
       setUser(u);
       await AsyncStorage.multiSet([
         [STORAGE_SESSION, JSON.stringify(newSession)],
         [STORAGE_USER, JSON.stringify(u)],
       ]);
+      console.log('[LOGIN] Step 5 DONE - returning role:', u.role);
       return { error: null, role: u.role };
-    } catch {
+    } catch (ex) {
+      console.log('[LOGIN] OUTER EXCEPTION:', ex);
       return { error: 'Network error. Please check your connection.', role: null };
     }
   }, []);
