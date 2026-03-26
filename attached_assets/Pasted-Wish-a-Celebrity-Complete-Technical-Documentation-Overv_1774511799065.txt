@@ -1,0 +1,742 @@
+Wish a Celebrity — Complete Technical Documentation
+Overview
+The "Wish a Celebrity" feature has two parallel flows that both end at the same destination. The system lets fans send personalized AI-generated greeting cards (or uploaded cards/videos) to celebrities on special occasions.
+
+FLOW ARCHITECTURE
+
+/wish-celebrity (Browse & Select)
+        │
+        ├── Subscribed? ──► /wish-booking/:celebrityId (Simple Flow)
+        │                        │
+        │                        └──► Payment ──► /wish-confirmation/:orderId
+        │                                              │
+        │                                              └──► Generate Card ──► Approve & Send
+        │                                                                          │
+        │                                                                          ▼
+        │                                                              /wish-congratulations?orderId=X
+        │
+        └── Not Subscribed? ──► /celebrity/:id (Subscribe first)
+                                     │
+                                     └──► After subscribing ──► /wish-celebrity-occasion/:celebrityId (Advanced Flow)
+                                                                     │
+                                                                     └──► Payment ──► Generate/Upload ──► Approve & Send
+                                                                                                              │
+                                                                                                              ▼
+                                                                                                /wish-congratulations?orderId=X
+PAGE 1: /wish-celebrity — Celebrity Browse & Selection
+File: src/pages/WishACelebrity.tsx Purpose: Lists all active celebrities, separated into "Subscribed" and "Browse More" sections.
+
+UI Components: AuthenticatedLayout, Card, CardContent, Button, Input, Badge, Heart/Search/Star/CheckCircle/Lock icons.
+
+Data Loading (2 parallel queries):
+
+Query	Table	Filters	Fields
+Celebrities	celebrities	is_active = true	* (all fields)
+Subscriptions	celebrity_favorites	user_id = profile.id, status = 'active'	celebrity_id
+Identification Logic:
+
+
+const isSubscribed = (celebrityId: string) => subscriptions.includes(celebrityId);
+Sorting: Subscribed celebrities appear first, then unsubscribed.
+
+User Actions:
+
+"Wish Now" button (subscribed): Navigates to /wish-booking/:celebrityId
+"Subscribe to Wish" button (not subscribed): Navigates to /celebrity/:celebrityId (profile page with subscribe option)
+PAGE 2: /wish-booking/:celebrityId — Simple Wish Flow
+File: src/pages/WishBooking.tsx Purpose: Form to create a wish order with AI message suggestions, then pay.
+
+UI Components: Card, CardHeader, CardTitle, CardContent, Input, Label, Textarea, Select/SelectContent/SelectItem/SelectTrigger/SelectValue, Badge, Button, Alert, PaymentInstructionModal, VoiceMessageInput, Skeleton.
+
+Hooks Used: useAuth(), useWalletBalance(), usePlanDiscount(), useParams(), useNavigate()
+
+Occasions List (hardcoded):
+
+
+["Birthday", "Anniversary", "Wedding", "Congratulations",
+ "Get Well Soon", "Thank You", "Good Luck", "Graduation"]
+Form Fields:
+
+Field	Type	Required	Source
+Occasion	Select dropdown	Yes	Hardcoded list above
+Your Name (sender)	Input text	Yes	User types
+Message	Textarea + Voice input	Yes	User types or voice
+AI Card Prompt	Textarea	Yes	User types or AI suggestions
+Price Calculation:
+
+
+const basePrice = celebrity?.service_prices?.general_wish || 5000;
+const finalPrice = getDiscountedPrice(basePrice);  // applies plan discount
+const savings = getSavingsAmount(basePrice);
+AI Suggestion Endpoints
+1. Message Suggestions
+
+Edge Function: generate-message-suggestions
+Payload:
+
+{
+  "celebrityName": "Shah Rukh Khan",
+  "occasionType": "Birthday",
+  "recipientName": "Fan Name"
+}
+Response:
+
+{
+  "suggestions": [
+    "Happy Birthday, Shah Rukh Khan! Your movies have...",
+    "Wishing you an amazing birthday! Your talent...",
+    "On your special day, I want to say..."
+  ]
+}
+2. Card Prompt Suggestions
+
+Edge Function: suggest-greeting-card-prompts
+Payload:
+
+{
+  "celebrityName": "Shah Rukh Khan",
+  "occasionType": "Birthday",
+  "recipientName": "Fan Name",
+  "message": "Happy Birthday!"
+}
+Response:
+
+{
+  "prompts": [
+    "Elegant Bollywood-themed card with golden accents...",
+    "Vibrant celebration with confetti and film reels..."
+  ]
+}
+Payment Flow
+Validation before payment:
+
+
+if (!occasionType || !recipientName || !message || !aiPrompt) → error
+if (!celebrity?.service_prices?.general_wish) → error
+Option A — Wallet Payment:
+
+Insert into wish_celebrity_orders:
+
+{
+  "user_id": "profile.id",
+  "celebrity_id": "celebrityId",
+  "occasion_type": "Birthday",
+  "recipient_name": "Fan Name",
+  "message": "Happy Birthday!",
+  "card_prompt": "Elegant design with...",
+  "amount_paid": 4500,
+  "discount_percentage": 10,
+  "discount_amount": 500,
+  "payment_method": "wallet",
+  "payment_status": "completed",
+  "status": "pending"
+}
+Insert into wallet_transactions:
+
+{
+  "user_id": "profile.id",
+  "amount": 4500,
+  "transaction_type": "booking",
+  "status": "completed",
+  "description": "Wish order #uuid for Celebrity - Birthday",
+  "transaction_details": {
+    "base_price": 5000,
+    "discount_percentage": 10,
+    "discount_amount": 500,
+    "plan": "premium"
+  }
+}
+On wallet_transaction failure → Rollback: Delete the order.
+Navigate to /wish-confirmation/:orderId
+Option B — Razorpay Payment:
+
+Insert into wish_celebrity_orders (same as above but payment_status: 'pending', payment_method: 'razorpay')
+
+Call Edge Function create-razorpay-order:
+
+
+{
+  "amount": 4500,
+  "currency": "INR",
+  "receipt": "WISH-{orderId}",
+  "notes": { "orderId": "uuid", "orderType": "wish" }
+}
+Response:
+
+
+{
+  "id": "order_xyz",
+  "key_id": "rzp_live_xxx",
+  "amount": 450000,
+  "currency": "INR"
+}
+Open Razorpay checkout widget
+On success, call verify-razorpay-payment:
+
+{
+  "razorpay_payment_id": "pay_xxx",
+  "razorpay_order_id": "order_xyz",
+  "razorpay_signature": "sig_xxx",
+  "orderId": "uuid",
+  "orderType": "wish"
+}
+Navigate to /wish-confirmation/:orderId
+PAGE 3: /wish-celebrity-occasion/:celebrityId — Advanced Wish Flow
+File: src/pages/WishCelebrityOccasion.tsx (1406 lines) Purpose: Extended wish flow with 3 upload modes, card generation, approval, and sending.
+
+Key Difference from Simple Flow: This page handles the ENTIRE lifecycle (form → payment → card generation → approval → send) on ONE page, whereas the simple flow splits across multiple pages.
+
+3 Upload Modes:
+
+Mode	Value	Description
+AI-Generated Card	'ai'	System generates card via AI
+Upload Own Card	'upload-card'	User uploads image file
+Upload Own Video	'upload-video'	User uploads video file
+Additional Form Fields (beyond simple flow):
+
+Field	Type	Purpose
+Upload Mode	Radio/Select	Choose ai/upload-card/upload-video
+Reference Image	File upload	Optional reference for AI generation
+Custom Prompt	Textarea	Custom AI prompt for card design
+Content Policy	Checkbox	Must accept before payment
+User File Upload	File input	For upload-card or upload-video modes
+File Upload Process (for user uploads):
+
+
+// Upload to Supabase Storage bucket: 'greeting-card-uploads'
+// Path: user-cards/{profile.id}-{timestamp}.{ext}  OR
+//       user-videos/{profile.id}-{timestamp}.{ext}  OR
+//       ref-images/{profile.id}-{timestamp}.{ext}
+const { error } = await supabase.storage
+  .from('greeting-card-uploads')
+  .upload(fileName, file);
+Order Insert (wish_celebrity_orders):
+
+
+{
+  "user_id": "profile.id",
+  "celebrity_id": "celebrityId",
+  "occasion_type": "Birthday",
+  "recipient_name": "Fan Name",
+  "message": "Happy Birthday!",
+  "card_prompt": "Custom prompt or auto-generated",
+  "reference_image_url": "https://...ref-image.png or null",
+  "user_uploaded_card_url": "https://...card.png or null",
+  "user_uploaded_video_url": "https://...video.mp4 or null",
+  "card_generation_type": "ai | upload-card | upload-video",
+  "status": "pending",
+  "payment_status": "pending",
+  "amount_paid": 999
+}
+Wallet Transaction Type: 'greeting_card_generation' (different from simple flow's 'booking')
+
+Post-Payment: Card Generation
+Edge Function: generate-wish-celebrity-card Payload:
+
+
+{ "orderId": "uuid" }
+Internal Process:
+
+Fetches order + celebrity data from wish_celebrity_orders joined with celebrities
+Validates message (1-1000 chars) and recipient name (1-100 chars)
+Runs profanity filter
+Generates greeting TEXT via Lovable AI Gateway:
+Model: google/gemini-2.5-flash
+Prompt: Creates warm fan-to-celebrity greeting
+Generates card IMAGE via Lovable AI Gateway:
+Model: google/gemini-2.5-flash-image-preview
+If celebrity has image_url: sends as multimodal (text + image)
+If no image: text-only prompt
+Uploads generated image to Supabase Storage: greeting-card-uploads/ai-cards/{orderId}-{timestamp}.png
+Updates order: greeting_text, generated_card_image_url, generation_attempts, status: 'generated'
+Response:
+
+
+{
+  "success": true,
+  "greeting_text": "Happy Birthday, Shah Rukh Khan! ...",
+  "card_url": "https://...storage.../ai-cards/uuid-123.png",
+  "generation_attempts": 1
+}
+Max 3 regeneration attempts (enforced in UI, not backend).
+
+Post-Generation: Approve & Send
+For AI cards → calls send-wish-to-celebrity:
+
+
+{ "orderId": "uuid" }
+Internal Process (send-wish-to-celebrity Edge Function):
+
+Fetches order with celebrity + user profile joins
+Validates: card must be generated (generated_card_image_url + greeting_text exist)
+Validates: not already sent (card_approved = false, status != 'sent')
+Finds or creates conversations record between user and celebrity
+Inserts message from USER to celebrity (the greeting card):
+
+INSERT INTO messages (conversation_id, sender_id, sender_type, message_text, is_ai_generated)
+VALUES (conv.id, userId, 'user', '{greetingText}\n\n[Greeting Card: {cardUrl}]', true)
+Inserts auto-reply from CELEBRITY to user (AI thank-you):
+
+INSERT INTO messages (conversation_id, sender_id, sender_type, message_text, is_ai_generated)
+VALUES (conv.id, celebrityId, 'celebrity', 'Thank you so much...', true)
+Updates order: card_approved: true, status: 'sent', completed_at: now()
+Response:
+
+
+{
+  "success": true,
+  "message": "Greeting card sent successfully to celebrity",
+  "conversation_id": "conv-uuid"
+}
+For uploaded cards/videos → calls send-wish-thankyou-dm:
+
+
+{ "orderId": "uuid" }
+Then updates order status to 'sent'.
+
+Order Restoration
+On page load, the system restores an existing order:
+
+Check localStorage for wishOrderId:{celebrityId}
+If not found, query DB for latest completed order for this user+celebrity
+Restores all form fields and card generation state
+PAGE 4: /wish-confirmation/:orderId
+File: src/pages/WishConfirmation.tsx Purpose: Post-payment confirmation with card generation and approval (for simple flow).
+
+Data Loading:
+
+
+supabase.from('wish_celebrity_orders')
+  .select('*, celebrities (id, name, image_url, category)')
+  .eq('id', orderId).single()
+Auto-generates card if payment_status === 'completed' and no generated_card_image_url.
+
+Actions: "Regenerate Card" and "Approve & Send" (same endpoints as above).
+
+PAGE 5: /wish-congratulations?orderId=X
+File: src/pages/WishCongratulations.tsx Purpose: Success page with 10-second auto-redirect to /messages.
+
+UI: Animated success icon, order summary, "View Conversation" button, "View All My Wishes" button, countdown timer.
+
+DATABASE TABLE: wish_celebrity_orders
+Column	Type	Description
+id	uuid	Primary key
+user_id	uuid	FK to profiles.id
+celebrity_id	uuid	FK to celebrities.id
+occasion_type	text	"Birthday", "Anniversary", etc.
+recipient_name	text	Fan's name (sender)
+message	text	Fan's personal message
+card_prompt	text	AI generation prompt
+reference_image_url	text	Optional reference image
+user_uploaded_card_url	text	User's own card image
+user_uploaded_video_url	text	User's own video
+card_generation_type	text	'ai', 'upload-card', 'upload-video'
+generated_card_image_url	text	AI-generated card URL
+greeting_text	text	AI-generated greeting text
+generation_attempts	integer	Number of regenerations
+amount_paid	integer	Final price in INR
+discount_percentage	integer	Plan discount %
+discount_amount	integer	Saved amount
+payment_method	text	'wallet' or 'razorpay'
+payment_status	text	'pending', 'completed', 'failed'
+status	text	'pending', 'generated', 'sent'
+card_approved	boolean	User approved the card
+completed_at	timestamp	When sent
+razorpay_order_id	text	Razorpay reference
+razorpay_payment_id	text	Razorpay payment ref
+created_at	timestamp	Order creation time
+ALL EDGE FUNCTIONS USED
+Function	Purpose	Payload
+generate-message-suggestions	AI message ideas	{celebrityName, occasionType, recipientName}
+suggest-greeting-card-prompts	AI card design prompts	{celebrityName, occasionType, recipientName, message}
+create-razorpay-order	Create payment order	{amount, currency, receipt, notes}
+verify-razorpay-payment	Verify payment signature	{razorpay_payment_id, razorpay_order_id, razorpay_signature, orderId, orderType}
+generate-wish-celebrity-card	Generate AI card	{orderId}
+send-wish-to-celebrity	Send card + create conversation	{orderId}
+send-wish-thankyou-dm	Send uploaded content DM	{orderId}
+SUPABASE TABLES ACCESSED
+Table	Operations
+celebrities	SELECT (fetch details)
+celebrity_favorites	SELECT (check subscription)
+profiles	SELECT (wallet_balance)
+wish_celebrity_orders	INSERT, UPDATE, SELECT, DELETE (rollback)
+wallet_transactions	INSERT
+conversations	SELECT, INSERT (via edge function)
+messages	INSERT (via edge function)
+STORAGE BUCKET
+Bucket: greeting-card-uploads
+Paths: user-cards/, user-videos/, ref-images/, ai-cards/
+Here is the complete technical documentation for Replit:
+
+Wish a Celebrity — Complete Technical Documentation
+Overview
+The "Wish a Celebrity" feature has two parallel flows that both end at the same destination. The system lets fans send personalized AI-generated greeting cards (or uploaded cards/videos) to celebrities on special occasions.
+
+FLOW ARCHITECTURE
+
+/wish-celebrity (Browse & Select)
+        │
+        ├── Subscribed? ──► /wish-booking/:celebrityId (Simple Flow)
+        │                        │
+        │                        └──► Payment ──► /wish-confirmation/:orderId
+        │                                              │
+        │                                              └──► Generate Card ──► Approve & Send
+        │                                                                          │
+        │                                                                          ▼
+        │                                                              /wish-congratulations?orderId=X
+        │
+        └── Not Subscribed? ──► /celebrity/:id (Subscribe first)
+                                     │
+                                     └──► After subscribing ──► /wish-celebrity-occasion/:celebrityId (Advanced Flow)
+                                                                     │
+                                                                     └──► Payment ──► Generate/Upload ──► Approve & Send
+                                                                                                              │
+                                                                                                              ▼
+                                                                                                /wish-congratulations?orderId=X
+PAGE 1: /wish-celebrity — Celebrity Browse & Selection
+File: src/pages/WishACelebrity.tsx Purpose: Lists all active celebrities, separated into "Subscribed" and "Browse More" sections.
+
+UI Components: AuthenticatedLayout, Card, CardContent, Button, Input, Badge, Heart/Search/Star/CheckCircle/Lock icons.
+
+Data Loading (2 parallel queries):
+
+Query	Table	Filters	Fields
+Celebrities	celebrities	is_active = true	* (all fields)
+Subscriptions	celebrity_favorites	user_id = profile.id, status = 'active'	celebrity_id
+Identification Logic:
+
+
+const isSubscribed = (celebrityId: string) => subscriptions.includes(celebrityId);
+Sorting: Subscribed celebrities appear first, then unsubscribed.
+
+User Actions:
+
+"Wish Now" button (subscribed): Navigates to /wish-booking/:celebrityId
+"Subscribe to Wish" button (not subscribed): Navigates to /celebrity/:celebrityId (profile page with subscribe option)
+PAGE 2: /wish-booking/:celebrityId — Simple Wish Flow
+File: src/pages/WishBooking.tsx Purpose: Form to create a wish order with AI message suggestions, then pay.
+
+UI Components: Card, CardHeader, CardTitle, CardContent, Input, Label, Textarea, Select/SelectContent/SelectItem/SelectTrigger/SelectValue, Badge, Button, Alert, PaymentInstructionModal, VoiceMessageInput, Skeleton.
+
+Hooks Used: useAuth(), useWalletBalance(), usePlanDiscount(), useParams(), useNavigate()
+
+Occasions List (hardcoded):
+
+
+["Birthday", "Anniversary", "Wedding", "Congratulations",
+ "Get Well Soon", "Thank You", "Good Luck", "Graduation"]
+Form Fields:
+
+Field	Type	Required	Source
+Occasion	Select dropdown	Yes	Hardcoded list above
+Your Name (sender)	Input text	Yes	User types
+Message	Textarea + Voice input	Yes	User types or voice
+AI Card Prompt	Textarea	Yes	User types or AI suggestions
+Price Calculation:
+
+
+const basePrice = celebrity?.service_prices?.general_wish || 5000;
+const finalPrice = getDiscountedPrice(basePrice);  // applies plan discount
+const savings = getSavingsAmount(basePrice);
+AI Suggestion Endpoints
+1. Message Suggestions
+
+Edge Function: generate-message-suggestions
+Payload:
+
+{
+  "celebrityName": "Shah Rukh Khan",
+  "occasionType": "Birthday",
+  "recipientName": "Fan Name"
+}
+Response:
+
+{
+  "suggestions": [
+    "Happy Birthday, Shah Rukh Khan! Your movies have...",
+    "Wishing you an amazing birthday! Your talent...",
+    "On your special day, I want to say..."
+  ]
+}
+2. Card Prompt Suggestions
+
+Edge Function: suggest-greeting-card-prompts
+Payload:
+
+{
+  "celebrityName": "Shah Rukh Khan",
+  "occasionType": "Birthday",
+  "recipientName": "Fan Name",
+  "message": "Happy Birthday!"
+}
+Response:
+
+{
+  "prompts": [
+    "Elegant Bollywood-themed card with golden accents...",
+    "Vibrant celebration with confetti and film reels..."
+  ]
+}
+Payment Flow
+Validation before payment:
+
+
+if (!occasionType || !recipientName || !message || !aiPrompt) → error
+if (!celebrity?.service_prices?.general_wish) → error
+Option A — Wallet Payment:
+
+Insert into wish_celebrity_orders:
+
+{
+  "user_id": "profile.id",
+  "celebrity_id": "celebrityId",
+  "occasion_type": "Birthday",
+  "recipient_name": "Fan Name",
+  "message": "Happy Birthday!",
+  "card_prompt": "Elegant design with...",
+  "amount_paid": 4500,
+  "discount_percentage": 10,
+  "discount_amount": 500,
+  "payment_method": "wallet",
+  "payment_status": "completed",
+  "status": "pending"
+}
+Insert into wallet_transactions:
+
+{
+  "user_id": "profile.id",
+  "amount": 4500,
+  "transaction_type": "booking",
+  "status": "completed",
+  "description": "Wish order #uuid for Celebrity - Birthday",
+  "transaction_details": {
+    "base_price": 5000,
+    "discount_percentage": 10,
+    "discount_amount": 500,
+    "plan": "premium"
+  }
+}
+On wallet_transaction failure → Rollback: Delete the order.
+Navigate to /wish-confirmation/:orderId
+Option B — Razorpay Payment:
+
+Insert into wish_celebrity_orders (same as above but payment_status: 'pending', payment_method: 'razorpay')
+
+Call Edge Function create-razorpay-order:
+
+
+{
+  "amount": 4500,
+  "currency": "INR",
+  "receipt": "WISH-{orderId}",
+  "notes": { "orderId": "uuid", "orderType": "wish" }
+}
+Response:
+
+
+{
+  "id": "order_xyz",
+  "key_id": "rzp_live_xxx",
+  "amount": 450000,
+  "currency": "INR"
+}
+Open Razorpay checkout widget
+On success, call verify-razorpay-payment:
+
+{
+  "razorpay_payment_id": "pay_xxx",
+  "razorpay_order_id": "order_xyz",
+  "razorpay_signature": "sig_xxx",
+  "orderId": "uuid",
+  "orderType": "wish"
+}
+Navigate to /wish-confirmation/:orderId
+PAGE 3: /wish-celebrity-occasion/:celebrityId — Advanced Wish Flow
+File: src/pages/WishCelebrityOccasion.tsx (1406 lines) Purpose: Extended wish flow with 3 upload modes, card generation, approval, and sending.
+
+Key Difference from Simple Flow: This page handles the ENTIRE lifecycle (form → payment → card generation → approval → send) on ONE page, whereas the simple flow splits across multiple pages.
+
+3 Upload Modes:
+
+Mode	Value	Description
+AI-Generated Card	'ai'	System generates card via AI
+Upload Own Card	'upload-card'	User uploads image file
+Upload Own Video	'upload-video'	User uploads video file
+Additional Form Fields (beyond simple flow):
+
+Field	Type	Purpose
+Upload Mode	Radio/Select	Choose ai/upload-card/upload-video
+Reference Image	File upload	Optional reference for AI generation
+Custom Prompt	Textarea	Custom AI prompt for card design
+Content Policy	Checkbox	Must accept before payment
+User File Upload	File input	For upload-card or upload-video modes
+File Upload Process (for user uploads):
+
+
+// Upload to Supabase Storage bucket: 'greeting-card-uploads'
+// Path: user-cards/{profile.id}-{timestamp}.{ext}  OR
+//       user-videos/{profile.id}-{timestamp}.{ext}  OR
+//       ref-images/{profile.id}-{timestamp}.{ext}
+const { error } = await supabase.storage
+  .from('greeting-card-uploads')
+  .upload(fileName, file);
+Order Insert (wish_celebrity_orders):
+
+
+{
+  "user_id": "profile.id",
+  "celebrity_id": "celebrityId",
+  "occasion_type": "Birthday",
+  "recipient_name": "Fan Name",
+  "message": "Happy Birthday!",
+  "card_prompt": "Custom prompt or auto-generated",
+  "reference_image_url": "https://...ref-image.png or null",
+  "user_uploaded_card_url": "https://...card.png or null",
+  "user_uploaded_video_url": "https://...video.mp4 or null",
+  "card_generation_type": "ai | upload-card | upload-video",
+  "status": "pending",
+  "payment_status": "pending",
+  "amount_paid": 999
+}
+Wallet Transaction Type: 'greeting_card_generation' (different from simple flow's 'booking')
+
+Post-Payment: Card Generation
+Edge Function: generate-wish-celebrity-card Payload:
+
+
+{ "orderId": "uuid" }
+Internal Process:
+
+Fetches order + celebrity data from wish_celebrity_orders joined with celebrities
+Validates message (1-1000 chars) and recipient name (1-100 chars)
+Runs profanity filter
+Generates greeting TEXT via Lovable AI Gateway:
+Model: google/gemini-2.5-flash
+Prompt: Creates warm fan-to-celebrity greeting
+Generates card IMAGE via Lovable AI Gateway:
+Model: google/gemini-2.5-flash-image-preview
+If celebrity has image_url: sends as multimodal (text + image)
+If no image: text-only prompt
+Uploads generated image to Supabase Storage: greeting-card-uploads/ai-cards/{orderId}-{timestamp}.png
+Updates order: greeting_text, generated_card_image_url, generation_attempts, status: 'generated'
+Response:
+
+
+{
+  "success": true,
+  "greeting_text": "Happy Birthday, Shah Rukh Khan! ...",
+  "card_url": "https://...storage.../ai-cards/uuid-123.png",
+  "generation_attempts": 1
+}
+Max 3 regeneration attempts (enforced in UI, not backend).
+
+Post-Generation: Approve & Send
+For AI cards → calls send-wish-to-celebrity:
+
+
+{ "orderId": "uuid" }
+Internal Process (send-wish-to-celebrity Edge Function):
+
+Fetches order with celebrity + user profile joins
+Validates: card must be generated (generated_card_image_url + greeting_text exist)
+Validates: not already sent (card_approved = false, status != 'sent')
+Finds or creates conversations record between user and celebrity
+Inserts message from USER to celebrity (the greeting card):
+
+INSERT INTO messages (conversation_id, sender_id, sender_type, message_text, is_ai_generated)
+VALUES (conv.id, userId, 'user', '{greetingText}\n\n[Greeting Card: {cardUrl}]', true)
+Inserts auto-reply from CELEBRITY to user (AI thank-you):
+
+INSERT INTO messages (conversation_id, sender_id, sender_type, message_text, is_ai_generated)
+VALUES (conv.id, celebrityId, 'celebrity', 'Thank you so much...', true)
+Updates order: card_approved: true, status: 'sent', completed_at: now()
+Response:
+
+
+{
+  "success": true,
+  "message": "Greeting card sent successfully to celebrity",
+  "conversation_id": "conv-uuid"
+}
+For uploaded cards/videos → calls send-wish-thankyou-dm:
+
+
+{ "orderId": "uuid" }
+Then updates order status to 'sent'.
+
+Order Restoration
+On page load, the system restores an existing order:
+
+Check localStorage for wishOrderId:{celebrityId}
+If not found, query DB for latest completed order for this user+celebrity
+Restores all form fields and card generation state
+PAGE 4: /wish-confirmation/:orderId
+File: src/pages/WishConfirmation.tsx Purpose: Post-payment confirmation with card generation and approval (for simple flow).
+
+Data Loading:
+
+
+supabase.from('wish_celebrity_orders')
+  .select('*, celebrities (id, name, image_url, category)')
+  .eq('id', orderId).single()
+Auto-generates card if payment_status === 'completed' and no generated_card_image_url.
+
+Actions: "Regenerate Card" and "Approve & Send" (same endpoints as above).
+
+PAGE 5: /wish-congratulations?orderId=X
+File: src/pages/WishCongratulations.tsx Purpose: Success page with 10-second auto-redirect to /messages.
+
+UI: Animated success icon, order summary, "View Conversation" button, "View All My Wishes" button, countdown timer.
+
+DATABASE TABLE: wish_celebrity_orders
+Column	Type	Description
+id	uuid	Primary key
+user_id	uuid	FK to profiles.id
+celebrity_id	uuid	FK to celebrities.id
+occasion_type	text	"Birthday", "Anniversary", etc.
+recipient_name	text	Fan's name (sender)
+message	text	Fan's personal message
+card_prompt	text	AI generation prompt
+reference_image_url	text	Optional reference image
+user_uploaded_card_url	text	User's own card image
+user_uploaded_video_url	text	User's own video
+card_generation_type	text	'ai', 'upload-card', 'upload-video'
+generated_card_image_url	text	AI-generated card URL
+greeting_text	text	AI-generated greeting text
+generation_attempts	integer	Number of regenerations
+amount_paid	integer	Final price in INR
+discount_percentage	integer	Plan discount %
+discount_amount	integer	Saved amount
+payment_method	text	'wallet' or 'razorpay'
+payment_status	text	'pending', 'completed', 'failed'
+status	text	'pending', 'generated', 'sent'
+card_approved	boolean	User approved the card
+completed_at	timestamp	When sent
+razorpay_order_id	text	Razorpay reference
+razorpay_payment_id	text	Razorpay payment ref
+created_at	timestamp	Order creation time
+ALL EDGE FUNCTIONS USED
+Function	Purpose	Payload
+generate-message-suggestions	AI message ideas	{celebrityName, occasionType, recipientName}
+suggest-greeting-card-prompts	AI card design prompts	{celebrityName, occasionType, recipientName, message}
+create-razorpay-order	Create payment order	{amount, currency, receipt, notes}
+verify-razorpay-payment	Verify payment signature	{razorpay_payment_id, razorpay_order_id, razorpay_signature, orderId, orderType}
+generate-wish-celebrity-card	Generate AI card	{orderId}
+send-wish-to-celebrity	Send card + create conversation	{orderId}
+send-wish-thankyou-dm	Send uploaded content DM	{orderId}
+SUPABASE TABLES ACCESSED
+Table	Operations
+celebrities	SELECT (fetch details)
+celebrity_favorites	SELECT (check subscription)
+profiles	SELECT (wallet_balance)
+wish_celebrity_orders	INSERT, UPDATE, SELECT, DELETE (rollback)
+wallet_transactions	INSERT
+conversations	SELECT, INSERT (via edge function)
+messages	INSERT (via edge function)
+STORAGE BUCKET
+Bucket: greeting-card-uploads
+Paths: user-cards/, user-videos/, ref-images/, ai-cards/
+
+
+
+
