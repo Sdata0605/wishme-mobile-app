@@ -1,0 +1,866 @@
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { Loader2, ArrowLeft, AlertCircle, Eye, EyeOff, Lock, Mail, HelpCircle, Star, ChevronRight } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useToast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { validatePhone, validateEmail } from "@/utils/validation";
+import authPerson1 from "@/assets/auth-person-1.jpg";
+import authPerson2 from "@/assets/auth-person-2.jpg";
+import authPerson3 from "@/assets/auth-person-3.jpg";
+import { PasswordStrengthMeter } from "@/components/auth/PasswordStrengthMeter";
+import { OTPVerification } from "@/components/auth/OTPVerification";
+import { checkPasswordStrength } from "@/utils/passwordStrength";
+import { logActivity } from "@/utils/auditLogger";
+
+type SignUpStep = 'form' | 'otp';
+type AuthView = 'main' | 'forgot-password';
+
+interface SignUpData {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  referralCode: string;
+}
+
+// Google G logo SVG
+const GoogleLogo = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+  </svg>
+);
+
+export default function Auth() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [searchParams] = useSearchParams();
+  const [referralCode, setReferralCode] = useState("");
+  const [activeTab, setActiveTab] = useState<"signin" | "signup">("signin");
+  const [authView, setAuthView] = useState<AuthView>('main');
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotMethod, setForgotMethod] = useState<'email' | 'sms'>('email');
+  const [showSignInPassword, setShowSignInPassword] = useState(false);
+  const [forgotPhone, setForgotPhone] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotError, setForgotError] = useState("");
+  const [phoneError, setPhoneError] = useState<string | undefined>();
+  const [emailError, setEmailError] = useState<string | undefined>();
+  const [password, setPassword] = useState("");
+  const [isPasswordValid, setIsPasswordValid] = useState(false);
+  const [signUpStep, setSignUpStep] = useState<SignUpStep>('form');
+  const [signUpData, setSignUpData] = useState<SignUpData | null>(null);
+  const [otpAlreadySent, setOtpAlreadySent] = useState(false);
+  const navigate = useNavigate();
+  const { signUp, signIn, user, profile } = useAuth();
+  const isMobile = useIsMobile();
+  const { toast } = useToast();
+  
+  const redirectTo = searchParams.get('redirect') || '/dashboard';
+
+  // Auto-populate referral code from URL
+  useEffect(() => {
+    const urlReferralCode = searchParams.get('ref');
+    if (urlReferralCode) {
+      setReferralCode(urlReferralCode);
+    }
+  }, [searchParams]);
+
+  // Redirect if already logged in - check role and plan
+  useEffect(() => {
+    const checkRedirect = async () => {
+      if (user && profile) {
+        if (profile.role === 'admin') {
+          navigate('/admin');
+          return;
+        }
+        const { data: celebrityData } = await supabase
+          .from('celebrities')
+          .select('id')
+          .eq('profile_id', profile.id)
+          .maybeSingle();
+        
+        if (celebrityData) {
+          navigate('/celebrity-dashboard');
+          return;
+        }
+        if (profile.plan === 'premium' || profile.plan === 'elite') {
+          navigate(redirectTo);
+        } else {
+          const skipped = sessionStorage.getItem('plan_skipped_this_session');
+          if (skipped === 'true') {
+            navigate(redirectTo);
+          } else {
+            navigate('/plan?redirected=true');
+          }
+        }
+      }
+    };
+    checkRedirect();
+  }, [user, profile, navigate, redirectTo]);
+
+  const handleSignUpFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setPhoneError(undefined);
+    setEmailError(undefined);
+
+    const formData = new FormData(e.currentTarget);
+    const email = formData.get('email') as string;
+    const firstName = formData.get('firstName') as string;
+    const lastName = formData.get('lastName') as string;
+    const phone = formData.get('phone') as string;
+    const referralCodeValue = formData.get('referralCode') as string;
+
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.isValid) {
+      setEmailError(emailValidation.error);
+      return;
+    }
+
+    const phoneValidation = validatePhone(phone);
+    if (!phoneValidation.isValid) {
+      setPhoneError(phoneValidation.error);
+      return;
+    }
+
+    const passwordStrength = checkPasswordStrength(password);
+    if (!passwordStrength.isValid) {
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const normalizedPhone = phone.replace(/[\s\-()]/g, '');
+      const { data: existingPhone } = await supabase
+        .from('profiles')
+        .select('id')
+        .or(`phone.eq.${normalizedPhone},phone.eq.${phone}`)
+        .limit(1)
+        .maybeSingle();
+
+      if (existingPhone) {
+        setPhoneError("This phone number is already registered. Please login.");
+        setIsLoading(false);
+        return;
+      }
+    } catch (err) {
+      console.error('Error checking phone:', err);
+    }
+
+    setIsLoading(false);
+
+    setSignUpData({
+      email,
+      password,
+      firstName,
+      lastName,
+      phone,
+      referralCode: referralCodeValue,
+    });
+    setSignUpStep('otp');
+  };
+
+  const handleOTPVerified = async () => {
+    if (!signUpData) return;
+
+    setIsLoading(true);
+
+    const { error } = await signUp(
+      signUpData.email, 
+      signUpData.password, 
+      signUpData.firstName, 
+      signUpData.lastName, 
+      signUpData.phone, 
+      signUpData.referralCode
+    );
+    
+    if (!error) {
+      if (signUpData.phone) {
+        try {
+          await supabase.functions.invoke('send-whatsapp-welcome', {
+            body: { 
+              phone: signUpData.phone,
+              firstName: signUpData.firstName || 'there'
+            }
+          });
+        } catch (whatsappError) {
+          console.log('WhatsApp welcome message failed:', whatsappError);
+        }
+      }
+      navigate('/plan?redirected=true');
+    }
+    
+    setIsLoading(false);
+  };
+
+  const handleBackToForm = () => {
+    setSignUpStep('form');
+    setOtpAlreadySent(false);
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setForgotError("");
+
+    if (forgotMethod === 'email') {
+      if (!forgotEmail) {
+        setForgotError("Please enter your email address");
+        setIsLoading(false);
+        return;
+      }
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotEmail, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) {
+        setForgotError(error.message);
+      } else {
+        setForgotSent(true);
+        toast({ title: "Reset link sent!", description: "Check your email for the password reset link." });
+        logActivity({
+          action_category: 'auth',
+          action_type: 'forgot_password',
+          action_label: `Password reset requested for ${forgotEmail}`,
+          severity: 'warning',
+          metadata: { method: 'email' },
+        }).catch(() => {});
+      }
+    } else {
+      if (!forgotPhone) {
+        setForgotError("Please enter your phone number");
+        setIsLoading(false);
+        return;
+      }
+      const { data: profileData, error: lookupError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('phone', forgotPhone)
+        .maybeSingle();
+
+      if (lookupError || !profileData?.email) {
+        setForgotError("No account found with this phone number");
+        setIsLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(profileData.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) {
+        setForgotError(error.message);
+      } else {
+        setForgotSent(true);
+        toast({ title: "Reset link sent!", description: `A reset link has been sent to the email associated with this phone number.` });
+      }
+    }
+    setIsLoading(false);
+  };
+
+  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    const formData = new FormData(e.currentTarget);
+    const emailInput = (formData.get('email') as string) || '';
+    const passwordInput = (formData.get('password') as string) || '';
+
+    const { error } = await signIn(emailInput, passwordInput);
+    
+    if (!error) {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, role, plan')
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+        
+        if (profileData) {
+          if (profileData.role === 'admin') {
+            navigate('/admin');
+          } else {
+            const { data: celebrityData } = await supabase
+              .from('celebrities')
+              .select('id')
+              .eq('profile_id', profileData.id)
+              .maybeSingle();
+            
+            if (celebrityData) {
+              navigate('/celebrity-dashboard');
+            } else if (profileData.plan === 'premium' || profileData.plan === 'elite') {
+              navigate('/dashboard');
+            } else {
+              const skipped = sessionStorage.getItem('plan_skipped_this_session');
+              navigate(skipped === 'true' ? '/dashboard' : '/plan?redirected=true');
+            }
+          }
+        }
+      }
+    }
+    
+    setIsLoading(false);
+  };
+
+  const handleGoogleSignIn = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`,
+      }
+    });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  };
+
+  // Shared input style
+  const inputContainerClass = "flex items-center gap-3 rounded-[14px] h-[52px] px-4 transition-all duration-300 border focus-within:border-[#EC4899]/50 focus-within:shadow-[0_0_0_3px_rgba(236,72,153,0.1)]";
+  const inputClass = "bg-transparent border-none outline-none text-white text-[15px] flex-1 placeholder:text-white/25";
+
+  // Render forgot password
+  const renderForgotPassword = () => (
+    <div className="animate-fade-in">
+      <button
+        type="button"
+        onClick={() => { setAuthView('main'); setForgotSent(false); setForgotError(""); }}
+        className="flex items-center gap-2 text-white/50 hover:text-white text-sm mb-6 transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" /> Back to Sign In
+      </button>
+
+      {forgotSent ? (
+        <div className="text-center space-y-5 py-8">
+          <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center" style={{ background: 'rgba(236,72,153,0.15)' }}>
+            <Mail className="w-8 h-8 text-[#EC4899]" />
+          </div>
+          <div>
+            <h3 className="text-xl font-semibold text-white">Reset Link Sent!</h3>
+            <p className="text-sm text-white/50 mt-2">
+              {forgotMethod === 'email'
+                ? `We've sent a password reset link to ${forgotEmail}`
+                : `We've sent a reset link to the email linked with your phone number`}
+            </p>
+          </div>
+          <button
+            onClick={() => { setAuthView('main'); setForgotSent(false); }}
+            className="w-full h-[52px] rounded-full border border-white/10 text-white/70 hover:text-white hover:border-white/20 transition-all text-sm font-medium"
+          >
+            Back to Sign In
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleForgotPassword} className="space-y-5">
+          <h2 className="text-2xl font-bold text-white" style={{ fontFamily: "'Playfair Display', serif" }}>Reset Password</h2>
+          <p className="text-sm text-white/50">Choose how you'd like to reset your password</p>
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setForgotMethod('email')}
+              className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-full text-sm font-medium transition-all ${
+                forgotMethod === 'email'
+                  ? 'text-white border-0'
+                  : 'text-white/50 border border-white/10 hover:border-white/20'
+              }`}
+              style={forgotMethod === 'email' ? { background: 'linear-gradient(135deg, #FF6B33, #EC4899, #B44CFF)' } : {}}
+            >
+              <Mail className="w-4 h-4" /> Email
+            </button>
+            <button
+              type="button"
+              onClick={() => setForgotMethod('sms')}
+              className={`flex-1 flex items-center justify-center gap-2 h-11 rounded-full text-sm font-medium transition-all ${
+                forgotMethod === 'sms'
+                  ? 'text-white border-0'
+                  : 'text-white/50 border border-white/10 hover:border-white/20'
+              }`}
+              style={forgotMethod === 'sms' ? { background: 'linear-gradient(135deg, #FF6B33, #EC4899, #B44CFF)' } : {}}
+            >
+              Phone
+            </button>
+          </div>
+
+          {forgotMethod === 'email' ? (
+            <div>
+              <label className="block text-[11px] uppercase tracking-[1.5px] text-white/45 mb-2.5 font-medium">Email Address</label>
+              <div className={inputContainerClass} style={{ background: '#161B24', borderColor: 'rgba(255,255,255,0.08)' }}>
+                <Mail className="w-[18px] h-[18px] text-white/30 shrink-0" />
+                <input
+                  type="email"
+                  placeholder="your@email.com"
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  required
+                  className={inputClass}
+                />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[11px] uppercase tracking-[1.5px] text-white/45 mb-2.5 font-medium">Phone Number</label>
+              <div className={inputContainerClass} style={{ background: '#161B24', borderColor: 'rgba(255,255,255,0.08)' }}>
+                <span className="text-white/30 text-sm">+91</span>
+                <input
+                  type="tel"
+                  placeholder="9876543210"
+                  value={forgotPhone}
+                  onChange={(e) => setForgotPhone(e.target.value)}
+                  required
+                  className={inputClass}
+                />
+              </div>
+              <p className="text-xs text-white/30 mt-2">We'll send the reset link to the email associated with this number</p>
+            </div>
+          )}
+
+          {forgotError && (
+            <div className="flex items-center gap-2 text-sm text-red-400 bg-red-500/10 p-3 rounded-xl">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {forgotError}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full h-14 rounded-full text-white font-bold text-base tracking-wide transition-all hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0 active:brightness-95 disabled:opacity-60 flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, #FF6B33 0%, #EC4899 50%, #B44CFF 100%)' }}
+          >
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Send Reset Link
+          </button>
+        </form>
+      )}
+    </div>
+  );
+
+  // Render sign in form
+  const renderSignIn = () => (
+    <div className="animate-fade-in">
+      <h2 className="text-[32px] font-bold text-white mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>Welcome Back</h2>
+      <p className="text-[15px] text-white/50 mb-8">Your VIP experience awaits.</p>
+
+      <form onSubmit={handleSignIn} className="space-y-5">
+        <div>
+          <label className="block text-[11px] uppercase tracking-[1.5px] text-white/45 mb-2.5 font-medium">Email Address</label>
+          <div className={inputContainerClass} style={{ background: '#161B24', borderColor: 'rgba(255,255,255,0.08)' }}>
+            <Mail className="w-[18px] h-[18px] text-white/30 shrink-0" />
+            <input
+              name="email"
+              type="email"
+              placeholder="curator@wishme.com"
+              required
+              className={inputClass}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] uppercase tracking-[1.5px] text-white/45 mb-2.5 font-medium">Password</label>
+          <div className={inputContainerClass} style={{ background: '#161B24', borderColor: 'rgba(255,255,255,0.08)' }}>
+            <Lock className="w-[18px] h-[18px] text-white/30 shrink-0" />
+            <input
+              name="password"
+              type={showSignInPassword ? 'text' : 'password'}
+              required
+              placeholder="••••••••"
+              className={inputClass}
+            />
+            <button
+              type="button"
+              onClick={() => setShowSignInPassword(!showSignInPassword)}
+              className="text-white/30 hover:text-white/60 transition-colors shrink-0"
+            >
+              {showSignInPassword ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="text-right">
+          <button
+            type="button"
+            onClick={() => setAuthView('forgot-password')}
+            className="text-[14px] text-[#EC4899] hover:underline transition-colors"
+          >
+            Forgot Password?
+          </button>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full h-14 rounded-full text-white font-bold text-base tracking-wide transition-all hover:brightness-110 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(236,72,153,0.4)] active:translate-y-0 active:brightness-95 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+          style={{ background: 'linear-gradient(135deg, #FF6B33 0%, #EC4899 50%, #B44CFF 100%)' }}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              Signing in...
+            </>
+          ) : (
+            isMobile ? 'ENTER' : 'Enter the Gala'
+          )}
+        </button>
+      </form>
+
+      {/* Divider */}
+      <div className="flex items-center gap-4 my-6">
+        <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+        <span className="text-[11px] uppercase tracking-[1.5px] text-white/30 font-medium">Or continue with</span>
+        <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+      </div>
+
+      {/* Google */}
+      <button
+        type="button"
+        onClick={handleGoogleSignIn}
+        className="w-full h-[52px] rounded-full flex items-center justify-center gap-3 text-white text-[15px] font-medium transition-all hover:border-white/20"
+        style={{ background: '#161B24', border: '1px solid rgba(255,255,255,0.1)' }}
+      >
+        <GoogleLogo />
+        {isMobile ? 'Google' : 'Google Account'}
+      </button>
+    </div>
+  );
+
+  // Render sign up form
+  const renderSignUp = () => {
+    if (signUpStep === 'otp' && signUpData) {
+      return (
+        <div className="animate-fade-in">
+          <button
+            type="button"
+            onClick={handleBackToForm}
+            className="flex items-center gap-2 text-white/50 hover:text-white text-sm mb-6 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" /> Back
+          </button>
+          <h2 className="text-[28px] font-bold text-white mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>Verify Your Email</h2>
+          <p className="text-sm text-white/50 mb-6">
+            We sent a 6-digit code to <span className="text-[#EC4899]">{signUpData.email}</span>
+          </p>
+          <OTPVerification
+            email={signUpData.email}
+            onVerified={handleOTPVerified}
+            onBack={handleBackToForm}
+            initialOtpSent={otpAlreadySent}
+            onOtpSent={() => setOtpAlreadySent(true)}
+          />
+          {isLoading && (
+            <div className="flex items-center justify-center mt-4 gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-[#EC4899]" />
+              <span className="text-sm text-white/50">Creating your account...</span>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="animate-fade-in">
+        <h2 className="text-[28px] md:text-[32px] font-bold text-white mb-2" style={{ fontFamily: "'Playfair Display', serif" }}>Create Account</h2>
+        <p className="text-[15px] text-white/50 mb-8">Your celebrity journey begins here.</p>
+
+        <form onSubmit={handleSignUpFormSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] uppercase tracking-[1.5px] text-white/45 mb-2.5 font-medium">First Name</label>
+              <div className={inputContainerClass} style={{ background: '#161B24', borderColor: 'rgba(255,255,255,0.08)' }}>
+                <input name="firstName" placeholder="John" required className={inputClass} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-[11px] uppercase tracking-[1.5px] text-white/45 mb-2.5 font-medium">Last Name</label>
+              <div className={inputContainerClass} style={{ background: '#161B24', borderColor: 'rgba(255,255,255,0.08)' }}>
+                <input name="lastName" placeholder="Doe" required className={inputClass} />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-[11px] uppercase tracking-[1.5px] text-white/45 mb-2.5 font-medium">Email Address</label>
+            <div className={`${inputContainerClass} ${emailError ? '!border-red-500' : ''}`} style={{ background: '#161B24', borderColor: 'rgba(255,255,255,0.08)' }}>
+              <Mail className="w-[18px] h-[18px] text-white/30 shrink-0" />
+              <input name="email" type="email" placeholder="your@email.com" required className={inputClass} onChange={() => setEmailError(undefined)} />
+            </div>
+            {emailError && (
+              <p className="text-sm text-red-400 flex items-center gap-1 mt-1.5">
+                <AlertCircle className="w-3 h-3" /> {emailError}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-[11px] uppercase tracking-[1.5px] text-white/45 mb-2.5 font-medium">Phone Number</label>
+            <div className={`${inputContainerClass} ${phoneError ? '!border-red-500' : ''}`} style={{ background: '#161B24', borderColor: 'rgba(255,255,255,0.08)' }}>
+              <span className="text-white/30 text-sm shrink-0">+91</span>
+              <input name="phone" type="tel" placeholder="98765 43210" required className={inputClass} onChange={() => setPhoneError(undefined)} />
+            </div>
+            {phoneError && (
+              <p className="text-sm text-red-400 flex items-center gap-1 mt-1.5">
+                <AlertCircle className="w-3 h-3" /> {phoneError}
+              </p>
+            )}
+            <p className="text-xs text-white/30 mt-1.5">Enter 10-digit Indian mobile number</p>
+          </div>
+
+          <PasswordStrengthMeter
+            password={password}
+            onPasswordChange={setPassword}
+            onValidityChange={setIsPasswordValid}
+            id="signup-password"
+            name="password"
+          />
+
+          <div>
+            <label className="block text-[11px] uppercase tracking-[1.5px] text-white/45 mb-2.5 font-medium">Referral Code (Optional)</label>
+            <div className={inputContainerClass} style={{ background: '#161B24', borderColor: 'rgba(255,255,255,0.08)' }}>
+              <input name="referralCode" placeholder="Enter referral code" value={referralCode} onChange={(e) => setReferralCode(e.target.value)} className={inputClass} />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading || !isPasswordValid}
+            className="w-full h-14 rounded-full text-white font-bold text-base tracking-wide transition-all hover:brightness-110 hover:-translate-y-0.5 hover:shadow-[0_12px_40px_rgba(236,72,153,0.4)] active:translate-y-0 active:brightness-95 disabled:opacity-60 flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg, #FF6B33 0%, #EC4899 50%, #B44CFF 100%)' }}
+          >
+            {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+            {isMobile ? 'JOIN' : 'Join the Gala'}
+          </button>
+        </form>
+
+        {/* Divider */}
+        <div className="flex items-center gap-4 my-6">
+          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+          <span className="text-[11px] uppercase tracking-[1.5px] text-white/30 font-medium">Or continue with</span>
+          <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleGoogleSignIn}
+          className="w-full h-[52px] rounded-full flex items-center justify-center gap-3 text-white text-[15px] font-medium transition-all hover:border-white/20"
+          style={{ background: '#161B24', border: '1px solid rgba(255,255,255,0.1)' }}
+        >
+          <GoogleLogo />
+          {isMobile ? 'Google' : 'Google Account'}
+        </button>
+      </div>
+    );
+  };
+
+  // Tab switcher component
+  const TabSwitcher = () => (
+    <div
+      className="flex p-1 rounded-full w-full max-w-[440px]"
+      style={{ background: '#161B24', border: '1px solid rgba(255,255,255,0.08)' }}
+    >
+      <button
+        onClick={() => { setActiveTab("signin"); setSignUpStep('form'); setAuthView('main'); }}
+        className={`flex-1 h-11 rounded-full text-[13px] font-semibold transition-all duration-200 ${
+          activeTab === "signin" ? 'text-white' : 'text-white/50 hover:text-white/80'
+        }`}
+        style={activeTab === "signin" ? { background: 'linear-gradient(135deg, #FF6B33 0%, #EC4899 50%, #B44CFF 100%)' } : {}}
+      >
+        Sign In
+      </button>
+      <button
+        onClick={() => { setActiveTab("signup"); setAuthView('main'); }}
+        className={`flex-1 h-11 rounded-full text-[13px] font-medium transition-all duration-200 ${
+          activeTab === "signup" ? 'text-white' : 'text-white/50 hover:text-white/80'
+        }`}
+        style={activeTab === "signup" ? { background: 'linear-gradient(135deg, #FF6B33 0%, #EC4899 50%, #B44CFF 100%)' } : {}}
+      >
+        Sign Up
+      </button>
+      <button
+        onClick={() => navigate('/celebrity-signup')}
+        className="flex-1 h-11 rounded-full text-[13px] font-medium text-white/50 transition-all duration-200 flex items-center justify-center gap-1.5 hover:text-white hover:bg-white/10"
+      >
+        <Star className="w-3.5 h-3.5 text-[#F5A623]" fill="#F5A623" /> Celebrity
+      </button>
+    </div>
+  );
+
+  // ─── MOBILE ───
+  if (isMobile) {
+    return (
+      <div
+        className="min-h-screen flex flex-col overflow-auto"
+        style={{ background: '#0A0A14' }}
+      >
+        {/* Subtle gradient overlay */}
+        <div className="fixed inset-0 pointer-events-none" style={{
+          background: 'radial-gradient(ellipse at top left, rgba(180,76,255,0.08) 0%, transparent 50%), radial-gradient(ellipse at bottom right, rgba(236,72,153,0.06) 0%, transparent 50%)',
+        }} />
+
+        {/* Top bar */}
+        <div className="relative z-10 flex items-center justify-between px-5 pt-6 pb-4">
+          <span className="text-[22px] font-bold italic" style={{ color: '#EC4899', textShadow: '0 0 30px rgba(236,72,153,0.3)', fontFamily: "'Playfair Display', serif" }}>
+            WishMe
+          </span>
+          <button className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Form card */}
+        <div className="relative z-10 flex-1 px-5 pb-4">
+          <div
+            className="rounded-[28px] p-6 md:p-7"
+            style={{
+              background: 'rgba(255,255,255,0.04)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <TabSwitcher />
+
+            <div className="mt-7">
+              {activeTab === "signin" ? (
+                authView === 'forgot-password' ? renderForgotPassword() : renderSignIn()
+              ) : (
+                renderSignUp()
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Celebrity CTA */}
+        <div className="relative z-10 text-center py-6">
+          <Link
+            to="/celebrity-signup"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-[13px] uppercase tracking-[2px] font-semibold text-white border border-white/20 bg-white/10 backdrop-blur-sm hover:bg-white/20 hover:border-white/30 hover:shadow-[0_0_20px_rgba(236,72,153,0.3)] transition-all duration-300"
+          >
+            Join as Celebrity <Star className="w-4 h-4 text-[#F5A623]" fill="#F5A623" />
+          </Link>
+        </div>
+
+        {/* Footer */}
+        <div className="relative z-10 text-center pb-6 px-5 space-y-2">
+          <p className="text-[11px] uppercase tracking-[1px] text-white/25">
+            © 2024 WISHME. THE DIGITAL CURATOR.
+          </p>
+          <div className="flex items-center justify-center gap-6">
+            <Link to="/privacy-policy" className="text-[11px] uppercase tracking-[1px] text-white/35 hover:text-white/70 transition-colors">Privacy</Link>
+            <Link to="/terms-of-service" className="text-[11px] uppercase tracking-[1px] text-white/35 hover:text-white/70 transition-colors">Terms</Link>
+            <Link to="/support" className="text-[11px] uppercase tracking-[1px] text-white/35 hover:text-white/70 transition-colors">Support</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── DESKTOP ───
+  return (
+    <div className="h-screen flex overflow-hidden" style={{ background: '#0A0A0F' }}>
+      {/* Left Panel — Brand */}
+      <div
+        className="w-1/2 flex flex-col justify-center px-[60px] relative overflow-hidden"
+        style={{ background: '#080810', animation: 'fade-in 600ms ease-out 200ms both' }}
+      >
+        {/* Badge */}
+        <div
+          className="inline-flex items-center gap-2 rounded-full px-4 py-2 mb-8 w-fit"
+          style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
+        >
+          <div className="w-2 h-2 rounded-full" style={{ background: '#F5A623' }} />
+          <span className="text-[11px] uppercase tracking-[2px] text-white/70 font-medium">India's #1 Celebrity Marketplace</span>
+        </div>
+
+        {/* Headline */}
+        <h1 style={{ fontFamily: "'Playfair Display', serif", lineHeight: 1.1 }}>
+          <span className="block text-white text-[72px] font-bold">Join the</span>
+          <span className="block text-[72px] font-bold italic" style={{ color: '#EC4899' }}>WishMe</span>
+        </h1>
+
+        {/* Description */}
+        <p className="text-base text-white/55 leading-[1.7] mt-7 max-w-[380px]" style={{ fontFamily: "'DM Sans', system-ui, sans-serif" }}>
+          Step behind the velvet rope. Experience exclusive access to your favorite icons, personalized for your biggest moments.
+        </p>
+
+        {/* Celebrity Photo Stack */}
+        <div className="relative mt-16 h-[200px] w-[400px]">
+          <div
+            className="absolute left-0 bottom-0 w-[140px] h-[160px] rounded-[20px] overflow-hidden z-[1]"
+            style={{
+              transform: 'rotate(-5deg)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+              border: '2px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <img src={authPerson1} alt="Happy person" className="w-full h-full object-cover" loading="lazy" />
+          </div>
+          <div
+            className="absolute left-[100px] bottom-[20px] w-[150px] h-[175px] rounded-[20px] overflow-hidden z-[2]"
+            style={{
+              transform: 'rotate(0deg)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+              border: '2px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <img src={authPerson2} alt="Happy person" className="w-full h-full object-cover" loading="lazy" />
+          </div>
+          <div
+            className="absolute left-[220px] bottom-0 w-[130px] h-[160px] rounded-[20px] overflow-hidden z-[3]"
+            style={{
+              transform: 'rotate(3deg)',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+              border: '2px solid rgba(255,255,255,0.08)',
+            }}
+          >
+            <img src={authPerson3} alt="Happy person" className="w-full h-full object-cover" loading="lazy" />
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel — Auth */}
+      <div
+        className="w-1/2 flex flex-col items-center justify-between py-10 px-12 overflow-y-auto"
+        style={{ background: '#0D1117', animation: 'fade-in 500ms ease-out 100ms both' }}
+      >
+        {/* Top row */}
+        <div className="flex items-center justify-between w-full max-w-[440px]">
+          <span className="text-2xl font-bold italic" style={{ color: '#EC4899', textShadow: '0 0 30px rgba(236,72,153,0.3)', fontFamily: "'Playfair Display', serif" }}>
+            WishMe
+          </span>
+          <button className="w-9 h-9 rounded-full flex items-center justify-center text-white text-sm" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <HelpCircle className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Main content */}
+        <div className="w-full max-w-[440px] flex-1 flex flex-col justify-center py-8">
+          <TabSwitcher />
+
+          <div className="mt-9">
+            {activeTab === "signin" ? (
+              authView === 'forgot-password' ? renderForgotPassword() : renderSignIn()
+            ) : (
+              renderSignUp()
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center w-full max-w-[440px] space-y-3 pt-4">
+          <p className="text-[11px] uppercase tracking-[1px] text-white/25">
+            © 2024 WISHME. THE DIGITAL CURATOR.
+          </p>
+          <div className="flex items-center justify-center gap-6">
+            <Link to="/privacy-policy" className="text-[11px] uppercase tracking-[1px] text-white/35 hover:text-white/70 transition-colors">Privacy</Link>
+            <Link to="/terms-of-service" className="text-[11px] uppercase tracking-[1px] text-white/35 hover:text-white/70 transition-colors">Terms</Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

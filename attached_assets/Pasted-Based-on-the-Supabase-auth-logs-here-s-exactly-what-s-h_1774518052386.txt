@@ -1,0 +1,64 @@
+Based on the Supabase auth logs, here's exactly what's happening — you can share this directly with your Replit team:
+
+Proof from Supabase Logs
+Web (Lovable) — SUCCESS ✅
+
+Referer: lovableproject.com → Status 200 → user_id c2fcbb0c-f421-4942-bdf7-0f17e86d45b7
+The account john.doe.1764309480590.952@example.com exists in auth.users and authenticates successfully.
+Mobile (Replit) — FAILS ❌
+
+Referer: localhost:3000 → Status 400 → invalid_credentials
+Same Supabase project, same endpoint (/token), but rejected.
+What to Tell Replit
+The account is real and works. The mobile app failure means one of these:
+
+Wrong Supabase URL or Anon Key — The mobile app must use:
+
+URL: https://eqikeuqwbphwongtfzhe.supabase.co
+Anon Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y
+Password typo in code — The password is Common123! (capital C, no space). Have them log it before sending.
+
+Email typo — The full email is john.doe.1764309480590.952@example.com. Have them log the exact string being sent in the POST body.
+
+API call format — The correct endpoint is:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/auth/v1/token?grant_type=password
+Headers: apikey: <anon_key>, Content-Type: application/json
+Body: {"email":"john.doe.1764309480590.952@example.com","password":"Common123!"}
+Bottom line: The account is proven working by Supabase's own logs. The 400 from localhost:3000 means the mobile app is sending something slightly different — wrong key, wrong URL, or a character mismatch in the credentials.
+
+Based on the Supabase auth logs, here's exactly what's happening — you can share this directly with your Replit team:
+
+Proof from Supabase Logs
+Web (Lovable) — SUCCESS ✅
+
+Referer: lovableproject.com → Status 200 → user_id c2fcbb0c-f421-4942-bdf7-0f17e86d45b7
+The account john.doe.1764309480590.952@example.com exists in auth.users and authenticates successfully.
+Mobile (Replit) — FAILS ❌
+
+Referer: localhost:3000 → Status 400 → invalid_credentials
+Same Supabase project, same endpoint (/token), but rejected.
+What to Tell Replit
+The account is real and works. The mobile app failure means one of these:
+
+Wrong Supabase URL or Anon Key — The mobile app must use:
+
+URL: https://eqikeuqwbphwongtfzhe.supabase.co
+Anon Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y
+Password typo in code — The password is Common123! (capital C, no space). Have them log it before sending.
+
+Email typo — The full email is john.doe.1764309480590.952@example.com. Have them log the exact string being sent in the POST body.
+
+API call format — The correct endpoint is:
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/auth/v1/token?grant_type=password
+Headers: apikey: <anon_key>, Content-Type: application/json
+Body: {"email":"john.doe.1764309480590.952@example.com","password":"Common123!"}
+Bottom line: The account is proven working by Supabase's own logs. The 400 from localhost:3000 means the mobile app is sending something slightly different — wrong key, wrong URL, or a character mismatch in the credentials.
+
+
+
+
+
+Supabase
+Check Users in Supabase
