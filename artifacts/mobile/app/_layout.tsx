@@ -15,6 +15,7 @@ import { AppState, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { CelebrityDashboardSwitcher } from '@/components/CelebrityDashboardSwitcher';
 import { DraggableMoreButton } from '@/components/DraggableMoreButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
@@ -104,6 +105,7 @@ export default function RootLayout() {
                   <View style={{ flex: 1 }}>
                     <RootLayoutNav />
                     <DraggableMoreButton />
+                    <CelebrityDashboardSwitcher />
                   </View>
                 </DrawerProvider>
               </AuthProvider>
