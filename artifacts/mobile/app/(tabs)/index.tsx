@@ -95,6 +95,7 @@ const VIDEO_CARDS = [
 ];
 
 const BIRTHDAY_VIDEO = require('../../assets/videos/happy-birthday.mp4');
+const ANNIVERSARY_VIDEO = require('../../assets/videos/wedding-anniversary.mp4');
 
 function BirthdayVideoCard({ tag }: { tag: string }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -162,6 +163,62 @@ function BirthdayVideoCard({ tag }: { tag: string }) {
       </TouchableOpacity>
       {/* Tag badge */}
       <View style={[{ position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 }]}>
+        <Text style={{ color: '#fff', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>{tag}</Text>
+      </View>
+    </View>
+  );
+}
+
+function AnniversaryVideoCard({ tag }: { tag: string }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const player = useVideoPlayer(ANNIVERSARY_VIDEO, p => {
+    p.loop = true;
+    p.muted = false;
+  });
+
+  const togglePlay = useCallback(() => {
+    if (isPlaying) {
+      player.pause();
+      setIsPlaying(false);
+    } else {
+      player.play();
+      setIsPlaying(true);
+    }
+  }, [isPlaying, player]);
+
+  const toggleMute = useCallback(() => {
+    const next = !isMuted;
+    player.muted = next;
+    setIsMuted(next);
+  }, [isMuted, player]);
+
+  return (
+    <View style={styles.videoThumb}>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+        nativeControls={false}
+      />
+      <TouchableOpacity
+        onPress={togglePlay}
+        activeOpacity={0.8}
+        style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={isPlaying ? 'pause' : 'play'} size={26} color="#fff" />
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={toggleMute}
+        activeOpacity={0.8}
+        style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Icon name={isMuted ? 'volume-x' : 'volume-2'} size={16} color="#fff" />
+      </TouchableOpacity>
+      <View style={{ position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 }}>
         <Text style={{ color: '#fff', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>{tag}</Text>
       </View>
     </View>
@@ -477,6 +534,8 @@ export default function HomeScreen() {
               <View style={[styles.videoCard, { width: W - 60, backgroundColor: colors.card }]}>
                 {item.id === 'v2' ? (
                   <BirthdayVideoCard tag={item.tag} />
+                ) : item.id === 'v3' ? (
+                  <AnniversaryVideoCard tag={item.tag} />
                 ) : (
                   <LinearGradient
                     colors={item.gradient as [string, string]}
