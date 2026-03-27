@@ -11,10 +11,11 @@ import { Stack } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
-import { AppState, Platform } from 'react-native';
+import { AppState, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { DraggableMoreButton } from '@/components/DraggableMoreButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 import { AuthProvider } from '@/context/AuthContext';
@@ -100,7 +101,10 @@ export default function RootLayout() {
             <ThemeProvider>
               <AuthProvider>
                 <DrawerProvider>
-                  <RootLayoutNav />
+                  <View style={{ flex: 1 }}>
+                    <RootLayoutNav />
+                    <DraggableMoreButton />
+                  </View>
                 </DrawerProvider>
               </AuthProvider>
             </ThemeProvider>
