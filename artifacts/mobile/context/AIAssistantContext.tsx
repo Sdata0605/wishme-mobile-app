@@ -26,7 +26,7 @@ interface AIAssistantContextValue {
   isTyping: boolean;
   openChat: () => void;
   closeChat: () => void;
-  sendMessage: (content: string, isVoice?: boolean) => Promise<void>;
+  sendMessage: (content: string, isVoice?: boolean) => Promise<string>;
   clearMessages: () => void;
 }
 
@@ -47,7 +47,7 @@ export function AIAssistantProvider({ children }: { children: React.ReactNode })
     messagesRef.current = [];
   }, []);
 
-  const sendMessage = useCallback(async (content: string, isVoice = false) => {
+  const sendMessage = useCallback(async (content: string, isVoice = false): Promise<string> => {
     const userMsg: AIMessage = {
       id: Date.now().toString(),
       role: 'user',
@@ -61,6 +61,8 @@ export function AIAssistantProvider({ children }: { children: React.ReactNode })
     setMessages([...next]);
     setIsLoading(true);
     setIsTyping(true);
+
+    const fallback = "Sorry, I'm having trouble connecting right now. Please try again.";
 
     try {
       const history = messagesRef.current
@@ -91,10 +93,11 @@ export function AIAssistantProvider({ children }: { children: React.ReactNode })
         data = await res.json();
       }
 
+      const responseText = data.message || fallback;
       const assistantMsg: AIMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: data.message || "Sorry, I'm having trouble connecting right now. Please try again.",
+        content: responseText,
         timestamp: new Date(),
         actions: data.actions,
         suggestions: data.suggestions,
@@ -104,17 +107,19 @@ export function AIAssistantProvider({ children }: { children: React.ReactNode })
       const withReply = [...messagesRef.current, assistantMsg];
       messagesRef.current = withReply;
       setMessages([...withReply]);
+      return responseText;
     } catch {
       const errMsg: AIMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
-        content: "Sorry, I'm having trouble connecting right now. Please try again.",
+        content: fallback,
         timestamp: new Date(),
         isError: true,
       };
       const withErr = [...messagesRef.current, errMsg];
       messagesRef.current = withErr;
       setMessages([...withErr]);
+      return fallback;
     } finally {
       setIsLoading(false);
       setIsTyping(false);

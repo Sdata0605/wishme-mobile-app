@@ -543,6 +543,27 @@ const ICONS = {
       <Path d="M19 14l.75 2.25L22 17l-2.25.75L19 20l-.75-2.25L16 17l2.25-.75L19 14z" stroke={c} strokeWidth={1.5} strokeLinecap={lc} strokeLinejoin={lj} fill={c} fillOpacity={0.2} />
     </Svg>
   ),
+  loader: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Line x1={12} y1={2} x2={12} y2={6} {...p(c)} />
+      <Line x1={12} y1={18} x2={12} y2={22} {...p(c)} />
+      <Line x1={4.93} y1={4.93} x2={7.76} y2={7.76} {...p(c)} />
+      <Line x1={16.24} y1={16.24} x2={19.07} y2={19.07} {...p(c)} />
+      <Line x1={2} y1={12} x2={6} y2={12} {...p(c)} />
+      <Line x1={18} y1={12} x2={22} y2={12} {...p(c)} />
+      <Line x1={4.93} y1={19.07} x2={7.76} y2={16.24} {...p(c)} />
+      <Line x1={16.24} y1={7.76} x2={19.07} y2={4.93} {...p(c)} />
+    </Svg>
+  ),
+  'mic-off': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Line x1={1} y1={1} x2={23} y2={23} {...p(c)} />
+      <Path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" {...p(c)} />
+      <Path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" {...p(c)} />
+      <Line x1={12} y1={19} x2={12} y2={23} {...p(c)} />
+      <Line x1={8} y1={23} x2={16} y2={23} {...p(c)} />
+    </Svg>
+  ),
 } satisfies Record<string, RenderFn>;
 
 const ALIASES = {

@@ -14,9 +14,10 @@ import {
   View,
 } from 'react-native';
 import { Audio } from 'expo-av';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFetch } from '@/constants/supabase';
+import { useAIAssistant } from '@/context/AIAssistantContext';
 
 type VoiceStatus = 'idle' | 'connecting' | 'listening' | 'processing' | 'speaking' | 'error';
 
@@ -29,7 +30,7 @@ const BG_BY_STATUS: Record<VoiceStatus, string> = {
   error: '#E8527A',
 };
 
-const ICON_BY_STATUS: Record<VoiceStatus, string> = {
+const ICON_BY_STATUS: Record<VoiceStatus, IconName> = {
   idle: 'mic',
   connecting: 'loader',
   listening: 'mic',
@@ -47,10 +48,53 @@ const LABEL_BY_STATUS: Record<VoiceStatus, string> = {
   error: 'Tap to retry',
 };
 
-type ConversationTurn = { role: 'user' | 'assistant'; content: string };
+interface WebSpeechRecognitionResult {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
+interface WebSpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): { readonly length: number; item(i: number): WebSpeechRecognitionResult };
+  [index: number]: { readonly length: number; [i: number]: WebSpeechRecognitionResult };
+}
+
+interface WebSpeechRecognitionEvent {
+  readonly results: WebSpeechRecognitionResultList;
+}
+
+interface WebSpeechRecognitionErrorEvent {
+  readonly error: string;
+}
+
+interface WebSpeechRecognition {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onresult: ((event: WebSpeechRecognitionEvent) => void) | null;
+  onerror: ((event: WebSpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+interface WindowWithSpeech extends Window {
+  SpeechRecognition?: new () => WebSpeechRecognition;
+  webkitSpeechRecognition?: new () => WebSpeechRecognition;
+}
+
+function getSpeechRecognitionCtor(): (new () => WebSpeechRecognition) | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const w = window as WindowWithSpeech;
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition;
+}
 
 export function VoiceAssistantButton() {
   const { session } = useAuth();
+  const { sendMessage } = useAIAssistant();
 
   const [status, setStatus] = useState<VoiceStatus>('idle');
   const [userTranscript, setUserTranscript] = useState('');
@@ -59,14 +103,13 @@ export function VoiceAssistantButton() {
   const [showFallback, setShowFallback] = useState(false);
   const [fallbackInput, setFallbackInput] = useState('');
 
-  const conversationHistory = useRef<ConversationTurn[]>([]);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideCardsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreUntilRef = useRef<number>(0);
   const lastTranscriptRef = useRef<string>('');
   const lastTranscriptTimeRef = useRef<number>(0);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<WebSpeechRecognition | null>(null);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseOpacity = useRef(new Animated.Value(0.5)).current;
@@ -115,65 +158,39 @@ export function VoiceAssistantButton() {
     }
   }, [status, spinAnim]);
 
-  const showTranscriptCards = useCallback((user: string, ai: string) => {
-    setUserTranscript(user);
-    setAiTranscript(ai.slice(0, 120));
-    setShowCards(true);
-    cardOpacity.setValue(0);
-    Animated.timing(cardOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
-    if (hideCardsTimeoutRef.current) clearTimeout(hideCardsTimeoutRef.current);
-    hideCardsTimeoutRef.current = setTimeout(() => {
-      Animated.timing(cardOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(() =>
-        setShowCards(false),
-      );
-    }, 8000);
-  }, [cardOpacity]);
-
-  const callAI = useCallback(
-    async (query: string, isVoice: boolean): Promise<string> => {
-      const res = await supabaseFetch(
-        '/functions/v1/ai-assistant',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            query,
-            conversationHistory: conversationHistory.current.slice(-8),
-            context: { currentRoute: '/', isVoiceInput: isVoice },
-            model: 'google/gemini-2.5-flash',
-          }),
-        },
-        session?.access_token,
-      );
-      if (!res.ok) throw new Error('AI request failed');
-      const data = await res.json();
-      const message: string = data.message || "Sorry, I'm having trouble right now.";
-      conversationHistory.current = [
-        ...conversationHistory.current,
-        { role: 'user', content: query },
-        { role: 'assistant', content: message },
-      ].slice(-16);
-      return message;
+  const showTranscriptCards = useCallback(
+    (user: string, ai: string) => {
+      setUserTranscript(user);
+      setAiTranscript(ai.slice(0, 120));
+      setShowCards(true);
+      cardOpacity.setValue(0);
+      Animated.timing(cardOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+      if (hideCardsTimeoutRef.current) clearTimeout(hideCardsTimeoutRef.current);
+      hideCardsTimeoutRef.current = setTimeout(() => {
+        Animated.timing(cardOpacity, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start(() => setShowCards(false));
+      }, 8000);
     },
-    [session?.access_token],
+    [cardOpacity],
   );
 
-  const speakNative = useCallback(
-    async (text: string) => {
-      setStatus('speaking');
-      await new Promise<void>((resolve) => {
-        Speech.speak(text, {
-          language: 'en-US',
-          rate: 1.0,
-          pitch: 1.05,
-          onDone: () => resolve(),
-          onError: () => resolve(),
-        });
+  const speakNative = useCallback(async (text: string) => {
+    setStatus('speaking');
+    await new Promise<void>((resolve) => {
+      Speech.speak(text, {
+        language: 'en-US',
+        rate: 1.0,
+        pitch: 1.05,
+        onDone: () => resolve(),
+        onError: () => resolve(),
       });
-      ignoreUntilRef.current = Date.now() + 2200;
-      setStatus('idle');
-    },
-    [],
-  );
+    });
+    ignoreUntilRef.current = Date.now() + 2200;
+    setStatus('idle');
+  }, []);
 
   const speakWeb = useCallback((text: string) => {
     setStatus('speaking');
@@ -222,27 +239,20 @@ export function VoiceAssistantButton() {
             audioBase64: base64,
             audioMimeType: 'audio/m4a',
             context: { currentRoute: '/', isVoiceInput: true },
-            conversationHistory: conversationHistory.current.slice(-8),
             model: 'google/gemini-2.5-flash',
           }),
         },
         session?.access_token,
       );
       if (!res.ok) throw new Error('audio_unsupported');
-      const data = await res.json();
-      const userSaid: string = data.transcript || '[voice input]';
-      const aiSaid: string = data.message || "Sorry, I'm having trouble right now.";
-      conversationHistory.current = [
-        ...conversationHistory.current,
-        { role: 'user', content: userSaid },
-        { role: 'assistant', content: aiSaid },
-      ].slice(-16);
-      setUserTranscript(userSaid);
+      const data = (await res.json()) as { transcript?: string; message?: string };
+      const userSaid = data.transcript ?? '[voice input]';
+      const aiSaid = data.message ?? "Sorry, I'm having trouble right now.";
       showTranscriptCards(userSaid, aiSaid);
       await speakNative(aiSaid);
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : '';
-      if (msg === 'audio_unsupported' || msg.includes('audio')) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg === 'audio_unsupported' || msg.toLowerCase().includes('audio')) {
         setShowFallback(true);
         setStatus('idle');
       } else {
@@ -272,8 +282,7 @@ export function VoiceAssistantButton() {
   }, [stopRecording]);
 
   const startWeb = useCallback(() => {
-    const SpeechRecognitionCtor =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    const SpeechRecognitionCtor = getSpeechRecognitionCtor();
     if (!SpeechRecognitionCtor) {
       setShowFallback(true);
       return;
@@ -287,8 +296,8 @@ export function VoiceAssistantButton() {
     recognitionRef.current = recognition;
 
     recognition.onstart = () => setStatus('listening');
-    recognition.onresult = async (event: any) => {
-      const transcript: string = event.results[0][0].transcript.trim();
+    recognition.onresult = (event: WebSpeechRecognitionEvent) => {
+      const transcript = event.results[0][0].transcript.trim();
       if (!transcript) return;
       const now = Date.now();
       if (now < ignoreUntilRef.current) return;
@@ -303,15 +312,14 @@ export function VoiceAssistantButton() {
       setUserTranscript(transcript);
       setStatus('processing');
       recognition.stop();
-      try {
-        const aiMsg = await callAI(transcript, true);
-        showTranscriptCards(transcript, aiMsg);
-        speakWeb(aiMsg);
-      } catch {
-        setStatus('error');
-      }
+      sendMessage(transcript, true)
+        .then((aiMsg) => {
+          showTranscriptCards(transcript, aiMsg);
+          speakWeb(aiMsg);
+        })
+        .catch(() => setStatus('error'));
     };
-    recognition.onerror = (e: any) => {
+    recognition.onerror = (e: WebSpeechRecognitionErrorEvent) => {
       if (e.error === 'no-speech' || e.error === 'aborted') {
         setStatus('idle');
       } else {
@@ -319,23 +327,23 @@ export function VoiceAssistantButton() {
       }
     };
     recognition.onend = () => {
-      if (status === 'listening') setStatus('idle');
+      setStatus((prev) => (prev === 'listening' ? 'idle' : prev));
     };
     try {
       recognition.start();
     } catch {
       setStatus('error');
     }
-  }, [callAI, showTranscriptCards, speakWeb, status]);
+  }, [sendMessage, showTranscriptCards, speakWeb]);
 
   const handlePress = useCallback(() => {
-    if (status === 'listening' && Platform.OS !== 'web') {
-      stopRecording();
-      return;
-    }
-    if (status === 'listening' && Platform.OS === 'web') {
-      recognitionRef.current?.stop();
-      setStatus('idle');
+    if (status === 'listening') {
+      if (Platform.OS !== 'web') {
+        stopRecording();
+      } else {
+        recognitionRef.current?.stop();
+        setStatus('idle');
+      }
       return;
     }
     if (status === 'speaking') {
@@ -361,7 +369,7 @@ export function VoiceAssistantButton() {
     setShowFallback(false);
     setStatus('processing');
     try {
-      const aiMsg = await callAI(query, true);
+      const aiMsg = await sendMessage(query, true);
       showTranscriptCards(query, aiMsg);
       if (Platform.OS !== 'web') {
         await speakNative(aiMsg);
@@ -371,14 +379,14 @@ export function VoiceAssistantButton() {
     } catch {
       setStatus('error');
     }
-  }, [fallbackInput, callAI, showTranscriptCards, speakNative, speakWeb]);
+  }, [fallbackInput, sendMessage, showTranscriptCards, speakNative, speakWeb]);
 
   useEffect(() => {
     return () => {
       if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
       if (hideCardsTimeoutRef.current) clearTimeout(hideCardsTimeoutRef.current);
       recordingRef.current?.stopAndUnloadAsync().catch(() => {});
-      recognitionRef.current?.stop();
+      recognitionRef.current?.abort();
       if (Platform.OS === 'web') window.speechSynthesis?.cancel();
       else Speech.stop();
     };
@@ -394,7 +402,10 @@ export function VoiceAssistantButton() {
   return (
     <>
       {showCards && (
-        <Animated.View style={[styles.cardsContainer, { opacity: cardOpacity }]} pointerEvents="none">
+        <Animated.View
+          style={[styles.cardsContainer, { opacity: cardOpacity }]}
+          pointerEvents="none"
+        >
           {aiTranscript ? (
             <View style={styles.aiCard}>
               <Text style={styles.cardLabel}>AI:</Text>
@@ -436,10 +447,7 @@ export function VoiceAssistantButton() {
                 <Icon name="send" size={16} color="#fff" />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              onPress={() => setShowFallback(false)}
-              style={styles.fallbackClose}
-            >
+            <TouchableOpacity onPress={() => setShowFallback(false)} style={styles.fallbackClose}>
               <Text style={styles.fallbackCloseText}>Cancel</Text>
             </TouchableOpacity>
           </View>
@@ -464,16 +472,14 @@ export function VoiceAssistantButton() {
         >
           {status === 'connecting' || status === 'processing' ? (
             <Animated.View style={{ transform: [{ rotate: spin }] }}>
-              <Icon name={ICON_BY_STATUS[status] as any} size={28} color="#fff" />
+              <Icon name={ICON_BY_STATUS[status]} size={28} color="#fff" />
             </Animated.View>
           ) : (
-            <Icon name={ICON_BY_STATUS[status] as any} size={28} color="#fff" />
+            <Icon name={ICON_BY_STATUS[status]} size={28} color="#fff" />
           )}
         </TouchableOpacity>
 
-        {label !== '' && (
-          <Text style={styles.label}>{label}</Text>
-        )}
+        {label !== '' && <Text style={styles.label}>{label}</Text>}
       </View>
     </>
   );
