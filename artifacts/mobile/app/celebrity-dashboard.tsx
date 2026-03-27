@@ -246,6 +246,14 @@ export default function CelebrityDashboardScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Celebrity Dashboard</Text>
+        <TouchableOpacity
+          onPress={() => router.replace('/(tabs)')}
+          activeOpacity={0.8}
+          style={styles.headerDashBtn}
+        >
+          <Icon name="home" size={14} color="#fff" />
+          <Text style={styles.headerDashBtnText}>User Dashboard</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -313,14 +321,6 @@ export default function CelebrityDashboardScreen() {
         </View>
       </ScrollView>
 
-      <TouchableOpacity
-        style={[styles.fab, { bottom: bottomPad + 16 }]}
-        onPress={() => router.replace('/(tabs)')}
-        activeOpacity={0.85}
-      >
-        <Icon name="home" size={18} color="#fff" />
-        <Text style={styles.fabText}>Go to User Dashboard</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -1983,6 +1983,6 @@ const styles = StyleSheet.create({
   toggleBtn: { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', minWidth: 52 },
   ratingBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   ratingBarFill: { height: 8, backgroundColor: '#F59E0B', borderRadius: 4 },
-  fab: { position: 'absolute', right: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B33', borderRadius: 99, paddingHorizontal: 18, paddingVertical: 13, gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 6 },
-  fabText: { color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 14 },
+  headerDashBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FF6B33', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 },
+  headerDashBtnText: { color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 12 },
 });
