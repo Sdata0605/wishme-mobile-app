@@ -243,9 +243,7 @@ export function VoiceAssistantButton() {
 
   useSpeechRecognitionEvent('result', (event) => {
     const transcript = event.results?.[0]?.transcript ?? '';
-    if (transcript && !event.isFinal === false) {
-      handleTranscript(transcript);
-    } else if (transcript && event.isFinal) {
+    if (transcript) {
       handleTranscript(transcript);
     }
   });
