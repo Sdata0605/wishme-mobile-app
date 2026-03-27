@@ -307,7 +307,7 @@ export default function CelebrityDashboardScreen() {
           </ScrollView>
         </View>
 
-        <View style={{ paddingBottom: bottomPad + 80 }}>
+        <View style={{ paddingBottom: bottomPad + 24 }}>
           {activeTab === 'bookings' && <BookingsTab celebrity={celebrity} colors={colors} session={session} />}
           {activeTab === 'wallet' && <WalletTab celebrity={celebrity} colors={colors} session={session} user={user} onRefreshCeleb={fetchCelebrity} />}
           {activeTab === 'messages' && <MessagesTab celebrity={celebrity} colors={colors} session={session} user={user} />}
