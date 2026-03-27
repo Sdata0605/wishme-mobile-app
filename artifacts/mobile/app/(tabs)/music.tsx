@@ -962,12 +962,13 @@ function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
     try {
       const payload: Record<string, unknown> = {
         song_title: songTitle.trim() || 'Untitled',
-        song_type: songType,
+        generation_type: songType === 'full' ? 'with_lyrics' : 'instrumental',
         genre,
         mood,
+        prompt: description.trim() || songTitle.trim() || `${genre} ${mood}`,
       };
       if (songType === 'full') {
-        payload.voice_gender = voiceGender;
+        payload.voice_type = voiceGender.toLowerCase();
         payload.language = language;
         if (lyrics.trim()) payload.lyrics = lyrics.trim();
       } else {
@@ -979,19 +980,10 @@ function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
         body: JSON.stringify(payload),
       }, ctx.session?.access_token);
 
-      const data = await res.json() as { success: boolean; task_id?: string; audio_url?: string; error?: string };
-      if (!data.success) throw new Error(data.error ?? 'Generation failed');
+      const data = await res.json() as { generation_id?: string; task_id?: string; status?: string; error?: string };
+      if (!res.ok || !data.generation_id) throw new Error(data.error ?? 'Generation failed — no generation ID returned');
 
-      if (data.audio_url) {
-        setAudioUrl(data.audio_url);
-        ctx.refreshWallet();
-        stopProgressCycling();
-        setGen(false);
-        return;
-      }
-
-      if (!data.task_id) throw new Error('No task ID returned');
-      const taskId = data.task_id;
+      const generationId = data.generation_id;
 
       await new Promise<void>(resolve => setTimeout(resolve, 10000));
 
@@ -1004,13 +996,13 @@ function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
           try {
             const statusRes = await supabaseFetch('/functions/v1/check-music-status', {
               method: 'POST',
-              body: JSON.stringify({ task_id: taskId }),
+              body: JSON.stringify({ generation_id: generationId }),
             }, ctx.session?.access_token);
-            const statusData = await statusRes.json() as { status: string; audio_url?: string; error?: string };
-            if (statusData.status === 'completed' && statusData.audio_url) {
+            const statusData = await statusRes.json() as { status: string; song_url?: string; download_url?: string; error?: string };
+            if (statusData.status === 'completed' && (statusData.song_url || statusData.download_url)) {
               if (pollingRef.current) clearInterval(pollingRef.current);
               pollingRef.current = null;
-              setAudioUrl(statusData.audio_url);
+              setAudioUrl(statusData.song_url ?? statusData.download_url ?? '');
               ctx.refreshWallet();
               resolve();
             } else if (statusData.status === 'failed') {
