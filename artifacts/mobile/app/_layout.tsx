@@ -7,7 +7,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack } from 'expo-router';
+import { Stack, useSegments } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
@@ -29,6 +29,21 @@ import { AIAssistantProvider } from '@/context/AIAssistantContext';
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
+
+const HIDDEN_SEGMENTS = new Set(['(auth)', 'onboarding']);
+
+function FloatingButtons() {
+  const segments = useSegments();
+  if (HIDDEN_SEGMENTS.has(segments[0] as string)) return null;
+  return (
+    <>
+      <DraggableMoreButton />
+      <AIChatButton />
+      <AIChatSheet />
+      <VoiceAssistantButton />
+    </>
+  );
+}
 
 function RootLayoutNav() {
   return (
@@ -108,10 +123,7 @@ export default function RootLayout() {
                   <DrawerProvider>
                     <View style={{ flex: 1 }}>
                       <RootLayoutNav />
-                      <DraggableMoreButton />
-                      <AIChatButton />
-                      <AIChatSheet />
-                      <VoiceAssistantButton />
+                      <FloatingButtons />
                     </View>
                   </DrawerProvider>
                 </AIAssistantProvider>
