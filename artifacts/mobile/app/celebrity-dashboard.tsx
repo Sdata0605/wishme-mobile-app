@@ -2,7 +2,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -493,6 +494,46 @@ function BookingsTab({ celebrity, colors, session }: TabProps) {
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
+  useEffect(() => {
+    if (!session?.access_token) return;
+    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
+    let ws: WebSocket | null = null;
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let ref = 0;
+    const send = (msg: object) => { try { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); } catch {} };
+    const join = (table: string) => {
+      send({
+        topic: `realtime:public:${table}`,
+        event: 'phx_join',
+        payload: {
+          config: {
+            broadcast: { ack: false, self: false },
+            postgres_changes: [{ event: '*', schema: 'public', table, filter: `celebrity_id=eq.${celebrity.id}` }],
+          },
+          access_token: session.access_token,
+        },
+        ref: String(++ref),
+      });
+    };
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        join('bookings');
+        join('image_promotions');
+        heartbeat = setInterval(() => { send({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) }); }, 30000);
+      };
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data as string);
+          if (msg.event === 'postgres_changes') fetchBookings();
+        } catch {}
+      };
+      ws.onerror = () => {};
+    } catch {}
+    return () => { if (heartbeat) clearInterval(heartbeat); ws?.close(); };
+  }, [celebrity.id, session?.access_token, fetchBookings]);
+
   const updateStatus = async (id: string, status: string) => {
     setActing(id);
     try {
@@ -621,6 +662,9 @@ interface WalletTx {
   id: string;
   transaction_type: string;
   amount: number;
+  gross_amount?: number;
+  tds_amount?: number;
+  tds_percentage?: number;
   status: string;
   description: string;
   created_at: string;
@@ -642,14 +686,28 @@ function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: TabProp
     if (!session?.access_token) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [bkRes, prRes, txRes] = await Promise.all([
+      const [bkRes, prRes, txRes, ipRes] = await Promise.all([
         supabaseFetch(`/rest/v1/bank_details?user_id=eq.${user?.profileId}&order=created_at.desc`, {}, session.access_token),
         supabaseFetch(`/rest/v1/payout_requests?celebrity_id=eq.${celebrity.id}&order=requested_at.desc&limit=20`, {}, session.access_token),
-        supabaseFetch(`/rest/v1/celebrity_wallet_transactions?celebrity_id=eq.${celebrity.id}&order=created_at.desc&limit=30`, {}, session.access_token),
+        supabaseFetch(`/rest/v1/celebrity_wallet_transactions?celebrity_id=eq.${celebrity.id}&order=created_at.desc&limit=50`, {}, session.access_token),
+        supabaseFetch(`/rest/v1/image_promotions?celebrity_id=eq.${celebrity.id}&status=eq.completed&order=created_at.desc&limit=50`, {}, session.access_token),
       ]);
       if (bkRes.ok) { const r = await bkRes.json() as BankDetail[]; setBanks(r ?? []); if (r?.length > 0) setSelectedBank(r[0]); }
       if (prRes.ok) { const r = await prRes.json() as PayoutRequest[]; setPayouts(r ?? []); }
-      if (txRes.ok) { const r = await txRes.json() as WalletTx[]; setTxns(r ?? []); }
+      const walletTxns: WalletTx[] = txRes.ok ? ((await txRes.json() as WalletTx[]) ?? []) : [];
+      const ipRows: ImagePromotion[] = ipRes.ok ? ((await ipRes.json() as ImagePromotion[]) ?? []) : [];
+      const virtualTxns: WalletTx[] = ipRows.map(ip => ({
+        id: `ip-${ip.id}`,
+        transaction_type: 'earning',
+        amount: Math.round((ip.price_paid ?? 0) * 0.7),
+        status: 'completed',
+        description: 'Image promotion commission',
+        created_at: ip.created_at,
+      }));
+      const merged = [...walletTxns, ...virtualTxns].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+      setTxns(merged);
     } catch {}
     setLoading(false);
   }, [celebrity.id, session?.access_token, user?.profileId]);
@@ -912,6 +970,89 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
 
   useEffect(() => { fetchConvos(); }, [fetchConvos]);
 
+  useEffect(() => {
+    if (!session?.access_token) return;
+    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
+    let ws: WebSocket | null = null;
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let ref = 0;
+    const send = (msg: object) => { try { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); } catch {} };
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        send({
+          topic: `realtime:public:conversations`,
+          event: 'phx_join',
+          payload: {
+            config: {
+              broadcast: { ack: false, self: false },
+              postgres_changes: [{ event: '*', schema: 'public', table: 'conversations', filter: `celebrity_id=eq.${celebrity.id}` }],
+            },
+            access_token: session.access_token,
+          },
+          ref: String(++ref),
+        });
+        heartbeat = setInterval(() => { send({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) }); }, 30000);
+      };
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data as string);
+          if (msg.event === 'postgres_changes') fetchConvos();
+        } catch {}
+      };
+      ws.onerror = () => {};
+    } catch {}
+    return () => { if (heartbeat) clearInterval(heartbeat); ws?.close(); };
+  }, [celebrity.id, session?.access_token, fetchConvos]);
+
+  const activeConvoRef = useRef<Conversation | null>(null);
+  activeConvoRef.current = activeConvo;
+
+  useEffect(() => {
+    if (!activeConvo?.id || !session?.access_token) return;
+    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
+    let ws: WebSocket | null = null;
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let ref = 0;
+    const send = (msg: object) => { try { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); } catch {} };
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        send({
+          topic: `realtime:public:messages`,
+          event: 'phx_join',
+          payload: {
+            config: {
+              broadcast: { ack: false, self: false },
+              postgres_changes: [{ event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${activeConvo.id}` }],
+            },
+            access_token: session.access_token,
+          },
+          ref: String(++ref),
+        });
+        heartbeat = setInterval(() => { send({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) }); }, 30000);
+      };
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data as string);
+          if (msg.event === 'postgres_changes' && activeConvoRef.current) {
+            supabaseFetch(
+              `/rest/v1/messages?conversation_id=eq.${activeConvoRef.current.id}&order=created_at.asc&limit=100`,
+              {},
+              session.access_token,
+            ).then(async res => {
+              if (res.ok) { const r = await res.json() as Message[]; setMessages(r ?? []); }
+            }).catch(() => {});
+          }
+        } catch {}
+      };
+      ws.onerror = () => {};
+    } catch {}
+    return () => { if (heartbeat) clearInterval(heartbeat); ws?.close(); };
+  }, [activeConvo?.id, session?.access_token]);
+
   const openConvo = async (c: Conversation) => {
     setActiveConvo(c);
     setMsgLoading(true);
@@ -967,7 +1108,12 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
         {
           method: 'POST',
           headers: { Prefer: 'return=minimal' } as Record<string, string>,
-          body: JSON.stringify({ conversation_id: activeConvo.id, sender_id: user?.profileId, message_text: reply.trim() }),
+          body: JSON.stringify({
+            conversation_id: activeConvo.id,
+            sender_id: user?.profileId,
+            sender_type: 'celebrity',
+            message_text: reply.trim(),
+          }),
         },
         session.access_token,
       );
@@ -976,6 +1122,11 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
         Alert.alert('Error', err.message ?? `Failed to send message (${res.status})`);
       } else {
         setReply('');
+        await supabaseFetch(
+          `/rest/v1/conversations?id=eq.${activeConvo.id}`,
+          { method: 'PATCH', headers: { Prefer: 'return=minimal' } as Record<string, string>, body: JSON.stringify({ last_message_at: new Date().toISOString() }) },
+          session.access_token,
+        ).catch(() => {});
         await openConvo(activeConvo);
       }
     } catch (err) {
@@ -1114,17 +1265,23 @@ interface CelebEvent {
   event_date: string;
   event_type: string;
   description: string;
+  location?: string;
+  is_public?: boolean;
   status: string;
 }
 
 const EVENT_TYPES = ['concert', 'meetup', 'birthday', 'anniversary', 'launch', 'charity', 'other'] as const;
 
+const EMPTY_EVENT_FORM = { title: '', event_type: '', event_date: '', description: '', location: '', is_public: true };
+
 function EventsTab({ celebrity, colors, session }: TabProps) {
   const [events, setEvents] = useState<CelebEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: '', event_type: '', event_date: '', description: '' });
+  const [editingEvent, setEditingEvent] = useState<CelebEvent | null>(null);
+  const [form, setForm] = useState(EMPTY_EVENT_FORM);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const fetchEvents = useCallback(async () => {
     setLoading(true);
@@ -1141,32 +1298,73 @@ function EventsTab({ celebrity, colors, session }: TabProps) {
 
   useEffect(() => { fetchEvents(); }, [fetchEvents]);
 
-  const createEvent = async () => {
+  const openCreate = () => {
+    setEditingEvent(null);
+    setForm(EMPTY_EVENT_FORM);
+    setShowForm(true);
+  };
+
+  const openEdit = (ev: CelebEvent) => {
+    setEditingEvent(ev);
+    setForm({ title: ev.title, event_type: ev.event_type, event_date: ev.event_date, description: ev.description || '', location: ev.location || '', is_public: ev.is_public ?? true });
+    setShowForm(true);
+  };
+
+  const closeForm = () => { setShowForm(false); setEditingEvent(null); setForm(EMPTY_EVENT_FORM); };
+
+  const saveEvent = async () => {
     if (!form.title || !form.event_type || !form.event_date) { Alert.alert('Fill title, type, and date'); return; }
     if (!session?.access_token) { Alert.alert('Not logged in'); return; }
     setSaving(true);
     try {
+      const isEdit = !!editingEvent;
+      const body = isEdit
+        ? { title: form.title, event_type: form.event_type, event_date: form.event_date, description: form.description, location: form.location, is_public: form.is_public }
+        : { ...form, celebrity_id: celebrity.id };
       const res = await supabaseFetch(
-        '/rest/v1/celebrity_events',
-        {
-          method: 'POST',
-          headers: { Prefer: 'return=minimal' } as Record<string, string>,
-          body: JSON.stringify({ ...form, celebrity_id: celebrity.id }),
-        },
+        isEdit ? `/rest/v1/celebrity_events?id=eq.${editingEvent!.id}` : '/rest/v1/celebrity_events',
+        { method: isEdit ? 'PATCH' : 'POST', headers: { Prefer: 'return=minimal' } as Record<string, string>, body: JSON.stringify(body) },
         session.access_token,
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as Record<string, string>;
-        Alert.alert('Error', err.message ?? `Failed to create event (${res.status})`);
+        Alert.alert('Error', err.message ?? `Failed to save event (${res.status})`);
       } else {
-        setShowForm(false);
-        setForm({ title: '', event_type: '', event_date: '', description: '' });
+        closeForm();
         fetchEvents();
       }
     } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to create event');
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save event');
     }
     setSaving(false);
+  };
+
+  const deleteEvent = (ev: CelebEvent) => {
+    Alert.alert('Delete Event', `Delete "${ev.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          if (!session?.access_token) return;
+          setDeleting(ev.id);
+          try {
+            const res = await supabaseFetch(
+              `/rest/v1/celebrity_events?id=eq.${ev.id}`,
+              { method: 'DELETE', headers: { Prefer: 'return=minimal' } as Record<string, string> },
+              session.access_token,
+            );
+            if (!res.ok) {
+              const err = await res.json().catch(() => ({})) as Record<string, string>;
+              Alert.alert('Error', err.message ?? `Failed to delete event (${res.status})`);
+            } else {
+              fetchEvents();
+            }
+          } catch (err) {
+            Alert.alert('Error', err instanceof Error ? err.message : 'Failed to delete event');
+          }
+          setDeleting(null);
+        },
+      },
+    ]);
   };
 
   if (loading) return <LoadingBox />;
@@ -1175,13 +1373,14 @@ function EventsTab({ celebrity, colors, session }: TabProps) {
     <View style={styles.tabPad}>
       <View style={styles.rowBetween}>
         <SectionTitle text={`Events (${events.length})`} colors={colors} />
-        <TouchableOpacity onPress={() => setShowForm(v => !v)} style={{ padding: 4 }}>
+        <TouchableOpacity onPress={showForm ? closeForm : openCreate} style={{ padding: 4 }}>
           <Icon name={showForm ? 'x' : 'plus'} size={22} color="#FF6B33" />
         </TouchableOpacity>
       </View>
 
       {showForm && (
         <Card colors={colors}>
+          <Text style={[styles.cardTitle, { color: colors.foreground, marginBottom: 12 }]}>{editingEvent ? 'Edit Event' : 'New Event'}</Text>
           <InputRow label="Title" value={form.title} onChangeText={(v) => setForm(p => ({ ...p, title: v }))} colors={colors} />
           <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Event Type</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
@@ -1196,8 +1395,18 @@ function EventsTab({ celebrity, colors, session }: TabProps) {
             ))}
           </ScrollView>
           <InputRow label="Event Date (YYYY-MM-DD)" value={form.event_date} onChangeText={(v) => setForm(p => ({ ...p, event_date: v }))} colors={colors} />
+          <InputRow label="Location" value={form.location} onChangeText={(v) => setForm(p => ({ ...p, location: v }))} colors={colors} />
           <InputRow label="Description" value={form.description} onChangeText={(v) => setForm(p => ({ ...p, description: v }))} colors={colors} multiline />
-          <PrimaryBtn label="Create Event" onPress={createEvent} loading={saving} colors={colors} />
+          <View style={[styles.rowBetween, { marginBottom: 16 }]}>
+            <Text style={[styles.inputLabel, { color: colors.mutedForeground, marginBottom: 0 }]}>Public Event</Text>
+            <Switch
+              value={form.is_public}
+              onValueChange={(v) => setForm(p => ({ ...p, is_public: v }))}
+              trackColor={{ false: colors.border, true: '#FF6B33' }}
+              thumbColor="#fff"
+            />
+          </View>
+          <PrimaryBtn label={editingEvent ? 'Save Changes' : 'Create Event'} onPress={saveEvent} loading={saving} colors={colors} />
         </Card>
       )}
 
@@ -1210,10 +1419,28 @@ function EventsTab({ celebrity, colors, session }: TabProps) {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: colors.foreground }]}>{ev.title}</Text>
                 {ev.description ? <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{ev.description}</Text> : null}
+                {ev.location ? <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>📍 {ev.location}</Text> : null}
               </View>
-              <StatusBadge status={ev.event_type} />
+              <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                <StatusBadge status={ev.event_type} />
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <TouchableOpacity onPress={() => openEdit(ev)} style={{ padding: 4 }}>
+                    <Icon name="edit-2" size={15} color="#3B82F6" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => deleteEvent(ev)} disabled={deleting === ev.id} style={{ padding: 4 }}>
+                    {deleting === ev.id
+                      ? <ActivityIndicator size="small" color="#EF4444" />
+                      : <Icon name="trash-2" size={15} color="#EF4444" />}
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
-            <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{fmtDate(ev.event_date)}</Text>
+            <View style={[styles.rowBetween, { marginTop: 4 }]}>
+              <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{fmtDate(ev.event_date)}</Text>
+              {ev.is_public === false && (
+                <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_400Regular' }}>Private</Text>
+              )}
+            </View>
           </Card>
         ))
       )}
@@ -1242,13 +1469,12 @@ function ConsentTab({ celebrity, colors, session, onRefresh }: TabPropsWithRefre
     setUploading(true);
     try {
       const ts = Date.now();
-      const safeName = celebrity.name.replace(/\s+/g, '_').toLowerCase();
-      const photoPath = `${safeName}/avatar/${ts}-consent.jpg`;
-      const videoPath = `${safeName}/promotional/video/${ts}-consent.mp4`;
+      const photoPath = `${celebrity.id}/consent-photo-${ts}.jpg`;
+      const videoPath = `${celebrity.id}/consent-video-${ts}.webm`;
 
       const [photoUrl, videoUrl] = await Promise.all([
-        uploadToStorage('celebrity-avatars', photoPath, photoUri, 'image/jpeg', session.access_token),
-        uploadToStorage('promotional-content', videoPath, videoUri, 'video/mp4', session.access_token),
+        uploadToStorage('verification-docs', photoPath, photoUri, 'image/jpeg', session.access_token),
+        uploadToStorage('verification-docs', videoPath, videoUri, 'video/webm', session.access_token),
       ]);
 
       if (!photoUrl || !videoUrl) { Alert.alert('Upload failed. Please try again.'); setUploading(false); return; }
@@ -1258,7 +1484,7 @@ function ConsentTab({ celebrity, colors, session, onRefresh }: TabPropsWithRefre
         {
           method: 'PATCH',
           headers: { Prefer: 'return=minimal' } as Record<string, string>,
-          body: JSON.stringify({ consent_photo_url: photoUrl, consent_video_url: videoUrl, consent_status: 'submitted' }),
+          body: JSON.stringify({ consent_photo_url: photoUrl, consent_video_url: videoUrl, consent_status: 'submitted', consent_given_at: new Date().toISOString() }),
         },
         session.access_token,
       );
@@ -1406,22 +1632,62 @@ interface Follower {
   created_at: string;
   status: string;
   subscription_expires_at?: string | null;
-  profiles?: { first_name: string; last_name: string };
+  profiles?: { first_name: string; last_name: string; email?: string };
 }
 
 function FollowersTab({ celebrity, colors, session }: TabProps) {
   const [followers, setFollowers] = useState<Follower[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    supabaseFetch(
-      `/rest/v1/celebrity_favorites?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name)&order=created_at.desc&limit=50`,
-      {},
-      session?.access_token,
-    ).then(async res => {
+  const fetchFollowers = useCallback(async () => {
+    try {
+      const res = await supabaseFetch(
+        `/rest/v1/celebrity_favorites?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name,email)&order=created_at.desc&limit=50`,
+        {},
+        session?.access_token,
+      );
       if (res.ok) { const r = await res.json() as Follower[]; setFollowers(r ?? []); }
-    }).catch(() => {}).finally(() => setLoading(false));
+    } catch {}
+    setLoading(false);
   }, [celebrity.id, session?.access_token]);
+
+  useEffect(() => { fetchFollowers(); }, [fetchFollowers]);
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
+    let ws: WebSocket | null = null;
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let ref = 0;
+    const send = (msg: object) => { try { if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg)); } catch {} };
+    try {
+      ws = new WebSocket(wsUrl);
+      ws.onopen = () => {
+        send({
+          topic: `realtime:public:celebrity_favorites`,
+          event: 'phx_join',
+          payload: {
+            config: {
+              broadcast: { ack: false, self: false },
+              postgres_changes: [{ event: '*', schema: 'public', table: 'celebrity_favorites', filter: `celebrity_id=eq.${celebrity.id}` }],
+            },
+            access_token: session.access_token,
+          },
+          ref: String(++ref),
+        });
+        heartbeat = setInterval(() => { send({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) }); }, 30000);
+      };
+      ws.onmessage = (evt) => {
+        try {
+          const msg = JSON.parse(evt.data as string);
+          if (msg.event === 'postgres_changes') fetchFollowers();
+        } catch {}
+      };
+      ws.onerror = () => {};
+    } catch {}
+    return () => { if (heartbeat) clearInterval(heartbeat); ws?.close(); };
+  }, [celebrity.id, session?.access_token, fetchFollowers]);
 
   if (loading) return <LoadingBox />;
   if (!followers.length) return <SectionEmpty icon="heart" text="No followers yet" colors={colors} />;
@@ -1440,12 +1706,14 @@ function FollowersTab({ celebrity, colors, session }: TabProps) {
       <SectionTitle text={`Followers (${followers.length})`} colors={colors} />
       {followers.map(f => {
         const fan = f.profiles ? `${f.profiles.first_name ?? ''} ${f.profiles.last_name ?? ''}`.trim() : 'Fan';
+        const email = f.profiles?.email;
         const expiresAt = f.subscription_expires_at ? fmtDate(f.subscription_expires_at) : 'Lifetime';
         return (
           <Card key={f.id} colors={colors}>
             <View style={styles.rowBetween}>
-              <View>
+              <View style={{ flex: 1 }}>
                 <Text style={[styles.cardTitle, { color: colors.foreground }]}>{fan}</Text>
+                {email ? <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{email}</Text> : null}
                 <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>Since {fmtDate(f.created_at)}</Text>
                 <Text style={[styles.cardDate, { color: f.subscription_expires_at ? colors.mutedForeground : '#22C55E' }]}>
                   Expires: {expiresAt}
@@ -1628,7 +1896,7 @@ function TdsTab({ celebrity, colors, session }: TabProps) {
     const { start, end } = fyDateRange(selectedFY);
     try {
       const res = await supabaseFetch(
-        `/rest/v1/celebrity_wallet_transactions?celebrity_id=eq.${celebrity.id}&created_at=gte.${start}&created_at=lte.${end}T23:59:59&order=created_at.desc`,
+        `/rest/v1/celebrity_wallet_transactions?celebrity_id=eq.${celebrity.id}&tds_amount=not.is.null&created_at=gte.${start}&created_at=lte.${end}T23:59:59&order=created_at.desc`,
         {},
         session?.access_token,
       );
@@ -1639,9 +1907,9 @@ function TdsTab({ celebrity, colors, session }: TabProps) {
 
   useEffect(() => { fetchTxns(); }, [fetchTxns]);
 
-  const totalCredited = txns.filter(t => ['credit', 'booking_payment'].includes(t.transaction_type)).reduce((s, t) => s + (t.amount ?? 0), 0);
-  const tds = Math.round(totalCredited * 0.1);
-  const net = totalCredited - tds;
+  const totalGross = txns.reduce((s, t) => s + (t.gross_amount ?? 0), 0);
+  const totalTds = txns.reduce((s, t) => s + (t.tds_amount ?? 0), 0);
+  const totalNet = txns.reduce((s, t) => s + (t.amount ?? 0), 0);
 
   return (
     <View style={styles.tabPad}>
@@ -1663,9 +1931,9 @@ function TdsTab({ celebrity, colors, session }: TabProps) {
         <>
           <Card colors={colors}>
             {[
-              { label: 'Total Credited', value: fmtRupee(totalCredited), color: '#22C55E' },
-              { label: 'Estimated TDS (10%)', value: fmtRupee(tds), color: '#EF4444' },
-              { label: 'Net Payout', value: fmtRupee(net), color: '#3B82F6' },
+              { label: 'Gross Earnings', value: fmtRupee(totalGross), color: '#22C55E' },
+              { label: 'TDS Deducted', value: fmtRupee(totalTds), color: '#EF4444' },
+              { label: 'Net Amount', value: fmtRupee(totalNet), color: '#3B82F6' },
             ].map(row => (
               <View key={row.label} style={[styles.rowBetween, { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
                 <Text style={[styles.cardSub, { color: colors.foreground }]}>{row.label}</Text>
@@ -1673,11 +1941,11 @@ function TdsTab({ celebrity, colors, session }: TabProps) {
               </View>
             ))}
             <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 12 }}>
-              Note: TDS is estimated at 10% on gross payments received during {selectedFY} as per Indian Income Tax Act. Consult a CA for exact filing.
+              Showing actual TDS deducted on transactions for {selectedFY}. Consult a CA for exact tax filing.
             </Text>
             <TouchableOpacity
               onPress={() => {
-                const summary = `WishMe TDS Summary — ${selectedFY}\nTotal Credited: ${fmtRupee(totalCredited)}\nEstimated TDS (10%): ${fmtRupee(tds)}\nNet Payout: ${fmtRupee(net)}\n\nNote: TDS estimated at 10%. Consult a CA for exact filing.`;
+                const summary = `WishMe TDS Summary — ${selectedFY}\nGross Earnings: ${fmtRupee(totalGross)}\nTDS Deducted: ${fmtRupee(totalTds)}\nNet Amount: ${fmtRupee(totalNet)}\nTransactions: ${txns.length}`;
                 Clipboard.setStringAsync(summary).then(() => Alert.alert('Copied', 'TDS summary copied to clipboard!'));
               }}
               style={[styles.copyBtn, { borderColor: colors.border }]}
@@ -1687,9 +1955,9 @@ function TdsTab({ celebrity, colors, session }: TabProps) {
             </TouchableOpacity>
           </Card>
 
-          <SectionTitle text={`Transactions (${txns.length})`} colors={colors} />
+          <SectionTitle text={`TDS Transactions (${txns.length})`} colors={colors} />
           {txns.length === 0 ? (
-            <SectionEmpty icon="trending-up" text={`No transactions in ${selectedFY}`} colors={colors} />
+            <SectionEmpty icon="trending-up" text={`No TDS transactions in ${selectedFY}`} colors={colors} />
           ) : (
             txns.map(t => (
               <Card key={t.id} colors={colors}>
@@ -1698,7 +1966,11 @@ function TdsTab({ celebrity, colors, session }: TabProps) {
                     <Text style={[styles.cardSub, { color: colors.foreground }]} numberOfLines={1}>{t.description || t.transaction_type?.replace(/_/g, ' ')}</Text>
                     <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{fmtDate(t.created_at)}</Text>
                   </View>
-                  <Text style={[styles.priceText, { color: '#22C55E' }]}>{fmtRupee(t.amount)}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ color: '#22C55E', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Gross: {fmtRupee(t.gross_amount ?? 0)}</Text>
+                    <Text style={{ color: '#EF4444', fontFamily: 'Inter_400Regular', fontSize: 12 }}>TDS {t.tds_percentage ?? 0}%: -{fmtRupee(t.tds_amount ?? 0)}</Text>
+                    <Text style={{ color: '#3B82F6', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Net: {fmtRupee(t.amount)}</Text>
+                  </View>
                 </View>
               </Card>
             ))
