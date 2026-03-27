@@ -1,0 +1,790 @@
+Celebrity Dashboard — Complete Tab-by-Tab Technical Documentation for Replit Mobile App
+This covers all 10 tabs of the Celebrity Dashboard (/celebrity-dashboard): their purpose, UI components, data flow, Supabase queries, and API endpoints.
+
+Tab Navigation Structure
+
+┌─────────────────────────────────────────────────────────┐
+│ Content │ Wallet │ Messages │ Events │ Consent │         │
+│ Bookings │ Reviews │ Followers │ TDS │ Profile │         │
+└─────────────────────────────────────────────────────────┘
+Component: <Tabs> with <TabsList> (horizontal scroll on mobile, overflow-x-auto). Each <TabsTrigger> uses flex-shrink-0 text-xs sm:text-sm.
+
+GLOBAL: Stats Overview (Above Tabs)
+Renders 5 stat cards in a grid-cols-2 md:grid-cols-5 grid before the tabs.
+
+Supabase Query (fetchStats):
+
+
+{
+  "table": "bookings",
+  "select": "celebrity_commission, status",
+  "filter": "celebrity_id = eq.{celebrity.id}",
+  "client_side_calc": {
+    "totalEarnings": "SUM(celebrity_commission) WHERE status = 'completed'",
+    "pendingEarnings": "SUM(celebrity_commission) WHERE status IN ('pending', 'in_progress')",
+    "totalBookings": "COUNT(*)",
+    "rating": "celebrity.rating (from celebrities table)",
+    "reviewCount": "celebrity.review_count (from celebrities table)"
+  }
+}
+UI Cards:
+
+Card	Icon	Color	Value Source
+Total Earnings	DollarSign	green-500	stats.totalEarnings
+Pending	Wallet	orange-500	stats.pendingEarnings
+Total Bookings	Users	blue-500	stats.totalBookings
+Rating	Star	yellow-500	stats.rating
+Reviews	TrendingUp	purple-500	stats.reviewCount
+TAB 1: Content
+Purpose: Upload avatar photos and promotional content (photos/videos) for AI processing.
+
+Component: Inline JSX in CelebrityDashboard.tsx (lines 443-543)
+
+UI Layout: grid-cols-1 lg:grid-cols-2 with two Cards.
+
+Card 1 — Avatar Creation
+Shows current avatar (celebrity.image_url) as w-32 h-32 rounded-full
+Dashed upload zone with <Camera> icon
+Hidden <input type="file" accept="image/*" multiple>
+Consent notice: blue-50 background card
+Upload Flow:
+
+
+{
+  "action": "handleAvatarFiles",
+  "steps": [
+    {
+      "step": 1,
+      "operation": "supabase.storage.from('celebrity-avatars').upload(path, file)",
+      "path_format": "{celebrity_name}/avatar/{timestamp}-{filename}"
+    },
+    {
+      "step": 2,
+      "operation": "supabase.storage.from('celebrity-avatars').getPublicUrl(path)",
+      "returns": "publicUrl string"
+    },
+    {
+      "step": 3,
+      "operation": "supabase.from('celebrities').update({ image_url: firstUploadedUrl }).eq('id', celebrity.id)"
+    }
+  ]
+}
+Card 2 — Promotional Content
+Two sub-zones: "Ad Photos" (accept="image/*") and "Video Content" (accept="video/*")
+Upload to promotional-content bucket
+Upload Flow:
+
+
+{
+  "action": "handlePromoFile",
+  "storage_bucket": "promotional-content",
+  "path_format": "{celebrity_name}/promotional/{photo|video}/{timestamp}-{filename}",
+  "operation": "supabase.storage.from('promotional-content').upload(path, file)"
+}
+TAB 2: Wallet
+Purpose: View earnings, commission history, request withdrawals.
+
+Component: <WalletTab celebrityId={celebrity.id} stats={stats} availableBalance={celebrity.available_balance} />
+
+File: src/components/celebrity/WalletTab.tsx
+
+UI Components:
+
+Card x3: Commission History header, Wallet Summary (balance + Withdraw button), Payout Requests list
+Dialog for withdrawal with bank account selection
+Badge for transaction/payout status
+Data Queries:
+1. Fetch Transactions:
+
+
+{
+  "query_1": {
+    "table": "celebrity_wallet_transactions",
+    "select": "*, bookings(id, service_type, final_price, user_id, profiles!bookings_user_id_fkey(first_name, last_name, email))",
+    "filter": "celebrity_id = eq.{celebrityId}",
+    "order": "created_at DESC"
+  },
+  "query_2": {
+    "table": "image_promotions",
+    "select": "id, price_paid, status, created_at, concept, profiles!image_promotions_user_id_fkey(first_name, last_name, email)",
+    "filter": "celebrity_id = eq.{celebrityId} AND status = eq.completed",
+    "order": "created_at DESC"
+  },
+  "merge": "Both arrays merged, sorted by created_at DESC. Image promotions mapped as virtual wallet transactions with 70% commission."
+}
+Response Shape (celebrity_wallet_transactions row):
+
+
+{
+  "id": "uuid",
+  "amount": 700,
+  "commission_percentage": 70,
+  "platform_fee": 300,
+  "status": "completed",
+  "created_at": "2025-01-15T10:00:00Z",
+  "booking_id": "uuid",
+  "description": "Video booking commission",
+  "transaction_type": "earning",
+  "gross_amount": 1000,
+  "tds_amount": 70,
+  "tds_percentage": 10,
+  "bookings": {
+    "id": "uuid",
+    "service_type": "video_wish",
+    "final_price": 1000,
+    "user_id": "uuid",
+    "profiles": {
+      "first_name": "John",
+      "last_name": "Doe",
+      "email": "john@example.com"
+    }
+  }
+}
+2. Fetch Payout Requests:
+
+
+{
+  "table": "payout_requests",
+  "select": "id, requested_amount, status, requested_at, processed_at, admin_notes",
+  "filter": "celebrity_id = eq.{celebrityId}",
+  "order": "requested_at DESC",
+  "limit": 10
+}
+3. Submit Withdrawal:
+
+
+{
+  "action": "handleWithdraw",
+  "step_1_insert": {
+    "table": "payout_requests",
+    "payload": {
+      "celebrity_id": "uuid",
+      "profile_id": "uuid",
+      "requested_amount": 5000,
+      "bank_account_number": "1234567890",
+      "bank_name": "HDFC Bank",
+      "ifsc_code": "HDFC0001234",
+      "account_holder_name": "Celebrity Name",
+      "status": "pending"
+    }
+  },
+  "step_2_update": {
+    "table": "celebrities",
+    "set": { "available_balance": "Math.max(0, currentBalance - amount)" },
+    "filter": "id = eq.{celebrityId}"
+  }
+}
+4. Load Bank Details (for withdraw dialog):
+
+
+{
+  "table": "bank_details",
+  "select": "*",
+  "filter": "user_id = eq.{profile.id}",
+  "order": "is_default DESC"
+}
+TAB 3: Messages
+Purpose: Chat with fans, toggle AI Auto-Reply, manually trigger AI responses.
+
+Component: <MessagesTab celebrityId={celebrity.id} />
+
+File: src/components/celebrity/MessagesTab.tsx
+
+UI Layout:
+
+Split panel: left = conversation list, right = chat thread
+Mobile: slide-over (showChat state toggles between list and chat)
+Switch toggle for AI Auto-Reply with Bot icon
+Button "Generate AI Reply" calls celebrity-ai-message edge function
+Data Queries:
+1. Fetch AI Settings:
+
+
+{
+  "table": "celebrity_settings",
+  "select": "ai_auto_reply_enabled, auto_reply_enabled",
+  "filter": "celebrity_id = eq.{celebrityId}",
+  "method": "maybeSingle()"
+}
+2. Toggle AI Auto-Reply:
+
+
+{
+  "table": "celebrity_settings",
+  "operation": "upsert",
+  "payload": {
+    "celebrity_id": "uuid",
+    "ai_auto_reply_enabled": true,
+    "auto_reply_enabled": true
+  },
+  "onConflict": "celebrity_id"
+}
+3. Fetch Conversations:
+
+
+{
+  "query_1": {
+    "table": "conversations",
+    "select": "*",
+    "filter": "celebrity_id = eq.{celebrityId}",
+    "order": "last_message_at DESC"
+  },
+  "query_2": {
+    "table": "profiles",
+    "select": "id, first_name, last_name",
+    "filter": "id IN (userIds from conversations)"
+  },
+  "merge": "Enrich each conversation with user_first_name, user_last_name"
+}
+4. Fetch Messages:
+
+
+{
+  "table": "messages",
+  "select": "*",
+  "filter": "conversation_id = eq.{conversationId}",
+  "order": "created_at ASC",
+  "post_action": [
+    "UPDATE messages SET is_read=true WHERE conversation_id={id} AND sender_type='user'",
+    "UPDATE conversations SET unread_count_celebrity=0 WHERE id={id}"
+  ]
+}
+Message Row Shape:
+
+
+{
+  "id": "uuid",
+  "conversation_id": "uuid",
+  "sender_id": "uuid (profile.id)",
+  "sender_type": "user | celebrity",
+  "message_text": "Hello! I'm a big fan",
+  "is_read": false,
+  "is_ai_generated": false,
+  "created_at": "2025-01-15T10:00:00Z"
+}
+5. Send Message (Celebrity manually):
+
+
+{
+  "table": "messages",
+  "operation": "insert",
+  "payload": {
+    "conversation_id": "uuid",
+    "sender_id": "profile.id",
+    "sender_type": "celebrity",
+    "message_text": "Thank you for your support!",
+    "is_ai_generated": false
+  },
+  "post_action": "UPDATE conversations SET last_message_at=now() WHERE id={conversationId}"
+}
+6. Generate AI Reply (Manual button):
+
+
+{
+  "edge_function": "celebrity-ai-message",
+  "method": "POST",
+  "url": "https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/celebrity-ai-message",
+  "headers": {
+    "Authorization": "Bearer {session.access_token}",
+    "apikey": "{SUPABASE_ANON_KEY}"
+  },
+  "payload": {
+    "conversationId": "uuid",
+    "userMessage": "Last message text from fan"
+  },
+  "response": {
+    "success": true,
+    "message": "AI reply inserted into messages table"
+  }
+}
+7. Realtime Subscriptions:
+
+
+{
+  "channel_1": {
+    "name": "celeb-conversations-{celebrityId}",
+    "table": "conversations",
+    "filter": "celebrity_id=eq.{celebrityId}",
+    "event": "*",
+    "action": "refetch conversation list"
+  },
+  "channel_2": {
+    "name": "celeb-messages-{conversationId}",
+    "table": "messages",
+    "filter": "conversation_id=eq.{conversationId}",
+    "event": "INSERT",
+    "action": "append new message, dedupe by id, auto-scroll, mark user messages as read"
+  }
+}
+TAB 4: Events
+Purpose: Manage celebrity events (concerts, meetups, appearances) and media gallery.
+
+Component: <CelebrityContentManager />
+
+File: src/components/celebrity/CelebrityContentManager.tsx
+
+UI Components:
+
+Events list with Edit/Trash2 buttons per row
+Dialog for add/edit event form (title, date, type, location, description, is_public)
+Media gallery grid with Dialog for upload (title, type, avatar/promo flags, file)
+Data Queries:
+1. Fetch Celebrity + Events + Media:
+
+
+{
+  "query_1": {
+    "table": "celebrities",
+    "select": "*",
+    "filter": "profile_id = eq.{profile.id}",
+    "method": "maybeSingle()"
+  },
+  "query_2": {
+    "table": "celebrity_events",
+    "select": "*",
+    "filter": "celebrity_id = eq.{celebrity.id}",
+    "order": "event_date DESC"
+  },
+  "query_3": {
+    "table": "celebrity_media",
+    "select": "*",
+    "filter": "celebrity_id = eq.{celebrity.id}",
+    "order": "created_at DESC"
+  }
+}
+2. Save Event (Insert or Update):
+
+
+{
+  "insert": {
+    "table": "celebrity_events",
+    "payload": {
+      "celebrity_id": "uuid",
+      "title": "Fan Meetup 2025",
+      "description": "Annual fan gathering",
+      "event_date": "2025-06-15",
+      "event_type": "meetup",
+      "location": "Mumbai",
+      "is_public": true
+    }
+  },
+  "update": {
+    "table": "celebrity_events",
+    "set": "same fields",
+    "filter": "id = eq.{event.id}"
+  }
+}
+Event Types: concert, meetup, appearance, charity, other
+
+3. Delete Event:
+
+
+{
+  "table": "celebrity_events",
+  "operation": "delete",
+  "filter": "id = eq.{event.id}"
+}
+4. Upload Media:
+
+
+{
+  "step_1": {
+    "operation": "supabase.storage.from('celebrity-media').upload(path, file)",
+    "path_format": "celebrity-{id}/{timestamp}-{filename}"
+  },
+  "step_2": {
+    "table": "celebrity_media",
+    "operation": "insert",
+    "payload": {
+      "celebrity_id": "uuid",
+      "title": "Behind the scenes",
+      "media_type": "image | video | audio",
+      "file_url": "public URL from step 1",
+      "is_avatar_content": false,
+      "is_promotional": true,
+      "is_public": true,
+      "consent_recorded": true
+    }
+  }
+}
+TAB 5: Consent
+Purpose: Capture live photo + video consent for legal verification before the celebrity profile goes public.
+
+Component: <ConsentCapture celebrityId={celebrity.id} onConsentSubmitted={fetchCelebrityData} />
+
+File: src/components/celebrity/ConsentCapture.tsx
+
+UI Flow:
+
+Step 1 — Photo: Opens camera via getUserMedia({ video: true }), renders in <video> element, draws frame to <canvas>, creates JPEG data URL
+Step 2 — Video: Opens camera+mic via getUserMedia({ video: true, audio: true }), records using MediaRecorder (webm/mp4), user reads the consent statement aloud
+Submit: Uploads both to Supabase Storage and updates celebrity record
+Consent Text (displayed to read aloud):
+
+"I, hereby give my consent to use my image, voice, and likeness for promotional purposes on this platform..."
+
+Upload Flow:
+
+
+{
+  "step_1_photo": {
+    "operation": "supabase.storage.from('verification-docs').upload(path, photoBlob)",
+    "path_format": "{celebrityId}/consent-photo-{timestamp}.jpg",
+    "content_type": "image/jpeg"
+  },
+  "step_2_video": {
+    "operation": "supabase.storage.from('verification-docs').upload(path, videoBlob)",
+    "path_format": "{celebrityId}/consent-video-{timestamp}.webm",
+    "content_type": "video/webm"
+  },
+  "step_3_update": {
+    "table": "celebrities",
+    "set": {
+      "consent_status": "submitted",
+      "consent_photo_url": "publicUrl of photo",
+      "consent_video_url": "publicUrl of video",
+      "consent_given_at": "new Date().toISOString()"
+    },
+    "filter": "id = eq.{celebrityId}"
+  }
+}
+Consent Status Values: pending → submitted → approved (by admin) or rejected
+
+Post-Submit UI: Shows Badge with status + submission date. If approved, green badge. If submitted, secondary badge "Pending Review".
+
+TAB 6: Bookings
+Purpose: View all orders placed by users — video bookings and image promotions.
+
+Component: <BookingsTab celebrityId={celebrity.id} />
+
+File: src/components/celebrity/BookingsTab.tsx
+
+UI Components:
+
+Single Card with two sections: Video Bookings list, Image Promotions list
+Each row: service icon, customer name, price, status Badge, "View" Button
+Two Dialog components: booking details and promotion details
+B2VideoPlayer for video playback in booking dialog
+Data Queries:
+1. Fetch Bookings:
+
+
+{
+  "table": "bookings",
+  "select": "*, profiles!bookings_user_id_fkey(first_name, last_name, email, phone)",
+  "filter": "celebrity_id = eq.{celebrityId}",
+  "order": "created_at DESC"
+}
+Booking Row Shape:
+
+
+{
+  "id": "uuid",
+  "service_type": "video_wish | greeting_card | text_message | image_promotion | ugc_video | photo_wish",
+  "final_price": 999,
+  "status": "pending | in_progress | completed | cancelled",
+  "created_at": "2025-01-15T10:00:00Z",
+  "delivery_date": "2025-01-17T10:00:00Z",
+  "message": "{\"recipientName\":\"Mom\",\"occasion\":\"Birthday\"}",
+  "instructions": "Please mention her dog Max",
+  "commission_percentage": 70,
+  "celebrity_commission": 699,
+  "platform_fee": 300,
+  "video_url": "https://...",
+  "heygen_video_id": "heygen-uuid",
+  "video_file_key": "b2-key",
+  "video_status": "pending | processing | completed | failed",
+  "card_url": "https://...",
+  "generated_card_image_url": "https://...",
+  "profiles": {
+    "first_name": "John",
+    "last_name": "Doe",
+    "email": "john@example.com",
+    "phone": "+919876543210"
+  }
+}
+2. Fetch Image Promotions:
+
+
+{
+  "table": "image_promotions",
+  "select": "*, profiles!image_promotions_user_id_fkey(first_name, last_name, email, phone)",
+  "filter": "celebrity_id = eq.{celebrityId}",
+  "order": "created_at DESC"
+}
+3. Realtime Subscriptions:
+
+
+{
+  "channel_1": {
+    "table": "bookings",
+    "filter": "celebrity_id=eq.{celebrityId}",
+    "event": "*",
+    "action": "refetch all orders"
+  },
+  "channel_2": {
+    "table": "image_promotions",
+    "filter": "celebrity_id=eq.{celebrityId}",
+    "event": "*",
+    "action": "refetch all orders"
+  }
+}
+Service Type Icons:
+
+service_type	Icon	Component
+video_wish	Video	lucide-react
+greeting_card	FileText	lucide-react
+image_promotion	Image	lucide-react
+default	Eye	lucide-react
+TAB 7: Reviews
+Purpose: View customer ratings and written reviews.
+
+Component: <ReviewsTab celebrityId={celebrity.id} />
+
+File: src/components/celebrity/ReviewsTab.tsx
+
+UI Components:
+
+Card 1: Rating Summary — large 4.5 number + 5-star display + review count
+Card 2: Customer Reviews list — each with name, stars, service type badge, date, review text
+Data Queries:
+1. Fetch Reviews:
+
+
+{
+  "query_1": {
+    "table": "celebrity_reviews",
+    "select": "*, bookings:booking_id(service_type)",
+    "filter": "celebrity_id = eq.{celebrityId}",
+    "order": "created_at DESC"
+  },
+  "query_2": {
+    "table": "profiles",
+    "select": "id, first_name, last_name",
+    "filter": "id IN (unique user_ids from reviews)"
+  }
+}
+Review Row Shape:
+
+
+{
+  "id": "uuid",
+  "celebrity_id": "uuid",
+  "user_id": "uuid",
+  "booking_id": "uuid",
+  "rating": 5,
+  "review_text": "Amazing experience! The video was perfect.",
+  "created_at": "2025-01-15T10:00:00Z",
+  "bookings": {
+    "service_type": "video_wish"
+  }
+}
+Client-Side Calculation:
+
+
+{
+  "averageRating": "SUM(rating) / COUNT(reviews), rounded to 1 decimal",
+  "starRendering": "Array.from({length: 5}), filled yellow-400 if index < rating, else gray-300"
+}
+TAB 8: Followers
+Purpose: View all users who have subscribed/followed the celebrity.
+
+Component: <FollowersTab celebrityId={celebrity.id} />
+
+File: src/components/celebrity/FollowersTab.tsx
+
+UI Components:
+
+Stats Card: total follower count with Users icon
+Table: Avatar, Name, Email, Status Badge, Followed On date, Expires date
+Data Query:
+
+{
+  "table": "celebrity_favorites",
+  "select": "*, profiles:user_id(first_name, last_name, email, avatar_url)",
+  "filter": "celebrity_id = eq.{celebrityId}",
+  "order": "created_at DESC"
+}
+Follower Row Shape:
+
+
+{
+  "id": "uuid",
+  "user_id": "uuid",
+  "celebrity_id": "uuid",
+  "status": "active | expired",
+  "created_at": "2025-01-15T10:00:00Z",
+  "subscription_start_date": "2025-01-15",
+  "subscription_expires_at": "2026-01-15T00:00:00Z",
+  "profiles": {
+    "first_name": "Fan",
+    "last_name": "User",
+    "email": "fan@example.com",
+    "avatar_url": "https://..."
+  }
+}
+Realtime Subscription:
+
+
+{
+  "channel": "celebrity-followers",
+  "table": "celebrity_favorites",
+  "filter": "celebrity_id=eq.{celebrityId}",
+  "event": "*",
+  "action": "refetch followers list"
+}
+TAB 9: TDS (Tax Deducted at Source)
+Purpose: View TDS deductions on earnings for Indian tax compliance.
+
+Component: <TDSReportsTab />
+
+File: src/components/celebrity/TDSReportsTab.tsx
+
+Hook: useTDSReports() from src/hooks/useTDSReports.ts
+
+UI Components:
+
+Financial year Select dropdown (generates last 3 FYs dynamically)
+"Download PDF" Button (placeholder)
+3 Summary Cards: Gross Earnings (IndianRupee icon), TDS Deducted (TrendingDown), Net Amount (Receipt)
+TDSTransactionTable component with columns: Date, Description, Gross Amount, TDS %, TDS Deducted, Net Amount
+Tax Filing Info card with bullet points
+Data Flow:
+
+{
+  "step_1": {
+    "table": "celebrities",
+    "select": "id",
+    "filter": "profile_id = eq.{profile.id}",
+    "method": "single()",
+    "purpose": "Get celebrity_id from logged-in user"
+  },
+  "step_2": {
+    "table": "celebrity_wallet_transactions",
+    "select": "*",
+    "filter": [
+      "celebrity_id = eq.{celebrity.id}",
+      "tds_amount IS NOT NULL"
+    ],
+    "order": "created_at DESC",
+    "optional_filters": [
+      "created_at >= startDate",
+      "created_at <= endDate"
+    ]
+  }
+}
+TDS Transaction Row Shape:
+
+
+{
+  "id": "uuid",
+  "celebrity_id": "uuid",
+  "created_at": "2025-01-15T10:00:00Z",
+  "gross_amount": 1000,
+  "tds_percentage": 10,
+  "tds_amount": 100,
+  "amount": 900,
+  "description": "Video booking commission",
+  "booking_id": "uuid"
+}
+Stats Calculation (client-side):
+
+
+{
+  "totalGrossAmount": "SUM(gross_amount)",
+  "totalTDSDeducted": "SUM(tds_amount)",
+  "totalNetAmount": "SUM(amount)",
+  "transactionCount": "COUNT(*)"
+}
+TAB 10: Profile
+Purpose: Read-only view of celebrity personal info, service pricing, social media links, and password change.
+
+Component: Inline JSX in CelebrityDashboard.tsx (lines 563-858)
+
+UI Layout: Two Cards stacked.
+
+Card 1 — Personal Information
+Read-only <input> fields (all have bg-muted readOnly):
+
+Field	Source
+First Name	profile.first_name
+Last Name	profile.last_name
+Email	profile.email
+Phone	profile.phone
+Celebrity Name	celebrity.name
+Category	celebrity.category
+Date of Birth	celebrity.date_of_birth
+Anniversary Date	celebrity.anniversary_date
+Bio	celebrity.bio (textarea, 4 rows)
+Service Pricing Section (below a border-t divider):
+
+Field	Source
+General Wish Price	celebrity.service_prices.general_wish
+Text Message Price	celebrity.service_prices.text_message
+Image Promotion Price	celebrity.service_prices.image_promotion
+Video Promotion Price	celebrity.service_prices.video_promotion
+Commission %	celebrity.commission_percentage (default 70)
+Delivery Time	celebrity.delivery_time (default "24 hours")
+Social Media Section (conditional, if celebrity.social_media exists): Fields: instagram, youtube, twitter, tiktok, facebook, linkedin, website, portfolio, other
+
+service_prices JSON shape in celebrities table:
+
+
+{
+  "general_wish": 999,
+  "text_message": 499,
+  "image_promotion": 1499,
+  "video_promotion": 2999
+}
+social_media JSON shape:
+
+
+{
+  "instagram": "https://instagram.com/celeb",
+  "youtube": "https://youtube.com/celeb",
+  "twitter": "@celeb",
+  "facebook": "https://facebook.com/celeb"
+}
+Card 2 — Change Password
+UI: Two password inputs + "Change Password" button.
+
+Validation: Passwords must match, minimum 6 characters.
+
+API Call:
+
+
+{
+  "method": "supabase.auth.updateUser({ password: newPassword })",
+  "wrapped_by": "useAuth().changePassword(newPassword)",
+  "response": {
+    "success": { "error": null },
+    "failure": { "error": { "message": "..." } }
+  }
+}
+Complete Supabase Tables Used Across All Tabs
+
+celebrities              → Core celebrity data, balance, consent
+celebrity_wallet_transactions → Commission earnings with TDS
+celebrity_settings       → AI auto-reply toggle
+celebrity_events         → Event management
+celebrity_media          → Media gallery
+celebrity_reviews        → Customer ratings
+celebrity_favorites      → Follower/subscription records
+bookings                 → Service orders
+image_promotions         → Image ad orders
+payout_requests          → Withdrawal requests
+bank_details             → Bank accounts for withdrawals
+conversations            → Chat threads
+messages                 → Individual chat messages
+profiles                 → User identity data
+Storage Buckets Used
+Bucket	Purpose
+celebrity-avatars	Avatar photos for AI processing
+promotional-content	Ad photos and videos
+verification-docs	Consent photo + video
+celebrity-media	Gallery media uploads
+Edge Functions Used
+Function	Tab	Purpose
+celebrity-ai-message	Messages	Generate AI reply on-demand
+celebrity-conversation-auto-reply	Messages	Automatic AI reply (triggered by DB/realtime)
+This covers every tab's complete UI structure, data flow, queries, payloads, and response shapes for Replit mobile implementation.
