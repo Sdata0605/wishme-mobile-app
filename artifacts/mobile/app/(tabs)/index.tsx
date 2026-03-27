@@ -462,13 +462,7 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
-      {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.primary }]}
-        onPress={() => router.push('/messages')}
-      >
-        <Icon name="zap" size={24} color="#fff" />
-      </TouchableOpacity>
+
     </View>
   );
 }
@@ -545,5 +539,4 @@ const styles = StyleSheet.create({
   referralSub: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontFamily: 'Inter_400Regular' },
   referralBtn: { backgroundColor: 'rgba(255,255,255,0.25)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 9999 },
   referralBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
-  fab: { position: 'absolute', bottom: 100, right: 20, width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', shadowColor: '#FF6B33', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
 });
