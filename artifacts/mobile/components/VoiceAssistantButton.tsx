@@ -1,11 +1,14 @@
-import * as FileSystem from 'expo-file-system';
 import * as Speech from 'expo-speech';
+import {
+  ExpoSpeechRecognitionModule,
+  useSpeechRecognitionEvent,
+} from 'expo-speech-recognition';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
   Keyboard,
-  KeyboardAvoidingView,
+  Modal,
   Platform,
   StyleSheet,
   Text,
@@ -13,19 +16,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Audio } from 'expo-av';
 import { Icon, type IconName } from '@/components/Icon';
-import { useAuth } from '@/context/AuthContext';
-import { supabaseFetch } from '@/constants/supabase';
 import { useAIAssistant } from '@/context/AIAssistantContext';
 
 type VoiceStatus = 'idle' | 'connecting' | 'listening' | 'processing' | 'speaking' | 'error';
 
 const BG_BY_STATUS: Record<VoiceStatus, string> = {
   idle: '#FF6B33',
-  connecting: '#666666',
+  connecting: '#888888',
   listening: '#E8527A',
-  processing: '#666666',
+  processing: '#888888',
   speaking: '#22C55E',
   error: '#E8527A',
 };
@@ -52,21 +52,17 @@ interface WebSpeechRecognitionResult {
   readonly transcript: string;
   readonly confidence: number;
 }
-
 interface WebSpeechRecognitionResultList {
   readonly length: number;
   item(index: number): { readonly length: number; item(i: number): WebSpeechRecognitionResult };
   [index: number]: { readonly length: number; [i: number]: WebSpeechRecognitionResult };
 }
-
 interface WebSpeechRecognitionEvent {
   readonly results: WebSpeechRecognitionResultList;
 }
-
 interface WebSpeechRecognitionErrorEvent {
   readonly error: string;
 }
-
 interface WebSpeechRecognition {
   continuous: boolean;
   interimResults: boolean;
@@ -80,12 +76,10 @@ interface WebSpeechRecognition {
   stop(): void;
   abort(): void;
 }
-
 interface WindowWithSpeech extends Window {
   SpeechRecognition?: new () => WebSpeechRecognition;
   webkitSpeechRecognition?: new () => WebSpeechRecognition;
 }
-
 function getSpeechRecognitionCtor(): (new () => WebSpeechRecognition) | undefined {
   if (typeof window === 'undefined') return undefined;
   const w = window as WindowWithSpeech;
@@ -93,8 +87,7 @@ function getSpeechRecognitionCtor(): (new () => WebSpeechRecognition) | undefine
 }
 
 export function VoiceAssistantButton() {
-  const { session } = useAuth();
-  const { sendMessage, messages } = useAIAssistant();
+  const { sendMessage } = useAIAssistant();
 
   const [status, setStatus] = useState<VoiceStatus>('idle');
   const [userTranscript, setUserTranscript] = useState('');
@@ -103,19 +96,18 @@ export function VoiceAssistantButton() {
   const [showFallback, setShowFallback] = useState(false);
   const [fallbackInput, setFallbackInput] = useState('');
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideCardsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const ignoreUntilRef = useRef<number>(0);
   const lastTranscriptRef = useRef<string>('');
   const lastTranscriptTimeRef = useRef<number>(0);
   const recognitionRef = useRef<WebSpeechRecognition | null>(null);
+  const processingRef = useRef(false);
 
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const pulseOpacity = useRef(new Animated.Value(0.5)).current;
   const spinAnim = useRef(new Animated.Value(0)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
-
   const pulseAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const spinAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -161,18 +153,16 @@ export function VoiceAssistantButton() {
   const showTranscriptCards = useCallback(
     (user: string, ai: string) => {
       setUserTranscript(user);
-      setAiTranscript(ai.slice(0, 120));
+      setAiTranscript(ai.slice(0, 140));
       setShowCards(true);
       cardOpacity.setValue(0);
       Animated.timing(cardOpacity, { toValue: 1, duration: 300, useNativeDriver: true }).start();
       if (hideCardsTimeoutRef.current) clearTimeout(hideCardsTimeoutRef.current);
       hideCardsTimeoutRef.current = setTimeout(() => {
-        Animated.timing(cardOpacity, {
-          toValue: 0,
-          duration: 400,
-          useNativeDriver: true,
-        }).start(() => setShowCards(false));
-      }, 8000);
+        Animated.timing(cardOpacity, { toValue: 0, duration: 400, useNativeDriver: true }).start(() =>
+          setShowCards(false),
+        );
+      }, 9000);
     },
     [cardOpacity],
   );
@@ -214,84 +204,108 @@ export function VoiceAssistantButton() {
     window.speechSynthesis.speak(utterance);
   }, []);
 
-  const stopRecording = useCallback(async () => {
+  const handleTranscript = useCallback(
+    async (transcript: string) => {
+      if (!transcript.trim()) return;
+      if (processingRef.current) return;
+      const now = Date.now();
+      if (now < ignoreUntilRef.current) return;
+      if (transcript === lastTranscriptRef.current && now - lastTranscriptTimeRef.current < 8000) return;
+      lastTranscriptRef.current = transcript;
+      lastTranscriptTimeRef.current = now;
+      processingRef.current = true;
+
+      if (stopTimeoutRef.current) {
+        clearTimeout(stopTimeoutRef.current);
+        stopTimeoutRef.current = null;
+      }
+
+      setStatus('processing');
+      try {
+        const aiMsg = await sendMessage(transcript.trim(), true);
+        showTranscriptCards(transcript.trim(), aiMsg);
+        await speakNative(aiMsg);
+      } catch {
+        setStatus('error');
+      } finally {
+        processingRef.current = false;
+      }
+    },
+    [sendMessage, showTranscriptCards, speakNative],
+  );
+
+  useSpeechRecognitionEvent('start', () => {
+    setStatus('listening');
+    stopTimeoutRef.current = setTimeout(() => {
+      ExpoSpeechRecognitionModule.stop();
+    }, 12000);
+  });
+
+  useSpeechRecognitionEvent('result', (event) => {
+    const transcript = event.results?.[0]?.transcript ?? '';
+    if (transcript && !event.isFinal === false) {
+      handleTranscript(transcript);
+    } else if (transcript && event.isFinal) {
+      handleTranscript(transcript);
+    }
+  });
+
+  useSpeechRecognitionEvent('end', () => {
     if (stopTimeoutRef.current) {
       clearTimeout(stopTimeoutRef.current);
       stopTimeoutRef.current = null;
     }
-    const recording = recordingRef.current;
-    if (!recording) return;
-    recordingRef.current = null;
-    try {
-      await recording.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
-      const uri = recording.getURI();
-      if (!uri) throw new Error('No recording URI');
-      setStatus('processing');
-      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
-      const conversationHistory = messages
-        .slice(-8)
-        .map((m) => ({ role: m.role, content: m.content }));
-      const res = await supabaseFetch(
-        '/functions/v1/ai-assistant',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            query: '[VOICE_AUDIO]',
-            audioBase64: base64,
-            audioMimeType: 'audio/m4a',
-            context: { currentRoute: '/', isVoiceInput: true },
-            conversationHistory,
-            model: 'google/gemini-2.5-flash',
-          }),
-        },
-        session?.access_token,
-      );
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({})) as { error?: string; message?: string };
-        const errMsg = (errData.error ?? errData.message ?? '').toLowerCase();
-        const isAudioUnsupported =
-          errMsg.includes('audio') ||
-          errMsg.includes('transcript') ||
-          errMsg.includes('unsupported') ||
-          res.status === 415;
-        throw new Error(isAudioUnsupported ? 'audio_unsupported' : `api_error_${res.status}`);
-      }
-      const data = (await res.json()) as { transcript?: string; message?: string };
-      const userSaid = data.transcript ?? '[voice input]';
-      const aiSaid = data.message ?? "Sorry, I'm having trouble right now.";
-      showTranscriptCards(userSaid, aiSaid);
-      await speakNative(aiSaid);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : '';
-      if (msg === 'audio_unsupported') {
-        setShowFallback(true);
-        setStatus('idle');
-      } else {
-        setStatus('error');
-      }
+    setStatus((prev) => (prev === 'listening' ? 'idle' : prev));
+  });
+
+  useSpeechRecognitionEvent('error', (event) => {
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
     }
-  }, [session?.access_token, showTranscriptCards, speakNative, messages]);
+    const code = event.error ?? '';
+    if (code === 'no-speech' || code === '7') {
+      setStatus('idle');
+    } else if (code === 'not-allowed' || code === '9') {
+      setShowFallback(true);
+      setStatus('idle');
+    } else {
+      setStatus('error');
+    }
+  });
 
   const startNative = useCallback(async () => {
     try {
       setStatus('connecting');
-      const { status: permStatus } = await Audio.requestPermissionsAsync();
-      if (permStatus !== 'granted') {
-        setStatus('error');
+      processingRef.current = false;
+      const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+      if (!granted) {
+        setShowFallback(true);
+        setStatus('idle');
         return;
       }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      );
-      recordingRef.current = recording;
-      setStatus('listening');
-      stopTimeoutRef.current = setTimeout(() => stopRecording(), 8000);
+      await ExpoSpeechRecognitionModule.start({
+        lang: 'en-US',
+        interimResults: false,
+        maxAlternatives: 1,
+        continuous: false,
+      });
     } catch {
-      setStatus('error');
+      setShowFallback(true);
+      setStatus('idle');
     }
-  }, [stopRecording]);
+  }, []);
+
+  const stopNative = useCallback(() => {
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
+    }
+    try {
+      ExpoSpeechRecognitionModule.stop();
+    } catch {}
+    setStatus('idle');
+  }, []);
 
   const startWeb = useCallback(() => {
     const SpeechRecognitionCtor = getSpeechRecognitionCtor();
@@ -313,12 +327,7 @@ export function VoiceAssistantButton() {
       if (!transcript) return;
       const now = Date.now();
       if (now < ignoreUntilRef.current) return;
-      if (
-        transcript === lastTranscriptRef.current &&
-        now - lastTranscriptTimeRef.current < 8000
-      ) {
-        return;
-      }
+      if (transcript === lastTranscriptRef.current && now - lastTranscriptTimeRef.current < 8000) return;
       lastTranscriptRef.current = transcript;
       lastTranscriptTimeRef.current = now;
       setUserTranscript(transcript);
@@ -332,11 +341,8 @@ export function VoiceAssistantButton() {
         .catch(() => setStatus('error'));
     };
     recognition.onerror = (e: WebSpeechRecognitionErrorEvent) => {
-      if (e.error === 'no-speech' || e.error === 'aborted') {
-        setStatus('idle');
-      } else {
-        setStatus('error');
-      }
+      if (e.error === 'no-speech' || e.error === 'aborted') setStatus('idle');
+      else setStatus('error');
     };
     recognition.onend = () => {
       setStatus((prev) => (prev === 'listening' ? 'idle' : prev));
@@ -350,12 +356,8 @@ export function VoiceAssistantButton() {
 
   const handlePress = useCallback(() => {
     if (status === 'listening') {
-      if (Platform.OS !== 'web') {
-        stopRecording();
-      } else {
-        recognitionRef.current?.stop();
-        setStatus('idle');
-      }
+      if (Platform.OS !== 'web') stopNative();
+      else { recognitionRef.current?.stop(); setStatus('idle'); }
       return;
     }
     if (status === 'speaking') {
@@ -365,13 +367,10 @@ export function VoiceAssistantButton() {
       return;
     }
     if (status === 'idle' || status === 'error') {
-      if (Platform.OS === 'web') {
-        startWeb();
-      } else {
-        startNative();
-      }
+      if (Platform.OS === 'web') startWeb();
+      else startNative();
     }
-  }, [status, stopRecording, startWeb, startNative]);
+  }, [status, stopNative, startWeb, startNative]);
 
   const handleFallbackSend = useCallback(async () => {
     const query = fallbackInput.trim();
@@ -383,11 +382,8 @@ export function VoiceAssistantButton() {
     try {
       const aiMsg = await sendMessage(query, true);
       showTranscriptCards(query, aiMsg);
-      if (Platform.OS !== 'web') {
-        await speakNative(aiMsg);
-      } else {
-        speakWeb(aiMsg);
-      }
+      if (Platform.OS !== 'web') await speakNative(aiMsg);
+      else speakWeb(aiMsg);
     } catch {
       setStatus('error');
     }
@@ -397,82 +393,88 @@ export function VoiceAssistantButton() {
     return () => {
       if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
       if (hideCardsTimeoutRef.current) clearTimeout(hideCardsTimeoutRef.current);
-      recordingRef.current?.stopAndUnloadAsync().catch(() => {});
-      recognitionRef.current?.abort();
-      if (Platform.OS === 'web') window.speechSynthesis?.cancel();
-      else Speech.stop();
+      if (Platform.OS === 'web') {
+        window.speechSynthesis?.cancel();
+        recognitionRef.current?.abort();
+      } else {
+        try { ExpoSpeechRecognitionModule.stop(); } catch {}
+        Speech.stop();
+      }
     };
   }, []);
 
-  const spin = spinAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
+  const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const label = LABEL_BY_STATUS[status];
 
   return (
     <>
       {showCards && (
-        <Animated.View
-          style={[styles.cardsContainer, { opacity: cardOpacity }]}
-          pointerEvents="none"
-        >
+        <Animated.View style={[styles.cardsContainer, { opacity: cardOpacity }]} pointerEvents="none">
           {aiTranscript ? (
             <View style={styles.aiCard}>
-              <Text style={styles.cardLabel}>AI:</Text>
+              <Text style={styles.cardLabel}>WishMe AI</Text>
               <Text style={styles.cardText}>{aiTranscript}</Text>
             </View>
           ) : null}
           {userTranscript ? (
             <View style={styles.userCard}>
-              <Text style={styles.cardLabel}>You said:</Text>
+              <Text style={styles.cardLabel}>You said</Text>
               <Text style={styles.cardText}>{userTranscript}</Text>
             </View>
           ) : null}
         </Animated.View>
       )}
 
-      {showFallback && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'position' : undefined}
-          style={styles.fallbackWrapper}
-        >
-          <View style={styles.fallbackCard}>
-            <Text style={styles.fallbackLabel}>Voice Mode (type to speak)</Text>
-            <View style={styles.fallbackRow}>
-              <TextInput
-                style={styles.fallbackInput}
-                value={fallbackInput}
-                onChangeText={setFallbackInput}
-                placeholder="Type your message..."
-                placeholderTextColor="#aaa"
-                onSubmitEditing={handleFallbackSend}
-                returnKeyType="send"
-                autoFocus
-              />
-              <TouchableOpacity
-                style={styles.fallbackSend}
-                onPress={handleFallbackSend}
-                activeOpacity={0.75}
-              >
-                <Icon name="send" size={16} color="#fff" />
-              </TouchableOpacity>
+      <Modal
+        visible={showFallback}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowFallback(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalIconRow}>
+              <View style={styles.modalIconBg}>
+                <Icon name="mic-off" size={28} color="#FF6B33" />
+              </View>
             </View>
-            <TouchableOpacity onPress={() => setShowFallback(false)} style={styles.fallbackClose}>
-              <Text style={styles.fallbackCloseText}>Cancel</Text>
+            <Text style={styles.modalTitle}>Voice input unavailable</Text>
+            <Text style={styles.modalSubtitle}>
+              Speech recognition isn't available on this device. Type your message below and WishMe AI will speak the reply.
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={fallbackInput}
+              onChangeText={setFallbackInput}
+              placeholder="Ask me anything..."
+              placeholderTextColor="#666"
+              onSubmitEditing={handleFallbackSend}
+              returnKeyType="send"
+              autoFocus
+              multiline={false}
+            />
+            <TouchableOpacity style={styles.modalSendBtn} onPress={handleFallbackSend} activeOpacity={0.8}>
+              <Icon name="send" size={18} color="#fff" />
+              <Text style={styles.modalSendText}>Send & Speak</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowFallback(false)} style={styles.modalCancel}>
+              <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </KeyboardAvoidingView>
-      )}
+        </View>
+      </Modal>
 
       <View style={styles.container}>
+        {status !== 'idle' && label !== '' && (
+          <View style={styles.statusPill}>
+            <Text style={styles.statusPillText}>{label}</Text>
+          </View>
+        )}
+
         {status === 'listening' && (
           <Animated.View
-            style={[
-              styles.pulseRing,
-              { transform: [{ scale: pulseAnim }], opacity: pulseOpacity },
-            ]}
+            style={[styles.pulseRing, { transform: [{ scale: pulseAnim }], opacity: pulseOpacity }]}
             pointerEvents="none"
           />
         )}
@@ -490,8 +492,6 @@ export function VoiceAssistantButton() {
             <Icon name={ICON_BY_STATUS[status]} size={20} color="#fff" />
           )}
         </TouchableOpacity>
-
-        {label !== '' && <Text style={styles.label}>{label}</Text>}
       </View>
     </>
   );
@@ -506,33 +506,39 @@ const styles = StyleSheet.create({
     zIndex: 9997,
   },
   button: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 6,
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.35,
     shadowRadius: 6,
   },
   pulseRing: {
     position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: '#E8527A',
     top: 0,
   },
-  label: {
-    marginTop: 4,
-    fontSize: 10,
+  statusPill: {
+    backgroundColor: 'rgba(0,0,0,0.82)',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  statusPillText: {
     color: '#fff',
-    textShadowColor: 'rgba(0,0,0,0.8)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
-    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   },
   cardsContainer: {
     position: 'absolute',
@@ -542,80 +548,118 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   userCard: {
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    borderRadius: 12,
-    padding: 10,
-    maxWidth: 220,
+    backgroundColor: 'rgba(10,13,20,0.92)',
+    borderRadius: 14,
+    padding: 12,
+    maxWidth: 240,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   aiCard: {
-    backgroundColor: 'rgba(255,107,51,0.15)',
-    borderRadius: 12,
-    padding: 10,
-    maxWidth: 220,
+    backgroundColor: 'rgba(255,107,51,0.12)',
+    borderRadius: 14,
+    padding: 12,
+    maxWidth: 240,
     borderWidth: 1,
-    borderColor: 'rgba(255,107,51,0.3)',
+    borderColor: 'rgba(255,107,51,0.35)',
   },
   cardLabel: {
     fontSize: 10,
     color: '#FF6B33',
     fontWeight: '700',
-    marginBottom: 3,
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   cardText: {
-    fontSize: 12,
-    color: '#fff',
-    lineHeight: 16,
-  },
-  fallbackWrapper: {
-    position: 'absolute',
-    bottom: 170,
-    left: 16,
-    zIndex: 9998,
-  },
-  fallbackCard: {
-    backgroundColor: 'rgba(20,20,30,0.95)',
-    borderRadius: 16,
-    padding: 14,
-    width: 240,
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,51,0.4)',
-  },
-  fallbackLabel: {
-    fontSize: 11,
-    color: '#FF6B33',
-    fontWeight: '700',
-    marginBottom: 10,
-  },
-  fallbackRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  fallbackInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
     fontSize: 13,
     color: '#fff',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.15)',
+    lineHeight: 18,
   },
-  fallbackSend: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#FF6B33',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#111827',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    paddingTop: 12,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    marginBottom: 20,
+  },
+  modalIconRow: {
+    marginBottom: 16,
+  },
+  modalIconBg: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: 'rgba(255,107,51,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,107,51,0.3)',
   },
-  fallbackClose: {
-    marginTop: 10,
-    alignSelf: 'flex-end',
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  fallbackCloseText: {
-    fontSize: 12,
-    color: '#aaa',
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#9CA3AF',
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 24,
+    paddingHorizontal: 8,
+  },
+  modalInput: {
+    width: '100%',
+    backgroundColor: '#1F2937',
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#fff',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+    marginBottom: 14,
+  },
+  modalSendBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF6B33',
+    borderRadius: 14,
+    paddingVertical: 14,
+    gap: 8,
+    marginBottom: 12,
+  },
+  modalSendText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  modalCancel: {
+    paddingVertical: 8,
+  },
+  modalCancelText: {
+    color: '#6B7280',
+    fontSize: 14,
   },
 });

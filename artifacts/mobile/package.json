@@ -66,6 +66,7 @@
     "expo-media-library": "^18.2.1",
     "expo-screen-capture": "^8.0.9",
     "expo-speech": "^55.0.9",
+    "expo-speech-recognition": "^3.1.2",
     "expo-video": "~3.0.16",
     "react-native-razorpay": "^2.3.1"
   }

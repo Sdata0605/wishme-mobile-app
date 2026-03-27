@@ -37,7 +37,14 @@
       ],
       "expo-font",
       "expo-web-browser",
-      "expo-media-library"
+      "expo-media-library",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow WishMe to use the microphone for voice commands.",
+          "speechRecognitionPermission": "Allow WishMe to recognise your speech so you can use the voice assistant."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
