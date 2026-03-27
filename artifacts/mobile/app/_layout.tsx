@@ -79,6 +79,7 @@ function RootLayoutNav() {
       <Stack.Screen name="settings" />
       <Stack.Screen name="celebrity-signup" />
       <Stack.Screen name="celebrity-dashboard" />
+      <Stack.Screen name="dashboard" />
       <Stack.Screen name="select-plan" />
       <Stack.Screen name="+not-found" />
     </Stack>

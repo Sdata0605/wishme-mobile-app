@@ -29,7 +29,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { icon: 'home', label: 'Dashboard', route: '/(tabs)' },
+  { icon: 'home', label: 'Dashboard', route: '/dashboard' },
   { icon: 'phone', label: 'Celebrity Call', route: '/(tabs)/voice-call' },
   { icon: 'credit-card', label: 'Wallet', route: '/wallet' },
   { icon: 'calendar', label: 'Bookings', route: '/bookings' },
