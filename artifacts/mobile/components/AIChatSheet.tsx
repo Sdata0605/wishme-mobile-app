@@ -380,8 +380,8 @@ const styles = StyleSheet.create({
   },
   headerText: { flex: 1 },
   headerTitle: {
+    fontSize: 22,
     color: '#fff',
-    fontSize: 18,
     fontFamily: 'Inter_700Bold',
   },
   headerStatus: {
