@@ -19,6 +19,7 @@ import { DraggableMoreButton } from '@/components/DraggableMoreButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AIChatButton } from '@/components/AIChatButton';
 import { AIChatSheet } from '@/components/AIChatSheet';
+import { VoiceAssistantButton } from '@/components/VoiceAssistantButton';
 
 import { AuthProvider } from '@/context/AuthContext';
 import { DrawerProvider } from '@/context/DrawerContext';
@@ -110,6 +111,7 @@ export default function RootLayout() {
                       <DraggableMoreButton />
                       <AIChatButton />
                       <AIChatSheet />
+                      <VoiceAssistantButton />
                     </View>
                   </DrawerProvider>
                 </AIAssistantProvider>
