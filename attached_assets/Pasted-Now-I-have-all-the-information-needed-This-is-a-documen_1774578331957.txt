@@ -1,0 +1,638 @@
+Now I have all the information needed. This is a documentation request, not an implementation task, so I'll provide the comprehensive documentation directly without a plan.
+
+Here is the complete Celebrity Dashboard documentation for the Replit mobile app team:
+
+Celebrity Dashboard — Complete Technical Documentation for Replit Mobile App
+Route: /celebrity-dashboard
+Purpose
+The Celebrity Dashboard is the central hub for celebrities (creators) to manage their entire presence on the platform. It provides tools for content upload, financial management, fan communication, booking management, reviews, followers, tax reports, consent verification, and profile viewing. Only users with a linked record in the celebrities table (where profile_id matches profiles.id) can access it. Admins can also view any celebrity's dashboard via a "View As" dropdown.
+
+Authentication & Access Control
+
+┌─────────────────────────────────────────┐
+│ User logs in via Supabase Auth          │
+│ ↓                                       │
+│ Check: profiles.id exists?              │
+│ ↓                                       │
+│ Check: celebrities.profile_id = profile.id │
+│ ↓ YES → Show Celebrity Dashboard       │
+│ ↓ NO  → Show "Access Restricted" card  │
+│         with link to /dashboard         │
+└─────────────────────────────────────────┘
+Auth query:
+
+
+{
+  "endpoint": "GET /rest/v1/celebrities?profile_id=eq.{profile.id}",
+  "table": "celebrities",
+  "filter": "profile_id=eq.{authenticated_user_profile_id}",
+  "select": "*",
+  "method": ".maybeSingle()",
+  "response": {
+    "id": "uuid",
+    "name": "string",
+    "bio": "string",
+    "category": "string",
+    "image_url": "string|null",
+    "profile_id": "uuid",
+    "rating": "number",
+    "review_count": "number",
+    "available_balance": "number",
+    "commission_percentage": "number",
+    "delivery_time": "string",
+    "consent_status": "string (pending|submitted|approved)",
+    "consent_photo_url": "string|null",
+    "consent_video_url": "string|null",
+    "consent_given_at": "string|null",
+    "date_of_birth": "string|null",
+    "anniversary_date": "string|null",
+    "social_media": "json|null",
+    "service_prices": "json|null",
+    "is_active": "boolean",
+    "is_verified": "boolean"
+  }
+}
+Header Section
+UI Elements:
+
+Gradient background header with celebrity name
+Admin "View As" dropdown (only if profile.role === 'admin')
+Notifications button → navigates to /celebrity-notifications
+Settings button → navigates to /celebrity-settings
+Sign Out button
+Admin "View As" query:
+
+
+{
+  "endpoint": "GET /rest/v1/celebrities?select=id,name,profile_id&order=name",
+  "response": [{ "id": "uuid", "name": "string", "profile_id": "uuid" }]
+}
+Stats Overview Cards (5 cards, 2-col mobile / 5-col desktop)
+Card	Field	Icon	Color
+Total Earnings	Sum of celebrity_commission where status=completed	DollarSign	green-500
+Pending	Sum of celebrity_commission where status=pending|in_progress	Wallet	orange-500
+Total Bookings	Count of all bookings	Users	blue-500
+Rating	celebrities.rating	Star	yellow-500
+Reviews	celebrities.review_count	TrendingUp	purple-500
+Stats query:
+
+
+{
+  "endpoint": "GET /rest/v1/bookings?celebrity_id=eq.{celebrityId}&select=celebrity_commission,status",
+  "response": [
+    { "celebrity_commission": 700, "status": "completed" },
+    { "celebrity_commission": 500, "status": "pending" }
+  ]
+}
+Consent Alert Banner
+Shows orange alert if celebrity.consent_status is NOT submitted or approved. Text: "You must submit consent to be displayed to users."
+
+10 Tabs
+
+[Content] [Wallet] [Messages] [Events] [Consent] [Bookings] [Reviews] [Followers] [TDS] [Profile]
+Horizontally scrollable on mobile with overflow-x-auto.
+
+TAB 1: Content
+Component: Inline in CelebrityDashboard.tsx
+
+Purpose: Upload avatar photos and promotional content (photos/videos) for AI processing.
+
+UI Elements:
+
+Avatar Creation Card — Shows current avatar (circle, 128px), dashed upload area, "Choose Photos" button
+Promotional Content Card — 2-column grid: Ad Photos upload + Video Content upload
+Storage Endpoints:
+
+
+{
+  "avatar_upload": {
+    "bucket": "celebrity-avatars",
+    "path": "{celebrity-name}/avatar/{timestamp}-{filename}",
+    "method": "supabase.storage.from('celebrity-avatars').upload(path, file)",
+    "after_upload": {
+      "update": "celebrities SET image_url = {publicUrl} WHERE id = {celebrityId}"
+    }
+  },
+  "promo_upload": {
+    "bucket": "promotional-content",
+    "path": "{celebrity-name}/promotional/{photo|video}/{timestamp}-{filename}",
+    "method": "supabase.storage.from('promotional-content').upload(path, file)"
+  }
+}
+TAB 2: Wallet
+Component: src/components/celebrity/WalletTab.tsx
+
+Props: { celebrityId: string, stats: { totalEarnings, pendingEarnings }, availableBalance: number }
+
+UI Elements:
+
+Commission History (left, 2/3 width) — List of transactions with service type, order ID, customer name, commission %, amount, status badge
+Wallet Summary (right, 1/3 width) — Available balance (green), pending clearance (orange), "Withdraw Funds" button
+Payout Requests — List of past withdrawal requests with status badges
+Data Queries:
+
+
+{
+  "transactions": {
+    "endpoint": "GET /rest/v1/celebrity_wallet_transactions?celebrity_id=eq.{id}&select=*,bookings(id,service_type,final_price,user_id,profiles!bookings_user_id_fkey(first_name,last_name,email))&order=created_at.desc",
+    "response": [{
+      "id": "uuid",
+      "amount": 700,
+      "commission_percentage": 70,
+      "platform_fee": 300,
+      "status": "completed",
+      "booking_id": "uuid",
+      "description": "string",
+      "transaction_type": "earning",
+      "created_at": "ISO8601",
+      "bookings": {
+        "id": "uuid",
+        "service_type": "video_wish",
+        "final_price": 1000,
+        "profiles": { "first_name": "John", "last_name": "Doe", "email": "..." }
+      }
+    }]
+  },
+  "image_promotions_as_earnings": {
+    "endpoint": "GET /rest/v1/image_promotions?celebrity_id=eq.{id}&status=eq.completed&select=id,price_paid,status,created_at,concept,profiles!image_promotions_user_id_fkey(first_name,last_name,email)",
+    "note": "Merged into transactions list with 70% commission calculation"
+  },
+  "payout_requests": {
+    "endpoint": "GET /rest/v1/payout_requests?celebrity_id=eq.{id}&select=id,requested_amount,status,requested_at,processed_at,admin_notes&order=requested_at.desc&limit=10",
+    "response": [{
+      "id": "uuid",
+      "requested_amount": 5000,
+      "status": "pending|processed|rejected",
+      "requested_at": "ISO8601",
+      "processed_at": "ISO8601|null",
+      "admin_notes": "string|null"
+    }]
+  }
+}
+Withdraw Flow:
+
+
+{
+  "step1_load_banks": {
+    "endpoint": "GET /rest/v1/bank_details?user_id=eq.{profile.id}&order=is_default.desc",
+    "response": [{
+      "id": "uuid",
+      "account_holder_name": "string",
+      "account_number": "string",
+      "bank_name": "string",
+      "ifsc_code": "string",
+      "is_default": true
+    }]
+  },
+  "step2_submit": {
+    "insert_payout": {
+      "table": "payout_requests",
+      "payload": {
+        "celebrity_id": "uuid",
+        "profile_id": "uuid",
+        "requested_amount": 5000,
+        "bank_account_number": "string",
+        "bank_name": "string",
+        "ifsc_code": "string",
+        "account_holder_name": "string",
+        "status": "pending"
+      }
+    },
+    "update_balance": {
+      "table": "celebrities",
+      "update": "SET available_balance = max(0, available_balance - amount) WHERE id = {celebrityId}"
+    }
+  }
+}
+TAB 3: Messages
+Component: src/components/celebrity/MessagesTab.tsx
+
+Props: { celebrityId: string }
+
+Purpose: Real-time fan messaging with AI Auto-Reply toggle.
+
+UI Elements:
+
+AI Auto-Reply toggle card (top) — Switch to enable/disable, green banner when ON
+Split panel: Conversations list (left 280px) + Chat area (right flex)
+Mobile: toggle between list and chat views
+Date separators, message bubbles, AI badge on AI-generated messages
+Manual "Generate AI Reply" button per conversation
+Data Queries:
+
+
+{
+  "settings": {
+    "endpoint": "GET /rest/v1/celebrity_settings?celebrity_id=eq.{id}&select=ai_auto_reply_enabled,auto_reply_enabled",
+    "response": { "ai_auto_reply_enabled": true, "auto_reply_enabled": true }
+  },
+  "toggle_auto_reply": {
+    "endpoint": "POST /rest/v1/celebrity_settings",
+    "method": "upsert",
+    "payload": {
+      "celebrity_id": "uuid",
+      "ai_auto_reply_enabled": true,
+      "auto_reply_enabled": true
+    },
+    "on_conflict": "celebrity_id"
+  },
+  "conversations": {
+    "endpoint": "GET /rest/v1/conversations?celebrity_id=eq.{id}&select=*&order=last_message_at.desc",
+    "then": "GET /rest/v1/profiles?id=in.({userIds})&select=id,first_name,last_name",
+    "response": [{
+      "id": "uuid",
+      "user_id": "uuid",
+      "celebrity_id": "uuid",
+      "last_message_at": "ISO8601",
+      "unread_count_celebrity": 3,
+      "user_first_name": "John",
+      "user_last_name": "Doe"
+    }]
+  },
+  "messages": {
+    "endpoint": "GET /rest/v1/messages?conversation_id=eq.{id}&select=*&order=created_at.asc",
+    "response": [{
+      "id": "uuid",
+      "conversation_id": "uuid",
+      "sender_id": "uuid",
+      "sender_type": "user|celebrity",
+      "message_text": "string",
+      "is_ai_generated": false,
+      "is_read": true,
+      "created_at": "ISO8601"
+    }]
+  },
+  "send_message": {
+    "table": "messages",
+    "payload": {
+      "conversation_id": "uuid",
+      "sender_id": "{celebrity_profile_id}",
+      "sender_type": "celebrity",
+      "message_text": "string",
+      "is_ai_generated": false
+    },
+    "then_update": "conversations SET last_message_at = now() WHERE id = {conversationId}"
+  },
+  "mark_read": {
+    "update": "messages SET is_read = true WHERE conversation_id = {id} AND sender_type = 'user'",
+    "update2": "conversations SET unread_count_celebrity = 0 WHERE id = {id}"
+  }
+}
+Realtime Subscriptions:
+
+
+{
+  "conversations_channel": {
+    "channel": "celeb-conversations-{celebrityId}",
+    "event": "*",
+    "table": "conversations",
+    "filter": "celebrity_id=eq.{celebrityId}"
+  },
+  "messages_channel": {
+    "channel": "celeb-messages-{conversationId}",
+    "event": "INSERT",
+    "table": "messages",
+    "filter": "conversation_id=eq.{conversationId}"
+  }
+}
+Edge Functions:
+
+
+{
+  "manual_ai_reply": {
+    "function": "celebrity-ai-message",
+    "method": "POST",
+    "payload": {
+      "conversationId": "uuid",
+      "userMessage": "string (last fan message)"
+    },
+    "response": { "success": true, "reply": "AI generated text" },
+    "description": "Manually trigger AI to reply as celebrity. Uses LOVABLE_API_KEY → Lovable AI Gateway."
+  },
+  "auto_reply": {
+    "function": "celebrity-conversation-auto-reply",
+    "method": "POST",
+    "trigger": "DB trigger on messages table (auto_reply_trigger) OR frontend invocation after fan message",
+    "payload": {
+      "conversationId": "uuid",
+      "messageId": "uuid",
+      "messageText": "string",
+      "celebrityId": "uuid",
+      "userId": "uuid"
+    },
+    "response": { "success": true, "reply": "AI generated text" },
+    "flow": [
+      "1. Verify conversation exists and get celebrity details",
+      "2. Check celebrity_settings.auto_reply_enabled = true",
+      "3. Verify celebrity has a linked profile_id in profiles table",
+      "4. Check for duplicate replies (within 15 seconds)",
+      "5. Fetch last 6 messages for context",
+      "6. Call Gemini API with personality prompt",
+      "7. Wait 2.5 seconds (natural delay)",
+      "8. Insert AI reply as celebrity message (sender_type='celebrity', is_ai_generated=true)",
+      "9. Update conversation.last_message_at and unread_count_user"
+    ],
+    "ai_model": "gemini-2.0-flash",
+    "api": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+  }
+}
+TAB 4: Events (Content Manager)
+Component: src/components/celebrity/CelebrityContentManager.tsx
+
+Purpose: Manage celebrity events (birthdays, shows, meetups) and media gallery.
+
+Data Queries:
+
+
+{
+  "events": {
+    "endpoint": "GET /rest/v1/celebrity_events?celebrity_id=eq.{id}&select=*&order=event_date.desc",
+    "response": [{
+      "id": "uuid",
+      "title": "string",
+      "description": "string|null",
+      "event_date": "date",
+      "event_type": "birthday|anniversary|show|meetup|other",
+      "location": "string|null",
+      "is_public": true
+    }]
+  },
+  "save_event": {
+    "insert/update": "celebrity_events",
+    "payload": {
+      "celebrity_id": "uuid",
+      "title": "string",
+      "event_date": "date",
+      "event_type": "string",
+      "location": "string|null",
+      "description": "string|null",
+      "is_public": true
+    }
+  },
+  "delete_event": {
+    "table": "celebrity_events",
+    "filter": "id=eq.{eventId}"
+  },
+  "media": {
+    "endpoint": "GET /rest/v1/celebrity_media?celebrity_id=eq.{id}&select=*&order=created_at.desc",
+    "response": [{
+      "id": "uuid",
+      "title": "string",
+      "media_type": "image|video|audio",
+      "file_url": "string",
+      "is_avatar_content": false,
+      "is_promotional": false,
+      "consent_recorded": false,
+      "is_public": true
+    }]
+  },
+  "upload_media": {
+    "storage_bucket": "celebrity-media",
+    "path": "{celebrityId}/{timestamp}-{filename}",
+    "then_insert": "celebrity_media with metadata"
+  }
+}
+TAB 5: Consent
+Component: src/components/celebrity/ConsentCapture.tsx
+
+Props: { celebrityId: string, onConsentSubmitted: () => void }
+
+Purpose: Capture live photo + video consent for AI processing rights. Required before celebrity can be displayed to users.
+
+Flow:
+
+
+Step 1: Capture Photo (getUserMedia → canvas → JPEG blob)
+Step 2: Record Video reading consent statement (MediaRecorder → WebM blob)
+Step 3: Submit → Upload both to Supabase Storage → Update celebrities table
+Data Operations:
+
+
+{
+  "photo_upload": {
+    "bucket": "verification-docs",
+    "path": "{celebrityId}/consent-photo-{timestamp}.jpg"
+  },
+  "video_upload": {
+    "bucket": "verification-docs",
+    "path": "{celebrityId}/consent-video-{timestamp}.webm"
+  },
+  "update_celebrity": {
+    "table": "celebrities",
+    "filter": "id=eq.{celebrityId}",
+    "payload": {
+      "consent_photo_url": "public_url",
+      "consent_video_url": "public_url",
+      "consent_status": "submitted",
+      "consent_given_at": "ISO8601"
+    }
+  }
+}
+Consent states: pending → submitted → approved (admin approves)
+
+TAB 6: Bookings
+Component: src/components/celebrity/BookingsTab.tsx
+
+Props: { celebrityId: string }
+
+Data Queries:
+
+
+{
+  "bookings": {
+    "endpoint": "GET /rest/v1/bookings?celebrity_id=eq.{id}&select=*,profiles!bookings_user_id_fkey(first_name,last_name,email,phone)&order=created_at.desc",
+    "response": [{
+      "id": "uuid",
+      "service_type": "video_wish|greeting_card|image_promotion|video_promotion",
+      "final_price": 1000,
+      "status": "pending|in_progress|confirmed|completed",
+      "celebrity_commission": 700,
+      "commission_percentage": 70,
+      "platform_fee": 300,
+      "message": "JSON string with requestDetails, creativeGuidelines",
+      "instructions": "string|null",
+      "video_url": "string|null",
+      "video_file_key": "string|null (Backblaze B2 key)",
+      "video_status": "string|null",
+      "card_url": "string|null",
+      "delivery_date": "date",
+      "created_at": "ISO8601",
+      "profiles": { "first_name": "string", "last_name": "string", "email": "string", "phone": "string|null" }
+    }]
+  },
+  "image_promotions": {
+    "endpoint": "GET /rest/v1/image_promotions?celebrity_id=eq.{id}&select=*,profiles!image_promotions_user_id_fkey(first_name,last_name,email,phone)&order=created_at.desc",
+    "response": [{
+      "id": "uuid",
+      "concept": "string",
+      "branding_details": "string|null",
+      "generated_image_url": "string|null",
+      "price_paid": 500,
+      "status": "pending|in_progress|completed",
+      "created_at": "ISO8601",
+      "profiles": { "first_name": "string", "last_name": "string", "email": "string" }
+    }]
+  }
+}
+Realtime: Subscribes to bookings and image_promotions UPDATE events filtered by celebrity_id.
+
+Booking message JSON structure (parsed from bookings.message):
+
+
+{
+  "requestDetails": {
+    "recipientName": "Mom",
+    "recipientRelation": "Mother",
+    "occasion": "Birthday",
+    "message": "Happy birthday message text"
+  },
+  "creativeGuidelines": {
+    "toneAndStyle": "Warm and loving",
+    "otherInfo": "Please mention her garden"
+  }
+}
+Video playback: Uses B2VideoPlayer component with video_file_key (Backblaze B2 storage).
+
+TAB 7: Reviews
+Component: src/components/celebrity/ReviewsTab.tsx
+
+Props: { celebrityId: string }
+
+
+{
+  "reviews": {
+    "endpoint": "GET /rest/v1/celebrity_reviews?celebrity_id=eq.{id}&select=*,bookings:booking_id(service_type)&order=created_at.desc",
+    "then": "GET /rest/v1/profiles?id=in.({userIds})&select=id,first_name,last_name",
+    "response": [{
+      "id": "uuid",
+      "rating": 5,
+      "review_text": "string|null",
+      "created_at": "ISO8601",
+      "user_id": "uuid",
+      "booking_id": "uuid",
+      "profiles": { "first_name": "string", "last_name": "string" },
+      "bookings": { "service_type": "video_wish" }
+    }]
+  }
+}
+UI: Rating summary card (average rating with stars) + scrollable review list with star ratings, reviewer name, service type badge, date, and review text.
+
+TAB 8: Followers
+Component: src/components/celebrity/FollowersTab.tsx
+
+Props: { celebrityId: string | undefined }
+
+
+{
+  "followers": {
+    "endpoint": "GET /rest/v1/celebrity_favorites?celebrity_id=eq.{id}&select=*,profiles:user_id(first_name,last_name,email,avatar_url)&order=created_at.desc",
+    "response": [{
+      "id": "uuid",
+      "user_id": "uuid",
+      "status": "active|expired",
+      "subscription_start_date": "date",
+      "subscription_expires_at": "date|null (null = lifetime)",
+      "created_at": "ISO8601",
+      "profiles": {
+        "first_name": "string",
+        "last_name": "string",
+        "email": "string",
+        "avatar_url": "string|null"
+      }
+    }]
+  }
+}
+Realtime: Subscribes to celebrity_favorites changes filtered by celebrity_id.
+
+UI: Total followers stat card + data table (Avatar, Name, Email, Status badge, Follow date, Expiry date).
+
+TAB 9: TDS Reports
+Component: src/components/celebrity/TDSReportsTab.tsx
+
+Uses useTDSReports() hook.
+
+UI Elements:
+
+Financial year selector dropdown
+3 summary cards: Gross Earnings, TDS Deducted, Net Amount
+Transaction history table
+Tax filing information card
+Download PDF button (placeholder)
+
+{
+  "tds_data": {
+    "hook": "useTDSReports()",
+    "returns": {
+      "transactions": "TDS transaction array",
+      "stats": {
+        "totalGrossAmount": 50000,
+        "totalTDSDeducted": 5000,
+        "totalNetAmount": 45000,
+        "transactionCount": 12
+      },
+      "loading": false
+    }
+  }
+}
+TAB 10: Profile
+Component: Inline in CelebrityDashboard.tsx
+
+Purpose: Read-only display of celebrity personal info, service pricing, social media links, and password change form.
+
+Displayed Fields (all read-only):
+
+First Name, Last Name, Email, Phone (from profiles)
+Celebrity Name, Category, DOB, Anniversary, Bio (from celebrities)
+Service prices: general_wish, text_message, image_promotion, video_promotion (from celebrities.service_prices JSON)
+Commission percentage, Delivery time
+Social media: instagram, youtube, twitter, tiktok, facebook, linkedin, website, portfolio, other (from celebrities.social_media JSON)
+Password Change:
+
+
+{
+  "endpoint": "supabase.auth.updateUser({ password: newPassword })",
+  "validation": "min 6 chars, passwords must match"
+}
+Key Supabase Tables Used
+Table	Purpose
+celebrities	Celebrity profiles, pricing, consent, balance
+profiles	User/celebrity personal info linked to auth.users
+bookings	All service bookings (video, card, etc.)
+image_promotions	Image promotion orders
+celebrity_wallet_transactions	Commission transaction log
+payout_requests	Withdrawal requests
+bank_details	Celebrity bank accounts
+conversations	Fan-celebrity message threads
+messages	Individual messages in conversations
+celebrity_settings	AI auto-reply toggle and other settings
+celebrity_reviews	Fan reviews with ratings
+celebrity_favorites	Fan subscriptions/follows
+celebrity_events	Celebrity events calendar
+celebrity_media	Celebrity media gallery
+celebrity_occasions	Celebrity special dates
+Storage Buckets
+Bucket	Purpose
+celebrity-avatars	Avatar photos for AI processing
+promotional-content	Ad photos and videos
+verification-docs	Consent photo and video
+celebrity-media	General media gallery
+Component Tree
+
+CelebrityDashboard (page)
+├── Header (gradient bar + admin selector)
+├── Consent Alert (orange banner)
+├── Stats Cards (5x)
+└── Tabs
+    ├── Content (inline: avatar + promo upload)
+    ├── WalletTab
+    ├── MessagesTab
+    │   ├── AI Toggle Card
+    │   ├── Conversation List
+    │   └── Chat Area (messages + input)
+    ├── CelebrityContentManager (events + media)
+    ├── ConsentCapture (photo + video capture)
+    ├── BookingsTab (orders + detail dialogs)
+    ├── ReviewsTab (rating summary + review list)
+    ├── FollowersTab (stats + table)
+    ├── TDSReportsTab (summary + transactions)
+    ├── Profile (read-only info + pa
