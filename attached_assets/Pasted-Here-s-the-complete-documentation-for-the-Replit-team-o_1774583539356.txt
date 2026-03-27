@@ -1,0 +1,243 @@
+Here's the complete documentation for the Replit team on how celebrities switch between User Dashboard and Celebrity Dashboard:
+
+Celebrity Dashboard Switching — Complete Technical Documentation for Replit
+Overview
+Celebrities are dual-role users. They have both a regular user account (/dashboard) and a celebrity account (/celebrity-dashboard). The platform provides 3 switching mechanisms so they can move between the two dashboards without logging out.
+
+1. How Celebrity Status Is Identified
+A user is a celebrity if a row exists in the celebrities table where profile_id matches their profiles.id.
+
+
+// Supabase Query
+{
+  "table": "celebrities",
+  "method": "SELECT",
+  "columns": ["id"],
+  "filter": { "profile_id": "eq.<user's profiles.id>" },
+  "mode": "maybeSingle"
+}
+
+// Response if celebrity:
+{ "id": "celebrity-uuid-here" }
+
+// Response if NOT celebrity:
+null
+Important: The profiles.role field ('user' or 'celebrity') is used for high-level routing at login, but the authoritative check is always the existence of a celebrities row. This prevents edge cases where profiles.role is stale.
+
+2. Post-Login Routing (Auth.tsx)
+When a celebrity logs in, the system automatically routes them to /celebrity-dashboard.
+
+
+Login Flow:
+┌─────────────────────────────┐
+│  User submits email/password │
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│  supabase.auth.signInWithPassword()  │
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│  Fetch profile from profiles │
+│  table using user_id         │
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│  Check: profile.role == 'admin'?  │
+│  YES → navigate('/admin')         │
+│  NO  → continue                   │
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│  Query celebrities table:         │
+│  WHERE profile_id = profile.id    │
+│  Found? → navigate('/celebrity-dashboard') │
+│  Not found? → navigate('/dashboard')       │
+└─────────────────────────────┘
+
+// Auth.tsx routing logic (pseudocode as JSON)
+{
+  "step_1": {
+    "action": "signIn",
+    "endpoint": "supabase.auth.signInWithPassword",
+    "payload": { "email": "john@example.com", "password": "****" },
+    "response": { "user": { "id": "auth-user-uuid" } }
+  },
+  "step_2": {
+    "action": "fetch_profile",
+    "query": {
+      "table": "profiles",
+      "select": "id, role, plan",
+      "filter": { "user_id": "eq.auth-user-uuid" }
+    },
+    "response": {
+      "id": "profile-uuid",
+      "role": "celebrity",
+      "plan": "premium"
+    }
+  },
+  "step_3": {
+    "action": "check_celebrity_status",
+    "query": {
+      "table": "celebrities",
+      "select": "id",
+      "filter": { "profile_id": "eq.profile-uuid" }
+    },
+    "response": { "id": "celebrity-uuid" }
+  },
+  "step_4": {
+    "action": "navigate",
+    "destination": "/celebrity-dashboard"
+  }
+}
+3. Switching Mechanism #1 — Floating DashboardSwitcher Button
+Component: src/components/dashboard/DashboardSwitcher.tsx
+
+This is a floating button fixed to the bottom-right corner of the screen. It only renders for users who are celebrities. It appears on both /dashboard and /celebrity-dashboard.
+
+
+{
+  "component": "DashboardSwitcher",
+  "visibility": "Only for celebrity users (celebrities table has matching profile_id)",
+  "position": {
+    "mobile": "fixed, bottom: 144px, right: 16px, z-index: 50",
+    "desktop": "fixed, bottom: 80px, right: 24px, z-index: 50"
+  },
+  "behavior": {
+    "when_on_celebrity_dashboard": {
+      "label": "User Dashboard",
+      "icon": "Users",
+      "navigates_to": "/dashboard"
+    },
+    "when_on_user_dashboard": {
+      "label": "Celebrity Dashboard",
+      "icon": "Star",
+      "navigates_to": "/celebrity-dashboard"
+    }
+  },
+  "detection_query": {
+    "table": "celebrities",
+    "select": "id",
+    "filter": { "profile_id": "eq.<profile.id from useAuth()>" },
+    "method": "maybeSingle",
+    "result": "if data exists → show button, else → hide"
+  }
+}
+Mobile App Implementation Note: On mobile, this should be a floating action button (FAB) positioned above the bottom navigation bar. Use bottom: 144px to clear the 72px nav bar + safe area.
+
+4. Switching Mechanism #2 — Sidebar Navigation Link
+Component: src/components/dashboard/UserSidebar.tsx
+
+When viewing the User Dashboard (/dashboard), the left sidebar shows a "Celebrity Dashboard" link at the bottom of the navigation items — but only if the user is a celebrity.
+
+
+{
+  "component": "UserSidebar",
+  "celebrity_link": {
+    "title": "Celebrity Dashboard",
+    "url": "/celebrity-dashboard",
+    "icon": "Crown",
+    "condition": "Only shown when isCelebrity === true",
+    "position": "Last item in navigation menu, before Settings"
+  },
+  "celebrity_detection": {
+    "trigger": "useEffect on profile change",
+    "query": {
+      "table": "celebrities",
+      "select": "id",
+      "filter": { "profile_id": "eq.<profile.id>" },
+      "method": "single"
+    },
+    "state": "isCelebrity: boolean"
+  }
+}
+5. Switching Mechanism #3 — Celebrity Dashboard Header
+Component: src/pages/CelebrityDashboard.tsx
+
+The Celebrity Dashboard header itself contains navigation back to the user dashboard and other user pages.
+
+
+{
+  "component": "CelebrityDashboard header",
+  "switch_elements": [
+    {
+      "type": "DashboardSwitcher floating button",
+      "rendered_at": "bottom of page",
+      "label": "User Dashboard",
+      "navigates_to": "/dashboard"
+    },
+    {
+      "type": "Settings icon in header",
+      "navigates_to": "/celebrity-settings"
+    },
+    {
+      "type": "Notifications icon in header",
+      "navigates_to": "/celebrity-notifications"
+    },
+    {
+      "type": "Sign Out button in header",
+      "action": "signOut() → navigates to /auth"
+    }
+  ]
+}
+6. Complete Route Map for Celebrity Users
+
+Celebrity User Route Access:
+┌──────────────────────────────────────────────┐
+│  CELEBRITY ROUTES (role-gated)               │
+│  /celebrity-dashboard    → Main celebrity hub │
+│  /celebrity-settings     → Celebrity settings │
+│  /celebrity-notifications→ Notifications      │
+├──────────────────────────────────────────────┤
+│  USER ROUTES (all users including celebrities)│
+│  /dashboard              → User dashboard     │
+│  /wallet                 → Wallet & balance    │
+│  /bookings               → User bookings      │
+│  /messages               → Messages            │
+│  /music-studio           → AI Music Studio     │
+│  /celebrities            → Browse celebrities  │
+│  /settings               → User settings       │
+│  /following              → Favorites            │
+│  /referrals              → Referral program     │
+│  ... (20+ more user routes)                    │
+└──────────────────────────────────────────────┘
+7. Data Flow Summary for Mobile App
+
+{
+  "on_app_launch": {
+    "step_1": "Check supabase.auth.getSession()",
+    "step_2": "If session exists, fetch profile: SELECT id, role, plan FROM profiles WHERE user_id = auth.uid()",
+    "step_3": "Check celebrity: SELECT id FROM celebrities WHERE profile_id = profile.id",
+    "step_4_if_celebrity": "Show celebrity dashboard as default, with switch button to user dashboard",
+    "step_4_if_user": "Show user dashboard, no switch button"
+  },
+  "switching": {
+    "from_celebrity_to_user": {
+      "action": "Navigate to /dashboard",
+      "no_re_auth": true,
+      "same_session": true,
+      "button_label_changes_to": "Celebrity Dashboard"
+    },
+    "from_user_to_celebrity": {
+      "action": "Navigate to /celebrity-dashboard",
+      "no_re_auth": true,
+      "same_session": true,
+      "button_label_changes_to": "User Dashboard"
+    }
+  },
+  "important_notes": [
+    "NO logout/login required to switch",
+    "Same auth session, same user, same profile",
+    "Only the UI view changes between dashboards",
+    "The profile_id stays the same across both dashboards",
+    "celebrity_id (from celebrities table) is used for celebrity-specific queries",
+    "profile.id (from profiles table) is used for user-specific queries like messages, wallet"
+  ]
+}
+8. Mobile App Recommendation
+For the mobile app, implement the switch as either:
+
+Bottom tab bar with profile icon — tap profile → "Switch to Celebrity/User mode"
+Drawer menu header — show current mode with a toggle
+Floating Action Button (FAB) — matching the web implementation
+The key point: no re-authentication needed. It's purely a UI navigation change using the same session token.
