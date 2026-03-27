@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
@@ -48,6 +49,7 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { colors, isDark, toggle } = useTheme();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useBottomTabBarHeight();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { balance: liveBalance, refetch: refetchWallet } = useWallet();
   const { isCelebrity, loading: celebrityLoading } = useCelebrity();
@@ -64,7 +66,7 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={[styles.container, { backgroundColor: colors.background }]}
-      contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}
+      contentContainerStyle={{ paddingBottom: tabBarHeight + 20 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
