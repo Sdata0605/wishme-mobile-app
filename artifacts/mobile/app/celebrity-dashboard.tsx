@@ -19,7 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/Icon';
-import { SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import type { Session, User } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -83,6 +83,8 @@ interface Celebrity {
   social_media: Record<string, string>;
   service_prices: Record<string, number>;
   status: string;
+  commission_percentage?: number;
+  delivery_time?: number;
 }
 
 interface Booking {
@@ -94,7 +96,17 @@ interface Booking {
   celebrity_commission: number;
   status: string;
   created_at: string;
+  message?: string;
   fan_name?: string;
+  profiles?: { first_name: string; last_name: string };
+}
+
+interface ImagePromotion {
+  id: string;
+  concept: string;
+  price_paid: number;
+  status: string;
+  created_at: string;
   profiles?: { first_name: string; last_name: string };
 }
 
@@ -245,26 +257,36 @@ export default function CelebrityDashboardScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B33" />}
-        stickyHeaderIndices={[1]}
       >
+        {celebrity.consent_status !== 'submitted' && celebrity.consent_status !== 'approved' && (
+          <View style={styles.consentBanner}>
+            <Icon name="alert-circle" size={16} color="#fff" />
+            <Text style={styles.consentBannerText}>
+              Your consent is pending. Please submit your consent documents to activate your profile.
+            </Text>
+          </View>
+        )}
         <LinearGradient colors={['#FF6B33', '#E8527A', '#B44CFF']} style={styles.heroBg}>
           <Text style={styles.heroName}>{celebrity.name}</Text>
           <Text style={styles.heroCategory}>{celebrity.category}</Text>
-          <View style={styles.statsRow}>
-            {[
-              { label: 'Total Earnings', value: fmtRupee(stats.totalEarnings) },
-              { label: 'Pending', value: fmtRupee(stats.pendingEarnings) },
-              { label: 'Bookings', value: String(stats.totalBookings) },
-              { label: 'Rating', value: (celebrity.rating ?? 0).toFixed(1) },
-              { label: 'Reviews', value: String(celebrity.review_count ?? 0) },
-            ].map((s) => (
-              <View key={s.label} style={styles.statChip}>
-                <Text style={styles.statVal} numberOfLines={1}>{s.value}</Text>
-                <Text style={styles.statLabel}>{s.label}</Text>
-              </View>
-            ))}
-          </View>
         </LinearGradient>
+        <View style={[styles.statsGrid, { backgroundColor: colors.background }]}>
+          {[
+            { label: 'Total Earnings', value: fmtRupee(stats.totalEarnings), icon: 'trending-up' as IconName, color: '#22C55E' },
+            { label: 'Pending', value: fmtRupee(stats.pendingEarnings), icon: 'clock' as IconName, color: '#F59E0B' },
+            { label: 'Bookings', value: String(stats.totalBookings), icon: 'credit-card' as IconName, color: '#3B82F6' },
+            { label: 'Rating', value: (celebrity.rating ?? 0).toFixed(1), icon: 'star' as IconName, color: '#EAB308' },
+            { label: 'Reviews', value: String(celebrity.review_count ?? 0), icon: 'message-circle' as IconName, color: '#A855F7' },
+          ].map((s) => (
+            <View key={s.label} style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <View style={[styles.statCardIcon, { backgroundColor: s.color + '22' }]}>
+                <Icon name={s.icon} size={18} color={s.color} />
+              </View>
+              <Text style={[styles.statCardVal, { color: colors.foreground }]} numberOfLines={1}>{s.value}</Text>
+              <Text style={[styles.statCardLabel, { color: colors.mutedForeground }]}>{s.label}</Text>
+            </View>
+          ))}
+        </View>
 
         <View style={[styles.tabBarWrapper, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabBar}>
@@ -432,24 +454,39 @@ interface TabPropsWithUserAndRefresh extends TabProps {
 
 function BookingsTab({ celebrity, colors, session }: TabProps) {
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [imagePromos, setImagePromos] = useState<ImagePromotion[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
+  const [expandedBookings, setExpandedBookings] = useState<Set<string>>(new Set());
 
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await supabaseFetch(
-        `/rest/v1/bookings?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name)&order=created_at.desc&limit=50`,
-        {},
-        session?.access_token,
-      );
-      if (res.ok) {
-        const rows = await res.json() as Booking[];
-        setBookings(rows ?? []);
-      }
+      const [bRes, ipRes] = await Promise.all([
+        supabaseFetch(
+          `/rest/v1/bookings?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name)&order=created_at.desc&limit=50`,
+          {},
+          session?.access_token,
+        ),
+        supabaseFetch(
+          `/rest/v1/image_promotions?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name)&order=created_at.desc&limit=30`,
+          {},
+          session?.access_token,
+        ),
+      ]);
+      if (bRes.ok) { const rows = await bRes.json() as Booking[]; setBookings(rows ?? []); }
+      if (ipRes.ok) { const rows = await ipRes.json() as ImagePromotion[]; setImagePromos(rows ?? []); }
     } catch {}
     setLoading(false);
   }, [celebrity.id, session?.access_token]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedBookings(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => { fetchBookings(); }, [fetchBookings]);
 
@@ -474,13 +511,16 @@ function BookingsTab({ celebrity, colors, session }: TabProps) {
   };
 
   if (loading) return <LoadingBox />;
-  if (!bookings.length) return <SectionEmpty icon="credit-card" text="No bookings yet" colors={colors} />;
 
   return (
     <View style={styles.tabPad}>
       <SectionTitle text={`All Bookings (${bookings.length})`} colors={colors} />
+      {bookings.length === 0 && <SectionEmpty icon="credit-card" text="No bookings yet" colors={colors} />}
       {bookings.map(b => {
         const fanName = b.profiles ? `${b.profiles.first_name ?? ''} ${b.profiles.last_name ?? ''}`.trim() : 'Fan';
+        let requestDetails: { recipientName?: string; occasion?: string; message?: string } | null = null;
+        try { if (b.message) { const parsed = JSON.parse(b.message); requestDetails = parsed?.requestDetails ?? parsed ?? null; } } catch {}
+        const isExpanded = expandedBookings.has(b.id);
         return (
           <Card key={b.id} colors={colors}>
             <View style={styles.rowBetween}>
@@ -494,6 +534,21 @@ function BookingsTab({ celebrity, colors, session }: TabProps) {
               </View>
             </View>
             <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{fmtDate(b.created_at)}</Text>
+            {requestDetails && (
+              <TouchableOpacity onPress={() => toggleExpand(b.id)} style={{ marginTop: 8 }}>
+                <View style={[styles.rowBetween, { paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }]}>
+                  <Text style={{ color: '#FF6B33', fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>Request Details</Text>
+                  <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="#FF6B33" />
+                </View>
+                {isExpanded && (
+                  <View style={{ marginTop: 8, gap: 4 }}>
+                    {requestDetails.recipientName ? <Text style={[styles.cardSub, { color: colors.foreground }]}>To: {requestDetails.recipientName}</Text> : null}
+                    {requestDetails.occasion ? <Text style={[styles.cardSub, { color: colors.foreground }]}>Occasion: {requestDetails.occasion}</Text> : null}
+                    {requestDetails.message ? <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{requestDetails.message}</Text> : null}
+                  </View>
+                )}
+              </TouchableOpacity>
+            )}
             {b.status === 'pending' && (
               <View style={styles.actionRow}>
                 <TouchableOpacity
@@ -515,6 +570,30 @@ function BookingsTab({ celebrity, colors, session }: TabProps) {
           </Card>
         );
       })}
+
+      <SectionTitle text="Image Promotions" colors={colors} />
+      {imagePromos.length === 0 ? (
+        <SectionEmpty icon="image" text="No image promotions yet" colors={colors} />
+      ) : (
+        imagePromos.map(ip => {
+          const customer = ip.profiles ? `${ip.profiles.first_name ?? ''} ${ip.profiles.last_name ?? ''}`.trim() : 'Customer';
+          return (
+            <Card key={ip.id} colors={colors}>
+              <View style={styles.rowBetween}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={2}>{ip.concept || 'Image Promotion'}</Text>
+                  <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{customer}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                  <Text style={[styles.priceText, { color: '#FF6B33' }]}>{fmtRupee(ip.price_paid)}</Text>
+                  <StatusBadge status={ip.status} />
+                </View>
+              </View>
+              <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{fmtDate(ip.created_at)}</Text>
+            </Card>
+          );
+        })
+      )}
     </View>
   );
 }
@@ -647,11 +726,19 @@ function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: TabProp
 
   if (loading) return <LoadingBox />;
 
+  const pendingClearance = txns.filter(tx => tx.status === 'pending').reduce((s, tx) => s + (tx.amount ?? 0), 0);
+
   return (
     <View style={styles.tabPad}>
       <LinearGradient colors={['#FF6B33', '#B44CFF']} style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
         <Text style={styles.balanceAmt}>{fmtRupee(celebrity.available_balance ?? 0)}</Text>
+        {pendingClearance > 0 && (
+          <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.3)' }}>
+            <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular' }}>Pending Clearance</Text>
+            <Text style={{ color: '#FCD34D', fontSize: 20, fontFamily: 'Inter_700Bold', marginTop: 2 }}>{fmtRupee(pendingClearance)}</Text>
+          </View>
+        )}
       </LinearGradient>
 
       <SectionTitle text="Request Payout" colors={colors} />
@@ -743,6 +830,7 @@ interface Conversation {
   user_id: string;
   last_message_at: string;
   last_message_text: string;
+  unread_count_celebrity?: number;
   profiles?: { first_name: string; last_name: string };
 }
 
@@ -753,6 +841,13 @@ interface Message {
   message_text: string;
   created_at: string;
   is_read: boolean;
+  is_ai_generated?: boolean;
+}
+
+interface CelebSettings {
+  id?: string;
+  celebrity_id: string;
+  ai_auto_reply_enabled: boolean;
 }
 
 function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
@@ -763,19 +858,54 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
   const [msgLoading, setMsgLoading] = useState(false);
   const [reply, setReply] = useState('');
   const [sending, setSending] = useState(false);
+  const [aiSettings, setAiSettings] = useState<CelebSettings | null>(null);
+  const [togglingAI, setTogglingAI] = useState(false);
+  const [generatingAI, setGeneratingAI] = useState(false);
 
   const fetchConvos = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await supabaseFetch(
-        `/rest/v1/conversations?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name)&order=last_message_at.desc&limit=30`,
-        {},
-        session?.access_token,
-      );
-      if (res.ok) { const r = await res.json() as Conversation[]; setConvos(r ?? []); }
+      const [convoRes, settingsRes] = await Promise.all([
+        supabaseFetch(
+          `/rest/v1/conversations?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name)&order=last_message_at.desc&limit=30`,
+          {},
+          session?.access_token,
+        ),
+        supabaseFetch(
+          `/rest/v1/celebrity_settings?celebrity_id=eq.${celebrity.id}&limit=1`,
+          {},
+          session?.access_token,
+        ),
+      ]);
+      if (convoRes.ok) { const r = await convoRes.json() as Conversation[]; setConvos(r ?? []); }
+      if (settingsRes.ok) {
+        const r = await settingsRes.json() as CelebSettings[];
+        setAiSettings(r?.[0] ?? { celebrity_id: celebrity.id, ai_auto_reply_enabled: false });
+      }
     } catch {}
     setLoading(false);
   }, [celebrity.id, session?.access_token]);
+
+  const toggleAIAutoReply = async () => {
+    if (!session?.access_token) return;
+    setTogglingAI(true);
+    try {
+      const newVal = !(aiSettings?.ai_auto_reply_enabled ?? false);
+      const res = await supabaseFetch(
+        '/rest/v1/celebrity_settings',
+        {
+          method: 'POST',
+          headers: { Prefer: 'resolution=merge-duplicates,return=minimal' } as Record<string, string>,
+          body: JSON.stringify({ celebrity_id: celebrity.id, ai_auto_reply_enabled: newVal }),
+        },
+        session.access_token,
+      );
+      if (res.ok) {
+        setAiSettings(prev => prev ? { ...prev, ai_auto_reply_enabled: newVal } : { celebrity_id: celebrity.id, ai_auto_reply_enabled: newVal });
+      }
+    } catch {}
+    setTogglingAI(false);
+  };
 
   useEffect(() => { fetchConvos(); }, [fetchConvos]);
 
@@ -796,6 +926,33 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
       );
     } catch {}
     setMsgLoading(false);
+  };
+
+  const generateAIReply = async () => {
+    if (!activeConvo || !session?.access_token) return;
+    const fanMessages = messages.filter(m => m.sender_id !== user?.profileId);
+    const lastFanMessage = fanMessages[fanMessages.length - 1]?.message_text ?? '';
+    setGeneratingAI(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/celebrity-ai-message`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ conversationId: activeConvo.id, userMessage: lastFanMessage }),
+      });
+      if (res.ok) {
+        await openConvo(activeConvo);
+      } else {
+        const err = await res.json().catch(() => ({})) as Record<string, string>;
+        Alert.alert('AI Error', err.message ?? 'Failed to generate reply');
+      }
+    } catch (err) {
+      Alert.alert('AI Error', err instanceof Error ? err.message : 'Failed to generate reply');
+    }
+    setGeneratingAI(false);
   };
 
   const sendReply = async () => {
@@ -826,6 +983,7 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
 
   if (activeConvo) {
     const fanName = activeConvo.profiles ? `${activeConvo.profiles.first_name ?? ''} ${activeConvo.profiles.last_name ?? ''}`.trim() : 'Fan';
+    const fanMessages = messages.filter(m => m.sender_id !== user?.profileId);
     return (
       <View style={{ flex: 1 }}>
         <View style={[styles.msgHeader, { borderBottomColor: colors.border }]}>
@@ -833,6 +991,18 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
             <Icon name="arrow-left" size={20} color={colors.foreground} />
           </TouchableOpacity>
           <Text style={[styles.cardTitle, { color: colors.foreground, flex: 1, marginLeft: 12 }]}>{fanName}</Text>
+          <TouchableOpacity
+            onPress={generateAIReply}
+            disabled={generatingAI || fanMessages.length === 0}
+            style={[styles.aiBtnSmall, { opacity: fanMessages.length === 0 ? 0.4 : 1 }]}
+          >
+            {generatingAI ? <ActivityIndicator size="small" color="#A855F7" /> : (
+              <>
+                <Text style={{ color: '#A855F7', fontFamily: 'Inter_700Bold', fontSize: 11 }}>AI</Text>
+                <Text style={{ color: '#A855F7', fontFamily: 'Inter_500Medium', fontSize: 11, marginLeft: 3 }}>Reply</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
         {msgLoading ? (
           <LoadingBox />
@@ -842,7 +1012,12 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
               const isMine = m.sender_id === user?.profileId;
               return (
                 <View key={m.id} style={{ alignItems: isMine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
-                  <View style={[styles.bubble, { backgroundColor: isMine ? '#FF6B33' : colors.card, borderColor: colors.border }]}>
+                  {m.is_ai_generated && isMine && (
+                    <View style={styles.aiBadge}>
+                      <Text style={{ color: '#A855F7', fontFamily: 'Inter_700Bold', fontSize: 10 }}>AI</Text>
+                    </View>
+                  )}
+                  <View style={[styles.bubble, { backgroundColor: isMine ? '#FF6B33' : colors.card, borderColor: m.is_ai_generated ? '#A855F7' : colors.border }]}>
                     <Text style={{ color: isMine ? '#fff' : colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 13 }}>{m.message_text}</Text>
                   </View>
                   <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 }}>{fmtDate(m.created_at)}</Text>
@@ -869,13 +1044,40 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
   }
 
   if (loading) return <LoadingBox />;
-  if (!convos.length) return <SectionEmpty icon="message-circle" text="No conversations yet" colors={colors} />;
 
   return (
     <View style={styles.tabPad}>
+      <Card colors={colors}>
+        <View style={styles.rowBetween}>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>AI Auto-Reply</Text>
+            <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>Automatically reply to fan messages with AI</Text>
+          </View>
+          <TouchableOpacity
+            onPress={toggleAIAutoReply}
+            disabled={togglingAI}
+            style={[styles.toggleBtn, { backgroundColor: aiSettings?.ai_auto_reply_enabled ? '#A855F7' : colors.border }]}
+          >
+            {togglingAI ? <ActivityIndicator size="small" color="#fff" /> : (
+              <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 12 }}>
+                {aiSettings?.ai_auto_reply_enabled ? 'ON' : 'OFF'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
+        {aiSettings?.ai_auto_reply_enabled && (
+          <View style={[styles.aiBanner]}>
+            <Icon name="check-circle" size={14} color="#22C55E" />
+            <Text style={{ color: '#22C55E', fontFamily: 'Inter_600SemiBold', fontSize: 13, marginLeft: 6 }}>AI Auto-Reply is ON</Text>
+          </View>
+        )}
+      </Card>
+
       <SectionTitle text="Conversations" colors={colors} />
+      {!convos.length && <SectionEmpty icon="message-circle" text="No conversations yet" colors={colors} />}
       {convos.map(c => {
         const fanName = c.profiles ? `${c.profiles.first_name ?? ''} ${c.profiles.last_name ?? ''}`.trim() : 'Fan';
+        const unread = c.unread_count_celebrity ?? 0;
         return (
           <TouchableOpacity key={c.id} onPress={() => openConvo(c)}>
             <Card colors={colors}>
@@ -884,9 +1086,15 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
                   <Text style={[styles.cardTitle, { color: colors.foreground }]}>{fanName}</Text>
                   <Text style={[styles.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>{c.last_message_text}</Text>
                 </View>
-                <View style={{ alignItems: 'flex-end' }}>
+                <View style={{ alignItems: 'flex-end', gap: 4 }}>
                   <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_400Regular' }}>{fmtDate(c.last_message_at)}</Text>
-                  <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
+                  {unread > 0 ? (
+                    <View style={styles.unreadBadge}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontFamily: 'Inter_700Bold' }}>{unread}</Text>
+                    </View>
+                  ) : (
+                    <Icon name="chevron-right" size={16} color={colors.mutedForeground} />
+                  )}
                 </View>
               </View>
             </Card>
@@ -1115,7 +1323,9 @@ interface Review {
   rating: number;
   review_text: string;
   created_at: string;
+  booking_id?: string;
   profiles?: { first_name: string; last_name: string };
+  bookings?: { service_type: string };
 }
 
 function ReviewsTab({ celebrity, colors, session }: TabProps) {
@@ -1124,7 +1334,7 @@ function ReviewsTab({ celebrity, colors, session }: TabProps) {
 
   useEffect(() => {
     supabaseFetch(
-      `/rest/v1/celebrity_reviews?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name)&order=created_at.desc&limit=30`,
+      `/rest/v1/celebrity_reviews?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name),bookings(service_type)&order=created_at.desc&limit=30`,
       {},
       session?.access_token,
     ).then(async res => {
@@ -1135,19 +1345,47 @@ function ReviewsTab({ celebrity, colors, session }: TabProps) {
   if (loading) return <LoadingBox />;
   if (!reviews.length) return <SectionEmpty icon="star" text="No reviews yet" colors={colors} />;
 
+  const avgRating = reviews.reduce((s, r) => s + (r.rating ?? 0), 0) / reviews.length;
+  const starCounts = [5, 4, 3, 2, 1].map(s => ({ star: s, count: reviews.filter(r => Math.round(r.rating) === s).length }));
+
   return (
     <View style={styles.tabPad}>
+      <Card colors={colors}>
+        <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+          <Text style={{ color: colors.foreground, fontSize: 48, fontFamily: 'Inter_700Bold', lineHeight: 56 }}>{avgRating.toFixed(1)}</Text>
+          <View style={[styles.starsRow, { marginBottom: 12 }]}>
+            {[1, 2, 3, 4, 5].map(s => (
+              <Icon key={s} name="star" size={18} color={s <= Math.round(avgRating) ? '#F59E0B' : colors.border} />
+            ))}
+          </View>
+          <View style={{ width: '100%', gap: 4 }}>
+            {starCounts.map(({ star, count }) => (
+              <View key={star} style={[styles.rowBetween, { gap: 8 }]}>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular', fontSize: 12, width: 20, textAlign: 'right' }}>{star}★</Text>
+                <View style={[styles.ratingBar, { backgroundColor: colors.border, flex: 1 }]}>
+                  <View style={[styles.ratingBarFill, { width: reviews.length ? `${(count / reviews.length) * 100}%` : '0%' }]} />
+                </View>
+                <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular', fontSize: 12, width: 24 }}>{count}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </Card>
       <SectionTitle text={`Reviews (${reviews.length})`} colors={colors} />
       {reviews.map(r => {
         const fan = r.profiles ? `${r.profiles.first_name ?? ''} ${r.profiles.last_name ?? ''}`.trim() : 'Fan';
+        const serviceType = r.bookings?.service_type;
         return (
           <Card key={r.id} colors={colors}>
             <View style={styles.rowBetween}>
               <Text style={[styles.cardTitle, { color: colors.foreground }]}>{fan}</Text>
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map(s => (
-                  <Icon key={s} name="star" size={13} color={s <= (r.rating ?? 0) ? '#F59E0B' : colors.border} />
-                ))}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                {serviceType && <StatusBadge status={serviceType.replace(/_/g, ' ')} />}
+                <View style={styles.starsRow}>
+                  {[1, 2, 3, 4, 5].map(s => (
+                    <Icon key={s} name="star" size={13} color={s <= (r.rating ?? 0) ? '#F59E0B' : colors.border} />
+                  ))}
+                </View>
               </View>
             </View>
             {r.review_text ? <Text style={[styles.cardSub, { color: colors.foreground, marginTop: 4 }]}>{r.review_text}</Text> : null}
@@ -1164,6 +1402,7 @@ interface Follower {
   user_id: string;
   created_at: string;
   status: string;
+  subscription_expires_at?: string | null;
   profiles?: { first_name: string; last_name: string };
 }
 
@@ -1186,15 +1425,28 @@ function FollowersTab({ celebrity, colors, session }: TabProps) {
 
   return (
     <View style={styles.tabPad}>
+      <Card colors={colors}>
+        <View style={{ alignItems: 'center', paddingVertical: 8 }}>
+          <View style={[styles.statCardIcon, { backgroundColor: '#EC489922' }]}>
+            <Icon name="heart" size={22} color="#EC4899" />
+          </View>
+          <Text style={{ color: colors.foreground, fontSize: 36, fontFamily: 'Inter_700Bold', marginTop: 8 }}>{followers.length}</Text>
+          <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular', fontSize: 14 }}>Total Followers</Text>
+        </View>
+      </Card>
       <SectionTitle text={`Followers (${followers.length})`} colors={colors} />
       {followers.map(f => {
         const fan = f.profiles ? `${f.profiles.first_name ?? ''} ${f.profiles.last_name ?? ''}`.trim() : 'Fan';
+        const expiresAt = f.subscription_expires_at ? fmtDate(f.subscription_expires_at) : 'Lifetime';
         return (
           <Card key={f.id} colors={colors}>
             <View style={styles.rowBetween}>
               <View>
                 <Text style={[styles.cardTitle, { color: colors.foreground }]}>{fan}</Text>
                 <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>Since {fmtDate(f.created_at)}</Text>
+                <Text style={[styles.cardDate, { color: f.subscription_expires_at ? colors.mutedForeground : '#22C55E' }]}>
+                  Expires: {expiresAt}
+                </Text>
               </View>
               <StatusBadge status={f.status || 'active'} />
             </View>
@@ -1463,6 +1715,13 @@ const SERVICE_PRICE_FIELDS: Array<{ key: string; label: string }> = [
   { key: 'voice_call', label: 'Voice Call' },
 ];
 
+interface ProfileInfo {
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone?: string;
+}
+
 function ProfileTab({ celebrity, colors, session, onRefresh }: TabPropsWithRefresh) {
   const [prices, setPrices] = useState<Record<string, string>>(() => {
     const sp = celebrity.service_prices ?? {};
@@ -1471,6 +1730,24 @@ function ProfileTab({ celebrity, colors, session, onRefresh }: TabPropsWithRefre
     return result;
   });
   const [saving, setSaving] = useState(false);
+  const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPwd, setChangingPwd] = useState(false);
+
+  useEffect(() => {
+    if (!celebrity.profile_id || !session?.access_token) return;
+    supabaseFetch(
+      `/rest/v1/profiles?id=eq.${celebrity.profile_id}&select=first_name,last_name,email,phone&limit=1`,
+      {},
+      session.access_token,
+    ).then(async res => {
+      if (res.ok) {
+        const rows = await res.json() as ProfileInfo[];
+        if (rows?.[0]) setProfileInfo(rows[0]);
+      }
+    }).catch(() => {});
+  }, [celebrity.profile_id, session?.access_token]);
 
   const savePrices = async () => {
     if (!session?.access_token) { Alert.alert('Not logged in'); return; }
@@ -1500,6 +1777,35 @@ function ProfileTab({ celebrity, colors, session, onRefresh }: TabPropsWithRefre
     setSaving(false);
   };
 
+  const changePassword = async () => {
+    if (!newPassword || newPassword.length < 6) { Alert.alert('Password must be at least 6 characters'); return; }
+    if (newPassword !== confirmPassword) { Alert.alert('Passwords do not match'); return; }
+    if (!session?.access_token) { Alert.alert('Not logged in'); return; }
+    setChangingPwd(true);
+    try {
+      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({})) as Record<string, string>;
+        Alert.alert('Error', err.message ?? `Failed to change password (${res.status})`);
+      } else {
+        Alert.alert('Success', 'Password changed successfully!');
+        setNewPassword('');
+        setConfirmPassword('');
+      }
+    } catch (err) {
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to change password');
+    }
+    setChangingPwd(false);
+  };
+
   const social = celebrity.social_media ?? {};
 
   const profileFields: Array<{ label: string; value: string | null | undefined }> = [
@@ -1509,6 +1815,8 @@ function ProfileTab({ celebrity, colors, session, onRefresh }: TabPropsWithRefre
     { label: 'Date of Birth', value: celebrity.date_of_birth },
     { label: 'Anniversary', value: celebrity.anniversary },
     { label: 'Status', value: celebrity.status },
+    { label: 'Commission', value: celebrity.commission_percentage != null ? `${celebrity.commission_percentage}%` : null },
+    { label: 'Delivery Time', value: celebrity.delivery_time != null ? `${celebrity.delivery_time} days` : null },
     { label: 'Rating', value: celebrity.rating != null ? `${(celebrity.rating).toFixed(1)} ★` : null },
     { label: 'Reviews', value: celebrity.review_count != null ? String(celebrity.review_count) : null },
     { label: 'Consent Status', value: celebrity.consent_status },
@@ -1524,6 +1832,25 @@ function ProfileTab({ celebrity, colors, session, onRefresh }: TabPropsWithRefre
 
   return (
     <View style={styles.tabPad}>
+      {profileInfo && (
+        <>
+          <SectionTitle text="Personal Info" colors={colors} />
+          <Card colors={colors}>
+            {[
+              { label: 'First Name', value: profileInfo.first_name },
+              { label: 'Last Name', value: profileInfo.last_name },
+              { label: 'Email', value: profileInfo.email },
+              { label: 'Phone', value: profileInfo.phone },
+            ].map(f => f.value ? (
+              <View key={f.label} style={[styles.profileRow, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.profileLabel, { color: colors.mutedForeground }]}>{f.label}</Text>
+                <Text style={[styles.profileValue, { color: colors.foreground }]} numberOfLines={1}>{f.value}</Text>
+              </View>
+            ) : null)}
+          </Card>
+        </>
+      )}
+
       <SectionTitle text="Profile Details" colors={colors} />
       <Card colors={colors}>
         {profileFields.map(f => f.value ? (
@@ -1554,6 +1881,33 @@ function ProfileTab({ celebrity, colors, session, onRefresh }: TabPropsWithRefre
         ))}
         <PrimaryBtn label="Save Pricing" onPress={savePrices} loading={saving} colors={colors} />
       </Card>
+
+      <SectionTitle text="Change Password" colors={colors} />
+      <Card colors={colors}>
+        <View style={{ marginBottom: 12 }}>
+          <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>New Password</Text>
+          <TextInput
+            value={newPassword}
+            onChangeText={setNewPassword}
+            placeholder="Min 6 characters"
+            placeholderTextColor={colors.mutedForeground}
+            secureTextEntry
+            style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+          />
+        </View>
+        <View style={{ marginBottom: 12 }}>
+          <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Confirm Password</Text>
+          <TextInput
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            placeholder="Repeat new password"
+            placeholderTextColor={colors.mutedForeground}
+            secureTextEntry
+            style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
+          />
+        </View>
+        <PrimaryBtn label="Change Password" onPress={changePassword} loading={changingPwd} colors={colors} />
+      </Card>
     </View>
   );
 }
@@ -1567,13 +1921,16 @@ const styles = StyleSheet.create({
   accessSub: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
   backBtn: { marginTop: 20, paddingHorizontal: 24, paddingVertical: 10, borderRadius: 99, borderWidth: 1.5 },
   backBtnText: { fontFamily: 'Inter_600SemiBold', fontSize: 14 },
-  heroBg: { padding: 24, paddingBottom: 28 },
+  consentBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F97316', paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  consentBannerText: { color: '#fff', fontFamily: 'Inter_500Medium', fontSize: 13, flex: 1 },
+  heroBg: { padding: 24, paddingBottom: 20 },
   heroName: { color: '#fff', fontSize: 22, fontFamily: 'PlayfairDisplay_700Bold', marginBottom: 4 },
-  heroCategory: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontFamily: 'Inter_500Medium', marginBottom: 20 },
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  statChip: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8, minWidth: 70, alignItems: 'center' },
-  statVal: { color: '#fff', fontSize: 15, fontFamily: 'Inter_700Bold' },
-  statLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 2, textAlign: 'center' },
+  heroCategory: { color: 'rgba(255,255,255,0.8)', fontSize: 13, fontFamily: 'Inter_500Medium' },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 10 },
+  statCard: { width: '47%', borderRadius: 14, borderWidth: 1, padding: 14, alignItems: 'flex-start', gap: 6 },
+  statCardIcon: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  statCardVal: { fontSize: 18, fontFamily: 'Inter_700Bold' },
+  statCardLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   tabBarWrapper: { borderBottomWidth: 1 },
   tabBar: { paddingHorizontal: 12 },
   tabItem: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 12 },
@@ -1616,4 +1973,11 @@ const styles = StyleSheet.create({
   priceInputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12 },
   rupeePrefix: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginRight: 4 },
   copyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 12 },
+  unreadBadge: { backgroundColor: '#EF4444', borderRadius: 99, minWidth: 18, height: 18, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
+  aiBadge: { backgroundColor: '#A855F722', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 2, alignSelf: 'flex-end' },
+  aiBtnSmall: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#A855F7', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
+  aiBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#22C55E18', borderRadius: 8, padding: 8, marginTop: 10 },
+  toggleBtn: { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', minWidth: 52 },
+  ratingBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  ratingBarFill: { height: 8, backgroundColor: '#F59E0B', borderRadius: 4 },
 });
