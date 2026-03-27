@@ -1,0 +1,716 @@
+Celebrity Subscription System — Complete Technical Documentation for Replit Mobile App
+1. How We Identify If a User Has Subscribed to a Celebrity
+The single source of truth is the celebrity_favorites table.
+
+
+{
+  "table": "celebrity_favorites",
+  "check_query": {
+    "from": "celebrity_favorites",
+    "select": "celebrity_id",
+    "filters": {
+      "user_id": "<profile.id of logged-in user>",
+      "status": "active"
+    }
+  },
+  "result": "Array of celebrity_id strings the user is subscribed to"
+}
+Frontend logic (used in /celebrities, /following, /wish-a-celebrity):
+
+
+// Step 1: Fetch all active subscriptions for the user
+const { data } = await supabase
+  .from('celebrity_favorites')
+  .select('celebrity_id')
+  .eq('user_id', profile.id)       // profile.id = public.profiles.id
+  .eq('status', 'active');
+
+// Step 2: Build a lookup array
+const subscriptions = data?.map(f => f.celebrity_id) || [];
+
+// Step 3: Check any celebrity
+const isSubscribed = (celebrityId: string) => subscriptions.includes(celebrityId);
+Important: user_id in celebrity_favorites is NOT auth.users.id. It is profiles.id (the UUID from the public.profiles table). The platform consistently uses profile.id for all user-owned data.
+
+2. Celebrity Favorites Table Schema
+
+{
+  "table": "celebrity_favorites",
+  "columns": {
+    "id": "uuid (PK, auto-generated)",
+    "user_id": "uuid (FK → profiles.id) — the fan/subscriber",
+    "celebrity_id": "uuid (FK → celebrities.id) — the celebrity",
+    "status": "text — 'active' | 'inactive' | 'expired'",
+    "price_paid": "integer — amount in INR (e.g., 499)",
+    "payment_method": "text — 'wallet' | 'razorpay'",
+    "referrer_commission": "integer — calculated on insert",
+    "celebrity_commission": "integer — calculated on insert",
+    "subscription_start_date": "timestamptz",
+    "auto_renew": "boolean (default false)",
+    "created_at": "timestamptz"
+  },
+  "unique_constraint": "(user_id, celebrity_id) when status = 'active'"
+}
+3. Celebrity Favorite Pricing Table
+Each celebrity's subscription price is set by admin in a separate pricing table:
+
+
+{
+  "table": "celebrity_favorite_pricing",
+  "columns": {
+    "id": "uuid (PK)",
+    "celebrity_id": "uuid (FK → celebrities.id)",
+    "price": "integer — subscription price in INR",
+    "referrer_commission_percentage": "integer (default 10)",
+    "celebrity_commission_percentage": "integer (default 5)",
+    "is_enabled": "boolean — if false, subscription is not available"
+  },
+  "query_to_get_price": {
+    "from": "celebrity_favorite_pricing",
+    "select": "*",
+    "filter": {
+      "celebrity_id": "<celebrity_id>",
+      "is_enabled": true
+    }
+  }
+}
+Rule: If a celebrity has NO entry in celebrity_favorite_pricing OR is_enabled = false, they cannot be subscribed to. The UI shows "View Profile" instead of "Subscribe".
+
+4. Visual States on Celebrity Cards
+The /celebrities page shows ALL active celebrities. Subscription status changes the card appearance:
+
+
+{
+  "card_states": {
+    "guest_user_not_logged_in": {
+      "image": "normal (no blur)",
+      "lock_overlay": "none",
+      "action": "clicking card goes to /celebrity/:id"
+    },
+    "logged_in_AND_subscribed": {
+      "image": "normal (no blur)",
+      "lock_overlay": "none",
+      "price_badge": "visible (top-right, ₹ amount)",
+      "action": "clicking card goes to /celebrity/:id where all services are accessible"
+    },
+    "logged_in_AND_NOT_subscribed": {
+      "image": "blurred (filter: blur(8px))",
+      "lock_overlay": {
+        "visible": true,
+        "icon": "Lock (centered, 52x52 circle with backdrop-blur)",
+        "text": "Subscription Required",
+        "button": "Unlock Now (white pill)"
+      },
+      "price_badge": "still visible (top-right)",
+      "action": "clicking card goes to /celebrity/:id which shows SubscriptionGate modal"
+    }
+  },
+  "detection_logic": {
+    "function": "needsSubscription(celebrity)",
+    "code": "return user && !isSubscribed(celebrity.id)",
+    "meaning": "Lock shown ONLY when user is logged in but NOT subscribed. Guests see no lock."
+  }
+}
+5. Subscription Purchase Flow (End-to-End)
+
+{
+  "flow": "User subscribes to a celebrity",
+  "steps": [
+    {
+      "step": 1,
+      "action": "User clicks 'Subscribe' or 'Unlock Now'",
+      "ui_component": "SubscriptionGate modal OR Following page button",
+      "triggers": "Opens PaymentMethodSelector dialog"
+    },
+    {
+      "step": 2,
+      "action": "User selects payment method",
+      "options": ["Wallet", "Razorpay"]
+    },
+    {
+      "step": 3,
+      "action": "Frontend calls atomic RPC",
+      "endpoint": "supabase.rpc('purchase_celebrity_subscription')",
+      "payload": {
+        "p_celebrity_id": "uuid — the celebrity to subscribe to",
+        "p_price": "integer — must match celebrity_favorite_pricing.price exactly",
+        "p_payment_method": "'wallet' | 'razorpay'"
+      },
+      "response_success": {
+        "success": true,
+        "favorite_id": "uuid — the new celebrity_favorites row",
+        "amount_charged": 499
+      },
+      "response_error_examples": [
+        { "error": "Not authenticated" },
+        { "error": "Already subscribed to this celebrity" },
+        { "error": "Subscription not available for this celebrity" },
+        { "error": "Price mismatch. Expected 499, got 299" },
+        { "error": "Insufficient wallet balance" }
+      ]
+    },
+    {
+      "step": 4,
+      "action": "RPC performs atomic transaction (all or nothing)",
+      "operations": [
+        "Validates caller profile via auth.uid()",
+        "Checks no duplicate active subscription exists",
+        "Validates price matches celebrity_favorite_pricing",
+        "If wallet: checks balance >= price",
+        "Calculates referrer_commission (default 10%)",
+        "Calculates celebrity_commission (default 5%)",
+        "INSERTs into celebrity_favorites (status='active')",
+        "If wallet: INSERTs wallet_transactions (type='celebrity_subscription')",
+        "INSERTs celebrity_wallet_transactions (type='earning')",
+        "UPDATEs celebrities.total_earnings and available_balance"
+      ]
+    },
+    {
+      "step": 5,
+      "action": "Frontend fires email notification (fire-and-forget)",
+      "endpoint": "supabase.functions.invoke('send-celebrity-subscription-email')",
+      "payload": {
+        "celebrity_id": "uuid",
+        "subscriber_name": "John Doe",
+        "subscriber_email": "john@example.com",
+        "price_paid": 499
+      }
+    },
+    {
+      "step": 6,
+      "action": "Frontend refreshes state",
+      "operations": [
+        "Re-fetch user favorites",
+        "Re-fetch wallet balance",
+        "Show success toast",
+        "Close modal"
+      ]
+    }
+  ]
+}
+6. Razorpay Payment Flow (Alternative to Wallet)
+
+{
+  "flow": "Razorpay subscription payment",
+  "steps": [
+    {
+      "step": 1,
+      "action": "Create Razorpay order",
+      "endpoint": "supabase.functions.invoke('create-razorpay-order')",
+      "payload": {
+        "amount": 499,
+        "currency": "INR",
+        "receipt": "fav_12345678_abcdef",
+        "notes": {
+          "user_id": "profile.id",
+          "celebrity_id": "celebrity.id",
+          "type": "celebrity_favorite"
+        }
+      },
+      "response": {
+        "id": "order_RazorpayOrderId",
+        "key_id": "rzp_live_xxxxx",
+        "amount": 49900,
+        "currency": "INR"
+      }
+    },
+    {
+      "step": 2,
+      "action": "Open Razorpay native SDK / checkout",
+      "config": {
+        "key": "response.key_id",
+        "amount": "response.amount",
+        "order_id": "response.id",
+        "prefill": { "name": "...", "email": "...", "contact": "..." }
+      }
+    },
+    {
+      "step": 3,
+      "action": "On payment success callback",
+      "action_detail": "Call same RPC with p_payment_method='razorpay'",
+      "note": "RPC skips wallet balance check when payment_method is 'razorpay'"
+    }
+  ]
+}
+7. How Subscription Gates Services
+Once subscribed, the isSubscribed flag controls access throughout the app:
+
+
+{
+  "service_gating": {
+    "/celebrity/:id (CelebrityProfile)": {
+      "subscribed": "All services visible with prices and 'Book Now' buttons",
+      "not_subscribed": "Services show Lock icon + 'Subscribe to Book' button → opens SubscriptionGate modal"
+    },
+    "/wish-a-celebrity": {
+      "subscribed": "Shows 'Wish Now' button → navigates to /wish-booking/:id",
+      "not_subscribed": "Shows 'Subscribe to Wish' button → navigates to /celebrity/:id"
+    },
+    "/booking/:id": {
+      "check": "useCelebritySubscription(celebrityId)",
+      "subscribed": "Full booking form accessible",
+      "not_subscribed": "Redirected to SubscriptionGate"
+    },
+    "/image-promotions": {
+      "check": "Loads only celebrities from user's favorites (celebrity_favorites + status=active)",
+      "no_favorites": "Shows 'Subscribe to celebrities first' message"
+    },
+    "/occasion-booking": {
+      "check": "Loads only subscribed celebrities for selection",
+      "no_favorites": "Shows 'Subscribe to Celebrities First' redirect"
+    }
+  }
+}
+8. The useCelebritySubscription Hook (Single Celebrity Check)
+Used on individual celebrity pages:
+
+
+{
+  "hook": "useCelebritySubscription(celebrityId)",
+  "query": {
+    "from": "celebrity_favorites",
+    "select": "*",
+    "filters": {
+      "user_id": "profile.id",
+      "celebrity_id": "celebrityId parameter",
+      "status": "active"
+    },
+    "method": "maybeSingle()"
+  },
+  "returns": {
+    "isSubscribed": "boolean",
+    "loading": "boolean",
+    "subscriptionData": "full row or null",
+    "checkSubscription": "function to re-check"
+  }
+}
+9. The useCelebrityFavorites Hook (All Favorites)
+Used for bulk checks across pages:
+
+
+{
+  "hook": "useCelebrityFavorites()",
+  "query": {
+    "from": "celebrity_favorites",
+    "select": "celebrity_id",
+    "filters": {
+      "user_id": "profile.id",
+      "status": "active"
+    }
+  },
+  "returns": {
+    "favorites": "string[] of celebrity_ids",
+    "hasFavorite": "(celebrityId: string) => boolean",
+    "loading": "boolean",
+    "refetchFavorites": "() => void"
+  }
+}
+10. Celebrity Data Loading (What Appears on Cards)
+
+{
+  "celebrities_query": {
+    "from": "celebrities",
+    "select": "* (all columns)",
+    "filters": {
+      "is_active": true,
+      "consent_status": "approved OR null"
+    },
+    "order": "rating DESC",
+    "pagination": "8 per page using .range(from, to)"
+  },
+  "key_card_fields": {
+    "id": "uuid — used for routing and subscription checks",
+    "name": "string — display name",
+    "category": "string — Actors, Singers, Comedians, etc.",
+    "image_url": "string — profile photo URL",
+    "rating": "number — 0-5 star rating",
+    "review_count": "number",
+    "bio": "string — short bio shown as subtitle",
+    "service_prices": {
+      "type": "JSONB",
+      "shape": {
+        "video_wish": 999,
+        "general_wish": 5000,
+        "image_promotion": 25000,
+        "video_promotion": 50000
+      },
+      "card_display": "Shows minimum price from all service_prices values"
+    },
+    "delivery_time": "string — '24 hours', '48 hours', etc."
+  }
+}
+11. Key Identifiers Summary
+
+{
+  "identity_mapping": {
+    "auth.uid()": "Supabase auth user ID (used internally by RLS)",
+    "profiles.id": "Public profile ID — used for ALL user data ownership",
+    "profiles.user_id": "FK to auth.users.id — links profile to auth",
+    "celebrities.id": "Celebrity entity ID — used in celebrity_favorites.celebrity_id",
+    "celebrities.profile_id": "FK to profiles.id — links celebrity to their user profile"
+  },
+  "critical_rule": "celebrity_favorites.user_id = profiles.id (NOT auth.uid()). The RPC resolves this internally via: SELECT id FROM profiles WHERE user_id = auth.uid()"
+}
+This documentation covers the complete subscription identification and gating system. The mobile app should replicate the same celebrity_favorites query pattern and purchase_celebrity_subscription RPC call for parity with the web app.
+
+Now I have all the information needed. Here's the comprehensive documentation:
+
+Celebrity Subscription System — Complete Technical Documentation for Replit Mobile App
+1. How We Identify If a User Has Subscribed to a Celebrity
+The single source of truth is the celebrity_favorites table.
+
+
+{
+  "table": "celebrity_favorites",
+  "check_query": {
+    "from": "celebrity_favorites",
+    "select": "celebrity_id",
+    "filters": {
+      "user_id": "<profile.id of logged-in user>",
+      "status": "active"
+    }
+  },
+  "result": "Array of celebrity_id strings the user is subscribed to"
+}
+Frontend logic (used in /celebrities, /following, /wish-a-celebrity):
+
+
+// Step 1: Fetch all active subscriptions for the user
+const { data } = await supabase
+  .from('celebrity_favorites')
+  .select('celebrity_id')
+  .eq('user_id', profile.id)       // profile.id = public.profiles.id
+  .eq('status', 'active');
+
+// Step 2: Build a lookup array
+const subscriptions = data?.map(f => f.celebrity_id) || [];
+
+// Step 3: Check any celebrity
+const isSubscribed = (celebrityId: string) => subscriptions.includes(celebrityId);
+Important: user_id in celebrity_favorites is NOT auth.users.id. It is profiles.id (the UUID from the public.profiles table). The platform consistently uses profile.id for all user-owned data.
+
+2. Celebrity Favorites Table Schema
+
+{
+  "table": "celebrity_favorites",
+  "columns": {
+    "id": "uuid (PK, auto-generated)",
+    "user_id": "uuid (FK → profiles.id) — the fan/subscriber",
+    "celebrity_id": "uuid (FK → celebrities.id) — the celebrity",
+    "status": "text — 'active' | 'inactive' | 'expired'",
+    "price_paid": "integer — amount in INR (e.g., 499)",
+    "payment_method": "text — 'wallet' | 'razorpay'",
+    "referrer_commission": "integer — calculated on insert",
+    "celebrity_commission": "integer — calculated on insert",
+    "subscription_start_date": "timestamptz",
+    "auto_renew": "boolean (default false)",
+    "created_at": "timestamptz"
+  },
+  "unique_constraint": "(user_id, celebrity_id) when status = 'active'"
+}
+3. Celebrity Favorite Pricing Table
+Each celebrity's subscription price is set by admin in a separate pricing table:
+
+
+{
+  "table": "celebrity_favorite_pricing",
+  "columns": {
+    "id": "uuid (PK)",
+    "celebrity_id": "uuid (FK → celebrities.id)",
+    "price": "integer — subscription price in INR",
+    "referrer_commission_percentage": "integer (default 10)",
+    "celebrity_commission_percentage": "integer (default 5)",
+    "is_enabled": "boolean — if false, subscription is not available"
+  },
+  "query_to_get_price": {
+    "from": "celebrity_favorite_pricing",
+    "select": "*",
+    "filter": {
+      "celebrity_id": "<celebrity_id>",
+      "is_enabled": true
+    }
+  }
+}
+Rule: If a celebrity has NO entry in celebrity_favorite_pricing OR is_enabled = false, they cannot be subscribed to. The UI shows "View Profile" instead of "Subscribe".
+
+4. Visual States on Celebrity Cards
+The /celebrities page shows ALL active celebrities. Subscription status changes the card appearance:
+
+
+{
+  "card_states": {
+    "guest_user_not_logged_in": {
+      "image": "normal (no blur)",
+      "lock_overlay": "none",
+      "action": "clicking card goes to /celebrity/:id"
+    },
+    "logged_in_AND_subscribed": {
+      "image": "normal (no blur)",
+      "lock_overlay": "none",
+      "price_badge": "visible (top-right, ₹ amount)",
+      "action": "clicking card goes to /celebrity/:id where all services are accessible"
+    },
+    "logged_in_AND_NOT_subscribed": {
+      "image": "blurred (filter: blur(8px))",
+      "lock_overlay": {
+        "visible": true,
+        "icon": "Lock (centered, 52x52 circle with backdrop-blur)",
+        "text": "Subscription Required",
+        "button": "Unlock Now (white pill)"
+      },
+      "price_badge": "still visible (top-right)",
+      "action": "clicking card goes to /celebrity/:id which shows SubscriptionGate modal"
+    }
+  },
+  "detection_logic": {
+    "function": "needsSubscription(celebrity)",
+    "code": "return user && !isSubscribed(celebrity.id)",
+    "meaning": "Lock shown ONLY when user is logged in but NOT subscribed. Guests see no lock."
+  }
+}
+5. Subscription Purchase Flow (End-to-End)
+
+{
+  "flow": "User subscribes to a celebrity",
+  "steps": [
+    {
+      "step": 1,
+      "action": "User clicks 'Subscribe' or 'Unlock Now'",
+      "ui_component": "SubscriptionGate modal OR Following page button",
+      "triggers": "Opens PaymentMethodSelector dialog"
+    },
+    {
+      "step": 2,
+      "action": "User selects payment method",
+      "options": ["Wallet", "Razorpay"]
+    },
+    {
+      "step": 3,
+      "action": "Frontend calls atomic RPC",
+      "endpoint": "supabase.rpc('purchase_celebrity_subscription')",
+      "payload": {
+        "p_celebrity_id": "uuid — the celebrity to subscribe to",
+        "p_price": "integer — must match celebrity_favorite_pricing.price exactly",
+        "p_payment_method": "'wallet' | 'razorpay'"
+      },
+      "response_success": {
+        "success": true,
+        "favorite_id": "uuid — the new celebrity_favorites row",
+        "amount_charged": 499
+      },
+      "response_error_examples": [
+        { "error": "Not authenticated" },
+        { "error": "Already subscribed to this celebrity" },
+        { "error": "Subscription not available for this celebrity" },
+        { "error": "Price mismatch. Expected 499, got 299" },
+        { "error": "Insufficient wallet balance" }
+      ]
+    },
+    {
+      "step": 4,
+      "action": "RPC performs atomic transaction (all or nothing)",
+      "operations": [
+        "Validates caller profile via auth.uid()",
+        "Checks no duplicate active subscription exists",
+        "Validates price matches celebrity_favorite_pricing",
+        "If wallet: checks balance >= price",
+        "Calculates referrer_commission (default 10%)",
+        "Calculates celebrity_commission (default 5%)",
+        "INSERTs into celebrity_favorites (status='active')",
+        "If wallet: INSERTs wallet_transactions (type='celebrity_subscription')",
+        "INSERTs celebrity_wallet_transactions (type='earning')",
+        "UPDATEs celebrities.total_earnings and available_balance"
+      ]
+    },
+    {
+      "step": 5,
+      "action": "Frontend fires email notification (fire-and-forget)",
+      "endpoint": "supabase.functions.invoke('send-celebrity-subscription-email')",
+      "payload": {
+        "celebrity_id": "uuid",
+        "subscriber_name": "John Doe",
+        "subscriber_email": "john@example.com",
+        "price_paid": 499
+      }
+    },
+    {
+      "step": 6,
+      "action": "Frontend refreshes state",
+      "operations": [
+        "Re-fetch user favorites",
+        "Re-fetch wallet balance",
+        "Show success toast",
+        "Close modal"
+      ]
+    }
+  ]
+}
+6. Razorpay Payment Flow (Alternative to Wallet)
+
+{
+  "flow": "Razorpay subscription payment",
+  "steps": [
+    {
+      "step": 1,
+      "action": "Create Razorpay order",
+      "endpoint": "supabase.functions.invoke('create-razorpay-order')",
+      "payload": {
+        "amount": 499,
+        "currency": "INR",
+        "receipt": "fav_12345678_abcdef",
+        "notes": {
+          "user_id": "profile.id",
+          "celebrity_id": "celebrity.id",
+          "type": "celebrity_favorite"
+        }
+      },
+      "response": {
+        "id": "order_RazorpayOrderId",
+        "key_id": "rzp_live_xxxxx",
+        "amount": 49900,
+        "currency": "INR"
+      }
+    },
+    {
+      "step": 2,
+      "action": "Open Razorpay native SDK / checkout",
+      "config": {
+        "key": "response.key_id",
+        "amount": "response.amount",
+        "order_id": "response.id",
+        "prefill": { "name": "...", "email": "...", "contact": "..." }
+      }
+    },
+    {
+      "step": 3,
+      "action": "On payment success callback",
+      "action_detail": "Call same RPC with p_payment_method='razorpay'",
+      "note": "RPC skips wallet balance check when payment_method is 'razorpay'"
+    }
+  ]
+}
+7. How Subscription Gates Services
+Once subscribed, the isSubscribed flag controls access throughout the app:
+
+
+{
+  "service_gating": {
+    "/celebrity/:id (CelebrityProfile)": {
+      "subscribed": "All services visible with prices and 'Book Now' buttons",
+      "not_subscribed": "Services show Lock icon + 'Subscribe to Book' button → opens SubscriptionGate modal"
+    },
+    "/wish-a-celebrity": {
+      "subscribed": "Shows 'Wish Now' button → navigates to /wish-booking/:id",
+      "not_subscribed": "Shows 'Subscribe to Wish' button → navigates to /celebrity/:id"
+    },
+    "/booking/:id": {
+      "check": "useCelebritySubscription(celebrityId)",
+      "subscribed": "Full booking form accessible",
+      "not_subscribed": "Redirected to SubscriptionGate"
+    },
+    "/image-promotions": {
+      "check": "Loads only celebrities from user's favorites (celebrity_favorites + status=active)",
+      "no_favorites": "Shows 'Subscribe to celebrities first' message"
+    },
+    "/occasion-booking": {
+      "check": "Loads only subscribed celebrities for selection",
+      "no_favorites": "Shows 'Subscribe to Celebrities First' redirect"
+    }
+  }
+}
+8. The useCelebritySubscription Hook (Single Celebrity Check)
+Used on individual celebrity pages:
+
+
+{
+  "hook": "useCelebritySubscription(celebrityId)",
+  "query": {
+    "from": "celebrity_favorites",
+    "select": "*",
+    "filters": {
+      "user_id": "profile.id",
+      "celebrity_id": "celebrityId parameter",
+      "status": "active"
+    },
+    "method": "maybeSingle()"
+  },
+  "returns": {
+    "isSubscribed": "boolean",
+    "loading": "boolean",
+    "subscriptionData": "full row or null",
+    "checkSubscription": "function to re-check"
+  }
+}
+9. The useCelebrityFavorites Hook (All Favorites)
+Used for bulk checks across pages:
+
+
+{
+  "hook": "useCelebrityFavorites()",
+  "query": {
+    "from": "celebrity_favorites",
+    "select": "celebrity_id",
+    "filters": {
+      "user_id": "profile.id",
+      "status": "active"
+    }
+  },
+  "returns": {
+    "favorites": "string[] of celebrity_ids",
+    "hasFavorite": "(celebrityId: string) => boolean",
+    "loading": "boolean",
+    "refetchFavorites": "() => void"
+  }
+}
+10. Celebrity Data Loading (What Appears on Cards)
+
+{
+  "celebrities_query": {
+    "from": "celebrities",
+    "select": "* (all columns)",
+    "filters": {
+      "is_active": true,
+      "consent_status": "approved OR null"
+    },
+    "order": "rating DESC",
+    "pagination": "8 per page using .range(from, to)"
+  },
+  "key_card_fields": {
+    "id": "uuid — used for routing and subscription checks",
+    "name": "string — display name",
+    "category": "string — Actors, Singers, Comedians, etc.",
+    "image_url": "string — profile photo URL",
+    "rating": "number — 0-5 star rating",
+    "review_count": "number",
+    "bio": "string — short bio shown as subtitle",
+    "service_prices": {
+      "type": "JSONB",
+      "shape": {
+        "video_wish": 999,
+        "general_wish": 5000,
+        "image_promotion": 25000,
+        "video_promotion": 50000
+      },
+      "card_display": "Shows minimum price from all service_prices values"
+    },
+    "delivery_time": "string — '24 hours', '48 hours', etc."
+  }
+}
+11. Key Identifiers Summary
+
+{
+  "identity_mapping": {
+    "auth.uid()": "Supabase auth user ID (used internally by RLS)",
+    "profiles.id": "Public profile ID — used for ALL user data ownership",
+    "profiles.user_id": "FK to auth.users.id — links profile to auth",
+    "celebrities.id": "Celebrity entity ID — used in celebrity_favorites.celebrity_id",
+    "celebrities.profile_id": "FK to profiles.id — links celebrity to their user profile"
+  },
+  "critical_rule": "celebrity_favorites.user_id = profiles.id (NOT auth.uid()). The RPC resolves this internally via: SELECT id FROM profiles WHERE user_id = auth.uid()"
+}
+This documentation covers the complete subscription identification and gating system. The mobile app should replicate the same celebrity_favorites query pattern and purchase_celebrity_subscription RPC call for parity with the web app.
+
+
+
+
+
