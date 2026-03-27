@@ -1,0 +1,690 @@
+Floating Buttons Documentation for Replit Mobile App
+There are two floating buttons visible on every page of the application. They serve completely different purposes and use different technology stacks.
+
+BUTTON 1: AI Assistant (Right Side) — Text Chat Widget
+Purpose
+A full AI chatbot that helps users navigate the platform, answer questions (general knowledge + platform-specific), book celebrities, check wallet balance, and perform actions. It works via typed text input and returns text responses with optional action buttons and suggestion chips.
+
+Position and Visual Design
+
+┌─────────────────────────────────┐
+│                                 │
+│                                 │
+│                                 │
+│                                 │
+│                          [AI]   │  ← Right side
+│                                 │
+└─────────────────────────────────┘
+Trigger Button (ChatBubble.tsx):
+
+Fixed position: bottom: 80px, right: 16px (mobile), bottom: 24px, right: 24px (desktop)
+Size: 56x56px circle
+z-index: 9998
+Background: linear-gradient(135deg, #FF6B33 0%, #EC4899 50%, #B44CFF 100%) (orange-pink-purple)
+Box shadow: 0 8px 30px rgba(255,107,51,0.4)
+Icon: Sparkles from lucide-react (white, 24x24)
+Animation: Continuous ping pulse ring (2s duration, 30% opacity) with the same gradient
+Unread badge: Green dot (top-right, 16x16, #22C55E, border #0A0D14)
+Hover: scale 1.08, Active: scale 0.95
+Tooltip (desktop only): "Ask me anything!"
+Chat Interface States
+The chat has 3 render modes:
+
+State 1 — Minimized Pill:
+
+Gradient pill with Sparkles icon, "AI Assistant" title, "Tap to expand" subtitle
+Close (X) button on the right
+Same position as trigger button
+State 2 — Mobile Bottom Sheet (< 640px):
+
+Full-width, 88vh height
+Background: #0D1117
+Border radius: 24px 24px 0 0
+Box shadow: 0 -10px 60px rgba(0,0,0,0.8)
+Backdrop: rgba(0,0,0,0.6) with blur(4px)
+Drag handle: 40x4px pill, rgba(255,255,255,0.2), centered top
+Drag-to-close: If dragged down > 150px, closes
+Header: 72px height, contains 52px gradient avatar (Sparkles icon), "AI Assistant" title (22px bold white), green "ONLINE NOW" status (11px, #22C55E), 44px close button
+Messages area: scrollable, padding: 20px 16px
+Input: 16px font (prevents iOS zoom), 44px round send button with gradient when active
+Safe area: paddingBottom: max(16px, env(safe-area-inset-bottom))
+State 3 — Desktop Floating Card:
+
+Position: bottom: 90px, right: 24px
+Size: 360x480px (or fullscreen)
+Background: #0F1520
+Border: 1px solid rgba(255,255,255,0.08)
+Border radius: 20px
+Box shadow: 0 24px 60px rgba(0,0,0,0.7)
+Header (52px): 32px gradient avatar, title, mode toggle pill (Text/Voice), action buttons (History, Preferences, Trash, Fullscreen, Minimize, Close) — each 28x28px
+Fullscreen mode: inset 0, optional conversation history sidebar (320px wide, #0F1520)
+Message Bubbles (MessageBubble.tsx)
+User messages:
+
+Mobile: max-width 88%, self-end, gradient background, border-radius 20px 20px 4px 20px, padding 18px 20px, font 16px
+Desktop: max-width 82%, 24px gradient avatar (User icon), border-radius 14px 14px 4px 14px, padding 10px 14px, font 13px
+Voice indicator: Mic icon + "Voice message" text if isVoiceInput: true
+Assistant messages:
+
+Mobile: full width, background #1C2438, border rgba(255,255,255,0.06), border-radius 16px
+Desktop: background #1C2640, border-radius 14px 14px 14px 4px, 24px gradient avatar (Bot icon)
+Action buttons (QuickActions.tsx): Pill-shaped, #1C2438/#1C2640, border rgba(255,255,255,0.1), with ArrowRight icon Suggestion chips (SuggestionChips.tsx): Same pill style, no arrow icon
+
+Quick Start Actions (Empty State)
+Mobile: Horizontal scrollable row of pills: "Book a Celebrity", "My Bookings", "Wallet Balance", "How it works"
+Desktop: 2-column grid of the same actions
+Data Flow and State Management
+Context Provider (AIAssistantContext.tsx):
+
+
+{
+  "state": {
+    "messages": "AIMessage[]",
+    "isOpen": "boolean",
+    "isLoading": "boolean",
+    "isTyping": "boolean",
+    "voiceState": { "isListening": "boolean", "isSpeaking": "boolean" },
+    "currentConversationId": "string | null",
+    "mode": "'text' | 'voice'"
+  },
+  "methods": [
+    "sendMessage(content: string, isVoice?: boolean)",
+    "clearMessages()",
+    "loadConversation(conversationId: string)",
+    "startNewConversation()",
+    "setMode(mode: 'text' | 'voice')",
+    "setVoiceState(state: Partial<VoiceState>)",
+    "executeAction(action: AIAction)"
+  ]
+}
+AIMessage interface:
+
+
+{
+  "id": "string (Date.now())",
+  "role": "'user' | 'assistant'",
+  "content": "string",
+  "timestamp": "Date",
+  "actions": [
+    {
+      "type": "'navigate' | 'fillForm' | 'search' | 'showInfo'",
+      "label": "string",
+      "data": { "route": "/celebrities" }
+    }
+  ],
+  "suggestions": ["string"],
+  "isVoiceInput": "boolean"
+}
+API Endpoint
+Edge Function: ai-assistant
+
+Invocation:
+
+
+supabase.functions.invoke('ai-assistant', { body: payload })
+Request Payload:
+
+
+{
+  "query": "How do I book a celebrity?",
+  "conversationHistory": [
+    { "role": "user", "content": "previous message" },
+    { "role": "assistant", "content": "previous response" }
+  ],
+  "context": {
+    "currentRoute": "/celebrities",
+    "userRole": "user",
+    "userId": "uuid",
+    "isVoiceInput": false
+  },
+  "model": "google/gemini-2.5-flash"
+}
+Internal API Call (inside edge function):
+
+POST https://ai.gateway.lovable.dev/v1/chat/completions
+Authorization: Bearer LOVABLE_API_KEY
+
+{
+  "model": "google/gemini-2.5-flash",
+  "messages": [
+    { "role": "system", "content": "You are a friendly AI assistant... [built prompt with knowledge base results]" },
+    { "role": "user", "content": "previous msg" },
+    { "role": "assistant", "content": "previous reply" },
+    { "role": "user", "content": "How do I book a celebrity?" }
+  ],
+  "max_tokens": 500,
+  "temperature": 0.7
+}
+Note: max_tokens = 300 for voice input, 500 for text input.
+
+Response:
+
+
+{
+  "message": "To book a celebrity, go to the Browse Celebrities page...",
+  "actions": [
+    {
+      "type": "navigate",
+      "route": "/celebrities",
+      "label": "Browse Celebrities"
+    }
+  ],
+  "suggestions": ["Go to Browse Celebrities", "Go to My Bookings"],
+  "searchResults": [
+    { "type": "page", "title": "Browse Celebrities", "route": "/celebrities" }
+  ]
+}
+Knowledge Base: The edge function has a built-in keyword search across:
+
+13 navigation routes (home, celebrities, bookings, music, etc.)
+12 FAQ entries (booking flow, payments, wallet, music, greeting cards, etc.)
+3 troubleshooting entries (video, login, profile issues)
+Results are ranked by relevance and injected into the system prompt for contextual answers.
+
+Persistence (Supabase Tables)
+Conversations are persisted via useAIConversations hook:
+
+ai_conversations table: { id, user_id, title, created_at, updated_at }
+ai_conversation_messages table: { id, conversation_id, role, content, is_voice_input, actions (jsonb), suggestions (jsonb), created_at }
+Analytics tracked via useAIAnalytics:
+
+ai_analytics table: action types like message_sent, voice_used
+User preferences via useAIPreferences:
+
+ai_user_preferences table: { voice_enabled, autoOpenOnVoice, default_minimized, language }
+BUTTON 2: Voice Assistant (Left Side) — Hands-Free Voice Interaction
+Purpose
+A completely separate, hands-free voice assistant. User taps the mic, speaks naturally, the browser transcribes speech to text, sends it to the same AI backend, receives a text response, and speaks it aloud using browser Text-to-Speech. It's a single-turn model: listen -> process -> speak -> idle.
+
+Position and Visual Design
+
+┌─────────────────────────────────┐
+│                                 │
+│                                 │
+│                                 │
+│                                 │
+│  [MIC]                          │  ← Left side
+│                                 │
+└─────────────────────────────────┘
+Trigger Button (GoogleVoiceAssistant.tsx):
+
+Fixed position: bottom: 80px, left: 16px
+Size: 64x64px circle (w-16 h-16)
+z-index: 100
+Icon: Mic (idle), Mic with pulse (listening), Loader2 spinning (connecting/processing), Volume2 (speaking), MicOff (error)
+Color states:
+
+Status	Background	Icon
+idle	bg-primary (brand blue)	Mic (white)
+connecting	bg-muted (gray)	Loader2 spinning
+listening	bg-destructive (red) + animate-pulse	Mic (white)
+processing	bg-muted (gray)	Loader2 spinning
+speaking	bg-accent (teal)	Volume2
+error	bg-destructive (red)	MicOff
+Status text (below button):
+
+Listening: "🎤 Listening..."
+Processing: "⚡ Thinking..."
+Speaking: "🔊 Speaking..."
+Error: "❌ Tap to retry"
+Transcript cards (floating, left side):
+
+"You said:" card: bottom: 144px, left: 16px, max-width xs, bg-background/95 backdrop-blur-sm
+"AI:" card: bottom: 208px, left: 16px, bg-primary/10, border primary/20
+Listening Animation (ListeningAnimation.tsx):
+
+Position: bottom: 32px, left: 80px
+When listening: 3 concentric pulsing rings (120/140/160px, staggered delays 0/0.3/0.6s) + spinning conic gradient ring (100px)
+When speaking: Static pulsing glow (100px) + spinning conic gradient ring
+Colors: Primary (blue) for listening, Chart-2 (green) for speaking
+Voice Detection Flow (Step by Step)
+
+1. User taps Mic button
+   ↓
+2. Status: idle → connecting
+   ↓
+3. Request microphone permission (getUserMedia)
+   Audio constraints: echoCancellation, noiseSuppression, autoGainControl = true
+   ↓
+4. Initialize SpeechRecognition (browser native)
+   Settings: continuous=false, interimResults=false, lang='en-US', maxAlternatives=1
+   ↓
+5. Status: connecting → listening
+   ↓
+6. User speaks... browser transcribes
+   ↓
+7. onresult fires with final transcript
+   Apply filters:
+   - Ignore results within 500ms of start (START_IGNORE_MS)
+   - Reject echo of last AI response (looksLikeAssistantEcho)
+   - Reject duplicate transcript within 8s window
+   ↓
+8. Status: listening → processing
+   Recognition.stop()
+   ↓
+9. Call supabase.functions.invoke('ai-assistant', {...})
+   (Same endpoint as text chat!)
+   ↓
+10. Receive AI response text
+    Update conversation history (last 8 messages)
+    ↓
+11. Status: processing → speaking
+    Call speakText(responseText) using SpeechSynthesisUtterance
+    Voice: Female English (Samantha/Victoria/Karen/Zira preferred)
+    Rate: 1.0, Pitch: 1.05, Volume: 1.0
+    ↓
+12. Speech finishes (utterance.onend)
+    ↓
+13. Status: speaking → idle
+    Set manualStop=true (prevents auto-restart)
+    Set ignoreResultsUntil = now + 2200ms (POST_SPEAK_IGNORE_MS)
+    User must tap again for next turn
+Anti-Echo Protection (5 layers)
+Hardware echo cancellation via getUserMedia({ echoCancellation: true })
+Post-speak ignore window: 2.2 seconds after AI finishes speaking, all transcripts are rejected
+Echo detection: looksLikeAssistantEcho() compares normalized transcript against last AI response
+Duplicate suppression: Same transcript within 8 seconds is rejected
+Single-turn model: After responding, recognition stops completely. User must tap again.
+API Endpoint (Same as Text Chat)
+Edge Function: ai-assistant
+
+Voice Request Payload:
+
+
+{
+  "query": "What celebrities are available?",
+  "conversationHistory": [
+    { "role": "user", "content": "previous voice query" },
+    { "role": "assistant", "content": "previous AI response" }
+  ],
+  "context": {
+    "currentRoute": "/",
+    "isVoiceInput": true
+  }
+}
+Response: Same format as text chat. The isVoiceInput: true flag causes max_tokens to be 300 (shorter, more suitable for spoken responses).
+
+Timeouts and Constants
+
+{
+  "IDLE_TIMEOUT": 180000,
+  "MAX_SILENT_RESTARTS": 3,
+  "START_IGNORE_MS": 500,
+  "RESTART_AFTER_SPEAK_DELAY_MS": 1200,
+  "POST_SPEAK_IGNORE_MS": 2200,
+  "DUPLICATE_TRANSCRIPT_WINDOW_MS": 8000
+}
+Text-to-Speech Voice Selection
+pickFemaleVoice() priority order (English voices):
+
+Samantha
+Victoria
+Karen
+Zira
+Moira
+Tessa
+Fiona
+Google UK English Female
+Google US English
+Any voice with "female" in name
+Fallback: any English voice, then first available
+Summary: Key Differences
+Feature	AI Assistant (Right)	Voice Assistant (Left)
+Input	Typed text	Spoken voice
+Output	Text in chat UI	Spoken aloud + floating cards
+UI	Full chat interface (sheet/card)	Single button + animation
+Persistence	Saved to Supabase	Not persisted (in-memory only)
+Conversation	Multi-turn with history	Single-turn per tap
+API endpoint	ai-assistant	ai-assistant (same!)
+Technology	React state + Supabase	Web Speech API (native browser)
+Works offline	No (needs API)	No (needs API)
+Both buttons are rendered in AuthenticatedLayout.tsx and appear on every authenticated page.
+
+Now I have all the information needed. Here's the comprehensive documentation:
+
+Floating Buttons Documentation for Replit Mobile App
+There are two floating buttons visible on every page of the application. They serve completely different purposes and use different technology stacks.
+
+BUTTON 1: AI Assistant (Right Side) — Text Chat Widget
+Purpose
+A full AI chatbot that helps users navigate the platform, answer questions (general knowledge + platform-specific), book celebrities, check wallet balance, and perform actions. It works via typed text input and returns text responses with optional action buttons and suggestion chips.
+
+Position and Visual Design
+
+┌─────────────────────────────────┐
+│                                 │
+│                                 │
+│                                 │
+│                                 │
+│                          [AI]   │  ← Right side
+│                                 │
+└─────────────────────────────────┘
+Trigger Button (ChatBubble.tsx):
+
+Fixed position: bottom: 80px, right: 16px (mobile), bottom: 24px, right: 24px (desktop)
+Size: 56x56px circle
+z-index: 9998
+Background: linear-gradient(135deg, #FF6B33 0%, #EC4899 50%, #B44CFF 100%) (orange-pink-purple)
+Box shadow: 0 8px 30px rgba(255,107,51,0.4)
+Icon: Sparkles from lucide-react (white, 24x24)
+Animation: Continuous ping pulse ring (2s duration, 30% opacity) with the same gradient
+Unread badge: Green dot (top-right, 16x16, #22C55E, border #0A0D14)
+Hover: scale 1.08, Active: scale 0.95
+Tooltip (desktop only): "Ask me anything!"
+Chat Interface States
+The chat has 3 render modes:
+
+State 1 — Minimized Pill:
+
+Gradient pill with Sparkles icon, "AI Assistant" title, "Tap to expand" subtitle
+Close (X) button on the right
+Same position as trigger button
+State 2 — Mobile Bottom Sheet (< 640px):
+
+Full-width, 88vh height
+Background: #0D1117
+Border radius: 24px 24px 0 0
+Box shadow: 0 -10px 60px rgba(0,0,0,0.8)
+Backdrop: rgba(0,0,0,0.6) with blur(4px)
+Drag handle: 40x4px pill, rgba(255,255,255,0.2), centered top
+Drag-to-close: If dragged down > 150px, closes
+Header: 72px height, contains 52px gradient avatar (Sparkles icon), "AI Assistant" title (22px bold white), green "ONLINE NOW" status (11px, #22C55E), 44px close button
+Messages area: scrollable, padding: 20px 16px
+Input: 16px font (prevents iOS zoom), 44px round send button with gradient when active
+Safe area: paddingBottom: max(16px, env(safe-area-inset-bottom))
+State 3 — Desktop Floating Card:
+
+Position: bottom: 90px, right: 24px
+Size: 360x480px (or fullscreen)
+Background: #0F1520
+Border: 1px solid rgba(255,255,255,0.08)
+Border radius: 20px
+Box shadow: 0 24px 60px rgba(0,0,0,0.7)
+Header (52px): 32px gradient avatar, title, mode toggle pill (Text/Voice), action buttons (History, Preferences, Trash, Fullscreen, Minimize, Close) — each 28x28px
+Fullscreen mode: inset 0, optional conversation history sidebar (320px wide, #0F1520)
+Message Bubbles (MessageBubble.tsx)
+User messages:
+
+Mobile: max-width 88%, self-end, gradient background, border-radius 20px 20px 4px 20px, padding 18px 20px, font 16px
+Desktop: max-width 82%, 24px gradient avatar (User icon), border-radius 14px 14px 4px 14px, padding 10px 14px, font 13px
+Voice indicator: Mic icon + "Voice message" text if isVoiceInput: true
+Assistant messages:
+
+Mobile: full width, background #1C2438, border rgba(255,255,255,0.06), border-radius 16px
+Desktop: background #1C2640, border-radius 14px 14px 14px 4px, 24px gradient avatar (Bot icon)
+Action buttons (QuickActions.tsx): Pill-shaped, #1C2438/#1C2640, border rgba(255,255,255,0.1), with ArrowRight icon Suggestion chips (SuggestionChips.tsx): Same pill style, no arrow icon
+
+Quick Start Actions (Empty State)
+Mobile: Horizontal scrollable row of pills: "Book a Celebrity", "My Bookings", "Wallet Balance", "How it works"
+Desktop: 2-column grid of the same actions
+Data Flow and State Management
+Context Provider (AIAssistantContext.tsx):
+
+
+{
+  "state": {
+    "messages": "AIMessage[]",
+    "isOpen": "boolean",
+    "isLoading": "boolean",
+    "isTyping": "boolean",
+    "voiceState": { "isListening": "boolean", "isSpeaking": "boolean" },
+    "currentConversationId": "string | null",
+    "mode": "'text' | 'voice'"
+  },
+  "methods": [
+    "sendMessage(content: string, isVoice?: boolean)",
+    "clearMessages()",
+    "loadConversation(conversationId: string)",
+    "startNewConversation()",
+    "setMode(mode: 'text' | 'voice')",
+    "setVoiceState(state: Partial<VoiceState>)",
+    "executeAction(action: AIAction)"
+  ]
+}
+AIMessage interface:
+
+
+{
+  "id": "string (Date.now())",
+  "role": "'user' | 'assistant'",
+  "content": "string",
+  "timestamp": "Date",
+  "actions": [
+    {
+      "type": "'navigate' | 'fillForm' | 'search' | 'showInfo'",
+      "label": "string",
+      "data": { "route": "/celebrities" }
+    }
+  ],
+  "suggestions": ["string"],
+  "isVoiceInput": "boolean"
+}
+API Endpoint
+Edge Function: ai-assistant
+
+Invocation:
+
+
+supabase.functions.invoke('ai-assistant', { body: payload })
+Request Payload:
+
+
+{
+  "query": "How do I book a celebrity?",
+  "conversationHistory": [
+    { "role": "user", "content": "previous message" },
+    { "role": "assistant", "content": "previous response" }
+  ],
+  "context": {
+    "currentRoute": "/celebrities",
+    "userRole": "user",
+    "userId": "uuid",
+    "isVoiceInput": false
+  },
+  "model": "google/gemini-2.5-flash"
+}
+Internal API Call (inside edge function):
+
+POST https://ai.gateway.lovable.dev/v1/chat/completions
+Authorization: Bearer LOVABLE_API_KEY
+
+{
+  "model": "google/gemini-2.5-flash",
+  "messages": [
+    { "role": "system", "content": "You are a friendly AI assistant... [built prompt with knowledge base results]" },
+    { "role": "user", "content": "previous msg" },
+    { "role": "assistant", "content": "previous reply" },
+    { "role": "user", "content": "How do I book a celebrity?" }
+  ],
+  "max_tokens": 500,
+  "temperature": 0.7
+}
+Note: max_tokens = 300 for voice input, 500 for text input.
+
+Response:
+
+
+{
+  "message": "To book a celebrity, go to the Browse Celebrities page...",
+  "actions": [
+    {
+      "type": "navigate",
+      "route": "/celebrities",
+      "label": "Browse Celebrities"
+    }
+  ],
+  "suggestions": ["Go to Browse Celebrities", "Go to My Bookings"],
+  "searchResults": [
+    { "type": "page", "title": "Browse Celebrities", "route": "/celebrities" }
+  ]
+}
+Knowledge Base: The edge function has a built-in keyword search across:
+
+13 navigation routes (home, celebrities, bookings, music, etc.)
+12 FAQ entries (booking flow, payments, wallet, music, greeting cards, etc.)
+3 troubleshooting entries (video, login, profile issues)
+Results are ranked by relevance and injected into the system prompt for contextual answers.
+
+Persistence (Supabase Tables)
+Conversations are persisted via useAIConversations hook:
+
+ai_conversations table: { id, user_id, title, created_at, updated_at }
+ai_conversation_messages table: { id, conversation_id, role, content, is_voice_input, actions (jsonb), suggestions (jsonb), created_at }
+Analytics tracked via useAIAnalytics:
+
+ai_analytics table: action types like message_sent, voice_used
+User preferences via useAIPreferences:
+
+ai_user_preferences table: { voice_enabled, autoOpenOnVoice, default_minimized, language }
+BUTTON 2: Voice Assistant (Left Side) — Hands-Free Voice Interaction
+Purpose
+A completely separate, hands-free voice assistant. User taps the mic, speaks naturally, the browser transcribes speech to text, sends it to the same AI backend, receives a text response, and speaks it aloud using browser Text-to-Speech. It's a single-turn model: listen -> process -> speak -> idle.
+
+Position and Visual Design
+
+┌─────────────────────────────────┐
+│                                 │
+│                                 │
+│                                 │
+│                                 │
+│  [MIC]                          │  ← Left side
+│                                 │
+└─────────────────────────────────┘
+Trigger Button (GoogleVoiceAssistant.tsx):
+
+Fixed position: bottom: 80px, left: 16px
+Size: 64x64px circle (w-16 h-16)
+z-index: 100
+Icon: Mic (idle), Mic with pulse (listening), Loader2 spinning (connecting/processing), Volume2 (speaking), MicOff (error)
+Color states:
+
+Status	Background	Icon
+idle	bg-primary (brand blue)	Mic (white)
+connecting	bg-muted (gray)	Loader2 spinning
+listening	bg-destructive (red) + animate-pulse	Mic (white)
+processing	bg-muted (gray)	Loader2 spinning
+speaking	bg-accent (teal)	Volume2
+error	bg-destructive (red)	MicOff
+Status text (below button):
+
+Listening: "🎤 Listening..."
+Processing: "⚡ Thinking..."
+Speaking: "🔊 Speaking..."
+Error: "❌ Tap to retry"
+Transcript cards (floating, left side):
+
+"You said:" card: bottom: 144px, left: 16px, max-width xs, bg-background/95 backdrop-blur-sm
+"AI:" card: bottom: 208px, left: 16px, bg-primary/10, border primary/20
+Listening Animation (ListeningAnimation.tsx):
+
+Position: bottom: 32px, left: 80px
+When listening: 3 concentric pulsing rings (120/140/160px, staggered delays 0/0.3/0.6s) + spinning conic gradient ring (100px)
+When speaking: Static pulsing glow (100px) + spinning conic gradient ring
+Colors: Primary (blue) for listening, Chart-2 (green) for speaking
+Voice Detection Flow (Step by Step)
+
+1. User taps Mic button
+   ↓
+2. Status: idle → connecting
+   ↓
+3. Request microphone permission (getUserMedia)
+   Audio constraints: echoCancellation, noiseSuppression, autoGainControl = true
+   ↓
+4. Initialize SpeechRecognition (browser native)
+   Settings: continuous=false, interimResults=false, lang='en-US', maxAlternatives=1
+   ↓
+5. Status: connecting → listening
+   ↓
+6. User speaks... browser transcribes
+   ↓
+7. onresult fires with final transcript
+   Apply filters:
+   - Ignore results within 500ms of start (START_IGNORE_MS)
+   - Reject echo of last AI response (looksLikeAssistantEcho)
+   - Reject duplicate transcript within 8s window
+   ↓
+8. Status: listening → processing
+   Recognition.stop()
+   ↓
+9. Call supabase.functions.invoke('ai-assistant', {...})
+   (Same endpoint as text chat!)
+   ↓
+10. Receive AI response text
+    Update conversation history (last 8 messages)
+    ↓
+11. Status: processing → speaking
+    Call speakText(responseText) using SpeechSynthesisUtterance
+    Voice: Female English (Samantha/Victoria/Karen/Zira preferred)
+    Rate: 1.0, Pitch: 1.05, Volume: 1.0
+    ↓
+12. Speech finishes (utterance.onend)
+    ↓
+13. Status: speaking → idle
+    Set manualStop=true (prevents auto-restart)
+    Set ignoreResultsUntil = now + 2200ms (POST_SPEAK_IGNORE_MS)
+    User must tap again for next turn
+Anti-Echo Protection (5 layers)
+Hardware echo cancellation via getUserMedia({ echoCancellation: true })
+Post-speak ignore window: 2.2 seconds after AI finishes speaking, all transcripts are rejected
+Echo detection: looksLikeAssistantEcho() compares normalized transcript against last AI response
+Duplicate suppression: Same transcript within 8 seconds is rejected
+Single-turn model: After responding, recognition stops completely. User must tap again.
+API Endpoint (Same as Text Chat)
+Edge Function: ai-assistant
+
+Voice Request Payload:
+
+
+{
+  "query": "What celebrities are available?",
+  "conversationHistory": [
+    { "role": "user", "content": "previous voice query" },
+    { "role": "assistant", "content": "previous AI response" }
+  ],
+  "context": {
+    "currentRoute": "/",
+    "isVoiceInput": true
+  }
+}
+Response: Same format as text chat. The isVoiceInput: true flag causes max_tokens to be 300 (shorter, more suitable for spoken responses).
+
+Timeouts and Constants
+
+{
+  "IDLE_TIMEOUT": 180000,
+  "MAX_SILENT_RESTARTS": 3,
+  "START_IGNORE_MS": 500,
+  "RESTART_AFTER_SPEAK_DELAY_MS": 1200,
+  "POST_SPEAK_IGNORE_MS": 2200,
+  "DUPLICATE_TRANSCRIPT_WINDOW_MS": 8000
+}
+Text-to-Speech Voice Selection
+pickFemaleVoice() priority order (English voices):
+
+Samantha
+Victoria
+Karen
+Zira
+Moira
+Tessa
+Fiona
+Google UK English Female
+Google US English
+Any voice with "female" in name
+Fallback: any English voice, then first available
+Summary: Key Differences
+Feature	AI Assistant (Right)	Voice Assistant (Left)
+Input	Typed text	Spoken voice
+Output	Text in chat UI	Spoken aloud + floating cards
+UI	Full chat interface (sheet/card)	Single button + animation
+Persistence	Saved to Supabase	Not persisted (in-memory only)
+Conversation	Multi-turn with history	Single-turn per tap
+API endpoint	ai-assistant	ai-assistant (same!)
+Technology	React state + Supabase	Web Speech API (native browser)
+Works offline	No (needs API)	No (needs API)
+Both buttons are rendered in AuthenticatedLayout.tsx and appear on every authenticated page.
+
+
+
+
+
