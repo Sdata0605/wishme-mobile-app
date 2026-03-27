@@ -484,10 +484,10 @@ export function VoiceAssistantButton() {
         >
           {status === 'connecting' || status === 'processing' ? (
             <Animated.View style={{ transform: [{ rotate: spin }] }}>
-              <Icon name={ICON_BY_STATUS[status]} size={28} color="#fff" />
+              <Icon name={ICON_BY_STATUS[status]} size={20} color="#fff" />
             </Animated.View>
           ) : (
-            <Icon name={ICON_BY_STATUS[status]} size={28} color="#fff" />
+            <Icon name={ICON_BY_STATUS[status]} size={20} color="#fff" />
           )}
         </TouchableOpacity>
 
@@ -506,9 +506,9 @@ const styles = StyleSheet.create({
     zIndex: 9997,
   },
   button: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 6,
@@ -519,9 +519,9 @@ const styles = StyleSheet.create({
   },
   pulseRing: {
     position: 'absolute',
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: '#E8527A',
     top: 0,
   },

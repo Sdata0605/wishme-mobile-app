@@ -70,7 +70,7 @@ export function AIChatButton() {
           end={{ x: 1, y: 1 }}
           style={styles.button}
         >
-          <Icon name="sparkles" size={22} color="#fff" />
+          <Icon name="sparkles" size={18} color="#fff" />
         </LinearGradient>
 
         {hasUnread && <View style={styles.unreadDot} />}
@@ -79,7 +79,7 @@ export function AIChatButton() {
   );
 }
 
-const BTN = 56;
+const BTN = 44;
 
 const styles = StyleSheet.create({
   container: {
