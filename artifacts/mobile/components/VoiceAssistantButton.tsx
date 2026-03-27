@@ -17,9 +17,15 @@ import { useAIAssistant } from '@/context/AIAssistantContext';
 
 // expo-speech-recognition requires a custom native build and is unavailable in
 // Expo Go. Load it dynamically so a missing native module doesn't crash the app.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type _SpeechEventHandler = (event: any) => void;
+
 type _SpeechEventName = 'start' | 'result' | 'end' | 'error';
+
+interface _SpeechEvent {
+  results?: ReadonlyArray<{ readonly transcript: string }>;
+  error?: string;
+}
+
+type _SpeechEventHandler = (event: _SpeechEvent) => void;
 
 interface _SpeechRecognitionModule {
   requestPermissionsAsync: () => Promise<{ granted: boolean }>;
@@ -34,7 +40,6 @@ let useSpeechRecognitionEvent: (event: _SpeechEventName, handler: _SpeechEventHa
 let hasSpeechRecognition = false;
 
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const _mod = require('expo-speech-recognition') as {
     ExpoSpeechRecognitionModule: _SpeechRecognitionModule;
     useSpeechRecognitionEvent: (event: _SpeechEventName, handler: _SpeechEventHandler) => void;
