@@ -96,7 +96,7 @@ const VIDEO_CARDS = [
 
 const BIRTHDAY_VIDEO = require('../../assets/videos/happy-birthday.mp4');
 
-function BirthdayVideoCard({ cardWidth, tag }: { cardWidth: number; tag: string }) {
+function BirthdayVideoCard({ tag }: { tag: string }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
@@ -122,7 +122,7 @@ function BirthdayVideoCard({ cardWidth, tag }: { cardWidth: number; tag: string 
   }, [isMuted, player]);
 
   return (
-    <View style={{ width: cardWidth, height: 190, borderRadius: 14, overflow: 'hidden' }}>
+    <View style={styles.videoThumb}>
       <VideoView
         player={player}
         style={StyleSheet.absoluteFillObject}
@@ -476,7 +476,7 @@ export default function HomeScreen() {
             renderItem={({ item }) => (
               <View style={[styles.videoCard, { width: W - 60, backgroundColor: colors.card }]}>
                 {item.id === 'v2' ? (
-                  <BirthdayVideoCard cardWidth={W - 60} tag={item.tag} />
+                  <BirthdayVideoCard tag={item.tag} />
                 ) : (
                   <LinearGradient
                     colors={item.gradient as [string, string]}
