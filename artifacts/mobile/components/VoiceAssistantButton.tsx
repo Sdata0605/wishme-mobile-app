@@ -1,8 +1,4 @@
 import * as Speech from 'expo-speech';
-import {
-  ExpoSpeechRecognitionModule,
-  useSpeechRecognitionEvent,
-} from 'expo-speech-recognition';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -18,6 +14,37 @@ import {
 } from 'react-native';
 import { Icon, type IconName } from '@/components/Icon';
 import { useAIAssistant } from '@/context/AIAssistantContext';
+
+// expo-speech-recognition requires a custom native build and is unavailable in
+// Expo Go. Load it dynamically so a missing native module doesn't crash the app.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type _SpeechEventHandler = (event: any) => void;
+type _SpeechEventName = 'start' | 'result' | 'end' | 'error';
+
+interface _SpeechRecognitionModule {
+  requestPermissionsAsync: () => Promise<{ granted: boolean }>;
+  start: (opts: Record<string, unknown>) => Promise<void>;
+  stop: () => void;
+}
+
+let ExpoSpeechRecognitionModule: _SpeechRecognitionModule | null = null;
+// No-op default; overwritten below if the native module loads successfully.
+let useSpeechRecognitionEvent: (event: _SpeechEventName, handler: _SpeechEventHandler) => void =
+  (_event, _handler) => {};
+let hasSpeechRecognition = false;
+
+try {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const _mod = require('expo-speech-recognition') as {
+    ExpoSpeechRecognitionModule: _SpeechRecognitionModule;
+    useSpeechRecognitionEvent: (event: _SpeechEventName, handler: _SpeechEventHandler) => void;
+  };
+  ExpoSpeechRecognitionModule = _mod.ExpoSpeechRecognitionModule;
+  useSpeechRecognitionEvent = _mod.useSpeechRecognitionEvent;
+  hasSpeechRecognition = true;
+} catch {
+  // Native module not available (e.g. Expo Go) — no-op already assigned above.
+}
 
 type VoiceStatus = 'idle' | 'connecting' | 'listening' | 'processing' | 'speaking' | 'error';
 
@@ -237,7 +264,7 @@ export function VoiceAssistantButton() {
   useSpeechRecognitionEvent('start', () => {
     setStatus('listening');
     stopTimeoutRef.current = setTimeout(() => {
-      ExpoSpeechRecognitionModule.stop();
+      ExpoSpeechRecognitionModule?.stop();
     }, 12000);
   });
 
@@ -273,6 +300,10 @@ export function VoiceAssistantButton() {
   });
 
   const startNative = useCallback(async () => {
+    if (!hasSpeechRecognition || !ExpoSpeechRecognitionModule) {
+      setShowFallback(true);
+      return;
+    }
     try {
       setStatus('connecting');
       processingRef.current = false;
@@ -300,7 +331,7 @@ export function VoiceAssistantButton() {
       stopTimeoutRef.current = null;
     }
     try {
-      ExpoSpeechRecognitionModule.stop();
+      ExpoSpeechRecognitionModule?.stop();
     } catch {}
     setStatus('idle');
   }, []);
@@ -395,7 +426,7 @@ export function VoiceAssistantButton() {
         window.speechSynthesis?.cancel();
         recognitionRef.current?.abort();
       } else {
-        try { ExpoSpeechRecognitionModule.stop(); } catch {}
+        try { ExpoSpeechRecognitionModule?.stop(); } catch {}
         Speech.stop();
       }
     };
