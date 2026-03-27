@@ -17,10 +17,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DraggableMoreButton } from '@/components/DraggableMoreButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { AIChatButton } from '@/components/AIChatButton';
+import { AIChatSheet } from '@/components/AIChatSheet';
 
 import { AuthProvider } from '@/context/AuthContext';
 import { DrawerProvider } from '@/context/DrawerContext';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { AIAssistantProvider } from '@/context/AIAssistantContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -100,12 +103,16 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <ThemeProvider>
               <AuthProvider>
-                <DrawerProvider>
-                  <View style={{ flex: 1 }}>
-                    <RootLayoutNav />
-                    <DraggableMoreButton />
-                  </View>
-                </DrawerProvider>
+                <AIAssistantProvider>
+                  <DrawerProvider>
+                    <View style={{ flex: 1 }}>
+                      <RootLayoutNav />
+                      <DraggableMoreButton />
+                      <AIChatButton />
+                      <AIChatSheet />
+                    </View>
+                  </DrawerProvider>
+                </AIAssistantProvider>
               </AuthProvider>
             </ThemeProvider>
           </GestureHandlerRootView>
