@@ -15,8 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CelebCard } from '@/components/CelebCard';
 import { Icon } from '@/components/Icon';
 import { CATEGORIES } from '@/constants/mockData';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useCelebrities } from '@/hooks/useCelebrities';
+import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 
 const { width: W } = Dimensions.get('window');
 const CARD_WIDTH = (W - 52) / 2;
@@ -42,6 +44,7 @@ const DELIVERY_TIMES = [
 
 export default function CelebritiesScreen() {
   const { colors } = useTheme();
+  const { user, session } = useAuth();
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
@@ -49,6 +52,10 @@ export default function CelebritiesScreen() {
   const [page, setPage] = useState(1);
 
   const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
+  const { hasFavorite } = useCelebrityFavorites({
+    profileId: user?.profileId,
+    accessToken: session?.access_token,
+  });
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -192,7 +199,13 @@ export default function CelebritiesScreen() {
             {paged.length > 0 ? (
               <View style={styles.grid}>
                 {paged.map((item) => (
-                  <CelebCard key={item.id} celebrity={item} width={CARD_WIDTH} />
+                  <CelebCard
+                    key={item.id}
+                    celebrity={item}
+                    width={CARD_WIDTH}
+                    isLoggedIn={!!user}
+                    isSubscribed={hasFavorite(item.id)}
+                  />
                 ))}
               </View>
             ) : (

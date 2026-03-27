@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import type { Celebrity } from '@/constants/mockData';
 import { useTheme } from '@/context/ThemeContext';
@@ -9,14 +9,27 @@ interface CelebCardProps {
   celebrity: Celebrity;
   width?: number;
   compact?: boolean;
+  isSubscribed?: boolean;
+  isLoggedIn?: boolean;
 }
 
-export function CelebCard({ celebrity, width = 130, compact = false }: CelebCardProps) {
+export function CelebCard({
+  celebrity,
+  width = 130,
+  compact = false,
+  isSubscribed,
+  isLoggedIn,
+}: CelebCardProps) {
   const { colors } = useTheme();
+  const showLock = isLoggedIn === true && isSubscribed === false;
+
+  const handlePress = () => {
+    router.push({ pathname: '/celebrity/[id]', params: { id: celebrity.id } });
+  };
 
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/celebrity/[id]', params: { id: celebrity.id } })}
+      onPress={handlePress}
       style={({ pressed }) => [
         styles.card,
         { width, backgroundColor: colors.card, opacity: pressed ? 0.85 : 1 },
@@ -26,14 +39,26 @@ export function CelebCard({ celebrity, width = 130, compact = false }: CelebCard
         <Image
           source={{ uri: celebrity.imageUrl }}
           style={[styles.image, { width: width - 0, height: compact ? 100 : 130 }]}
+          blurRadius={showLock ? 12 : 0}
         />
-        {celebrity.isVerified && (
+        {celebrity.isVerified && !showLock && (
           <View style={[styles.verifiedBadge, { backgroundColor: colors.primary }]}>
             <Icon name="check" size={8} color="#fff" />
           </View>
         )}
-        {celebrity.isAvailable && (
+        {celebrity.isAvailable && !showLock && (
           <View style={styles.availableDot} />
+        )}
+        {showLock && (
+          <View style={styles.lockOverlay}>
+            <View style={styles.lockCircle}>
+              <Icon name="lock" size={24} color="#FF6B33" />
+            </View>
+            <Text style={styles.lockText}>Subscription{'\n'}Required</Text>
+            <TouchableOpacity onPress={handlePress} style={styles.unlockPill}>
+              <Text style={styles.unlockPillText}>Unlock Now</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </View>
       <View style={styles.info}>
@@ -83,6 +108,41 @@ const styles = StyleSheet.create({
     backgroundColor: '#22C55E',
     borderWidth: 1.5,
     borderColor: '#fff',
+  },
+  lockOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingHorizontal: 8,
+  },
+  lockCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lockText: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: '#fff',
+    textAlign: 'center',
+    lineHeight: 15,
+  },
+  unlockPill: {
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 9999,
+    marginTop: 2,
+  },
+  unlockPillText: {
+    color: '#FF6B33',
+    fontSize: 11,
+    fontFamily: 'Inter_700Bold',
   },
   info: { padding: 8 },
   name: { fontSize: 13, fontFamily: 'Inter_600SemiBold', marginBottom: 1 },
