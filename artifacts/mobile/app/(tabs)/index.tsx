@@ -96,6 +96,7 @@ const VIDEO_CARDS = [
 
 const BIRTHDAY_VIDEO = require('../../assets/videos/happy-birthday.mp4');
 const ANNIVERSARY_VIDEO = require('../../assets/videos/wedding-anniversary.mp4');
+const GRADUATION_VIDEO = require('../../assets/videos/graduation-wish.mp4');
 
 function BirthdayVideoCard({ tag }: { tag: string }) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -174,6 +175,62 @@ function AnniversaryVideoCard({ tag }: { tag: string }) {
   const [isMuted, setIsMuted] = useState(false);
 
   const player = useVideoPlayer(ANNIVERSARY_VIDEO, p => {
+    p.loop = true;
+    p.muted = false;
+  });
+
+  const togglePlay = useCallback(() => {
+    if (isPlaying) {
+      player.pause();
+      setIsPlaying(false);
+    } else {
+      player.play();
+      setIsPlaying(true);
+    }
+  }, [isPlaying, player]);
+
+  const toggleMute = useCallback(() => {
+    const next = !isMuted;
+    player.muted = next;
+    setIsMuted(next);
+  }, [isMuted, player]);
+
+  return (
+    <View style={styles.videoThumb}>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+        nativeControls={false}
+      />
+      <TouchableOpacity
+        onPress={togglePlay}
+        activeOpacity={0.8}
+        style={{ ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' }}
+      >
+        <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={isPlaying ? 'pause' : 'play'} size={26} color="#fff" />
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={toggleMute}
+        activeOpacity={0.8}
+        style={{ position: 'absolute', top: 10, right: 10, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <Icon name={isMuted ? 'volume-x' : 'volume-2'} size={16} color="#fff" />
+      </TouchableOpacity>
+      <View style={{ position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 }}>
+        <Text style={{ color: '#fff', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>{tag}</Text>
+      </View>
+    </View>
+  );
+}
+
+function GraduationVideoCard({ tag }: { tag: string }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const player = useVideoPlayer(GRADUATION_VIDEO, p => {
     p.loop = true;
     p.muted = false;
   });
@@ -532,7 +589,9 @@ export default function HomeScreen() {
             decelerationRate="fast"
             renderItem={({ item }) => (
               <View style={[styles.videoCard, { width: W - 60, backgroundColor: colors.card }]}>
-                {item.id === 'v2' ? (
+                {item.id === 'v1' ? (
+                  <GraduationVideoCard tag={item.tag} />
+                ) : item.id === 'v2' ? (
                   <BirthdayVideoCard tag={item.tag} />
                 ) : item.id === 'v3' ? (
                   <AnniversaryVideoCard tag={item.tag} />
@@ -552,7 +611,7 @@ export default function HomeScreen() {
                 <View style={styles.videoInfo}>
                   <Text style={[styles.videoTitle, { color: colors.foreground }]}>{item.title}</Text>
                   <Text style={[styles.videoDesc, { color: colors.mutedForeground }]} numberOfLines={2}>{item.desc}</Text>
-                  <TouchableOpacity onPress={() => router.push('/wish-celebrity')} style={{ marginTop: 10 }}>
+                  <TouchableOpacity onPress={() => router.push('/(tabs)/celebrities')} style={{ marginTop: 10 }}>
                     <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.wishBtn}>
                       <Icon name="video" size={14} color="#fff" />
                       <Text style={styles.wishBtnText}>Create Your Wish</Text>
