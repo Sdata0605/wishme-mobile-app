@@ -125,7 +125,7 @@ const TABS: Array<{ key: string; label: string; icon: IconName }> = [
 
 export default function CelebrityDashboardScreen() {
   const { colors } = useTheme();
-  const { user, session, logout } = useAuth();
+  const { user, session } = useAuth();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = insets.bottom + 20;
@@ -245,13 +245,7 @@ export default function CelebrityDashboardScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Icon name="arrow-left" size={22} color={colors.foreground} />
-        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Celebrity Dashboard</Text>
-        <TouchableOpacity onPress={() => { logout(); router.replace('/'); }}>
-          <Icon name="log-out" size={20} color={colors.mutedForeground} />
-        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -305,7 +299,7 @@ export default function CelebrityDashboardScreen() {
           </ScrollView>
         </View>
 
-        <View style={{ paddingBottom: bottomPad }}>
+        <View style={{ paddingBottom: bottomPad + 80 }}>
           {activeTab === 'bookings' && <BookingsTab celebrity={celebrity} colors={colors} session={session} />}
           {activeTab === 'wallet' && <WalletTab celebrity={celebrity} colors={colors} session={session} user={user} onRefreshCeleb={fetchCelebrity} />}
           {activeTab === 'messages' && <MessagesTab celebrity={celebrity} colors={colors} session={session} user={user} />}
@@ -318,6 +312,15 @@ export default function CelebrityDashboardScreen() {
           {activeTab === 'profile' && <ProfileTab celebrity={celebrity} colors={colors} session={session} onRefresh={fetchCelebrity} />}
         </View>
       </ScrollView>
+
+      <TouchableOpacity
+        style={[styles.fab, { bottom: bottomPad + 16 }]}
+        onPress={() => router.replace('/(tabs)')}
+        activeOpacity={0.85}
+      >
+        <Icon name="home" size={18} color="#fff" />
+        <Text style={styles.fabText}>Go to User Dashboard</Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -1980,4 +1983,6 @@ const styles = StyleSheet.create({
   toggleBtn: { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', minWidth: 52 },
   ratingBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   ratingBarFill: { height: 8, backgroundColor: '#F59E0B', borderRadius: 4 },
+  fab: { position: 'absolute', right: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: '#FF6B33', borderRadius: 99, paddingHorizontal: 18, paddingVertical: 13, gap: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.18, shadowRadius: 8, elevation: 6 },
+  fabText: { color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 14 },
 });
