@@ -1,0 +1,671 @@
+Here is the complete technical documentation for the User Dashboard (/dashboard) page for the Replit mobile app team.
+
+User Dashboard — Complete Technical Documentation
+Purpose
+The /dashboard is the primary landing page for authenticated regular users. It provides a financial overview of the user's wallet balance, spending history across all platform services, and a searchable transaction ledger. For users who are also celebrities, it shows a floating button to switch to the Celebrity Dashboard.
+
+Authentication & Access Control
+
+{
+  "wrapper": "AuthenticatedLayout",
+  "auth_check": "useAuth() → if !user && !loading → redirect to /auth",
+  "required_role": "any authenticated user (no role restriction)",
+  "layout_mobile": "Header + MobileBottomNav (no sidebar)",
+  "layout_desktop": "UserSidebar (collapsed by default) + Header + Footer"
+}
+Page Architecture
+
+┌─────────────────────────────────────────────────┐
+│  AuthenticatedLayout                            │
+│  ┌─────────────────────────────────────────────┐│
+│  │  Dark Background (#0A0D14, min-height:100vh)││
+│  │                                             ││
+│  │  MOBILE LAYOUT:                             ││
+│  │  ┌─────────────────────────────────┐        ││
+│  │  │ Gradient Balance Card           │        ││
+│  │  │ (pink→purple, wallet balance)   │        ││
+│  │  │ [Add Funds] [View Reports]      │        ││
+│  │  └─────────────────────────────────┘        ││
+│  │  ┌──────────┐ ┌──────────┐                  ││
+│  │  │ Bookings │ │ Music    │  ← 2x2 StatCards ││
+│  │  │ Spent    │ │ Generated│                  ││
+│  │  ├──────────┤ ├──────────┤                  ││
+│  │  │ Voice    │ │ Other    │                  ││
+│  │  │ Calls    │ │ Services │                  ││
+│  │  └──────────┘ └──────────┘                  ││
+│  │  ┌─────────────────────────────────┐        ││
+│  │  │ Recent Transactions (5 items)   │        ││
+│  │  └─────────────────────────────────┘        ││
+│  │                                             ││
+│  │  DESKTOP LAYOUT:                            ││
+│  │  ROW 1: [Wallet Balance Card] [TDS Summary] ││
+│  │  ROW 2: [AreaChart 6 months]  [2x2 Stats]  ││
+│  │  ROW 3: [Transaction Table with search]     ││
+│  │                                             ││
+│  │  [DashboardSwitcher FAB] (if celebrity)     ││
+│  └─────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────┘
+Hooks Used
+Hook	Purpose	Source
+useAuth()	Get user, profile (id, name, role)	src/hooks/useAuth.tsx
+useWalletBalance()	Live wallet balance with realtime subscription	src/hooks/useWalletBalance.ts
+useIsMobile()	Responsive breakpoint detection	src/hooks/use-mobile.tsx
+Data Flow — Step by Step
+1. Wallet Balance (Real-time)
+
+{
+  "query": {
+    "table": "profiles",
+    "select": "wallet_balance",
+    "filter": "id = eq.{profile.id}",
+    "method": "single()"
+  },
+  "realtime_subscription": {
+    "channel": "wallet-balance-changes",
+    "event": "*",
+    "table": "profiles",
+    "filter": "id=eq.{profile.id}",
+    "field_watched": "wallet_balance"
+  },
+  "response": {
+    "data": {
+      "wallet_balance": 15000
+    }
+  }
+}
+2. Transaction History
+
+{
+  "query": {
+    "table": "wallet_transactions",
+    "select": "*",
+    "filter": "user_id = eq.{profile.id}",
+    "order": "created_at DESC",
+    "limit": 50
+  },
+  "response": {
+    "data": [
+      {
+        "id": "uuid-string",
+        "user_id": "uuid-string",
+        "transaction_type": "booking",
+        "amount": 2500,
+        "status": "completed",
+        "description": "Video shoutout booking",
+        "created_at": "2026-03-25T10:30:00Z",
+        "reference_id": "booking-uuid",
+        "payment_method": "wallet"
+      }
+    ]
+  }
+}
+Transaction types recognized by the UI:
+
+
+{
+  "transaction_type_mapping": {
+    "deposit":           { "icon": "Banknote",       "color": "#818CF8", "label": "Wallet Top-up",    "category": "DEPOSIT",  "is_credit": true },
+    "admin_credit":      { "icon": "Banknote",       "color": "#22C55E", "label": "Admin Credit",     "category": "CREDIT",   "is_credit": true },
+    "commission_earning":{ "icon": "Banknote",       "color": "#22C55E", "label": "Commission",       "category": "CREDIT",   "is_credit": true },
+    "referral_commission":{"icon": "Banknote",       "color": "#22C55E", "label": "Referral",         "category": "CREDIT",   "is_credit": true },
+    "booking":           { "icon": "Video",          "color": "#14B8A6", "label": "Video Shoutout",   "category": "BOOKING",  "is_credit": false },
+    "photo_wish":        { "icon": "Video",          "color": "#14B8A6", "label": "Photo Wish",       "category": "BOOKING",  "is_credit": false },
+    "ugc_video":         { "icon": "Video",          "color": "#14B8A6", "label": "UGC Video",        "category": "BOOKING",  "is_credit": false },
+    "music_generation":  { "icon": "Star",           "color": "#EAB308", "label": "Music Generation", "category": "SERVICE",  "is_credit": false },
+    "music_download":    { "icon": "Star",           "color": "#EAB308", "label": "Music Download",   "category": "SERVICE",  "is_credit": false },
+    "celebrity_call":    { "icon": "MessageSquare",  "color": "#A855F7", "label": "Voice Call",       "category": "CALL",     "is_credit": false },
+    "voice_call":        { "icon": "MessageSquare",  "color": "#A855F7", "label": "Voice Call",       "category": "CALL",     "is_credit": false },
+    "plan_upgrade":      { "icon": "Star",           "color": "#EAB308", "label": "Plan Upgrade",     "category": "UPGRADE",  "is_credit": false },
+    "greeting_card_generation": { "icon": "Landmark","color": "#EF4444", "label": "Greeting Card",    "category": "OTHER",    "is_credit": false },
+    "image_promotion":   { "icon": "Landmark",       "color": "#EF4444", "label": "Image Promotion",  "category": "OTHER",    "is_credit": false },
+    "service_payment":   { "icon": "Landmark",       "color": "#EF4444", "label": "Service Payment",  "category": "OTHER",    "is_credit": false },
+    "debit":             { "icon": "Landmark",       "color": "#EF4444", "label": "Debit",            "category": "OTHER",    "is_credit": false }
+  }
+}
+UI Components — Detailed Breakdown
+A. Wallet Balance Card (Desktop)
+
+{
+  "component": "inline div",
+  "style": {
+    "background": "#111827",
+    "border": "1px solid rgba(255,255,255,0.06)",
+    "border_radius": "20px",
+    "padding": "32px"
+  },
+  "content": {
+    "label": "Wallet Balance (10px uppercase, tracking 2px, white/40)",
+    "amount": "₹{balance}.00 (52px bold white, decimals in #EC4899)",
+    "trend": "+12.4% from last month (13px, #22C55E, TrendingUp icon)",
+    "buttons": [
+      { "text": "Withdraw Funds", "route": "/wallet", "style": "outline orange #FF6B33" },
+      { "text": "View Reports", "route": "/bookings", "style": "ghost white/15 border" }
+    ]
+  }
+}
+B. Wallet Balance Card (Mobile)
+
+{
+  "component": "inline div",
+  "style": {
+    "background": "linear-gradient(135deg, rgba(236,72,153,0.7), rgba(168,85,247,0.5))",
+    "border_radius": "16px",
+    "padding": "20px"
+  },
+  "content": {
+    "label": "Wallet Balance (10px uppercase, tracking 2px, white/60)",
+    "amount": "₹{balance} (30px bold white, Indian locale formatting)",
+    "buttons": [
+      { "text": "Add Funds", "route": "/wallet", "style": "rounded-full bg-white/15" },
+      { "text": "View Reports", "route": "/bookings", "style": "ghost rounded-full" }
+    ]
+  }
+}
+C. Stat Cards (2×2 Grid)
+
+{
+  "component": "StatCard",
+  "grid": "2 columns",
+  "cards": [
+    {
+      "icon": "Video",
+      "icon_color": "#14B8A6",
+      "label": "Bookings Spent",
+      "value_source": "sum of completed transactions where type in [booking, photo_wish, ugc_video]",
+      "bg": "rgba(20,184,166,0.08)",
+      "border": "rgba(20,184,166,0.15)"
+    },
+    {
+      "icon": "Star",
+      "icon_color": "#EAB308",
+      "label": "Music Generated",
+      "value_source": "sum of completed transactions where type in [music_generation, music_download]",
+      "bg": "rgba(234,179,8,0.08)",
+      "border": "rgba(234,179,8,0.15)"
+    },
+    {
+      "icon": "MessageSquare",
+      "icon_color": "#A855F7",
+      "label": "Voice Calls",
+      "value_source": "sum of completed transactions where type in [celebrity_call, voice_call]",
+      "bg": "rgba(168,85,247,0.08)",
+      "border": "rgba(168,85,247,0.15)"
+    },
+    {
+      "icon": "MoreHorizontal",
+      "icon_color": "rgba(255,255,255,0.5)",
+      "label": "Other Services",
+      "value_source": "sum of completed where type in [greeting_card_generation, image_promotion, service_payment, plan_upgrade, debit]",
+      "bg": "rgba(255,255,255,0.04)",
+      "border": "rgba(255,255,255,0.08)"
+    }
+  ]
+}
+D. Spending Overview Chart (Desktop Only)
+
+{
+  "component": "Recharts AreaChart",
+  "library": "recharts",
+  "data_source": "client-side aggregation of wallet_transactions by month",
+  "config": {
+    "type": "monotone AreaChart",
+    "time_range": "last 6 months",
+    "stroke_color": "#EC4899",
+    "gradient_fill": "linear from #EC4899/30% to transparent",
+    "grid": "horizontal only, rgba(255,255,255,0.05)",
+    "x_axis": "month abbreviation (JAN, FEB...)",
+    "current_month_highlight": "#EC4899 (others white/35)",
+    "tooltip": "white rounded box showing ₹ value",
+    "container_height": 320,
+    "chart_height": 200
+  },
+  "data_shape": [
+    { "name": "OCT", "value": 5000 },
+    { "name": "NOV", "value": 12000 },
+    { "name": "DEC", "value": 8500 },
+    { "name": "JAN", "value": 15000 },
+    { "name": "FEB", "value": 22000 },
+    { "name": "MAR", "value": 18000 }
+  ]
+}
+E. TDS Summary Card (Desktop Only)
+
+{
+  "component": "inline div",
+  "width": "320px fixed",
+  "content": {
+    "title": "TDS Summary",
+    "icon": "ShieldCheck (#FF6B33)",
+    "rows": [
+      { "label": "Tax Deducted (FY 23-24)", "value": "₹8,45,200" },
+      { "label": "Form 16A Status", "badge": "Generated (green pill)" }
+    ],
+    "action_button": {
+      "text": "Download TDS Certificate",
+      "icon": "Download",
+      "style": "gradient orange (#F5A623 → #FF6B33), full width"
+    }
+  },
+  "note": "Currently shows static placeholder data — no API endpoint"
+}
+F. Recent Transactions Table (Desktop)
+
+{
+  "component": "custom table div",
+  "columns": ["Transaction Details", "Date", "Type", "Amount", "Status"],
+  "grid_template": "2fr 1fr 1fr 1fr 1fr",
+  "features": {
+    "search": "filters by tx.id or transaction_type (client-side)",
+    "filter_button": "SlidersHorizontal icon (UI only, no backend filter)",
+    "max_rows_shown": 10,
+    "status_badges": {
+      "completed": { "bg": "rgba(34,197,94,0.12)", "color": "#22C55E" },
+      "credited":  { "bg": "rgba(99,102,241,0.12)", "color": "#818CF8" },
+      "pending":   { "bg": "rgba(234,179,8,0.12)",  "color": "#EAB308" },
+      "processing":{ "bg": "rgba(234,179,8,0.12)",  "color": "#EAB308" },
+      "rejected":  { "bg": "rgba(239,68,68,0.12)",  "color": "#EF4444" }
+    }
+  }
+}
+G. Recent Transactions List (Mobile)
+
+{
+  "component": "vertical list",
+  "max_items": 5,
+  "per_item": {
+    "left": "icon in colored rounded square (9x9 w-4 icon)",
+    "center": "title (14px white) + date (11px white/40)",
+    "right": "amount (14px, green if credit, white if debit) + status badge"
+  }
+}
+H. DashboardSwitcher (Floating Action Button)
+
+{
+  "component": "DashboardSwitcher",
+  "visibility_check": {
+    "query": {
+      "table": "celebrities",
+      "select": "id",
+      "filter": "profile_id = eq.{profile.id}",
+      "method": "maybeSingle()"
+    },
+    "show_if": "data !== null (user has a celebrity record)"
+  },
+  "position": "fixed bottom-36 md:bottom-20 right-4 md:right-6 z-50",
+  "behavior": {
+    "on_dashboard": "shows 'Celebrity Dashboard' button → navigates to /celebrity-dashboard",
+    "on_celebrity_dashboard": "shows 'User Dashboard' button → navigates to /dashboard"
+  }
+}
+Amount Formatting Helper
+
+{
+  "function": "fmtLakh(value)",
+  "logic": [
+    { "if": "value >= 100000", "format": "₹{value/100000}L  (e.g. ₹1.5L)" },
+    { "if": "value >= 1000",   "format": "₹{value/1000}K    (e.g. ₹15.0K)" },
+    { "else": "₹{value}                  (e.g. ₹500)" }
+  ]
+}
+Color Palette Reference
+
+{
+  "page_background": "#0A0D14",
+  "card_background": "#111827",
+  "card_border": "rgba(255,255,255,0.06)",
+  "text_primary": "#FFFFFF",
+  "text_secondary": "rgba(255,255,255,0.40)",
+  "text_label": "rgba(255,255,255,0.30)",
+  "accent_pink": "#EC4899",
+  "accent_orange": "#FF6B33",
+  "accent_green": "#22C55E",
+  "accent_teal": "#14B8A6",
+  "accent_yellow": "#EAB308",
+  "accent_purple": "#A855F7",
+  "accent_indigo": "#818CF8",
+  "accent_red": "#EF4444",
+  "mobile_gradient": "linear-gradient(135deg, rgba(236,72,153,0.7), rgba(168,85,247,0.5))"
+}
+Summary of Supabase Queries for Mobile Integration
+#	Table	Select	Filter	Order	Limit	Realtime
+1	profiles	wallet_balance	id = profile.id	—	1	Yes (postgres_changes on profiles)
+2	wallet_transactions	*	user_id = profile.id	created_at DESC	50	No (manual fetch)
+3	celebrities	id	profile_id = profile.id	—	1	No (one-time check for switcher)
+No Edge Functions Used
+This page uses zero edge functions. All data comes from direct Supabase client queries. The wallet balance updates in real-time via Supabase Realtime channel subscription, not polling.
+
+Here is the complete technical documentation for the User Dashboard (/dashboard) page for the Replit mobile app team.
+
+User Dashboard — Complete Technical Documentation
+Purpose
+The /dashboard is the primary landing page for authenticated regular users. It provides a financial overview of the user's wallet balance, spending history across all platform services, and a searchable transaction ledger. For users who are also celebrities, it shows a floating button to switch to the Celebrity Dashboard.
+
+Authentication & Access Control
+
+{
+  "wrapper": "AuthenticatedLayout",
+  "auth_check": "useAuth() → if !user && !loading → redirect to /auth",
+  "required_role": "any authenticated user (no role restriction)",
+  "layout_mobile": "Header + MobileBottomNav (no sidebar)",
+  "layout_desktop": "UserSidebar (collapsed by default) + Header + Footer"
+}
+Page Architecture
+
+┌─────────────────────────────────────────────────┐
+│  AuthenticatedLayout                            │
+│  ┌─────────────────────────────────────────────┐│
+│  │  Dark Background (#0A0D14, min-height:100vh)││
+│  │                                             ││
+│  │  MOBILE LAYOUT:                             ││
+│  │  ┌─────────────────────────────────┐        ││
+│  │  │ Gradient Balance Card           │        ││
+│  │  │ (pink→purple, wallet balance)   │        ││
+│  │  │ [Add Funds] [View Reports]      │        ││
+│  │  └─────────────────────────────────┘        ││
+│  │  ┌──────────┐ ┌──────────┐                  ││
+│  │  │ Bookings │ │ Music    │  ← 2x2 StatCards ││
+│  │  │ Spent    │ │ Generated│                  ││
+│  │  ├──────────┤ ├──────────┤                  ││
+│  │  │ Voice    │ │ Other    │                  ││
+│  │  │ Calls    │ │ Services │                  ││
+│  │  └──────────┘ └──────────┘                  ││
+│  │  ┌─────────────────────────────────┐        ││
+│  │  │ Recent Transactions (5 items)   │        ││
+│  │  └─────────────────────────────────┘        ││
+│  │                                             ││
+│  │  DESKTOP LAYOUT:                            ││
+│  │  ROW 1: [Wallet Balance Card] [TDS Summary] ││
+│  │  ROW 2: [AreaChart 6 months]  [2x2 Stats]  ││
+│  │  ROW 3: [Transaction Table with search]     ││
+│  │                                             ││
+│  │  [DashboardSwitcher FAB] (if celebrity)     ││
+│  └─────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────┘
+Hooks Used
+Hook	Purpose	Source
+useAuth()	Get user, profile (id, name, role)	src/hooks/useAuth.tsx
+useWalletBalance()	Live wallet balance with realtime subscription	src/hooks/useWalletBalance.ts
+useIsMobile()	Responsive breakpoint detection	src/hooks/use-mobile.tsx
+Data Flow — Step by Step
+1. Wallet Balance (Real-time)
+
+{
+  "query": {
+    "table": "profiles",
+    "select": "wallet_balance",
+    "filter": "id = eq.{profile.id}",
+    "method": "single()"
+  },
+  "realtime_subscription": {
+    "channel": "wallet-balance-changes",
+    "event": "*",
+    "table": "profiles",
+    "filter": "id=eq.{profile.id}",
+    "field_watched": "wallet_balance"
+  },
+  "response": {
+    "data": {
+      "wallet_balance": 15000
+    }
+  }
+}
+2. Transaction History
+
+{
+  "query": {
+    "table": "wallet_transactions",
+    "select": "*",
+    "filter": "user_id = eq.{profile.id}",
+    "order": "created_at DESC",
+    "limit": 50
+  },
+  "response": {
+    "data": [
+      {
+        "id": "uuid-string",
+        "user_id": "uuid-string",
+        "transaction_type": "booking",
+        "amount": 2500,
+        "status": "completed",
+        "description": "Video shoutout booking",
+        "created_at": "2026-03-25T10:30:00Z",
+        "reference_id": "booking-uuid",
+        "payment_method": "wallet"
+      }
+    ]
+  }
+}
+Transaction types recognized by the UI:
+
+
+{
+  "transaction_type_mapping": {
+    "deposit":           { "icon": "Banknote",       "color": "#818CF8", "label": "Wallet Top-up",    "category": "DEPOSIT",  "is_credit": true },
+    "admin_credit":      { "icon": "Banknote",       "color": "#22C55E", "label": "Admin Credit",     "category": "CREDIT",   "is_credit": true },
+    "commission_earning":{ "icon": "Banknote",       "color": "#22C55E", "label": "Commission",       "category": "CREDIT",   "is_credit": true },
+    "referral_commission":{"icon": "Banknote",       "color": "#22C55E", "label": "Referral",         "category": "CREDIT",   "is_credit": true },
+    "booking":           { "icon": "Video",          "color": "#14B8A6", "label": "Video Shoutout",   "category": "BOOKING",  "is_credit": false },
+    "photo_wish":        { "icon": "Video",          "color": "#14B8A6", "label": "Photo Wish",       "category": "BOOKING",  "is_credit": false },
+    "ugc_video":         { "icon": "Video",          "color": "#14B8A6", "label": "UGC Video",        "category": "BOOKING",  "is_credit": false },
+    "music_generation":  { "icon": "Star",           "color": "#EAB308", "label": "Music Generation", "category": "SERVICE",  "is_credit": false },
+    "music_download":    { "icon": "Star",           "color": "#EAB308", "label": "Music Download",   "category": "SERVICE",  "is_credit": false },
+    "celebrity_call":    { "icon": "MessageSquare",  "color": "#A855F7", "label": "Voice Call",       "category": "CALL",     "is_credit": false },
+    "voice_call":        { "icon": "MessageSquare",  "color": "#A855F7", "label": "Voice Call",       "category": "CALL",     "is_credit": false },
+    "plan_upgrade":      { "icon": "Star",           "color": "#EAB308", "label": "Plan Upgrade",     "category": "UPGRADE",  "is_credit": false },
+    "greeting_card_generation": { "icon": "Landmark","color": "#EF4444", "label": "Greeting Card",    "category": "OTHER",    "is_credit": false },
+    "image_promotion":   { "icon": "Landmark",       "color": "#EF4444", "label": "Image Promotion",  "category": "OTHER",    "is_credit": false },
+    "service_payment":   { "icon": "Landmark",       "color": "#EF4444", "label": "Service Payment",  "category": "OTHER",    "is_credit": false },
+    "debit":             { "icon": "Landmark",       "color": "#EF4444", "label": "Debit",            "category": "OTHER",    "is_credit": false }
+  }
+}
+UI Components — Detailed Breakdown
+A. Wallet Balance Card (Desktop)
+
+{
+  "component": "inline div",
+  "style": {
+    "background": "#111827",
+    "border": "1px solid rgba(255,255,255,0.06)",
+    "border_radius": "20px",
+    "padding": "32px"
+  },
+  "content": {
+    "label": "Wallet Balance (10px uppercase, tracking 2px, white/40)",
+    "amount": "₹{balance}.00 (52px bold white, decimals in #EC4899)",
+    "trend": "+12.4% from last month (13px, #22C55E, TrendingUp icon)",
+    "buttons": [
+      { "text": "Withdraw Funds", "route": "/wallet", "style": "outline orange #FF6B33" },
+      { "text": "View Reports", "route": "/bookings", "style": "ghost white/15 border" }
+    ]
+  }
+}
+B. Wallet Balance Card (Mobile)
+
+{
+  "component": "inline div",
+  "style": {
+    "background": "linear-gradient(135deg, rgba(236,72,153,0.7), rgba(168,85,247,0.5))",
+    "border_radius": "16px",
+    "padding": "20px"
+  },
+  "content": {
+    "label": "Wallet Balance (10px uppercase, tracking 2px, white/60)",
+    "amount": "₹{balance} (30px bold white, Indian locale formatting)",
+    "buttons": [
+      { "text": "Add Funds", "route": "/wallet", "style": "rounded-full bg-white/15" },
+      { "text": "View Reports", "route": "/bookings", "style": "ghost rounded-full" }
+    ]
+  }
+}
+C. Stat Cards (2×2 Grid)
+
+{
+  "component": "StatCard",
+  "grid": "2 columns",
+  "cards": [
+    {
+      "icon": "Video",
+      "icon_color": "#14B8A6",
+      "label": "Bookings Spent",
+      "value_source": "sum of completed transactions where type in [booking, photo_wish, ugc_video]",
+      "bg": "rgba(20,184,166,0.08)",
+      "border": "rgba(20,184,166,0.15)"
+    },
+    {
+      "icon": "Star",
+      "icon_color": "#EAB308",
+      "label": "Music Generated",
+      "value_source": "sum of completed transactions where type in [music_generation, music_download]",
+      "bg": "rgba(234,179,8,0.08)",
+      "border": "rgba(234,179,8,0.15)"
+    },
+    {
+      "icon": "MessageSquare",
+      "icon_color": "#A855F7",
+      "label": "Voice Calls",
+      "value_source": "sum of completed transactions where type in [celebrity_call, voice_call]",
+      "bg": "rgba(168,85,247,0.08)",
+      "border": "rgba(168,85,247,0.15)"
+    },
+    {
+      "icon": "MoreHorizontal",
+      "icon_color": "rgba(255,255,255,0.5)",
+      "label": "Other Services",
+      "value_source": "sum of completed where type in [greeting_card_generation, image_promotion, service_payment, plan_upgrade, debit]",
+      "bg": "rgba(255,255,255,0.04)",
+      "border": "rgba(255,255,255,0.08)"
+    }
+  ]
+}
+D. Spending Overview Chart (Desktop Only)
+
+{
+  "component": "Recharts AreaChart",
+  "library": "recharts",
+  "data_source": "client-side aggregation of wallet_transactions by month",
+  "config": {
+    "type": "monotone AreaChart",
+    "time_range": "last 6 months",
+    "stroke_color": "#EC4899",
+    "gradient_fill": "linear from #EC4899/30% to transparent",
+    "grid": "horizontal only, rgba(255,255,255,0.05)",
+    "x_axis": "month abbreviation (JAN, FEB...)",
+    "current_month_highlight": "#EC4899 (others white/35)",
+    "tooltip": "white rounded box showing ₹ value",
+    "container_height": 320,
+    "chart_height": 200
+  },
+  "data_shape": [
+    { "name": "OCT", "value": 5000 },
+    { "name": "NOV", "value": 12000 },
+    { "name": "DEC", "value": 8500 },
+    { "name": "JAN", "value": 15000 },
+    { "name": "FEB", "value": 22000 },
+    { "name": "MAR", "value": 18000 }
+  ]
+}
+E. TDS Summary Card (Desktop Only)
+
+{
+  "component": "inline div",
+  "width": "320px fixed",
+  "content": {
+    "title": "TDS Summary",
+    "icon": "ShieldCheck (#FF6B33)",
+    "rows": [
+      { "label": "Tax Deducted (FY 23-24)", "value": "₹8,45,200" },
+      { "label": "Form 16A Status", "badge": "Generated (green pill)" }
+    ],
+    "action_button": {
+      "text": "Download TDS Certificate",
+      "icon": "Download",
+      "style": "gradient orange (#F5A623 → #FF6B33), full width"
+    }
+  },
+  "note": "Currently shows static placeholder data — no API endpoint"
+}
+F. Recent Transactions Table (Desktop)
+
+{
+  "component": "custom table div",
+  "columns": ["Transaction Details", "Date", "Type", "Amount", "Status"],
+  "grid_template": "2fr 1fr 1fr 1fr 1fr",
+  "features": {
+    "search": "filters by tx.id or transaction_type (client-side)",
+    "filter_button": "SlidersHorizontal icon (UI only, no backend filter)",
+    "max_rows_shown": 10,
+    "status_badges": {
+      "completed": { "bg": "rgba(34,197,94,0.12)", "color": "#22C55E" },
+      "credited":  { "bg": "rgba(99,102,241,0.12)", "color": "#818CF8" },
+      "pending":   { "bg": "rgba(234,179,8,0.12)",  "color": "#EAB308" },
+      "processing":{ "bg": "rgba(234,179,8,0.12)",  "color": "#EAB308" },
+      "rejected":  { "bg": "rgba(239,68,68,0.12)",  "color": "#EF4444" }
+    }
+  }
+}
+G. Recent Transactions List (Mobile)
+
+{
+  "component": "vertical list",
+  "max_items": 5,
+  "per_item": {
+    "left": "icon in colored rounded square (9x9 w-4 icon)",
+    "center": "title (14px white) + date (11px white/40)",
+    "right": "amount (14px, green if credit, white if debit) + status badge"
+  }
+}
+H. DashboardSwitcher (Floating Action Button)
+
+{
+  "component": "DashboardSwitcher",
+  "visibility_check": {
+    "query": {
+      "table": "celebrities",
+      "select": "id",
+      "filter": "profile_id = eq.{profile.id}",
+      "method": "maybeSingle()"
+    },
+    "show_if": "data !== null (user has a celebrity record)"
+  },
+  "position": "fixed bottom-36 md:bottom-20 right-4 md:right-6 z-50",
+  "behavior": {
+    "on_dashboard": "shows 'Celebrity Dashboard' button → navigates to /celebrity-dashboard",
+    "on_celebrity_dashboard": "shows 'User Dashboard' button → navigates to /dashboard"
+  }
+}
+Amount Formatting Helper
+
+{
+  "function": "fmtLakh(value)",
+  "logic": [
+    { "if": "value >= 100000", "format": "₹{value/100000}L  (e.g. ₹1.5L)" },
+    { "if": "value >= 1000",   "format": "₹{value/1000}K    (e.g. ₹15.0K)" },
+    { "else": "₹{value}                  (e.g. ₹500)" }
+  ]
+}
+Color Palette Reference
+
+{
+  "page_background": "#0A0D14",
+  "card_background": "#111827",
+  "card_border": "rgba(255,255,255,0.06)",
+  "text_primary": "#FFFFFF",
+  "text_secondary": "rgba(255,255,255,0.40)",
+  "text_label": "rgba(255,255,255,0.30)",
+  "accent_pink": "#EC4899",
+  "accent_orange": "#FF6B33",
+  "accent_green": "#22C55E",
+  "accent_teal": "#14B8A6",
+  "accent_yellow": "#EAB308",
+  "accent_purple": "#A855F7",
+  "accent_indigo": "#818CF8",
+  "accent_red": "#EF4444",
+  "mobile_gradient": "linear-gradient(135deg, rgba(236,72,153,0.7), rgba(168,85,247,0.5))"
+}
+Summary of Supabase Queries for Mobile Integration
+#	Table	Select	Filter	Order	Limit	Realtime
+1	profiles	wallet_balance	id = profile.id	—	1	Yes (postgres_changes on profiles)
+2	wallet_transactions	*	user_id = profile.id	created_at DESC	50	No (manual fetch)
+3	celebrities	id	profile_id = profile.id	—	1	No (one-time check for switcher)
+No Edge Functions Used
+This page uses zero edge functions. All data comes from direct Supabase client queries. The wallet balance updates in real-time via Supabase Realtime channel subscription, not polling.
