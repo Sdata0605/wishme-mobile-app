@@ -170,9 +170,6 @@ export default function HomeScreen() {
               <Icon name="credit-card" size={13} color="#fff" />
               <Text style={styles.walletText}>₹{user?.walletBalance?.toLocaleString('en-IN') ?? '0'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => router.push('/messages')} style={styles.iconBtn}>
-              <Icon name="message-circle" size={22} color="#fff" />
-            </TouchableOpacity>
           </View>
         </View>
 

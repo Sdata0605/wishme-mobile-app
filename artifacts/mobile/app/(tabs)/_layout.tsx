@@ -1,10 +1,12 @@
 import { BlurView } from 'expo-blur';
 import { router, Tabs, type Href } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
   Modal,
+  PanResponder,
   Platform,
   ScrollView,
   StyleSheet,
@@ -17,7 +19,8 @@ import { DrawerMenu } from '@/components/DrawerMenu';
 import { Icon, type IconName } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 
-const { width: W } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get('window');
+const BTN_SIZE = 44;
 
 interface QuickItem {
   icon: IconName;
@@ -49,7 +52,53 @@ export default function TabLayout() {
 
   const TAB_CONTENT_H = isWeb ? 84 : 60;
   const tabBarH = TAB_CONTENT_H + (isWeb ? 0 : insets.bottom);
-  const moreBtnBottom = tabBarH + 10;
+
+  const initialX = W - BTN_SIZE - 16;
+  const initialY = H - tabBarH - BTN_SIZE - 16;
+
+  const pan = useRef(new Animated.ValueXY({ x: initialX, y: initialY })).current;
+  const lastPos = useRef({ x: initialX, y: initialY });
+  const dragStartPos = useRef({ x: 0, y: 0 });
+  const isDragging = useRef(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > 3 || Math.abs(gs.dy) > 3,
+      onPanResponderGrant: (_, gs) => {
+        dragStartPos.current = { x: lastPos.current.x, y: lastPos.current.y };
+        isDragging.current = false;
+        pan.setOffset({ x: lastPos.current.x, y: lastPos.current.y });
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: (_, gs) => {
+        if (Math.abs(gs.dx) > 5 || Math.abs(gs.dy) > 5) {
+          isDragging.current = true;
+        }
+        Animated.event([null, { dx: pan.x, dy: pan.y }], {
+          useNativeDriver: false,
+        })(_, gs);
+      },
+      onPanResponderRelease: (_, gs) => {
+        pan.flattenOffset();
+
+        const rawX = dragStartPos.current.x + gs.dx;
+        const rawY = dragStartPos.current.y + gs.dy;
+
+        const clampedX = Math.max(0, Math.min(W - BTN_SIZE, rawX));
+        const clampedY = Math.max(insets.top + 8, Math.min(H - BTN_SIZE - 8, rawY));
+
+        pan.setValue({ x: clampedX, y: clampedY });
+        lastPos.current = { x: clampedX, y: clampedY };
+
+        if (!isDragging.current) {
+          setQuickMenuVisible(true);
+        }
+        isDragging.current = false;
+      },
+    }),
+  ).current;
 
   const navigateQuick = (route: Href) => {
     setQuickMenuVisible(false);
@@ -147,22 +196,21 @@ export default function TabLayout() {
         </Tabs>
       </DrawerMenu>
 
-      {/* Floating "More" button — sits just above the tab bar */}
-      <TouchableOpacity
+      {/* Draggable "More" button */}
+      <Animated.View
         style={[
           styles.moreBtn,
           {
-            bottom: moreBtnBottom,
             backgroundColor: colors.card,
             borderColor: colors.border,
             shadowColor: isDark ? '#000' : '#666',
+            transform: [{ translateX: pan.x }, { translateY: pan.y }],
           },
         ]}
-        onPress={() => setQuickMenuVisible(true)}
-        activeOpacity={0.85}
+        {...panResponder.panHandlers}
       >
         <Icon name="more-horizontal" size={20} color={colors.foreground} />
-      </TouchableOpacity>
+      </Animated.View>
 
       {/* Quick Menu — full-screen overlay */}
       <Modal
@@ -217,17 +265,18 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   moreBtn: {
     position: 'absolute',
-    right: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    top: 0,
+    left: 0,
+    width: BTN_SIZE,
+    height: BTN_SIZE,
+    borderRadius: BTN_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
-    elevation: 4,
+    elevation: 6,
     zIndex: 50,
   },
   menuScreen: {
