@@ -20,10 +20,11 @@ export default function Index() {
             const user = JSON.parse(userStr) as { role?: string };
             if (user?.role === 'celebrity') {
               router.replace('/celebrity-dashboard');
-            } else {
+              return;
+            } else if (user?.role === 'user') {
               router.replace('/(tabs)');
+              return;
             }
-            return;
           } catch {}
         }
 

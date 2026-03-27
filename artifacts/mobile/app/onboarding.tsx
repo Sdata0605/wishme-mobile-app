@@ -221,8 +221,10 @@ export default function OnboardingScreen() {
   const [phase, setPhase] = useState<'video' | 'slides'>('video');
   const [current, setCurrent] = useState(0);
 
-  const finish = () => {
-    AsyncStorage.setItem(STORAGE_ONBOARDING, '1').catch(() => {});
+  const finish = async () => {
+    try {
+      await AsyncStorage.setItem(STORAGE_ONBOARDING, '1');
+    } catch {}
     router.replace('/(auth)');
   };
 
