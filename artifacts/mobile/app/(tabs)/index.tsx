@@ -1,6 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, type Href } from 'expo-router';
-import React, { useState } from 'react';
+import { VideoView, useVideoPlayer } from 'expo-video';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -92,6 +93,80 @@ const VIDEO_CARDS = [
   { id: 'v2', title: 'Birthday Magic', desc: 'Make their birthday unforgettable with a celebrity wish', tag: 'Birthday', gradient: ['#FF6B33', '#E8527A'] as const },
   { id: 'v3', title: 'Anniversary Special', desc: 'Celebrate love with a romantic celebrity message', tag: 'Anniversary', gradient: ['#B44CFF', '#E8527A'] as const },
 ];
+
+const BIRTHDAY_VIDEO = require('../../assets/videos/happy-birthday.mp4');
+
+function BirthdayVideoCard({ cardWidth, tag }: { cardWidth: number; tag: string }) {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(false);
+
+  const player = useVideoPlayer(BIRTHDAY_VIDEO, p => {
+    p.loop = true;
+    p.muted = false;
+  });
+
+  const togglePlay = useCallback(() => {
+    if (isPlaying) {
+      player.pause();
+      setIsPlaying(false);
+    } else {
+      player.play();
+      setIsPlaying(true);
+    }
+  }, [isPlaying, player]);
+
+  const toggleMute = useCallback(() => {
+    const next = !isMuted;
+    player.muted = next;
+    setIsMuted(next);
+  }, [isMuted, player]);
+
+  return (
+    <View style={{ width: cardWidth, height: 190, borderRadius: 14, overflow: 'hidden' }}>
+      <VideoView
+        player={player}
+        style={StyleSheet.absoluteFillObject}
+        contentFit="cover"
+        nativeControls={false}
+      />
+      {/* Play / Pause overlay */}
+      <TouchableOpacity
+        onPress={togglePlay}
+        activeOpacity={0.8}
+        style={{
+          ...StyleSheet.absoluteFillObject,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <View style={{
+          width: 52, height: 52, borderRadius: 26,
+          backgroundColor: 'rgba(0,0,0,0.45)',
+          alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Icon name={isPlaying ? 'pause' : 'play'} size={26} color="#fff" />
+        </View>
+      </TouchableOpacity>
+      {/* Mute / Unmute */}
+      <TouchableOpacity
+        onPress={toggleMute}
+        activeOpacity={0.8}
+        style={{
+          position: 'absolute', top: 10, right: 10,
+          width: 32, height: 32, borderRadius: 16,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <Icon name={isMuted ? 'volume-x' : 'volume-2'} size={16} color="#fff" />
+      </TouchableOpacity>
+      {/* Tag badge */}
+      <View style={[{ position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 }]}>
+        <Text style={{ color: '#fff', fontSize: 11, fontFamily: 'Inter_600SemiBold' }}>{tag}</Text>
+      </View>
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -400,17 +475,21 @@ export default function HomeScreen() {
             decelerationRate="fast"
             renderItem={({ item }) => (
               <View style={[styles.videoCard, { width: W - 60, backgroundColor: colors.card }]}>
-                <LinearGradient
-                  colors={item.gradient as [string, string]}
-                  style={styles.videoThumb}
-                >
-                  <View style={styles.playBtn}>
-                    <Icon name="play" size={28} color="#fff" />
-                  </View>
-                  <View style={[styles.tagBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
-                    <Text style={styles.tagText}>{item.tag}</Text>
-                  </View>
-                </LinearGradient>
+                {item.id === 'v2' ? (
+                  <BirthdayVideoCard cardWidth={W - 60} tag={item.tag} />
+                ) : (
+                  <LinearGradient
+                    colors={item.gradient as [string, string]}
+                    style={styles.videoThumb}
+                  >
+                    <View style={styles.playBtn}>
+                      <Icon name="play" size={28} color="#fff" />
+                    </View>
+                    <View style={[styles.tagBadge, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+                      <Text style={styles.tagText}>{item.tag}</Text>
+                    </View>
+                  </LinearGradient>
+                )}
                 <View style={styles.videoInfo}>
                   <Text style={[styles.videoTitle, { color: colors.foreground }]}>{item.title}</Text>
                   <Text style={[styles.videoDesc, { color: colors.mutedForeground }]} numberOfLines={2}>{item.desc}</Text>
