@@ -227,9 +227,7 @@ export function VoiceAssistantButton() {
       const uri = recording.getURI();
       if (!uri) throw new Error('No recording URI');
       setStatus('processing');
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
       const res = await supabaseFetch(
         '/functions/v1/ai-assistant',
         {
@@ -244,7 +242,16 @@ export function VoiceAssistantButton() {
         },
         session?.access_token,
       );
-      if (!res.ok) throw new Error('audio_unsupported');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({})) as { error?: string; message?: string };
+        const errMsg = (errData.error ?? errData.message ?? '').toLowerCase();
+        const isAudioUnsupported =
+          errMsg.includes('audio') ||
+          errMsg.includes('transcript') ||
+          errMsg.includes('unsupported') ||
+          res.status === 415;
+        throw new Error(isAudioUnsupported ? 'audio_unsupported' : `api_error_${res.status}`);
+      }
       const data = (await res.json()) as { transcript?: string; message?: string };
       const userSaid = data.transcript ?? '[voice input]';
       const aiSaid = data.message ?? "Sorry, I'm having trouble right now.";
@@ -252,7 +259,7 @@ export function VoiceAssistantButton() {
       await speakNative(aiSaid);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : '';
-      if (msg === 'audio_unsupported' || msg.toLowerCase().includes('audio')) {
+      if (msg === 'audio_unsupported') {
         setShowFallback(true);
         setStatus('idle');
       } else {
