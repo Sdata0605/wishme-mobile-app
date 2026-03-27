@@ -1,0 +1,412 @@
+Here is the complete Music Studio documentation for Replit:
+
+Music Studio (/music-studio) — Complete Technical Documentation
+Overview
+The Music Studio is an authenticated page with 7 tabs for AI-powered audio generation. All features use a wallet-based payment model — costs are deducted from the user's profiles.wallet_balance before API calls, with automatic refunds on failure.
+
+Route: /music-studio Auth: Required (redirects to /auth if unauthenticated) Component: src/pages/MusicStudio.tsx
+
+Wallet & Pricing
+Feature	Cost (₹)
+Text-to-Speech	50
+Voice Conversion	75
+Sound Effects	60
+Audio Isolation	40
+Instrumental Music	100
+Full Song (with lyrics)	150
+Voice Cloning	150
+Image + Music (instrumental)	120
+Image + Music (with vocals)	150
+Wallet check: Client checks walletBalance < cost before calling edge function. For Music Generation, the server also validates and handles deduction/refund server-side.
+
+TAB 1: Text-to-Speech (ElevenLabs)
+Edge Function: elevenlabs-text-to-speech External API: POST https://api.elevenlabs.io/v1/text-to-speech/{voiceId} Secrets: ELEVENLABS_API_KEY, B2_KEY_ID, B2_APPLICATION_KEY
+
+Frontend call:
+
+
+supabase.functions.invoke('elevenlabs-text-to-speech', {
+  body: { text, voiceId }
+})
+Request payload to edge function:
+
+
+{
+  "text": "Hello, this is a test",
+  "voiceId": "9BWtsMINqrJLrRacOk9x",
+  "modelId": "eleven_multilingual_v2",  // optional
+  "languageCode": "hi"                   // optional
+}
+Edge function → ElevenLabs API payload:
+
+
+{
+  "text": "Hello, this is a test",
+  "model_id": "eleven_multilingual_v2",
+  "voice_settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.75,
+    "style": 0.5,
+    "use_speaker_boost": true
+  }
+}
+Response from edge function:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,SUQzBAA...",
+  "b2Url": "https://f005.backblazeb2.com/file/wishmetoday/audio/tts/1711234567-abc123.mp3",
+  "message": "Speech generated successfully"
+}
+Error response:
+
+
+{
+  "success": false,
+  "error": "Voice ID not found. This cloned voice may have been deleted from ElevenLabs.",
+  "statusCode": 404
+}
+DB table: tts_generations
+
+
+{
+  "user_id": "profile-uuid",
+  "text": "Hello...",
+  "voice_id": "9BWtsMINqrJLrRacOk9x",
+  "voice_name": "Aria",
+  "audio_url": "https://f005.backblazeb2.com/file/wishmetoday/...",
+  "status": "completed",
+  "credits_used": 50
+}
+TAB 2: Voice Conversion (ElevenLabs Speech-to-Speech)
+Edge Function: elevenlabs-speech-to-speech External API: POST https://api.elevenlabs.io/v1/speech-to-speech/{voiceId} Secrets: ELEVENLABS_API_KEY, B2_KEY_ID, B2_APPLICATION_KEY
+
+Frontend call:
+
+
+const audioBase64 = await fileToBase64(audioFile);
+supabase.functions.invoke('elevenlabs-speech-to-speech', {
+  body: { audioBase64, voiceId }
+})
+Request payload:
+
+
+{
+  "audioBase64": "data:audio/webm;base64,GkXfo...",
+  "voiceId": "9BWtsMINqrJLrRacOk9x",
+  "modelId": "eleven_multilingual_sts_v2"  // optional
+}
+Edge function → ElevenLabs: Sends FormData with:
+
+audio: Blob file
+model_id: "eleven_multilingual_sts_v2"
+voice_settings: JSON string {"stability":0.5,"similarity_boost":0.75,"style":0.5,"use_speaker_boost":true}
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,...",
+  "b2Url": "https://f005.backblazeb2.com/file/wishmetoday/audio/voice-convert/...",
+  "message": "Speech converted successfully"
+}
+DB table: voice_conversion_generations
+
+TAB 3: Sound Effects (ElevenLabs)
+Edge Function: elevenlabs-sound-effects External API: POST https://api.elevenlabs.io/v1/sound-generation Secrets: ELEVENLABS_API_KEY
+
+Request payload:
+
+
+{
+  "text": "Thunder crashing during a storm",
+  "durationSeconds": 5,
+  "promptInfluence": 0.3
+}
+Note: This API uses text parameter (NOT prompt).
+
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,...",
+  "b2Url": "https://f005.backblazeb2.com/file/wishmetoday/audio/sfx/...",
+  "message": "Sound effect generated"
+}
+DB table: sound_effect_generations
+
+TAB 4: Audio Isolation (ElevenLabs)
+Edge Function: elevenlabs-audio-isolation External API: POST https://api.elevenlabs.io/v1/audio-isolation Secrets: ELEVENLABS_API_KEY
+
+Request payload:
+
+
+{
+  "audioBase64": "data:audio/mpeg;base64,..."
+}
+Edge function → ElevenLabs: Sends FormData with audio blob.
+
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,...",
+  "b2Url": "https://f005.backblazeb2.com/file/wishmetoday/audio/isolated/...",
+  "message": "Audio isolation complete"
+}
+DB table: audio_isolation_generations
+
+TAB 5: Voice Cloning (ElevenLabs)
+Edge Function: elevenlabs-clone-voice External API: POST https://api.elevenlabs.io/v1/voices/add Secrets: ELEVENLABS_API_KEY Auth: Requires JWT (validates user, saves ownership to user_cloned_voices)
+
+Request payload:
+
+
+{
+  "audioBase64": "data:audio/mpeg;base64,...",
+  "voiceName": "My Voice",
+  "voiceDescription": "My natural speaking voice"
+}
+Edge function → ElevenLabs: Sends FormData with:
+
+name: voice name
+description: optional
+files: audio blob as voice_sample.mp3
+Response:
+
+
+{
+  "success": true,
+  "voiceId": "abc123xyz",
+  "voiceName": "My Voice",
+  "message": "Voice cloned successfully!"
+}
+DB table: user_cloned_voices (tracks ownership: user_id, elevenlabs_voice_id, voice_name)
+
+TAB 6: Music Generation (Suno API v4.5)
+This is the most complex tab — uses asynchronous polling.
+
+Step 1: Generate Lyrics (optional)
+Edge Function: generate-lyrics AI Provider: Gemini 2.0 Flash (primary) → Lovable AI Gateway (fallback) Secrets: GEMINI_API_KEY or LOVABLE_API_KEY
+
+Request payload:
+
+
+{
+  "description": "A love song about missing someone",
+  "genre": "pop",
+  "mood": "sad",
+  "language": "Hindi"
+}
+Response:
+
+
+{
+  "lyrics": "Tere bina ye dil mera\nKaise jiye akela..."
+}
+Step 2: Start Music Generation
+Edge Function: generate-music External API: POST https://api.sunoapi.org/api/v1/generate Secrets: SUNO_API_KEY Auth: Requires JWT (server-side wallet validation and deduction)
+
+Frontend call:
+
+
+supabase.functions.invoke('generate-music', {
+  body: {
+    song_title: "My Love Song",
+    genre: "pop",
+    mood: "romantic",
+    prompt: "A beautiful love song",
+    lyrics: "Tere bina ye dil mera...",
+    generation_type: "with_lyrics",  // or "instrumental"
+    voice_type: "female",            // "male", "female", "any"
+    language: "Hindi"
+  }
+})
+Edge function → Suno API payload:
+
+
+{
+  "prompt": "Tere bina ye dil mera...",
+  "title": "My Love Song",
+  "style": "pop, romantic, Hindi, female vocalist, professional recording",
+  "customMode": true,
+  "model": "V4_5ALL",
+  "instrumental": false,
+  "callBackUrl": "https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/check-music-status"
+}
+Important: instrumental is a boolean (NOT make_instrumental).
+
+Response from edge function:
+
+
+{
+  "generation_id": "uuid-of-music-generation-record",
+  "task_id": "suno-task-id-12345",
+  "status": "processing"
+}
+Error (insufficient wallet):
+
+
+{ "error": "Insufficient wallet balance. Need ₹150" }
+// HTTP 402
+DB operations: Inserts into music_generations (status: pending → processing), inserts into wallet_transactions for payment. On API failure, auto-refunds.
+
+Step 3: Poll Status
+Edge Function: check-music-status External API: GET https://api.sunoapi.org/api/v1/generate/record-info?taskId={taskId} Secrets: SUNO_API_KEY, B2_KEY_ID, B2_APPLICATION_KEY
+
+Frontend polling (every 5s, starts after 10s delay, max 60 attempts = 5 min):
+
+
+supabase.functions.invoke('check-music-status', {
+  body: { generation_id: "uuid" }
+})
+Suno API response structure (parsed by edge function):
+
+
+{
+  "code": 200,
+  "data": {
+    "status": "SUCCESS",
+    "response": {
+      "sunoData": [{
+        "audioUrl": "https://cdn.suno.ai/...",
+        "imageUrl": "https://cdn.suno.ai/...",
+        "duration": 180
+      }]
+    }
+  }
+}
+Possible statuses from Suno: PENDING, TEXT_SUCCESS, FIRST_SUCCESS, SUCCESS, GENERATE_AUDIO_FAILED, CREATE_TASK_FAILED, CALLBACK_EXCEPTION
+
+Response (processing):
+
+
+{
+  "status": "processing",
+  "message": "Creating melody..."
+}
+Response (completed) — after downloading audio from Suno and uploading to B2:
+
+
+{
+  "status": "completed",
+  "song_url": "https://f005.backblazeb2.com/file/wishmetoday/music/songs/user-id/1711234567-My-Love-Song.mp3",
+  "download_url": "https://f005.backblazeb2.com/file/wishmetoday/music/songs/user-id/1711234567-My-Love-Song.mp3",
+  "cover_image_url": "https://cdn.suno.ai/image_...",
+  "duration": 180
+}
+Response (failed) — auto-refunds wallet:
+
+
+{
+  "status": "failed",
+  "error": "Song generation failed. ₹150 refunded."
+}
+Response (timeout after 5 min) — auto-refunds:
+
+
+{
+  "status": "failed",
+  "error": "Generation timed out. ₹150 refunded."
+}
+DB table: music_generations
+
+
+{
+  "id": "uuid",
+  "user_id": "profile-uuid",
+  "song_title": "My Love Song",
+  "genre": "pop",
+  "mood": "romantic",
+  "prompt": "A beautiful love song",
+  "lyrics": "Tere bina...",
+  "generation_type": "with_lyrics",
+  "status": "completed",
+  "api_task_id": "suno-task-id",
+  "song_url": "https://f005.backblazeb2.com/...",
+  "download_url": "https://f005.backblazeb2.com/...",
+  "credits_used": 1,
+  "price_paid": 150,
+  "duration": 180,
+  "completed_at": "2026-03-27T...",
+  "error_message": null
+}
+TAB 7: Image + Music (ElevenLabs)
+Edge Function: elevenlabs-image-music-video External APIs:
+
+With vocals: POST https://api.elevenlabs.io/v1/music/compose
+Instrumental: POST https://api.elevenlabs.io/v1/sound-generation Secrets: ELEVENLABS_API_KEY, B2_KEY_ID, B2_APPLICATION_KEY
+Request payload:
+
+
+{
+  "imageBase64": "data:image/jpeg;base64,...",
+  "musicDescription": "Calm ambient background",
+  "lyrics": "Optional lyrics for vocal version",
+  "genre": "ambient",
+  "mood": "calm",
+  "language": "Hindi",
+  "durationSeconds": 30,
+  "uploadedAudioBase64": null
+}
+If uploadedAudioBase64 is provided, it skips generation and uses that audio directly.
+
+Response:
+
+
+{
+  "success": true,
+  "audioUrl": "data:audio/mpeg;base64,...",
+  "b2Url": "https://f005.backblazeb2.com/file/wishmetoday/audio/image-music/...",
+  "imageBase64": "data:image/jpeg;base64,...",
+  "message": "Music generated",
+  "duration": 30,
+  "hasVocals": true
+}
+Client-side video creation: After receiving audio, the frontend creates a video by combining the image + audio using canvas.captureStream() + MediaRecorder (WebM format). This is purely client-side.
+
+DB table: image_music_generations
+
+Voice Loading
+Edge Function: get-user-voices (primary) → elevenlabs-get-user-voices (fallback)
+
+Response:
+
+
+{
+  "premadeVoices": [
+    { "voice_id": "9BWtsMINqrJLrRacOk9x", "name": "Aria", "category": "premade", "preview_url": "https://..." }
+  ],
+  "clonedVoices": [
+    { "voice_id": "custom-xyz", "name": "My Voice", "category": "cloned", "created_at": "2026-..." }
+  ]
+}
+Hardcoded fallback voices are used if auth fails (9 default ElevenLabs premade voices).
+
+Storage Pattern
+All generated audio follows this flow:
+
+Edge function generates audio via external API
+Audio is base64-encoded for immediate frontend playback
+Audio bytes are uploaded to Backblaze B2 (wishmetoday bucket) for permanent storage
+B2 public URL is stored in the database record
+Frontend uses the base64 audioUrl for immediate playback, DB stores the B2 URL
+B2 directory structure:
+
+audio/tts/ — Text-to-Speech
+audio/voice-convert/ — Voice Conversion
+audio/sfx/ — Sound Effects
+audio/isolated/ — Audio Isolation
+audio/image-music/ — Image + Music
+music/songs/{user_id}/ — Suno music generation
+Secrets Required
+Secret	Used By
+ELEVENLABS_API_KEY	TTS, STS, SFX, Isolation, Clone, Image+Music
+SUNO_API_KEY	Music Generation, Check Status
+B2_KEY_ID	All (for permanent storage)
+B2_APPLICATION_KEY	All (for permanent storage)
+GEMINI_API_KEY	Lyrics generation (primary)
+LOVABLE_API_KEY	Lyrics generation (fallback)
