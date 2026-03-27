@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState, useMemo } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -52,10 +53,18 @@ export default function CelebritiesScreen() {
   const [page, setPage] = useState(1);
 
   const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
-  const { hasFavorite } = useCelebrityFavorites({
+  const { hasFavorite, refetch: refetchFavorites } = useCelebrityFavorites({
     profileId: user?.profileId,
     accessToken: session?.access_token,
   });
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user?.profileId && session?.access_token) {
+        refetchFavorites();
+      }
+    }, [user?.profileId, session?.access_token, refetchFavorites]),
+  );
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 

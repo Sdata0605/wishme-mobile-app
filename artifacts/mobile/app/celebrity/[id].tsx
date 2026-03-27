@@ -120,12 +120,13 @@ export default function CelebrityDetailScreen() {
       if (res.ok && data.success) {
         setShowSubSheet(false);
         setIsSubscribed(true);
+        fetchSubscriptionData();
         Alert.alert('Subscribed!', 'You can now book services from this celebrity.');
       } else {
         const errMsg = (data.error as string) ?? 'Subscription failed. Please try again.';
         const lower = errMsg.toLowerCase();
         if (lower.includes('insufficient') || lower.includes('balance') || lower.includes('wallet')) {
-          Alert.alert('Insufficient Balance', 'Not enough wallet balance. Please add funds.');
+          Alert.alert('Insufficient Balance', 'Insufficient balance. Add funds to your wallet.');
         } else {
           Alert.alert('Error', errMsg);
         }
