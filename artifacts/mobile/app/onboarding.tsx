@@ -1,3 +1,4 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
@@ -12,6 +13,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const STORAGE_ONBOARDING = '@wishme/onboarding_seen';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -219,6 +222,7 @@ export default function OnboardingScreen() {
   const [current, setCurrent] = useState(0);
 
   const finish = () => {
+    AsyncStorage.setItem(STORAGE_ONBOARDING, '1').catch(() => {});
     router.replace('/(auth)');
   };
 
