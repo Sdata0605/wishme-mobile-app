@@ -267,6 +267,7 @@ export function AIChatSheet() {
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
+                    style={styles.quickStartScroll}
                     contentContainerStyle={styles.quickStartRow}
                   >
                     {QUICK_STARTS.map((qs) => (
@@ -411,7 +412,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   emptyState: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 40,
@@ -436,9 +437,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     marginBottom: 24,
   },
+  quickStartScroll: {
+    flexShrink: 0,
+    flexGrow: 0,
+  },
   quickStartRow: {
     gap: 10,
     paddingHorizontal: 4,
+    alignItems: 'center',
   },
   quickChip: {
     paddingHorizontal: 16,
