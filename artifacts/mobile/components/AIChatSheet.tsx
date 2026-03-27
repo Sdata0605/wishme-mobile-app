@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
@@ -99,7 +99,7 @@ function MessageBubble({ msg, onSuggestion }: { msg: AIMessage; onSuggestion: (s
               style={styles.actionBtn}
               onPress={() => {
                 if (action.type === 'navigate' && action.data.route) {
-                  router.push(action.data.route as any);
+                  router.push(action.data.route as Href);
                 }
               }}
               activeOpacity={0.75}
@@ -134,7 +134,6 @@ export function AIChatSheet() {
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
 
-  const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
   const dragY = useRef(new Animated.Value(0)).current;
   const dragOffset = useRef(0);
 
@@ -142,20 +141,8 @@ export function AIChatSheet() {
     if (isOpen) {
       dragY.setValue(0);
       dragOffset.current = 0;
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        useNativeDriver: true,
-        tension: 70,
-        friction: 12,
-      }).start();
-    } else {
-      Animated.timing(slideAnim, {
-        toValue: SHEET_HEIGHT,
-        duration: 280,
-        useNativeDriver: true,
-      }).start();
     }
-  }, [isOpen, slideAnim, dragY]);
+  }, [isOpen, dragY]);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -181,6 +168,7 @@ export function AIChatSheet() {
       onPanResponderRelease: () => {
         dragY.flattenOffset();
         if (dragOffset.current > 150) {
+          dragY.setValue(0);
           closeChat();
         } else {
           Animated.spring(dragY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
@@ -205,14 +193,10 @@ export function AIChatSheet() {
     sendMessage(query);
   }, [sendMessage]);
 
-  const sheetTranslate = Animated.add(slideAnim, dragY);
-
-  if (!isOpen) return null;
-
   return (
     <Modal
       visible={isOpen}
-      animationType="none"
+      animationType="slide"
       transparent
       onRequestClose={closeChat}
       statusBarTranslucent
@@ -225,7 +209,7 @@ export function AIChatSheet() {
         <Animated.View
           style={[
             styles.sheet,
-            { height: SHEET_HEIGHT, transform: [{ translateY: sheetTranslate }] },
+            { height: SHEET_HEIGHT, transform: [{ translateY: dragY }] },
           ]}
         >
           {/* Drag handle */}
