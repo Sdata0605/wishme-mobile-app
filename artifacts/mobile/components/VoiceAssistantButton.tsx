@@ -94,7 +94,7 @@ function getSpeechRecognitionCtor(): (new () => WebSpeechRecognition) | undefine
 
 export function VoiceAssistantButton() {
   const { session } = useAuth();
-  const { sendMessage } = useAIAssistant();
+  const { sendMessage, messages } = useAIAssistant();
 
   const [status, setStatus] = useState<VoiceStatus>('idle');
   const [userTranscript, setUserTranscript] = useState('');
@@ -224,10 +224,14 @@ export function VoiceAssistantButton() {
     recordingRef.current = null;
     try {
       await recording.stopAndUnloadAsync();
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
       const uri = recording.getURI();
       if (!uri) throw new Error('No recording URI');
       setStatus('processing');
       const base64 = await FileSystem.readAsStringAsync(uri, { encoding: 'base64' });
+      const conversationHistory = messages
+        .slice(-8)
+        .map((m) => ({ role: m.role, content: m.content }));
       const res = await supabaseFetch(
         '/functions/v1/ai-assistant',
         {
@@ -237,6 +241,7 @@ export function VoiceAssistantButton() {
             audioBase64: base64,
             audioMimeType: 'audio/m4a',
             context: { currentRoute: '/', isVoiceInput: true },
+            conversationHistory,
             model: 'google/gemini-2.5-flash',
           }),
         },
@@ -266,7 +271,7 @@ export function VoiceAssistantButton() {
         setStatus('error');
       }
     }
-  }, [session?.access_token, showTranscriptCards, speakNative]);
+  }, [session?.access_token, showTranscriptCards, speakNative, messages]);
 
   const startNative = useCallback(async () => {
     try {
@@ -291,7 +296,7 @@ export function VoiceAssistantButton() {
   const startWeb = useCallback(() => {
     const SpeechRecognitionCtor = getSpeechRecognitionCtor();
     if (!SpeechRecognitionCtor) {
-      setShowFallback(true);
+      setStatus('error');
       return;
     }
     setStatus('connecting');
