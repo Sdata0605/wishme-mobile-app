@@ -242,8 +242,8 @@ export function AIChatSheet() {
           {/* Messages */}
           <KeyboardAvoidingView
             style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={0}
+            behavior="padding"
+            keyboardVerticalOffset={insets.top}
           >
             <ScrollView
               ref={scrollRef}

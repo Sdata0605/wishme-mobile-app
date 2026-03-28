@@ -20,6 +20,7 @@
     },
     "android": {
       "package": "com.prashantuser1.wishme",
+      "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
