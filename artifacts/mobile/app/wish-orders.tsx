@@ -172,7 +172,7 @@ function OrderCard({ order, isPending, colors }: OrderCardProps) {
           </Text>
           <Text style={[s.meta, { color: colors.mutedForeground }]} numberOfLines={1}>
             {order.occasion_type}
-            {order.recipient_name ? ` · For ${order.recipient_name}` : ''}
+            {order.recipient_name ? ` • To: ${order.recipient_name}` : ''}
           </Text>
           {order.amount_paid != null && (
             <Text style={[s.amount, { color: colors.primary }]}>
@@ -203,6 +203,13 @@ function OrderCard({ order, isPending, colors }: OrderCardProps) {
         <Text style={[s.message, { color: colors.mutedForeground }]} numberOfLines={2}>
           {order.message}
         </Text>
+      )}
+
+      {order.status === 'processing' && (
+        <View style={s.processingRow}>
+          <ActivityIndicator size="small" color="#FF6B33" />
+          <Text style={[s.processingText, { color: '#FF6B33' }]}>Generating your card...</Text>
+        </View>
       )}
 
       <View style={s.actions}>
@@ -292,7 +299,7 @@ export default function WishOrdersScreen() {
     }
     try {
       const res = await supabaseFetch(
-        `/rest/v1/wish_celebrity_orders?select=*,celebrities(id,name,image_url)&user_id=eq.${profileId}&order=created_at.desc`,
+        `/rest/v1/wish_celebrity_orders?select=*,celebrities(id,name,image_url)&user_id=eq.${profileId}&order=created_at.desc&limit=50`,
         {},
         accessToken,
       );
@@ -321,7 +328,9 @@ export default function WishOrdersScreen() {
   }, [fetchOrders]);
 
   const pendingOrders = orders.filter(
-    (o) => o.payment_status === 'completed' && o.status !== 'sent',
+    (o) =>
+      (o.payment_status === 'completed' && o.status !== 'sent') ||
+      (o.payment_status !== 'completed'),
   );
   const completedOrders = orders.filter((o) => o.status === 'sent');
 
@@ -386,7 +395,7 @@ export default function WishOrdersScreen() {
               {pendingOrders.length > 0 && (
                 <View style={s.section}>
                   <View style={s.sectionHeader}>
-                    <View style={[s.sectionDot, { backgroundColor: '#FF6B33' }]} />
+                    <ActivityIndicator size="small" color="#FF6B33" />
                     <Text style={[s.sectionTitle, { color: colors.foreground }]}>
                       Active / Pending Orders
                     </Text>
@@ -410,7 +419,7 @@ export default function WishOrdersScreen() {
               {completedOrders.length > 0 && (
                 <View style={s.section}>
                   <View style={s.sectionHeader}>
-                    <View style={[s.sectionDot, { backgroundColor: '#22C55E' }]} />
+                    <Icon name="check-circle" size={16} color="#22C55E" />
                     <Text style={[s.sectionTitle, { color: colors.foreground }]}>
                       Completed Wishes
                     </Text>
@@ -484,7 +493,6 @@ const s = StyleSheet.create({
     gap: 8,
     marginBottom: 12,
   },
-  sectionDot: { width: 8, height: 8, borderRadius: 4 },
   sectionTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold', flex: 1 },
   sectionCount: { paddingHorizontal: 8, paddingVertical: 2, borderRadius: 12 },
   sectionCountText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
@@ -498,11 +506,11 @@ const s = StyleSheet.create({
   },
 
   topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  avatar: { width: 56, height: 56, borderRadius: 28 },
+  avatar: { width: 64, height: 64, borderRadius: 32 },
   avatarPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -520,6 +528,9 @@ const s = StyleSheet.create({
   statusText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
 
   message: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 19 },
+
+  processingRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  processingText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 
   actions: { flexDirection: 'row', gap: 8, flexWrap: 'wrap' },
   actionBtn: {
