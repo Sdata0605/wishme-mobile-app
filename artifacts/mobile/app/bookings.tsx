@@ -817,6 +817,7 @@ export default function BookingsScreen() {
   const [activeTab, setActiveTab] = useState<BookingTab>('Celebrity');
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const [data, setData] = useState<AllData>({
     celeb: [], wishes: [], cards: [], photo: [],
     calls: [], music: [], imgMusic: [], tts: [],
@@ -835,7 +836,10 @@ export default function BookingsScreen() {
           `/rest/v1/${table}?select=${encodeURIComponent(select)}&user_id=eq.${pid}&order=created_at.desc&limit=50`,
           {},
           tok,
-        ).then(r => r.ok ? r.json() : []).catch(() => []);
+        ).then(r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.json();
+        });
 
       const [celeb, wishes, cards, photo, calls, music, imgMusic, tts, sfx, convert, isolate, occasions] =
         await Promise.all([
@@ -854,9 +858,13 @@ export default function BookingsScreen() {
         ]);
 
       setData({ celeb, wishes, cards, photo, calls, music, imgMusic, tts, sfx, convert, isolate, occasions });
-    } catch {}
-    setLoading(false);
-    setRefreshing(false);
+      setFetchError(false);
+    } catch {
+      setFetchError(true);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   }, [user?.profileId, session?.access_token]);
 
   useEffect(() => {
@@ -871,6 +879,48 @@ export default function BookingsScreen() {
     useCallback(() => fetchAllBookings(true), [fetchAllBookings]),
   );
 
+  function renderTabItems(tab: BookingTab) {
+    const showEmpty = !fetchError;
+    switch (tab) {
+      case 'Celebrity':
+        return data.celeb.length === 0 ? (showEmpty ? <EmptyState tab="Celebrity" colors={colors} /> : null) :
+          data.celeb.map(item => <CelebCard key={item.id} item={item} colors={colors} />);
+      case 'Wishes':
+        return data.wishes.length === 0 ? (showEmpty ? <EmptyState tab="Wishes" colors={colors} /> : null) :
+          data.wishes.map(item => <WishCard key={item.id} item={item} colors={colors} />);
+      case 'Cards':
+        return data.cards.length === 0 ? (showEmpty ? <EmptyState tab="Cards" colors={colors} /> : null) :
+          data.cards.map(item => <CardCard key={item.id} item={item} colors={colors} />);
+      case 'Photo':
+        return data.photo.length === 0 ? (showEmpty ? <EmptyState tab="Photo" colors={colors} /> : null) :
+          data.photo.map(item => <PhotoCard key={item.id} item={item} colors={colors} />);
+      case 'Calls':
+        return data.calls.length === 0 ? (showEmpty ? <EmptyState tab="Calls" colors={colors} /> : null) :
+          data.calls.map(item => <CallCard key={item.id} item={item} colors={colors} />);
+      case 'Music':
+        return data.music.length === 0 ? (showEmpty ? <EmptyState tab="Music" colors={colors} /> : null) :
+          data.music.map(item => <MusicCard key={item.id} item={item} colors={colors} />);
+      case 'Img+Music':
+        return data.imgMusic.length === 0 ? (showEmpty ? <EmptyState tab="Img+Music" colors={colors} /> : null) :
+          data.imgMusic.map(item => <ImgMusicCard key={item.id} item={item} colors={colors} />);
+      case 'TTS':
+        return data.tts.length === 0 ? (showEmpty ? <EmptyState tab="TTS" colors={colors} /> : null) :
+          data.tts.map(item => <TtsCard key={item.id} item={item} colors={colors} />);
+      case 'SFX':
+        return data.sfx.length === 0 ? (showEmpty ? <EmptyState tab="SFX" colors={colors} /> : null) :
+          data.sfx.map(item => <SfxCard key={item.id} item={item} colors={colors} />);
+      case 'Convert':
+        return data.convert.length === 0 ? (showEmpty ? <EmptyState tab="Convert" colors={colors} /> : null) :
+          data.convert.map(item => <ConvertCard key={item.id} item={item} colors={colors} />);
+      case 'Isolate':
+        return data.isolate.length === 0 ? (showEmpty ? <EmptyState tab="Isolate" colors={colors} /> : null) :
+          data.isolate.map(item => <IsolateCard key={item.id} item={item} colors={colors} />);
+      case 'Occasions':
+        return data.occasions.length === 0 ? (showEmpty ? <EmptyState tab="Occasions" colors={colors} /> : null) :
+          data.occasions.map(item => <OccasionCard key={item.id} item={item} colors={colors} />);
+    }
+  }
+
   function renderTab() {
     if (loading) {
       return (
@@ -879,44 +929,7 @@ export default function BookingsScreen() {
         </View>
       );
     }
-    switch (activeTab) {
-      case 'Celebrity':
-        return data.celeb.length === 0 ? <EmptyState tab="Celebrity" colors={colors} /> :
-          data.celeb.map(item => <CelebCard key={item.id} item={item} colors={colors} />);
-      case 'Wishes':
-        return data.wishes.length === 0 ? <EmptyState tab="Wishes" colors={colors} /> :
-          data.wishes.map(item => <WishCard key={item.id} item={item} colors={colors} />);
-      case 'Cards':
-        return data.cards.length === 0 ? <EmptyState tab="Cards" colors={colors} /> :
-          data.cards.map(item => <CardCard key={item.id} item={item} colors={colors} />);
-      case 'Photo':
-        return data.photo.length === 0 ? <EmptyState tab="Photo" colors={colors} /> :
-          data.photo.map(item => <PhotoCard key={item.id} item={item} colors={colors} />);
-      case 'Calls':
-        return data.calls.length === 0 ? <EmptyState tab="Calls" colors={colors} /> :
-          data.calls.map(item => <CallCard key={item.id} item={item} colors={colors} />);
-      case 'Music':
-        return data.music.length === 0 ? <EmptyState tab="Music" colors={colors} /> :
-          data.music.map(item => <MusicCard key={item.id} item={item} colors={colors} />);
-      case 'Img+Music':
-        return data.imgMusic.length === 0 ? <EmptyState tab="Img+Music" colors={colors} /> :
-          data.imgMusic.map(item => <ImgMusicCard key={item.id} item={item} colors={colors} />);
-      case 'TTS':
-        return data.tts.length === 0 ? <EmptyState tab="TTS" colors={colors} /> :
-          data.tts.map(item => <TtsCard key={item.id} item={item} colors={colors} />);
-      case 'SFX':
-        return data.sfx.length === 0 ? <EmptyState tab="SFX" colors={colors} /> :
-          data.sfx.map(item => <SfxCard key={item.id} item={item} colors={colors} />);
-      case 'Convert':
-        return data.convert.length === 0 ? <EmptyState tab="Convert" colors={colors} /> :
-          data.convert.map(item => <ConvertCard key={item.id} item={item} colors={colors} />);
-      case 'Isolate':
-        return data.isolate.length === 0 ? <EmptyState tab="Isolate" colors={colors} /> :
-          data.isolate.map(item => <IsolateCard key={item.id} item={item} colors={colors} />);
-      case 'Occasions':
-        return data.occasions.length === 0 ? <EmptyState tab="Occasions" colors={colors} /> :
-          data.occasions.map(item => <OccasionCard key={item.id} item={item} colors={colors} />);
-    }
+    return renderTabItems(activeTab);
   }
 
   return (
@@ -958,6 +971,17 @@ export default function BookingsScreen() {
           );
         })}
       </ScrollView>
+
+      {fetchError && (
+        <TouchableOpacity
+          style={s.errorBanner}
+          onPress={() => fetchAllBookings(loading ? false : true)}
+          activeOpacity={0.8}
+        >
+          <Icon name="alert-circle" size={16} color="#fff" />
+          <Text style={s.errorBannerText}>Couldn't load bookings — tap to retry</Text>
+        </TouchableOpacity>
+      )}
 
       <ScrollView
         contentContainerStyle={[s.listContent, { paddingBottom: insets.bottom + 24 }]}
@@ -1025,4 +1049,9 @@ const s = StyleSheet.create({
   emptyTitle: { fontSize: 16, fontFamily: 'Inter_500Medium', textAlign: 'center' },
   emptyBtn: { backgroundColor: '#FF6B33', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 9999, marginTop: 4 },
   emptyBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  errorBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#DC2626', paddingHorizontal: 16, paddingVertical: 12,
+  },
+  errorBannerText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_500Medium', flex: 1 },
 });
