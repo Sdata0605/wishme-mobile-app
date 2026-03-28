@@ -307,7 +307,11 @@ export default function CelebrityDetailScreen() {
       router.push('/(auth)');
       return;
     }
-    if (isSubscribed || !hasPricing) {
+    if (!hasPricing && !isSubscribed) {
+      Alert.alert('Subscription Not Available', 'This celebrity has not enabled subscription services yet.');
+      return;
+    }
+    if (isSubscribed) {
       router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id } });
     } else {
       setShowStep1(true);
@@ -359,7 +363,7 @@ export default function CelebrityDetailScreen() {
 
   const isLoggedIn = !!user;
   const hasPricing = pricingPrice !== null && !isPricingDisabled;
-  const bookBtnLabel = !isLoggedIn ? 'Book a Wish' : isSubscribed ? 'Book a Wish' : hasPricing ? 'Subscribe to Book' : 'Book a Wish';
+  const bookBtnLabel = !isLoggedIn ? 'Book a Wish' : isSubscribed ? 'Book a Wish' : !hasPricing ? 'Subscription Not Available' : 'Subscribe to Book';
   const showSubscribeBanner = isLoggedIn && !isSubscribed && !subLoading && hasPricing;
   const walletBalance = user?.walletBalance ?? 0;
   const canAffordWallet = pricingPrice !== null && walletBalance >= pricingPrice;
@@ -625,7 +629,7 @@ export default function CelebrityDetailScreen() {
                     ) : (
                       <View style={[styles.lockPill, { borderColor: colors.border }]}>
                         <Icon name="lock" size={11} color={colors.mutedForeground} />
-                        <Text style={[styles.lockPillText, { color: colors.mutedForeground }]}>Subscribe to Unlock</Text>
+                        <Text style={[styles.lockPillText, { color: colors.mutedForeground }]}>{hasPricing ? 'Subscribe to Unlock' : 'Not Available'}</Text>
                       </View>
                     )}
                   </View>
@@ -708,7 +712,15 @@ export default function CelebrityDetailScreen() {
           <Icon name="phone" size={18} color={colors.primary} />
           <Text style={[styles.voiceCallText, { color: colors.primary }]}>Voice Call</Text>
         </TouchableOpacity>
-        {isLoggedIn && !isSubscribed ? (
+        {isLoggedIn && !isSubscribed && !hasPricing ? (
+          <TouchableOpacity
+            onPress={handleBookOrSubscribe}
+            style={[styles.subscribeToBookBtn, { borderColor: colors.border }]}
+          >
+            <Icon name="lock" size={16} color={colors.mutedForeground} />
+            <Text style={[styles.subscribeToBookText, { color: colors.mutedForeground }]}>{bookBtnLabel}</Text>
+          </TouchableOpacity>
+        ) : isLoggedIn && !isSubscribed ? (
           <TouchableOpacity
             onPress={handleBookOrSubscribe}
             style={styles.subscribeToBookBtn}
