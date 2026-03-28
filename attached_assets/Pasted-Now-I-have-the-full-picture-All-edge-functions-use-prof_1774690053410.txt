@@ -1,0 +1,141 @@
+Now I have the full picture. All edge functions use profile.id (profile UUID) when inserting into wallet_transactions. The frontend also queries by profile?.id. So the system is consistent — both use profile UUID.
+
+The Replit developer's issue is likely that they're using the auth UUID (user_id from Supabase Auth) instead of the profile UUID (profiles.id). Let me provide a clear answer.
+
+Here's the answer for the Replit developer's question:
+
+Answer to Replit's 3 Questions
+The Core Issue: Two Different UUIDs
+Every user has two UUIDs:
+
+Auth UUID — auth.users.id (also stored as profiles.user_id)
+Profile UUID — profiles.id (a separate auto-generated UUID)
+Both wallet_transactions.user_id and referral_transactions.referrer_id store the Profile UUID (profiles.id), NOT the Auth UUID.
+
+How the Web App Resolves This
+The web app's auth hook (useAuth) fetches the full profile row on login:
+
+auth.users.id → profiles.user_id (match) → returns profiles.id
+Then all wallet queries use profile.id:
+
+
+// Wallet transactions — uses profile.id
+supabase.from('wallet_transactions')
+  .select('*')
+  .eq('user_id', profile.id)  // ← This is profiles.id, NOT auth.users.id
+
+// Referral transactions — uses profile.id  
+supabase.from('referral_transactions')
+  .select('*')
+  .eq('referrer_id', profile.id)  // ← Also profiles.id
+What Replit Must Do
+Step 1: After login, fetch the profile row to get the profile UUID:
+
+GET /rest/v1/profiles?user_id=eq.{AUTH_UUID}&select=id,user_id,wallet_balance,first_name,last_name,referral_code
+Headers: Authorization: Bearer {session_access_token}, apikey: {anon_key}
+Response:
+
+
+[{
+  "id": "abc123-profile-uuid",      // ← THIS is what you query with
+  "user_id": "xyz789-auth-uuid",    // ← This is the auth UUID, do NOT use for wallet queries
+  "wallet_balance": 1500,
+  "first_name": "John",
+  "last_name": "Doe",
+  "referral_code": "JOHN5X"
+}]
+Step 2: Use profiles.id (NOT user_id) for all wallet and referral queries:
+
+// Wallet transactions
+GET /rest/v1/wallet_transactions?user_id=eq.{PROFILE_UUID}&order=created_at.desc
+                                         ^^^^^^^^^^^^^^
+                                         profiles.id, NOT auth UUID
+
+// Referral transactions  
+GET /rest/v1/referral_transactions?referrer_id=eq.{PROFILE_UUID}&order=created_at.desc
+                                               ^^^^^^^^^^^^^^
+                                               profiles.id, NOT auth UUID
+
+// Payment transactions (for WishMe ID lookup)
+GET /rest/v1/payment_transactions?user_id=eq.{PROFILE_UUID}&order=paid_at.desc
+                                          ^^^^^^^^^^^^^^
+                                          profiles.id, NOT auth UUID
+Summary
+Table	Column	Stores
+wallet_transactions	user_id	profiles.id (profile UUID)
+referral_transactions	referrer_id	profiles.id (profile UUID)
+payment_transactions	user_id	profiles.id (profile UUID)
+profiles	id	profile UUID (use this for queries)
+profiles	user_id	auth UUID (only for initial profile lookup)
+The fix: After Supabase login, always resolve auth UUID → profile UUID via the profiles table, then use the profile UUID for all subsequent data queries.
+
+Now I have the full picture. All edge functions use profile.id (profile UUID) when inserting into wallet_transactions. The frontend also queries by profile?.id. So the system is consistent — both use profile UUID.
+
+The Replit developer's issue is likely that they're using the auth UUID (user_id from Supabase Auth) instead of the profile UUID (profiles.id). Let me provide a clear answer.
+
+Here's the answer for the Replit developer's question:
+
+Answer to Replit's 3 Questions
+The Core Issue: Two Different UUIDs
+Every user has two UUIDs:
+
+Auth UUID — auth.users.id (also stored as profiles.user_id)
+Profile UUID — profiles.id (a separate auto-generated UUID)
+Both wallet_transactions.user_id and referral_transactions.referrer_id store the Profile UUID (profiles.id), NOT the Auth UUID.
+
+How the Web App Resolves This
+The web app's auth hook (useAuth) fetches the full profile row on login:
+
+auth.users.id → profiles.user_id (match) → returns profiles.id
+Then all wallet queries use profile.id:
+
+
+// Wallet transactions — uses profile.id
+supabase.from('wallet_transactions')
+  .select('*')
+  .eq('user_id', profile.id)  // ← This is profiles.id, NOT auth.users.id
+
+// Referral transactions — uses profile.id  
+supabase.from('referral_transactions')
+  .select('*')
+  .eq('referrer_id', profile.id)  // ← Also profiles.id
+What Replit Must Do
+Step 1: After login, fetch the profile row to get the profile UUID:
+
+GET /rest/v1/profiles?user_id=eq.{AUTH_UUID}&select=id,user_id,wallet_balance,first_name,last_name,referral_code
+Headers: Authorization: Bearer {session_access_token}, apikey: {anon_key}
+Response:
+
+
+[{
+  "id": "abc123-profile-uuid",      // ← THIS is what you query with
+  "user_id": "xyz789-auth-uuid",    // ← This is the auth UUID, do NOT use for wallet queries
+  "wallet_balance": 1500,
+  "first_name": "John",
+  "last_name": "Doe",
+  "referral_code": "JOHN5X"
+}]
+Step 2: Use profiles.id (NOT user_id) for all wallet and referral queries:
+
+// Wallet transactions
+GET /rest/v1/wallet_transactions?user_id=eq.{PROFILE_UUID}&order=created_at.desc
+                                         ^^^^^^^^^^^^^^
+                                         profiles.id, NOT auth UUID
+
+// Referral transactions  
+GET /rest/v1/referral_transactions?referrer_id=eq.{PROFILE_UUID}&order=created_at.desc
+                                               ^^^^^^^^^^^^^^
+                                               profiles.id, NOT auth UUID
+
+// Payment transactions (for WishMe ID lookup)
+GET /rest/v1/payment_transactions?user_id=eq.{PROFILE_UUID}&order=paid_at.desc
+                                          ^^^^^^^^^^^^^^
+                                          profiles.id, NOT auth UUID
+Summary
+Table	Column	Stores
+wallet_transactions	user_id	profiles.id (profile UUID)
+referral_transactions	referrer_id	profiles.id (profile UUID)
+payment_transactions	user_id	profiles.id (profile UUID)
+profiles	id	profile UUID (use this for queries)
+profiles	user_id	auth UUID (only for initial profile lookup)
+The fix: After Supabase login, always resolve auth UUID → profile UUID via the profiles table, then use the profile UUID for all subsequent data queries.
