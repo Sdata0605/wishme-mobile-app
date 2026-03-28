@@ -302,6 +302,7 @@ export default function LovedOnesScreen() {
 
   const saveOccasions = async () => {
     if (!occasionTarget) return;
+    if (!user?.profileId) return;
     setOccSaving(true);
     setOccError(null);
     try {
@@ -319,6 +320,52 @@ export default function LovedOnesScreen() {
         setOccError(msg);
         return;
       }
+
+      const previousOccasions = occasionTarget.occasions ?? [];
+      const currentIds = new Set(localOccasions.map((o) => o.id));
+      const toDelete = previousOccasions.filter((o) => !currentIds.has(o.id));
+
+      let syncFailed = false;
+
+      for (const occ of toDelete) {
+        const dr = await supabaseFetch(
+          `/rest/v1/occasion_alerts?user_id=eq.${user.profileId}&loved_one_id=eq.${occasionTarget.id}&occasion_name=eq.${encodeURIComponent(occ.name)}`,
+          { method: 'DELETE' },
+          session?.access_token,
+        ).catch(() => null);
+        if (!dr || !dr.ok) syncFailed = true;
+      }
+
+      for (const occ of localOccasions) {
+        const ir = await supabaseFetch(
+          '/rest/v1/occasion_alerts?on_conflict=user_id,loved_one_id,occasion_name',
+          {
+            method: 'POST',
+            headers: {
+              Prefer: 'resolution=merge-duplicates,return=minimal',
+            } as Record<string, string>,
+            body: JSON.stringify({
+              user_id: user.profileId,
+              loved_one_id: occasionTarget.id,
+              occasion_name: occ.name,
+              occasion_type: occ.type,
+              occasion_date: occ.date || null,
+              alert_enabled: true,
+              auto_send_enabled: false,
+              alert_days_before: 7,
+            }),
+          },
+          session?.access_token,
+        ).catch(() => null);
+        if (!ir || !ir.ok) syncFailed = true;
+      }
+
+      if (syncFailed) {
+        setOccError('Occasions saved, but some alerts could not be synced.');
+        await fetchLovedOnes();
+        return;
+      }
+
       setOccasionModal(false);
       await fetchLovedOnes();
     } catch {

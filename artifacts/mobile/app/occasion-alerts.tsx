@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Switch,
   Text,
-  ToastAndroid,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -76,12 +75,6 @@ function alertStatus(
   return { label: fmtDate(occasionDate), bgColor: colors.border, textColor: colors.mutedForeground };
 }
 
-function showToast(msg: string) {
-  if (Platform.OS === 'android') {
-    ToastAndroid.show(msg, ToastAndroid.SHORT);
-  }
-}
-
 export default function OccasionAlertsScreen() {
   const { colors } = useTheme();
   const { user, session } = useAuth();
@@ -91,6 +84,14 @@ export default function OccasionAlertsScreen() {
   const [alerts, setAlerts] = useState<OccasionAlert[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [toast, setToast] = useState('');
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (msg: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast(msg);
+    toastTimer.current = setTimeout(() => setToast(''), 2500);
+  };
 
   const fetchAlerts = useCallback(
     async (isRefresh = false) => {
@@ -209,7 +210,7 @@ export default function OccasionAlertsScreen() {
             <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Upcoming</Text>
           </View>
           <View style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Icon name="zap" size={20} color="#B44CFF" />
+            <Icon name="clock" size={20} color="#B44CFF" />
             <Text style={[s.statNum, { color: colors.foreground }]}>{thisWeekCount}</Text>
             <Text style={[s.statLabel, { color: colors.mutedForeground }]}>This Week</Text>
           </View>
@@ -320,6 +321,14 @@ export default function OccasionAlertsScreen() {
           </>
         )}
       </ScrollView>
+
+      {!!toast && (
+        <View style={s.toastOverlay} pointerEvents="none">
+          <View style={s.toastBox}>
+            <Text style={s.toastText}>{toast}</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -393,4 +402,20 @@ const s = StyleSheet.create({
   pastDate: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   pastBadge: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9999, marginTop: 2 },
   pastBadgeText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  toastOverlay: {
+    position: 'absolute',
+    bottom: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    pointerEvents: 'none',
+  },
+  toastBox: {
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    maxWidth: '80%',
+  },
+  toastText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_500Medium', textAlign: 'center' },
 });

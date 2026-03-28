@@ -206,7 +206,7 @@ export default function OccasionBookScreen() {
 
       const typeLabel = bookingType === 'video' ? 'video' : 'greeting card';
       showToast(`Booking created! Your ${typeLabel} is being generated.`);
-      setTimeout(() => router.back(), 1500);
+      setTimeout(() => router.replace('/dashboard' as never), 1500);
     } finally {
       setSubmitting(false);
     }
@@ -272,9 +272,9 @@ export default function OccasionBookScreen() {
           <Text style={[s.gateSubtitle, { color: colors.mutedForeground }]}>You need to follow at least one celebrity to make a booking.</Text>
           <TouchableOpacity
             style={[s.gateBtn, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/favorites' as never)}
+            onPress={() => router.push('/following' as never)}
           >
-            <Text style={s.gateBtnText}>Browse &amp; Subscribe</Text>
+            <Text style={s.gateBtnText}>Browse &amp; Subscribe to Celebrities</Text>
           </TouchableOpacity>
         </View>
       </View>
