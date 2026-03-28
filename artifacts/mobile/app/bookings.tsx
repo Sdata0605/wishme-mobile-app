@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Animated,
   Image,
+  Linking,
   Modal,
   Platform,
   ScrollView,
@@ -21,9 +22,11 @@ import { useAuth } from '@/context/AuthContext';
 import { supabaseFetch, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
 import { useTheme } from '@/context/ThemeContext';
 
-const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
-
-function useRealtimeBookings(profileId: string | null, accessToken: string | null, onUpdate: () => void) {
+function useRealtimeBookings(
+  profileId: string | null,
+  accessToken: string | null,
+  onUpdate: (table: string) => void,
+) {
   const onUpdateRef = useRef(onUpdate);
   onUpdateRef.current = onUpdate;
 
@@ -69,7 +72,14 @@ function useRealtimeBookings(profileId: string | null, accessToken: string | nul
           const isUpdate =
             msg.event === 'postgres_changes' &&
             (msg.payload?.data?.type === 'UPDATE' || msg.payload?.eventType === 'UPDATE');
-          if (isUpdate) onUpdateRef.current();
+          if (isUpdate) {
+            const topic: string = msg.topic ?? '';
+            if (topic.includes('music_generations')) {
+              onUpdateRef.current('music_generations');
+            } else if (topic.includes('bookings')) {
+              onUpdateRef.current('bookings');
+            }
+          }
         } catch {}
       };
       ws.onerror = () => {};
@@ -136,12 +146,12 @@ interface WishOrder {
   celebrities: { name: string; image_url: string } | null;
 }
 interface GreetingCard {
-  id: string; occasion_name: string; recipient_name: string; greeting_text: string;
+  id: string; occasion_name: string; recipient_name: string; original_prompt: string;
   generated_image_url: string | null; amount_charged: number; status: string; created_at: string;
 }
 interface PhotoWish {
-  id: string; occasion: string; recipient_name: string; message: string;
-  generated_image_url: string | null; price_paid: number; status: string; created_at: string;
+  id: string; occasion_type: string; recipient_name: string; message: string;
+  output_url: string | null; credits_used: number; status: string; created_at: string;
 }
 interface VoiceCall {
   id: string; celebrity_id: string; recipient_name: string; recipient_phone: string;
@@ -151,8 +161,8 @@ interface VoiceCall {
   celebrities: { name: string; image_url: string } | null;
 }
 interface MusicGen {
-  id: string; song_title: string; genre: string; lyrics: string | null;
-  song_url: string | null; download_url: string | null; credits_used: number;
+  id: string; title: string; genre: string; mood: string; lyrics: string | null;
+  audio_url: string | null; credits_used: number; has_vocals: boolean;
   status: string; error_message: string | null; created_at: string;
 }
 interface ImgMusicGen {
@@ -183,7 +193,7 @@ interface OccasionBooking {
   occasions: { name: string } | null;
 }
 
-interface AllData {
+interface TabData {
   celeb: CelebBooking[];
   wishes: WishOrder[];
   cards: GreetingCard[];
@@ -198,16 +208,18 @@ interface AllData {
   occasions: OccasionBooking[];
 }
 
+type TabDataKey = keyof TabData;
+
 function getCelebStatus(row: CelebBooking): { label: string; color: string; pulse: boolean } {
   if (row.status === 'cancelled') return { label: '❌ Cancelled', color: '#EF4444', pulse: false };
   if (row.video_status === 'failed' || row.generation_status === 'failed')
     return { label: '⚠️ Failed', color: '#EF4444', pulse: false };
-  if (row.generation_status === 'timeout') return { label: '⚠️ Timed Out', color: '#EF4444', pulse: false };
+  if (row.generation_status === 'timeout') return { label: '⚠️ Timed Out', color: '#F97316', pulse: false };
   if (row.status === 'completed') return { label: '✅ Completed', color: '#22C55E', pulse: false };
   if (row.status === 'video_sent' || row.status === 'sent')
     return { label: '📤 Delivered to You', color: '#22C55E', pulse: false };
   if (row.generation_status === 'completed' && row.video_status === 'ready')
-    return { label: '🎥 Video Ready', color: '#8B5CF6', pulse: false };
+    return { label: '🎥 Video Ready — Pending Admin Review', color: '#8B5CF6', pulse: false };
   if (row.generation_status === 'uploading')
     return { label: '⬆️ Uploading Video', color: '#3B82F6', pulse: true };
   if (row.generation_status === 'downloading')
@@ -228,6 +240,14 @@ function getStatusColor(status: string): string {
   if (s === 'ready') return '#8B5CF6';
   return '#F59E0B';
 }
+
+const SERVICE_TYPE_LABELS: Record<string, string> = {
+  video_wish: 'Video Wish',
+  voice_message: 'Voice Message',
+  live_call: 'Live Call',
+  personalized_song: 'Personalized Song',
+  shoutout: 'Shoutout',
+};
 
 function SmallStatusBadge({ status, colors }: { status: string; colors: Colors }) {
   const color = getStatusColor(status);
@@ -314,6 +334,18 @@ function BookingAudioPlayer({ audioUrl, colors }: { audioUrl: string | null; col
   );
 }
 
+function DownloadLink({ url, colors }: { url: string; colors: Colors }) {
+  return (
+    <TouchableOpacity
+      onPress={() => Linking.openURL(url).catch(() => {})}
+      style={s.downloadLink}
+    >
+      <Icon name="download" size={13} color="#3B82F6" />
+      <Text style={[s.downloadLinkText, { color: '#3B82F6' }]}>Download</Text>
+    </TouchableOpacity>
+  );
+}
+
 function ImagePreviewModal({ url, onClose }: { url: string; onClose: () => void }) {
   const insets = useSafeAreaInsets();
   return (
@@ -337,10 +369,42 @@ function InlineCelebVideoPlayer({ videoUri, colors }: { videoUri: string; colors
   );
 }
 
-function getVideoUrl(row: CelebBooking): string | null {
-  if (row.video_file_key && row.video_status === 'ready') return B2_BASE + row.video_file_key;
-  if (row.video_url?.startsWith('http')) return row.video_url;
-  return null;
+function useCelebSignedVideoUrl(row: CelebBooking, accessToken: string | null) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [loadingVideo, setLoadingVideo] = useState(false);
+
+  useEffect(() => {
+    const canShow =
+      (row.status === 'video_sent' || row.status === 'sent' || row.status === 'completed') &&
+      row.video_file_key;
+
+    if (!canShow || !accessToken) {
+      setSignedUrl(null);
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingVideo(true);
+
+    supabaseFetch(
+      '/functions/v1/b2-get-signed-url',
+      {
+        method: 'POST',
+        body: JSON.stringify({ fileKey: row.video_file_key }),
+      },
+      accessToken,
+    )
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(data => {
+        if (!cancelled) setSignedUrl(data?.signedUrl ?? data?.url ?? null);
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoadingVideo(false); });
+
+    return () => { cancelled = true; };
+  }, [row.id, row.status, row.video_file_key, accessToken]);
+
+  return { signedUrl, loadingVideo };
 }
 
 function parseCelebMessage(msg: string | null): { recipientName?: string; occasion?: string; message?: string } {
@@ -389,11 +453,27 @@ function OrderTimeline({ row, colors }: { row: CelebBooking; colors: Colors }) {
   );
 }
 
-function CelebCard({ item, colors }: { item: CelebBooking; colors: Colors }) {
+function CelebCard({ item, colors, accessToken }: { item: CelebBooking; colors: Colors; accessToken: string | null }) {
   const { label, color, pulse } = getCelebStatus(item);
   const parsed = parseCelebMessage(item.message);
-  const videoUrl = getVideoUrl(item);
   const [showTimeline, setShowTimeline] = useState(false);
+  const { signedUrl, loadingVideo } = useCelebSignedVideoUrl(item, accessToken);
+
+  const serviceLabel = SERVICE_TYPE_LABELS[item.service_type] ?? item.service_type ?? null;
+
+  const isVideoReady =
+    (item.status === 'video_sent' || item.status === 'sent' || item.status === 'completed') &&
+    item.video_file_key != null;
+
+  const isUnderReview =
+    item.status === 'confirmed' &&
+    item.video_file_key != null &&
+    item.video_status === 'ready';
+
+  const isBeingCreated =
+    item.status === 'confirmed' &&
+    !isUnderReview;
+
   return (
     <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={s.cardRow}>
@@ -414,6 +494,9 @@ function CelebCard({ item, colors }: { item: CelebBooking; colors: Colors }) {
           {item.celebrities?.category ? (
             <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.celebrities.category}</Text>
           ) : null}
+          {serviceLabel ? (
+            <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{serviceLabel}</Text>
+          ) : null}
           {parsed.occasion || parsed.recipientName ? (
             <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={1}>
               {parsed.occasion}{parsed.recipientName ? ` for ${parsed.recipientName}` : ''}
@@ -426,12 +509,37 @@ function CelebCard({ item, colors }: { item: CelebBooking; colors: Colors }) {
           <Text style={[s.orderId, { color: colors.mutedForeground }]}>Order #{item.id.slice(0, 8).toUpperCase()}</Text>
         </View>
       </View>
-      {videoUrl && Platform.OS !== 'web' && <InlineCelebVideoPlayer videoUri={videoUrl} colors={colors} />}
-      {videoUrl && Platform.OS === 'web' && (
-        <View style={[s.videoWrapper, { borderColor: colors.border }]}>
-          <video src={videoUrl} controls style={{ width: '100%', borderRadius: 10 }} />
+
+      {isUnderReview && (
+        <View style={[s.infoBox, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+          <Icon name="clock" size={14} color="#92400E" />
+          <Text style={[s.infoBoxText, { color: '#92400E' }]}>Video Under Review — our team will send it to you shortly.</Text>
         </View>
       )}
+
+      {isBeingCreated && (
+        <View style={[s.infoBox, { backgroundColor: colors.border + '44', borderColor: colors.border }]}>
+          <ActivityIndicator size="small" color="#F59E0B" />
+          <Text style={[s.infoBoxText, { color: colors.mutedForeground }]}>Video Being Created...</Text>
+        </View>
+      )}
+
+      {isVideoReady && loadingVideo && (
+        <View style={s.videoLoadingRow}>
+          <ActivityIndicator size="small" color="#FF6B33" />
+          <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>Loading video...</Text>
+        </View>
+      )}
+
+      {isVideoReady && signedUrl && Platform.OS !== 'web' && (
+        <InlineCelebVideoPlayer videoUri={signedUrl} colors={colors} />
+      )}
+      {isVideoReady && signedUrl && Platform.OS === 'web' && (
+        <View style={[s.videoWrapper, { borderColor: colors.border }]}>
+          <video src={signedUrl} controls style={{ width: '100%', borderRadius: 10 }} />
+        </View>
+      )}
+
       {item.status !== 'pending' && (
         <TouchableOpacity onPress={() => setShowTimeline(t => !t)} style={s.timelineToggle}>
           <Text style={{ color: '#FF6B33', fontSize: 12, fontFamily: 'Inter_500Medium' }}>
@@ -483,6 +591,7 @@ function WishCard({ item, colors }: { item: WishOrder; colors: Colors }) {
 
 function CardCard({ item, colors }: { item: GreetingCard; colors: Colors }) {
   const [preview, setPreview] = useState<string | null>(null);
+  const cardTitle = [item.occasion_name, item.original_prompt].filter(Boolean).join(' - ');
   return (
     <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={s.cardRow}>
@@ -491,17 +600,19 @@ function CardCard({ item, colors }: { item: GreetingCard; colors: Colors }) {
         </View>
         <View style={{ flex: 1 }}>
           <View style={s.cardTop}>
-            <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{item.occasion_name}</Text>
+            <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{cardTitle || item.occasion_name}</Text>
             <SmallStatusBadge status={item.status} colors={colors} />
           </View>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For {item.recipient_name}</Text>
-          {item.greeting_text ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.greeting_text}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
           {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
           {item.generated_image_url ? (
             <TouchableOpacity onPress={() => setPreview(item.generated_image_url!)}>
               <Image source={{ uri: item.generated_image_url }} style={s.cardImg} resizeMode="cover" />
             </TouchableOpacity>
+          ) : null}
+          {item.status === 'completed' && item.generated_image_url ? (
+            <DownloadLink url={item.generated_image_url} colors={colors} />
           ) : null}
         </View>
       </View>
@@ -512,6 +623,7 @@ function CardCard({ item, colors }: { item: GreetingCard; colors: Colors }) {
 
 function PhotoCard({ item, colors }: { item: PhotoWish; colors: Colors }) {
   const [preview, setPreview] = useState<string | null>(null);
+  const photoTitle = item.occasion_type ? `${item.occasion_type} Photo Wish` : 'Photo Wish';
   return (
     <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={s.cardRow}>
@@ -520,15 +632,16 @@ function PhotoCard({ item, colors }: { item: PhotoWish; colors: Colors }) {
         </View>
         <View style={{ flex: 1 }}>
           <View style={s.cardTop}>
-            <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{item.occasion} for {item.recipient_name}</Text>
+            <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{photoTitle}</Text>
             <SmallStatusBadge status={item.status} colors={colors} />
           </View>
+          <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For {item.recipient_name}</Text>
           {item.message ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.message}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
-          {item.generated_image_url ? (
-            <TouchableOpacity onPress={() => setPreview(item.generated_image_url!)}>
-              <Image source={{ uri: item.generated_image_url }} style={s.cardImg} resizeMode="cover" />
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
+          {item.output_url ? (
+            <TouchableOpacity onPress={() => setPreview(item.output_url!)}>
+              <Image source={{ uri: item.output_url }} style={s.cardImg} resizeMode="cover" />
             </TouchableOpacity>
           ) : null}
         </View>
@@ -558,31 +671,27 @@ function CallCard({ item, colors }: { item: VoiceCall; colors: Colors }) {
           </View>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.occasion} for {item.recipient_name}</Text>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>From: {item.sender_name} → {item.recipient_phone}</Text>
-          {item.scheduled_at && (
-            <Text style={[s.cardSub, { color: colors.mutedForeground }]}>
-              📅 {fmtDateLong(item.scheduled_at)} at {fmtTime(item.scheduled_at)}
-            </Text>
-          )}
-          {item.call_status === 'completed' && item.call_duration_seconds != null && (
-            <Text style={[s.cardSub, { color: '#22C55E' }]}>Duration: {fmtDuration(item.call_duration_seconds)}</Text>
-          )}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
           {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
         </View>
       </View>
+      {item.scheduled_at && (
+        <View style={[s.infoBox, { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' }]}>
+          <Icon name="calendar" size={14} color="#1D4ED8" />
+          <Text style={[s.infoBoxText, { color: '#1D4ED8' }]}>
+            Scheduled: {fmtDateLong(item.scheduled_at)} at {fmtTime(item.scheduled_at)}
+          </Text>
+        </View>
+      )}
+      {item.call_status === 'completed' && item.call_duration_seconds != null && (
+        <Text style={[s.cardSub, { color: '#22C55E', marginTop: 6 }]}>Duration: {fmtDuration(item.call_duration_seconds)}</Text>
+      )}
     </View>
   );
 }
 
-function resolveMusicUrl(item: MusicGen): string | null {
-  if (item.download_url?.startsWith('http')) return item.download_url;
-  if (item.song_url?.startsWith('http')) return item.song_url;
-  if (item.song_url) return B2_BASE + item.song_url;
-  return null;
-}
-
 function MusicCard({ item, colors }: { item: MusicGen; colors: Colors }) {
-  const audioUrl = resolveMusicUrl(item);
+  const audioUrl = item.audio_url ?? null;
   return (
     <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={s.cardRow}>
@@ -591,16 +700,24 @@ function MusicCard({ item, colors }: { item: MusicGen; colors: Colors }) {
         </View>
         <View style={{ flex: 1 }}>
           <View style={s.cardTop}>
-            <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{item.song_title || 'Song'}</Text>
+            <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>{item.title || 'Song'}</Text>
             <SmallStatusBadge status={item.status} colors={colors} />
           </View>
-          <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.genre}</Text>
+          <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.genre}{item.mood ? ` · ${item.mood}` : ''}</Text>
+          {item.has_vocals && (
+            <View style={[s.vocBadge, { borderColor: '#8B5CF6' }]}>
+              <Text style={{ color: '#8B5CF6', fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>🎤 Vocals</Text>
+            </View>
+          )}
           {item.lyrics ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.lyrics}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>{item.credits_used} credits</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
           {item.error_message ? <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'Inter_400Regular' }}>{item.error_message}</Text> : null}
           {item.status === 'completed' && audioUrl ? (
-            <BookingAudioPlayer audioUrl={audioUrl} colors={colors} />
+            <>
+              <BookingAudioPlayer audioUrl={audioUrl} colors={colors} />
+              <DownloadLink url={audioUrl} colors={colors} />
+            </>
           ) : item.status === 'processing' ? (
             <View style={s.processingRow}>
               <ActivityIndicator size="small" color="#FF6B33" />
@@ -643,7 +760,10 @@ function ImgMusicCard({ item, colors }: { item: ImgMusicGen; colors: Colors }) {
             <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
             {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
             {item.status === 'completed' && item.audio_url ? (
-              <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
+              <>
+                <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
+                <DownloadLink url={item.audio_url} colors={colors} />
+              </>
             ) : null}
           </View>
         </View>
@@ -667,7 +787,7 @@ function TtsCard({ item, colors }: { item: TtsGen; colors: Colors }) {
           </View>
           {item.text ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={3}>{item.text}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>{item.credits_used} credits</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -693,7 +813,7 @@ function SfxCard({ item, colors }: { item: SfxGen; colors: Colors }) {
             <Text style={[s.cardSub, { color: colors.mutedForeground }]}>Duration: {item.duration_seconds}s</Text>
           )}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>{item.credits_used} credits</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -717,7 +837,7 @@ function ConvertCard({ item, colors }: { item: VoiceConversion; colors: Colors }
           </View>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>File: {item.original_file_name}</Text>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>{item.credits_used} credits</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -740,7 +860,7 @@ function IsolateCard({ item, colors }: { item: AudioIsolation; colors: Colors })
             <SmallStatusBadge status={item.status} colors={colors} />
           </View>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>{item.credits_used} credits</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -809,82 +929,151 @@ function EmptyState({ tab, colors }: { tab: BookingTab; colors: Colors }) {
   );
 }
 
+const TAB_TO_TABLES: Record<BookingTab, { table: string; select: string; dataKey: TabDataKey }[]> = {
+  Celebrity: [{ table: 'bookings', select: 'id,user_id,celebrity_id,service_type,status,generation_status,video_status,video_file_key,video_url,message,final_price,created_at,generation_error,celebrities:celebrity_id(name,image_url,category)', dataKey: 'celeb' }],
+  Wishes: [{ table: 'wish_celebrity_orders', select: 'id,celebrity_id,occasion_type,recipient_name,message,amount_paid,status,generated_card_image_url,card_url,created_at,celebrities:celebrity_id(name,image_url)', dataKey: 'wishes' }],
+  Cards: [{ table: 'greeting_card_generations', select: 'id,occasion_name,recipient_name,original_prompt,generated_image_url,amount_charged,status,created_at', dataKey: 'cards' }],
+  Photo: [{ table: 'photo_wishes', select: 'id,occasion_type,recipient_name,message,output_url,credits_used,status,created_at', dataKey: 'photo' }],
+  Calls: [{ table: 'voice_call_wishes', select: 'id,celebrity_id,recipient_name,recipient_phone,occasion,sender_name,call_status,scheduled_at,call_duration_seconds,price_paid,vapi_voice_name,created_at,celebrities:celebrity_id(name,image_url)', dataKey: 'calls' }],
+  Music: [{ table: 'music_generations', select: 'id,title,genre,mood,lyrics,audio_url,credits_used,has_vocals,status,error_message,created_at', dataKey: 'music' }],
+  'Img+Music': [{ table: 'image_music_generations', select: 'id,genre,mood,has_vocals,description,image_url,audio_url,amount_charged,status,created_at', dataKey: 'imgMusic' }],
+  TTS: [{ table: 'tts_generations', select: 'id,text,voice_name,audio_url,credits_used,status,created_at', dataKey: 'tts' }],
+  SFX: [{ table: 'sound_effect_generations', select: 'id,description,duration_seconds,audio_url,credits_used,status,created_at', dataKey: 'sfx' }],
+  Convert: [{ table: 'voice_conversion_generations', select: 'id,target_voice_name,original_file_name,audio_url,credits_used,status,created_at', dataKey: 'convert' }],
+  Isolate: [{ table: 'audio_isolation_generations', select: 'id,original_file_name,audio_url,credits_used,status,created_at', dataKey: 'isolate' }],
+  Occasions: [{ table: 'occasion_bookings', select: 'id,recipient_name,message,price,status,created_at,celebrities:celebrity_id(name,image_url),occasions:occasion_id(name)', dataKey: 'occasions' }],
+};
+
+const TABLE_TO_TAB: Record<string, BookingTab> = {
+  bookings: 'Celebrity',
+  music_generations: 'Music',
+};
+
 export default function BookingsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { user, session } = useAuth();
   const [activeTab, setActiveTab] = useState<BookingTab>('Celebrity');
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  const [tabLoading, setTabLoading] = useState<Partial<Record<BookingTab, boolean>>>({});
   const [fetchError, setFetchError] = useState(false);
-  const [data, setData] = useState<AllData>({
+  const [badgeCounts, setBadgeCounts] = useState<Partial<Record<BookingTab, number>>>({});
+  const [data, setData] = useState<TabData>({
     celeb: [], wishes: [], cards: [], photo: [],
     calls: [], music: [], imgMusic: [], tts: [],
     sfx: [], convert: [], isolate: [], occasions: [],
   });
+  const loadedTabsRef = useRef<Set<BookingTab>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
 
-  const fetchAllBookings = useCallback(async (quiet = false) => {
+  const fetchBadgeCounts = useCallback(async () => {
     if (!user?.profileId || !session?.access_token) return;
     const pid = user.profileId;
     const tok = session.access_token;
-    if (!quiet) setLoading(true);
-    else setRefreshing(true);
+
+    const countFetches = BOOKING_TABS.map(async (tab) => {
+      const configs = TAB_TO_TABLES[tab];
+      let total = 0;
+      for (const cfg of configs) {
+        try {
+          const res = await supabaseFetch(
+            `/rest/v1/${cfg.table}?select=id&user_id=eq.${pid}&limit=1`,
+            { method: 'HEAD', headers: { Prefer: 'count=exact' } },
+            tok,
+          );
+          const rangeHeader = res.headers.get('content-range');
+          if (rangeHeader) {
+            const match = rangeHeader.match(/\/(\d+)$/);
+            if (match) total += parseInt(match[1], 10);
+          }
+        } catch {}
+      }
+      return { tab, count: total };
+    });
+
+    const results = await Promise.all(countFetches);
+    const counts: Partial<Record<BookingTab, number>> = {};
+    for (const { tab, count } of results) {
+      counts[tab] = count;
+    }
+    setBadgeCounts(counts);
+  }, [user?.profileId, session?.access_token]);
+
+  const fetchTab = useCallback(async (tab: BookingTab, force = false) => {
+    if (!user?.profileId || !session?.access_token) return;
+    if (!force && loadedTabsRef.current.has(tab)) return;
+
+    const pid = user.profileId;
+    const tok = session.access_token;
+    setTabLoading(prev => ({ ...prev, [tab]: true }));
+
+    const configs = TAB_TO_TABLES[tab];
     try {
-      const q = (table: string, select = '*') =>
-        supabaseFetch(
-          `/rest/v1/${table}?select=${encodeURIComponent(select)}&user_id=eq.${pid}&order=created_at.desc&limit=50`,
+      for (const cfg of configs) {
+        const res = await supabaseFetch(
+          `/rest/v1/${cfg.table}?select=${encodeURIComponent(cfg.select)}&user_id=eq.${pid}&order=created_at.desc&limit=20`,
           {},
           tok,
-        ).then(r => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.json();
-        });
-
-      const [celeb, wishes, cards, photo, calls, music, imgMusic, tts, sfx, convert, isolate, occasions] =
-        await Promise.all([
-          q('bookings', '*,celebrities:celebrity_id(name,image_url,category)'),
-          q('wish_celebrity_orders', '*,celebrities:celebrity_id(name,image_url)'),
-          q('greeting_card_generations'),
-          q('photo_wishes'),
-          q('voice_call_wishes', '*,celebrities:celebrity_id(name,image_url)'),
-          q('music_generations'),
-          q('image_music_generations'),
-          q('tts_generations'),
-          q('sound_effect_generations'),
-          q('voice_conversion_generations'),
-          q('audio_isolation_generations'),
-          q('occasion_bookings', '*,celebrities:celebrity_id(name,image_url),occasions:occasion_id(name)'),
-        ]);
-
-      setData({ celeb, wishes, cards, photo, calls, music, imgMusic, tts, sfx, convert, isolate, occasions });
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const rows = await res.json();
+        setData(prev => ({ ...prev, [cfg.dataKey]: rows }));
+      }
+      loadedTabsRef.current.add(tab);
       setFetchError(false);
     } catch {
       setFetchError(true);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      setTabLoading(prev => ({ ...prev, [tab]: false }));
     }
   }, [user?.profileId, session?.access_token]);
 
+  const handleRefreshButton = useCallback(async () => {
+    setRefreshing(true);
+    loadedTabsRef.current.delete(activeTab);
+    await Promise.all([fetchBadgeCounts(), fetchTab(activeTab, true)]);
+    setRefreshing(false);
+  }, [activeTab, fetchBadgeCounts, fetchTab]);
+
   useEffect(() => {
-    fetchAllBookings();
-    const interval = setInterval(() => fetchAllBookings(true), 30000);
-    return () => clearInterval(interval);
-  }, [fetchAllBookings]);
+    fetchBadgeCounts();
+  }, [fetchBadgeCounts]);
+
+  useEffect(() => {
+    fetchTab(activeTab);
+  }, [activeTab, fetchTab]);
+
+  const handleRealtimeUpdate = useCallback((table: string) => {
+    const tab = TABLE_TO_TAB[table];
+    if (tab) {
+      loadedTabsRef.current.delete(tab);
+      if (tab === activeTab) {
+        fetchTab(tab, true);
+      }
+      fetchBadgeCounts();
+    }
+  }, [activeTab, fetchTab, fetchBadgeCounts]);
 
   useRealtimeBookings(
     user?.profileId ?? null,
     session?.access_token ?? null,
-    useCallback(() => fetchAllBookings(true), [fetchAllBookings]),
+    handleRealtimeUpdate,
   );
 
   function renderTabItems(tab: BookingTab) {
+    const isLoading = tabLoading[tab];
+    if (isLoading) {
+      return (
+        <View style={s.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF6B33" />
+        </View>
+      );
+    }
     const showEmpty = !fetchError;
     switch (tab) {
       case 'Celebrity':
         return data.celeb.length === 0 ? (showEmpty ? <EmptyState tab="Celebrity" colors={colors} /> : null) :
-          data.celeb.map(item => <CelebCard key={item.id} item={item} colors={colors} />);
+          data.celeb.map(item => <CelebCard key={item.id} item={item} colors={colors} accessToken={session?.access_token ?? null} />);
       case 'Wishes':
         return data.wishes.length === 0 ? (showEmpty ? <EmptyState tab="Wishes" colors={colors} /> : null) :
           data.wishes.map(item => <WishCard key={item.id} item={item} colors={colors} />);
@@ -921,17 +1110,6 @@ export default function BookingsScreen() {
     }
   }
 
-  function renderTab() {
-    if (loading) {
-      return (
-        <View style={s.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B33" />
-        </View>
-      );
-    }
-    return renderTabItems(activeTab);
-  }
-
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
       <View style={[s.header, { paddingTop: topPad + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -939,7 +1117,7 @@ export default function BookingsScreen() {
           <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[s.headerTitle, { color: colors.foreground }]}>My Bookings</Text>
-        <TouchableOpacity onPress={() => fetchAllBookings(true)} disabled={refreshing}>
+        <TouchableOpacity onPress={handleRefreshButton} disabled={refreshing}>
           {refreshing ? (
             <ActivityIndicator size="small" color="#FF6B33" />
           ) : (
@@ -956,6 +1134,8 @@ export default function BookingsScreen() {
       >
         {BOOKING_TABS.map(tab => {
           const active = tab === activeTab;
+          const count = badgeCounts[tab];
+          const label = count != null ? `${tab} (${count})` : tab;
           return (
             <TouchableOpacity
               key={tab}
@@ -965,7 +1145,7 @@ export default function BookingsScreen() {
               <Text style={[s.tabPillText, { color: active ? '#fff' : colors.mutedForeground },
                 active && s.tabPillTextActive]}
               >
-                {tab}
+                {label}
               </Text>
             </TouchableOpacity>
           );
@@ -975,7 +1155,10 @@ export default function BookingsScreen() {
       {fetchError && (
         <TouchableOpacity
           style={s.errorBanner}
-          onPress={() => fetchAllBookings(loading ? false : true)}
+          onPress={() => {
+            loadedTabsRef.current.delete(activeTab);
+            fetchTab(activeTab, true);
+          }}
           activeOpacity={0.8}
         >
           <Icon name="alert-circle" size={16} color="#fff" />
@@ -987,7 +1170,7 @@ export default function BookingsScreen() {
         contentContainerStyle={[s.listContent, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}
       >
-        {renderTab()}
+        {renderTabItems(activeTab)}
       </ScrollView>
     </View>
   );
@@ -1033,6 +1216,7 @@ const s = StyleSheet.create({
   audioDuration: { fontSize: 10, fontFamily: 'Inter_500Medium', minWidth: 60, textAlign: 'right' },
   videoWrapper: { marginTop: 12, borderRadius: 12, overflow: 'hidden', borderWidth: 1, height: 200 },
   videoView: { flex: 1 },
+  videoLoadingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   timelineToggle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 10 },
   timeline: { marginTop: 12, paddingLeft: 4 },
   timelineStep: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
@@ -1054,4 +1238,13 @@ const s = StyleSheet.create({
     backgroundColor: '#DC2626', paddingHorizontal: 16, paddingVertical: 12,
   },
   errorBannerText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_500Medium', flex: 1 },
+  infoBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 10,
+  },
+  infoBoxText: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular' },
+  downloadLink: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8,
+  },
+  downloadLinkText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
 });
