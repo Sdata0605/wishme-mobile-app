@@ -270,9 +270,7 @@ export default function CommissionScreen() {
               <Text style={s.heroStatLabel}>Pending</Text>
             </View>
           </View>
-          <TouchableOpacity style={s.withdrawBtn} onPress={() => router.push('/wallet' as never)}>
-            <Text style={s.withdrawBtnText}>Withdraw Earnings</Text>
-          </TouchableOpacity>
+
         </LinearGradient>
 
         {/* 3-card summary */}
@@ -577,8 +575,7 @@ const s = StyleSheet.create({
   heroStatVal: { color: '#fff', fontSize: 18, fontFamily: 'Inter_700Bold' },
   heroStatLabel: { color: 'rgba(255,255,255,0.75)', fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   heroDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.3)', marginHorizontal: 8 },
-  withdrawBtn: { backgroundColor: '#fff', paddingHorizontal: 24, paddingVertical: 11, borderRadius: 9999 },
-  withdrawBtnText: { color: '#FF6B33', fontSize: 14, fontFamily: 'Inter_700Bold' },
+
   summaryRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 16 },
   summaryCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: 'center', gap: 5 },
   summaryVal: { fontSize: 14, fontFamily: 'Inter_700Bold' },
