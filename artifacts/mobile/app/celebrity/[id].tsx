@@ -41,16 +41,20 @@ export default function CelebrityDetailScreen() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subLoading, setSubLoading] = useState(false);
   const [pricingPrice, setPricingPrice] = useState<number | null>(null);
+  const [isUsingFallbackPrice, setIsUsingFallbackPrice] = useState(false);
+  const [isPricingDisabled, setIsPricingDisabled] = useState(false);
   const [showSubSheet, setShowSubSheet] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
 
+  const DEFAULT_SUBSCRIPTION_PRICE = 99;
+
   const fetchSubscriptionData = useCallback(async () => {
     if (!id || !user?.profileId || !session?.access_token) return;
     setSubLoading(true);
     try {
-      const [subRes, pricingRes] = await Promise.all([
+      const [subRes, pricingRes, disabledRes] = await Promise.all([
         supabaseFetch(
           `/rest/v1/celebrity_favorites?user_id=eq.${user.profileId}&celebrity_id=eq.${id}&status=eq.active&select=id&limit=1`,
           {},
@@ -61,14 +65,54 @@ export default function CelebrityDetailScreen() {
           {},
           session.access_token,
         ),
+        supabaseFetch(
+          `/rest/v1/celebrity_favorite_pricing?celebrity_id=eq.${id}&is_enabled=eq.false&select=id&limit=1`,
+          {},
+          session.access_token,
+        ),
       ]);
       if (subRes.ok) {
         const rows = await subRes.json() as Array<{ id: string }>;
         setIsSubscribed(rows && rows.length > 0);
       }
+      const applyFallbackPrice = async () => {
+        let fallbackPrice = DEFAULT_SUBSCRIPTION_PRICE;
+        try {
+          const plansRes = await supabaseFetch(
+            `/rest/v1/plans?is_active=eq.true&select=price&order=price.asc&limit=1`,
+            {},
+            session.access_token,
+          );
+          if (plansRes.ok) {
+            const plans = await plansRes.json() as Array<{ price: number }>;
+            if (plans && plans.length > 0) {
+              fallbackPrice = plans[0].price;
+            }
+          }
+        } catch {}
+        setPricingPrice(fallbackPrice);
+        setIsUsingFallbackPrice(true);
+        setIsPricingDisabled(false);
+      };
+
       if (pricingRes.ok) {
         const pricing = await pricingRes.json() as Array<{ price: number }>;
-        setPricingPrice(pricing && pricing.length > 0 ? pricing[0].price : null);
+        if (pricing && pricing.length > 0) {
+          setPricingPrice(pricing[0].price);
+          setIsUsingFallbackPrice(false);
+          setIsPricingDisabled(false);
+        } else {
+          const disabledRows = disabledRes.ok ? (await disabledRes.json() as Array<{ id: string }>) : [];
+          if (disabledRows && disabledRows.length > 0) {
+            setPricingPrice(null);
+            setIsUsingFallbackPrice(false);
+            setIsPricingDisabled(true);
+          } else {
+            await applyFallbackPrice();
+          }
+        }
+      } else {
+        await applyFallbackPrice();
       }
     } catch {
     } finally {
@@ -409,7 +453,7 @@ export default function CelebrityDetailScreen() {
           <Text style={[styles.sheetTitle, { color: colors.foreground }]}>{celebrity.name}</Text>
           <Text style={[styles.sheetSub, { color: colors.mutedForeground }]}>Subscribe to unlock all services</Text>
 
-          {pricingPrice === null ? (
+          {isPricingDisabled ? (
             <View style={styles.unavailableBox}>
               <Icon name="info" size={20} color={colors.mutedForeground} />
               <Text style={[styles.unavailableText, { color: colors.mutedForeground }]}>
@@ -419,10 +463,12 @@ export default function CelebrityDetailScreen() {
                 <Text style={[styles.viewProfileText, { color: colors.foreground }]}>View Profile Only</Text>
               </TouchableOpacity>
             </View>
-          ) : (
+          ) : pricingPrice !== null ? (
             <>
               <View style={[styles.priceBox, { backgroundColor: colors.backgroundSecondary }]}>
-                <Text style={[styles.priceBoxLabel, { color: colors.mutedForeground }]}>Subscription Price</Text>
+                <Text style={[styles.priceBoxLabel, { color: colors.mutedForeground }]}>
+                  {isUsingFallbackPrice ? 'Standard subscription price' : 'Subscription Price'}
+                </Text>
                 <Text style={[styles.priceBoxValue, { color: colors.primary }]}>₹{pricingPrice.toLocaleString('en-IN')}</Text>
               </View>
 
@@ -447,7 +493,7 @@ export default function CelebrityDetailScreen() {
                 <Text style={[styles.razorpayDisabledText, { color: colors.mutedForeground }]}>Razorpay — Coming Soon</Text>
               </TouchableOpacity>
             </>
-          )}
+          ) : null}
 
           <TouchableOpacity onPress={() => setShowSubSheet(false)} style={styles.cancelLink}>
             <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
