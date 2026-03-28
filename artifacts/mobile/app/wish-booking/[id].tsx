@@ -229,17 +229,10 @@ export default function WishBookingScreen() {
         body: JSON.stringify({
           user_id: profileId,
           amount: -finalPrice,
-          type: 'debit',
           transaction_type: 'booking',
-          reference_id: orderId,
           status: 'completed',
           description: `Wish order #${orderId} for ${celeb?.name} - ${occasion}`,
-          transaction_details: {
-            base_price: basePrice,
-            discount_percentage: planDiscountPct,
-            discount_amount: discountAmt,
-            plan: planDiscountPct > 0 ? 'subscriber' : 'standard',
-          },
+          payment_method: 'wallet',
         }),
       }, session?.access_token);
 
@@ -247,7 +240,9 @@ export default function WishBookingScreen() {
         await supabaseFetch(`/rest/v1/wish_celebrity_orders?id=eq.${orderId}`, {
           method: 'DELETE',
           headers: { Prefer: 'return=minimal' },
-        }, session?.access_token).catch(() => {});
+        }, session?.access_token).catch((err: unknown) => {
+          console.error('Failed to delete orphaned wish order:', orderId, err);
+        });
         throw new Error('Wallet transaction failed');
       }
 
