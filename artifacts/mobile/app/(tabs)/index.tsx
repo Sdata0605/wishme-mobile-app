@@ -646,7 +646,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Referral Banner */}
-        <View style={{ paddingHorizontal: 20 }}>
+        <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
           <LinearGradient colors={['#7B2FFF', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.referralBanner}>
             <View style={{ flex: 1 }}>
               <Text style={styles.referralTitle}>Earn with WishMe</Text>

@@ -1,0 +1,576 @@
+WishMe Occasion Alerts System — Complete Technical Documentation for Mobile App (Replit)
+1. PURPOSE & OVERVIEW
+The Occasion Alerts system lets authenticated users:
+
+Save "Loved Ones" (friends/family) with their birthdays, anniversaries, and custom occasions
+Get automated reminders (7-day and 1-day alerts) before each occasion via Email/SMS/WhatsApp
+Browse platform occasions (Diwali, Christmas, etc.) managed by admin
+Book celebrity video wishes or AI greeting cards for any occasion
+Send free text wishes to subscribed celebrities on their special days and receive AI auto-replies
+2. USER FLOW & NAVIGATION
+
+┌─────────────────────────────────────────────────────────────┐
+│                    USER SIDEBAR NAVIGATION                   │
+│                                                             │
+│  /loved-ones          → Add/manage contacts & their dates   │
+│  /occasion-alerts     → View/toggle reminder notifications  │
+│  /occasions           → Browse platform occasions catalog   │
+│  /occasions/:id/book  → Book video/card for an occasion     │
+│  /occasion-wishes     → Send free wish to subscribed celeb  │
+│  /wish-celebrity      → Wish a celebrity (paid flow)        │
+└─────────────────────────────────────────────────────────────┘
+
+ADMIN SIDEBAR:
+  /admin/occasions      → CRUD manage platform occasions
+End-to-End User Journey:
+
+Step 1: User goes to /loved-ones
+        → Adds "Mom" with DOB June 15
+        → Adds occasion "Wedding Anniversary" on Dec 10
+
+Step 2: System auto-creates entries in occasion_alerts table
+        (or user manually views /occasion-alerts)
+
+Step 3: pg_cron runs daily at 8 AM
+        → Checks occasion_alerts where date is 7 days or 1 day away
+        → Fires send-wishme-notification with event_key 'occasion_reminder'
+        → User receives Email/SMS/WhatsApp reminder
+
+Step 4: User opens /occasions to browse featured occasions
+        → Clicks "Book Now" on "Diwali" → redirected to /occasions/:id/book
+        → Selects a subscribed celebrity
+        → Chooses Video or Greeting Card
+        → Fills recipient details + message
+        → Submits → AI generates video/card
+
+Step 5: Alternatively, user goes to /occasion-wishes
+        → Selects a subscribed celebrity
+        → Selects their upcoming occasion (birthday/anniversary)
+        → Types a free text wish message
+        → Sends → If auto_reply_enabled, AI generates reply
+3. DATABASE TABLES
+Table: loved_ones
+
+CREATE TABLE loved_ones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  first_name TEXT NOT NULL,
+  last_name TEXT,
+  email TEXT,
+  phone TEXT,
+  date_of_birth DATE,
+  relationship TEXT,
+  notes TEXT,
+  import_source TEXT DEFAULT 'manual',
+  occasions JSONB DEFAULT '[]',  -- Array of {name, date, type}
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+-- RLS: user_id = current user's profile ID
+Table: occasion_alerts
+
+CREATE TABLE occasion_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  loved_one_id UUID REFERENCES loved_ones(id) ON DELETE CASCADE,
+  celebrity_id UUID REFERENCES celebrities(id) ON DELETE CASCADE,
+  occasion_type TEXT NOT NULL CHECK (occasion_type IN ('birthday','anniversary','custom','celebrity_event')),
+  occasion_name TEXT NOT NULL,
+  occasion_date DATE NOT NULL,
+  alert_enabled BOOLEAN DEFAULT true,
+  auto_send_enabled BOOLEAN DEFAULT false,
+  alert_days_before INTEGER DEFAULT 7,
+  notification_sent BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+-- RLS: user_id = current user's profile ID
+Table: occasions (admin-managed catalog)
+
+-- Columns: id, name, description, date, image_url, is_active, is_featured
+-- Admin creates/edits via /admin/occasions
+-- Public browsing at /occasions filtered by is_active = true
+Table: occasion_bookings
+
+-- Columns: id, user_id, occasion_id, celebrity_id, booking_type ('video'|'greeting_card'),
+--   recipient_name, recipient_email, recipient_phone, message, price, status, ai_generated_content
+Table: celebrity_occasions
+
+-- Columns: id, celebrity_id, occasion_name, occasion_type, occasion_date,
+--   auto_reply_enabled, auto_reply_template, is_public
+-- Seeded from celebrity DOB/anniversary; admin can add more
+Table: occasion_wishes (free text wishes)
+
+-- Columns: id, user_id, celebrity_id, occasion_id (FK to celebrity_occasions),
+--   message, reply_message, reply_sent_at, created_at
+4. API ENDPOINTS (Supabase)
+4.1 Loved Ones CRUD
+All via Supabase JS client — no edge function needed.
+
+Operation	Method	Table	Payload/Filter
+List	SELECT *	loved_ones	.eq('user_id', profileId).order('first_name')
+Create	INSERT	loved_ones	{ user_id, first_name, last_name, email, phone, date_of_birth, relationship, notes, import_source: 'manual' }
+Update	UPDATE	loved_ones	{ first_name, last_name, ... }.eq('id', lovedOneId)
+Delete	DELETE	loved_ones	.eq('id', lovedOneId)
+Save Occasions	UPDATE	loved_ones	{ occasions: [{name, date, type}, ...] }.eq('id', lovedOneId)
+Response: Standard Supabase row object with all columns.
+
+4.2 Occasion Alerts
+Operation	Method	Table	Payload/Filter
+List alerts	SELECT	occasion_alerts	.select('*, loved_ones(first_name, last_name), celebrities!occasion_alerts_celebrity_id_fkey(name)').eq('user_id', profileId).order('occasion_date')
+Toggle alert	UPDATE	occasion_alerts	{ alert_enabled: !current }.eq('id', alertId)
+Response: Array of OccasionAlert objects with joined loved_ones and celebrities names.
+
+4.3 Browse Occasions (Public Catalog)
+Operation	Method	Table	Filter
+List active	SELECT *	occasions	.eq('is_active', true).order('date', { ascending: true })
+Response:
+
+
+[{
+  "id": "uuid",
+  "name": "Diwali",
+  "description": "Festival of lights",
+  "date": "2026-10-20",
+  "image_url": "https://...",
+  "is_featured": true
+}]
+4.4 Occasion Booking (Video/Card)
+Step	Method	Detail
+Create booking	INSERT into occasion_bookings	{ user_id, occasion_id, celebrity_id, booking_type, recipient_name, recipient_email, recipient_phone, message, price, status: 'pending' }
+Generate AI Video	supabase.functions.invoke('generate-occasion-video')	See Edge Function #1 below
+Generate Card	supabase.functions.invoke('generate-greeting-card')	See Edge Function #2 below
+4.5 Occasion Wishes (Free Text to Celebrity)
+Step	Method	Detail
+Get subscribed celebs	SELECT from celebrities	.in('id', favoriteIds).eq('is_active', true)
+Get celeb occasions	SELECT from celebrity_occasions	.in('celebrity_id', favoriteIds).eq('is_public', true).gte('occasion_date', today)
+Send wish	INSERT into occasion_wishes	{ user_id, celebrity_id, occasion_id, message }
+AI auto-reply	supabase.functions.invoke('generate-occasion-auto-reply')	Triggered if auto_reply_enabled is true
+View sent wishes	SELECT from occasion_wishes	.eq('user_id', profileId).order('created_at', desc).limit(20) with join on celebrity_occasions and celebrities
+5. EDGE FUNCTIONS
+Edge Function #1: generate-occasion-video
+Invocation:
+
+
+supabase.functions.invoke('generate-occasion-video', {
+  body: {
+    bookingId: string,      // occasion_bookings.id
+    occasionName: string,   // e.g. "Diwali"
+    recipientName: string,
+    message: string,        // user's personal message
+    celebrityId: string
+  }
+})
+What it does:
+
+Fetches celebrity name + bio from celebrities table
+Calls Google Gemini API to generate a 30-45 second video script
+Updates occasion_bookings with ai_generated_content and status: 'processing'
+Response: { success: true, script: "..." }
+
+Edge Function #2: generate-greeting-card
+Invocation:
+
+
+supabase.functions.invoke('generate-greeting-card', {
+  body: {
+    bookingId: string,
+    occasionName: string,
+    recipientName: string,
+    message: string,
+    celebrityId: string
+  }
+})
+Edge Function #3: generate-occasion-auto-reply
+Invocation (called automatically when auto_reply_enabled is true):
+
+
+supabase.functions.invoke('generate-occasion-auto-reply', {
+  body: {
+    wish_id: string,          // occasion_wishes.id
+    celebrity_id: string,
+    occasion_name: string,    // e.g. "Birthday"
+    user_message: string      // the wish text user sent
+  }
+})
+What it does:
+
+Fetches celebrity name, category, bio from celebrities
+Calls Lovable AI Gateway (ai.gateway.lovable.dev/v1/chat/completions) with Gemini model
+Generates a 2-3 sentence warm reply "as the celebrity"
+Updates occasion_wishes with reply_message and reply_sent_at
+Response: { reply: "Thank you for...", message: "Auto-reply generated and sent successfully" }
+
+6. AUTOMATED CRON (pg_cron)
+Daily at 8:00 AM — daily-occasion-reminders
+Runs SQL function process_occasion_reminders() which:
+
+Queries occasion_alerts WHERE alert_enabled = true AND notification_sent IS NOT TRUE
+Checks if occasion_date - today equals alert_days_before (7 days) or 1 day
+For each matching alert, calls send-wishme-notification with:
+
+{
+  "event_key": "occasion_reminder",
+  "recipient_type": "user",
+  "recipient_id": "<profile_id>",
+  "data": {
+    "occasion_name": "Mom's Birthday",
+    "occasion_date": "2026-06-15",
+    "days_until": "7",
+    "person_name": "Rahul"
+  }
+}
+Sets notification_sent = true after sending
+7. UI COMPONENTS USED
+/loved-ones Page
+Component	Library	Usage
+AuthenticatedLayout	Custom	Page wrapper with sidebar
+Card, CardContent, CardHeader, CardTitle, CardDescription	shadcn/ui	Contact cards
+Button	shadcn/ui	Add, Edit, Delete, Save actions
+Input	shadcn/ui	Name, email, phone, DOB fields
+Label	shadcn/ui	Form labels
+Textarea	shadcn/ui	Notes field
+Select, SelectContent, SelectItem, SelectTrigger, SelectValue	shadcn/ui	Relationship dropdown
+Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger	shadcn/ui	Add/Edit modal + Occasions modal
+Badge	shadcn/ui	Relationship tag, birthday countdown
+Plus, Edit, Trash2, Heart, Calendar, Mail, Phone, Upload	lucide-react	Icons
+/occasion-alerts Page
+Component	Usage
+Card with stat counts	3-column grid: Upcoming, This Week, Auto-Send
+Switch	Toggle alert_enabled per alert
+Badge with variants	Status: "Today!", "7 days", "Past"
+Heart / Star icons	Loved one vs Celebrity alert indicator
+/occasions Page
+Component	Usage
+Card grid	Featured (2-col) + All occasions (4-col)
+Image overlay with gradient	Featured occasion hero cards
+Button "Book Now" / "Book for Free"	Navigation to booking
+/occasions/:id/book Page
+Component	Usage
+RadioGroup	Video vs Greeting Card selection
+Celebrity grid with selection border	Click to select
+Input + Textarea	Recipient details form
+Subscription gate (Lock icon)	Shown when user has no favorites
+/occasion-wishes Page
+Component	Usage
+Tabs (Send / My Wishes)	Two-tab layout
+Select cascading dropdowns	Celebrity → filters → Occasion
+Textarea	Wish message (500 char limit)
+Wish history cards	Shows sent message + AI reply if received
+Sparkles icon	AI auto-reply indicator
+8. AUTHENTICATION & PREREQUISITES
+All pages require authentication — wrapped in AuthenticatedLayout or gated with useAuth()
+/occasion-wishes and /occasions/:id/book require at least one active celebrity subscription (checked via useCelebrityFavorites hook querying celebrity_favorites WHERE status = 'active')
+If no subscriptions: shows gate UI directing user to /following to browse & subscribe
+useCelebrityFavorites Hook
+
+// Returns: { favorites: string[], hasFavorite(id), loading, refetchFavorites }
+// Query: celebrity_favorites WHERE user_id = profile.id AND status = 'active'
+// Returns array of celebrity_id strings
+9. ADMIN MANAGEMENT
+/admin/occasions — AdminOccasions Page
+Full CRUD for platform occasions:
+
+List: SELECT * FROM occasions ORDER BY date
+Create: INSERT INTO occasions with { name, description, date, image_url, is_active, is_featured }
+Update: UPDATE occasions SET ... WHERE id = :id
+Delete: DELETE FROM occasions WHERE id = :id
+UI: Dialog form with inputs for name, description, date picker, image URL, active toggle, featured toggle.
+
+10. KEY DIFFERENCES BETWEEN FLOWS
+Feature	Occasion Booking (/occasions/:id/book)	Occasion Wishes (/occasion-wishes)
+Cost	Paid (celebrity service_prices)	Free
+Output	AI Video or Greeting Card	Text message + optional AI reply
+Table	occasion_bookings	occasion_wishes
+Occasions from	occasions (admin catalog)	celebrity_occasions (celeb-specific)
+Requires subscription	Yes	Yes
+Edge function	generate-occasion-video / generate-greeting-card	generate-occasion-auto-reply
+I now have complete information. Here's the comprehensive document for Replit:
+
+WishMe Occasion Alerts System — Complete Technical Documentation for Mobile App (Replit)
+1. PURPOSE & OVERVIEW
+The Occasion Alerts system lets authenticated users:
+
+Save "Loved Ones" (friends/family) with their birthdays, anniversaries, and custom occasions
+Get automated reminders (7-day and 1-day alerts) before each occasion via Email/SMS/WhatsApp
+Browse platform occasions (Diwali, Christmas, etc.) managed by admin
+Book celebrity video wishes or AI greeting cards for any occasion
+Send free text wishes to subscribed celebrities on their special days and receive AI auto-replies
+2. USER FLOW & NAVIGATION
+
+┌─────────────────────────────────────────────────────────────┐
+│                    USER SIDEBAR NAVIGATION                   │
+│                                                             │
+│  /loved-ones          → Add/manage contacts & their dates   │
+│  /occasion-alerts     → View/toggle reminder notifications  │
+│  /occasions           → Browse platform occasions catalog   │
+│  /occasions/:id/book  → Book video/card for an occasion     │
+│  /occasion-wishes     → Send free wish to subscribed celeb  │
+│  /wish-celebrity      → Wish a celebrity (paid flow)        │
+└─────────────────────────────────────────────────────────────┘
+
+ADMIN SIDEBAR:
+  /admin/occasions      → CRUD manage platform occasions
+End-to-End User Journey:
+
+Step 1: User goes to /loved-ones
+        → Adds "Mom" with DOB June 15
+        → Adds occasion "Wedding Anniversary" on Dec 10
+
+Step 2: System auto-creates entries in occasion_alerts table
+        (or user manually views /occasion-alerts)
+
+Step 3: pg_cron runs daily at 8 AM
+        → Checks occasion_alerts where date is 7 days or 1 day away
+        → Fires send-wishme-notification with event_key 'occasion_reminder'
+        → User receives Email/SMS/WhatsApp reminder
+
+Step 4: User opens /occasions to browse featured occasions
+        → Clicks "Book Now" on "Diwali" → redirected to /occasions/:id/book
+        → Selects a subscribed celebrity
+        → Chooses Video or Greeting Card
+        → Fills recipient details + message
+        → Submits → AI generates video/card
+
+Step 5: Alternatively, user goes to /occasion-wishes
+        → Selects a subscribed celebrity
+        → Selects their upcoming occasion (birthday/anniversary)
+        → Types a free text wish message
+        → Sends → If auto_reply_enabled, AI generates reply
+3. DATABASE TABLES
+Table: loved_ones
+
+CREATE TABLE loved_ones (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  first_name TEXT NOT NULL,
+  last_name TEXT,
+  email TEXT,
+  phone TEXT,
+  date_of_birth DATE,
+  relationship TEXT,
+  notes TEXT,
+  import_source TEXT DEFAULT 'manual',
+  occasions JSONB DEFAULT '[]',  -- Array of {name, date, type}
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+-- RLS: user_id = current user's profile ID
+Table: occasion_alerts
+
+CREATE TABLE occasion_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  loved_one_id UUID REFERENCES loved_ones(id) ON DELETE CASCADE,
+  celebrity_id UUID REFERENCES celebrities(id) ON DELETE CASCADE,
+  occasion_type TEXT NOT NULL CHECK (occasion_type IN ('birthday','anniversary','custom','celebrity_event')),
+  occasion_name TEXT NOT NULL,
+  occasion_date DATE NOT NULL,
+  alert_enabled BOOLEAN DEFAULT true,
+  auto_send_enabled BOOLEAN DEFAULT false,
+  alert_days_before INTEGER DEFAULT 7,
+  notification_sent BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+-- RLS: user_id = current user's profile ID
+Table: occasions (admin-managed catalog)
+
+-- Columns: id, name, description, date, image_url, is_active, is_featured
+-- Admin creates/edits via /admin/occasions
+-- Public browsing at /occasions filtered by is_active = true
+Table: occasion_bookings
+
+-- Columns: id, user_id, occasion_id, celebrity_id, booking_type ('video'|'greeting_card'),
+--   recipient_name, recipient_email, recipient_phone, message, price, status, ai_generated_content
+Table: celebrity_occasions
+
+-- Columns: id, celebrity_id, occasion_name, occasion_type, occasion_date,
+--   auto_reply_enabled, auto_reply_template, is_public
+-- Seeded from celebrity DOB/anniversary; admin can add more
+Table: occasion_wishes (free text wishes)
+
+-- Columns: id, user_id, celebrity_id, occasion_id (FK to celebrity_occasions),
+--   message, reply_message, reply_sent_at, created_at
+4. API ENDPOINTS (Supabase)
+4.1 Loved Ones CRUD
+All via Supabase JS client — no edge function needed.
+
+Operation	Method	Table	Payload/Filter
+List	SELECT *	loved_ones	.eq('user_id', profileId).order('first_name')
+Create	INSERT	loved_ones	{ user_id, first_name, last_name, email, phone, date_of_birth, relationship, notes, import_source: 'manual' }
+Update	UPDATE	loved_ones	{ first_name, last_name, ... }.eq('id', lovedOneId)
+Delete	DELETE	loved_ones	.eq('id', lovedOneId)
+Save Occasions	UPDATE	loved_ones	{ occasions: [{name, date, type}, ...] }.eq('id', lovedOneId)
+Response: Standard Supabase row object with all columns.
+
+4.2 Occasion Alerts
+Operation	Method	Table	Payload/Filter
+List alerts	SELECT	occasion_alerts	.select('*, loved_ones(first_name, last_name), celebrities!occasion_alerts_celebrity_id_fkey(name)').eq('user_id', profileId).order('occasion_date')
+Toggle alert	UPDATE	occasion_alerts	{ alert_enabled: !current }.eq('id', alertId)
+Response: Array of OccasionAlert objects with joined loved_ones and celebrities names.
+
+4.3 Browse Occasions (Public Catalog)
+Operation	Method	Table	Filter
+List active	SELECT *	occasions	.eq('is_active', true).order('date', { ascending: true })
+Response:
+
+
+[{
+  "id": "uuid",
+  "name": "Diwali",
+  "description": "Festival of lights",
+  "date": "2026-10-20",
+  "image_url": "https://...",
+  "is_featured": true
+}]
+4.4 Occasion Booking (Video/Card)
+Step	Method	Detail
+Create booking	INSERT into occasion_bookings	{ user_id, occasion_id, celebrity_id, booking_type, recipient_name, recipient_email, recipient_phone, message, price, status: 'pending' }
+Generate AI Video	supabase.functions.invoke('generate-occasion-video')	See Edge Function #1 below
+Generate Card	supabase.functions.invoke('generate-greeting-card')	See Edge Function #2 below
+4.5 Occasion Wishes (Free Text to Celebrity)
+Step	Method	Detail
+Get subscribed celebs	SELECT from celebrities	.in('id', favoriteIds).eq('is_active', true)
+Get celeb occasions	SELECT from celebrity_occasions	.in('celebrity_id', favoriteIds).eq('is_public', true).gte('occasion_date', today)
+Send wish	INSERT into occasion_wishes	{ user_id, celebrity_id, occasion_id, message }
+AI auto-reply	supabase.functions.invoke('generate-occasion-auto-reply')	Triggered if auto_reply_enabled is true
+View sent wishes	SELECT from occasion_wishes	.eq('user_id', profileId).order('created_at', desc).limit(20) with join on celebrity_occasions and celebrities
+5. EDGE FUNCTIONS
+Edge Function #1: generate-occasion-video
+Invocation:
+
+
+supabase.functions.invoke('generate-occasion-video', {
+  body: {
+    bookingId: string,      // occasion_bookings.id
+    occasionName: string,   // e.g. "Diwali"
+    recipientName: string,
+    message: string,        // user's personal message
+    celebrityId: string
+  }
+})
+What it does:
+
+Fetches celebrity name + bio from celebrities table
+Calls Google Gemini API to generate a 30-45 second video script
+Updates occasion_bookings with ai_generated_content and status: 'processing'
+Response: { success: true, script: "..." }
+
+Edge Function #2: generate-greeting-card
+Invocation:
+
+
+supabase.functions.invoke('generate-greeting-card', {
+  body: {
+    bookingId: string,
+    occasionName: string,
+    recipientName: string,
+    message: string,
+    celebrityId: string
+  }
+})
+Edge Function #3: generate-occasion-auto-reply
+Invocation (called automatically when auto_reply_enabled is true):
+
+
+supabase.functions.invoke('generate-occasion-auto-reply', {
+  body: {
+    wish_id: string,          // occasion_wishes.id
+    celebrity_id: string,
+    occasion_name: string,    // e.g. "Birthday"
+    user_message: string      // the wish text user sent
+  }
+})
+What it does:
+
+Fetches celebrity name, category, bio from celebrities
+Calls Lovable AI Gateway (ai.gateway.lovable.dev/v1/chat/completions) with Gemini model
+Generates a 2-3 sentence warm reply "as the celebrity"
+Updates occasion_wishes with reply_message and reply_sent_at
+Response: { reply: "Thank you for...", message: "Auto-reply generated and sent successfully" }
+
+6. AUTOMATED CRON (pg_cron)
+Daily at 8:00 AM — daily-occasion-reminders
+Runs SQL function process_occasion_reminders() which:
+
+Queries occasion_alerts WHERE alert_enabled = true AND notification_sent IS NOT TRUE
+Checks if occasion_date - today equals alert_days_before (7 days) or 1 day
+For each matching alert, calls send-wishme-notification with:
+
+{
+  "event_key": "occasion_reminder",
+  "recipient_type": "user",
+  "recipient_id": "<profile_id>",
+  "data": {
+    "occasion_name": "Mom's Birthday",
+    "occasion_date": "2026-06-15",
+    "days_until": "7",
+    "person_name": "Rahul"
+  }
+}
+Sets notification_sent = true after sending
+7. UI COMPONENTS USED
+/loved-ones Page
+Component	Library	Usage
+AuthenticatedLayout	Custom	Page wrapper with sidebar
+Card, CardContent, CardHeader, CardTitle, CardDescription	shadcn/ui	Contact cards
+Button	shadcn/ui	Add, Edit, Delete, Save actions
+Input	shadcn/ui	Name, email, phone, DOB fields
+Label	shadcn/ui	Form labels
+Textarea	shadcn/ui	Notes field
+Select, SelectContent, SelectItem, SelectTrigger, SelectValue	shadcn/ui	Relationship dropdown
+Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger	shadcn/ui	Add/Edit modal + Occasions modal
+Badge	shadcn/ui	Relationship tag, birthday countdown
+Plus, Edit, Trash2, Heart, Calendar, Mail, Phone, Upload	lucide-react	Icons
+/occasion-alerts Page
+Component	Usage
+Card with stat counts	3-column grid: Upcoming, This Week, Auto-Send
+Switch	Toggle alert_enabled per alert
+Badge with variants	Status: "Today!", "7 days", "Past"
+Heart / Star icons	Loved one vs Celebrity alert indicator
+/occasions Page
+Component	Usage
+Card grid	Featured (2-col) + All occasions (4-col)
+Image overlay with gradient	Featured occasion hero cards
+Button "Book Now" / "Book for Free"	Navigation to booking
+/occasions/:id/book Page
+Component	Usage
+RadioGroup	Video vs Greeting Card selection
+Celebrity grid with selection border	Click to select
+Input + Textarea	Recipient details form
+Subscription gate (Lock icon)	Shown when user has no favorites
+/occasion-wishes Page
+Component	Usage
+Tabs (Send / My Wishes)	Two-tab layout
+Select cascading dropdowns	Celebrity → filters → Occasion
+Textarea	Wish message (500 char limit)
+Wish history cards	Shows sent message + AI reply if received
+Sparkles icon	AI auto-reply indicator
+8. AUTHENTICATION & PREREQUISITES
+All pages require authentication — wrapped in AuthenticatedLayout or gated with useAuth()
+/occasion-wishes and /occasions/:id/book require at least one active celebrity subscription (checked via useCelebrityFavorites hook querying celebrity_favorites WHERE status = 'active')
+If no subscriptions: shows gate UI directing user to /following to browse & subscribe
+useCelebrityFavorites Hook
+
+// Returns: { favorites: string[], hasFavorite(id), loading, refetchFavorites }
+// Query: celebrity_favorites WHERE user_id = profile.id AND status = 'active'
+// Returns array of celebrity_id strings
+9. ADMIN MANAGEMENT
+/admin/occasions — AdminOccasions Page
+Full CRUD for platform occasions:
+
+List: SELECT * FROM occasions ORDER BY date
+Create: INSERT INTO occasions with { name, description, date, image_url, is_active, is_featured }
+Update: UPDATE occasions SET ... WHERE id = :id
+Delete: DELETE FROM occasions WHERE id = :id
+UI: Dialog form with inputs for name, description, date picker, image URL, active toggle, featured toggle.
+
+10. KEY DIFFERENCES BETWEEN FLOWS
+Feature	Occasion Booking (/occasions/:id/book)	Occasion Wishes (/occasion-wishes)
+Cost	Paid (celebrity service_prices)	Free
+Output	AI Video or Greeting Card	Text message + optional AI reply
+Table	occasion_bookings	occasion_wishes
+Occasions from	occasions (admin catalog)	celebrity_occasions (celeb-specific)
+Requires subscription	Yes	Yes
+Edge function	generate-occasion-video / generate-greeting-card	generate-occasion-auto-reply
