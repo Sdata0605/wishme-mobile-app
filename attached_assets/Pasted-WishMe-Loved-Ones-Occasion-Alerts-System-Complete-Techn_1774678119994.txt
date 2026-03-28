@@ -1,0 +1,292 @@
+WishMe — Loved Ones & Occasion Alerts System (Complete Technical Spec for Replit Mobile App)
+1. SYSTEM PURPOSE
+The Loved Ones system lets users save contacts (family, friends) with their birthdays and special dates. The Occasion Alerts system automatically reminds users before those dates via Email, SMS, and WhatsApp. Together they form a "never miss a special moment" pipeline: Add Contact → Add Occasions → Get Automated Reminders → Book a Celebrity Wish.
+
+2. NAVIGATION FLOW
+
+User logs in
+  │
+  ├─► /loved-ones ──────── Add/Edit/Delete contacts
+  │      │                  Add occasions per contact
+  │      │                  (occasions stored as JSON on loved_ones row)
+  │      │
+  │      └─► occasions auto-create ──► /occasion-alerts
+  │
+  ├─► /occasion-alerts ──── View all upcoming/past alerts
+  │      │                   Toggle alert ON/OFF per occasion
+  │      │                   See stats (upcoming, this week, auto-send)
+  │      │                   Empty state → links to /loved-ones
+  │      │
+  │      └─► Reminder fires (cron) ──► Email/SMS/WhatsApp sent
+  │
+  ├─► /occasions ──────── Browse platform-wide occasion catalog
+  │      │                (admin-managed: Diwali, Christmas, etc.)
+  │      └─► Click "Book Now" ──► /occasions/:id/book
+  │
+  └─► /occasion-wishes ── Send free text wishes to subscribed celebrities
+         └─► Optional AI auto-reply via edge function
+3. DATABASE TABLES
+Table: loved_ones
+Column	Type	Nullable	Default	Notes
+id	UUID	NO	gen_random_uuid()	Primary key
+user_id	UUID	NO	—	FK → profiles.id, ON DELETE CASCADE
+first_name	TEXT	NO	—	Required
+last_name	TEXT	YES	—	
+email	TEXT	YES	—	
+phone	TEXT	YES	—	
+date_of_birth	DATE	YES	—	
+relationship	TEXT	YES	—	e.g. Family, Friend, Partner, Colleague, Other
+notes	TEXT	YES	—	
+import_source	TEXT	YES	—	CHECK: manual, gmail, facebook, phonebook
+occasions	JSONB	YES	'[]'	Array of {name, date, type} objects
+created_at	TIMESTAMPTZ	NO	NOW()	
+updated_at	TIMESTAMPTZ	NO	NOW()	Auto-updated via trigger
+RLS: Users can only CRUD their own rows (user_id = get_my_profile_id()). Admins have full access.
+
+Indexes: idx_loved_ones_user(user_id), idx_loved_ones_dob(date_of_birth)
+
+Table: occasion_alerts
+Column	Type	Nullable	Default	Notes
+id	UUID	NO	gen_random_uuid()	Primary key
+user_id	UUID	NO	—	FK → profiles.id
+loved_one_id	UUID	YES	—	FK → loved_ones.id, ON DELETE CASCADE
+celebrity_id	UUID	YES	—	FK → celebrities.id, ON DELETE CASCADE
+occasion_type	TEXT	NO	—	CHECK: birthday, anniversary, custom, celebrity_event
+occasion_name	TEXT	YES	—	e.g. "Mom's Birthday"
+occasion_date	DATE	NO	—	The actual date of the event
+alert_enabled	BOOLEAN	NO	true	User toggle
+auto_send_enabled	BOOLEAN	NO	false	Auto-send wish on the date
+alert_days_before	INTEGER	NO	3	How many days before to alert
+reminder_time	TIME	NO	09:00:00	Preferred reminder time
+preferred_celebrity_id	UUID	YES	—	FK → celebrities.id
+max_budget	NUMERIC(10,2)	YES	—	Budget for auto-booking
+message_template	TEXT	YES	—	Pre-written message
+notification_sent	BOOLEAN	YES	—	Tracks if cron already sent
+created_at	TIMESTAMPTZ	NO	NOW()	
+updated_at	TIMESTAMPTZ	NO	NOW()	
+RLS: Same as loved_ones — user owns their rows.
+
+Indexes: user_id, occasion_date, loved_one_id, alert_enabled
+
+4. SUPABASE API ENDPOINTS (via JS Client)
+All calls use the Supabase JS client. For mobile, use the Supabase Flutter/React Native/Swift SDK with the same project URL and anon key.
+
+4.1 Loved Ones CRUD
+Fetch all loved ones for current user:
+
+GET /rest/v1/loved_ones?user_id=eq.{profile_id}&order=first_name
+
+// Supabase JS equivalent:
+const { data, error } = await supabase
+  .from('loved_ones')
+  .select('*')
+  .eq('user_id', profileId)
+  .order('first_name');
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "first_name": "Rahul",
+    "last_name": "Sharma",
+    "email": "rahul@email.com",
+    "phone": "+919876543210",
+    "date_of_birth": "1995-06-15",
+    "relationship": "Friend",
+    "notes": "College friend",
+    "import_source": "manual",
+    "occasions": [
+      { "name": "Birthday", "date": "2026-06-15", "type": "Birthday" },
+      { "name": "Wedding Anniversary", "date": "2026-11-20", "type": "Anniversary" }
+    ],
+    "created_at": "2026-03-01T10:00:00Z",
+    "updated_at": "2026-03-01T10:00:00Z"
+  }
+]
+Insert new loved one:
+
+POST /rest/v1/loved_ones
+
+// Payload:
+{
+  "user_id": "profile-uuid",
+  "first_name": "Priya",
+  "last_name": "Verma",
+  "email": "priya@email.com",
+  "phone": "+919876543210",
+  "date_of_birth": "1998-03-22",
+  "relationship": "Family",
+  "notes": "Sister",
+  "import_source": "manual"
+}
+Update loved one:
+
+PATCH /rest/v1/loved_ones?id=eq.{id}
+
+// Payload (partial update):
+{ "first_name": "Priya", "relationship": "Family" }
+Update occasions (JSONB field):
+
+PATCH /rest/v1/loved_ones?id=eq.{id}
+
+// Payload:
+{
+  "occasions": [
+    { "name": "Birthday", "date": "2026-03-22", "type": "Birthday" },
+    { "name": "Rakhi", "date": "2026-08-10", "type": "custom" }
+  ]
+}
+Delete loved one:
+
+DELETE /rest/v1/loved_ones?id=eq.{id}
+4.2 Occasion Alerts
+Fetch all alerts with joined data:
+
+GET /rest/v1/occasion_alerts?user_id=eq.{profile_id}&order=occasion_date
+  &select=*,loved_ones(first_name,last_name),celebrities!occasion_alerts_celebrity_id_fkey(name)
+
+// Supabase JS:
+const { data, error } = await supabase
+  .from('occasion_alerts')
+  .select(`
+    *,
+    loved_ones (first_name, last_name),
+    celebrities!occasion_alerts_celebrity_id_fkey (name)
+  `)
+  .eq('user_id', profileId)
+  .order('occasion_date');
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "loved_one_id": "uuid",
+    "celebrity_id": null,
+    "occasion_type": "birthday",
+    "occasion_name": "Mom's Birthday",
+    "occasion_date": "2026-06-15",
+    "alert_enabled": true,
+    "auto_send_enabled": false,
+    "alert_days_before": 3,
+    "reminder_time": "09:00:00",
+    "preferred_celebrity_id": null,
+    "max_budget": null,
+    "message_template": null,
+    "loved_ones": {
+      "first_name": "Sunita",
+      "last_name": "Sharma"
+    },
+    "celebrities": null
+  }
+]
+Toggle alert ON/OFF:
+
+PATCH /rest/v1/occasion_alerts?id=eq.{alertId}
+
+// Payload:
+{ "alert_enabled": false }
+4.3 Occasions Catalog (Platform-wide)
+Fetch active occasions:
+
+GET /rest/v1/occasions?is_active=eq.true&order=date.asc
+
+// Response:
+[
+  {
+    "id": "uuid",
+    "name": "Diwali 2026",
+    "description": "Festival of Lights",
+    "date": "2026-10-20",
+    "image_url": "https://...",
+    "is_featured": true,
+    "is_active": true
+  }
+]
+5. AUTOMATED CRON JOB (Backend)
+A PostgreSQL pg_cron job runs daily at 8:00 AM executing cron_occasion_reminders():
+
+Logic:
+
+Query occasion_alerts JOIN profiles WHERE notification_sent IS NOT TRUE AND alert_date is 7 days or 1 day from now
+For each matching alert, call send-wishme-notification edge function via net.http_post
+Payload:
+
+{
+  "event_key": "occasion_reminder",
+  "recipient_type": "user",
+  "recipient_id": "profile-uuid",
+  "data": {
+    "first_name": "Rahul",
+    "occasion_name": "Mom's Birthday",
+    "person_name": "Sunita Sharma",
+    "days": "7"
+  }
+}
+The send-wishme-notification function checks the Communication Hub toggles and sends via enabled channels (Email/SMS/WhatsApp).
+
+6. UI COMPONENTS USED
+Loved Ones Page (/loved-ones)
+Component	Library	Purpose
+AuthenticatedLayout	Custom	Page wrapper with sidebar + auth guard
+Card, CardHeader, CardContent, CardTitle, CardDescription	shadcn/ui	Contact cards
+Button	shadcn/ui	Add, Edit, Delete, Manage Occasions
+Input	shadcn/ui	Form text inputs
+Label	shadcn/ui	Form field labels
+Textarea	shadcn/ui	Notes field
+Select, SelectContent, SelectItem, SelectTrigger, SelectValue	shadcn/ui	Relationship dropdown
+Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger	shadcn/ui (Radix)	Add/Edit form modal
+Badge	shadcn/ui	Relationship tag, occasion pills, birthday countdown
+Heart, Calendar, Mail, Phone, Plus, Edit, Trash2, Upload	lucide-react	Icons
+format()	date-fns	Date formatting
+Occasion Alerts Page (/occasion-alerts)
+Component	Library	Purpose
+AuthenticatedLayout	Custom	Page wrapper
+Card, CardContent, CardHeader, CardTitle, CardDescription	shadcn/ui	Stat cards + alert cards
+Button	shadcn/ui	Navigate to /loved-ones
+Badge	shadcn/ui	Status badges (Today!, 3 days, Past)
+Switch	shadcn/ui (Radix)	Toggle alert ON/OFF
+Bell, Heart, Star, CalendarIcon	lucide-react	Icons
+format()	date-fns	Date formatting
+7. BUSINESS LOGIC (Client-Side)
+Birthday Countdown (getUpcomingBirthday)
+
+function getUpcomingBirthday(dateOfBirth: string): number | null {
+  const dob = new Date(dateOfBirth);
+  const today = new Date();
+  const birthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+  if (birthday < today) birthday.setFullYear(today.getFullYear() + 1);
+  return Math.ceil((birthday.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+Alert Status Badge Logic (getAlertStatus)
+
+function getAlertStatus(occasionDate: string, alertDaysBefore: number) {
+  const daysUntil = getDaysUntil(occasionDate);
+  if (daysUntil < 0)  return { label: "Past", variant: "secondary" };
+  if (daysUntil === 0) return { label: "Today!", variant: "destructive" };
+  if (daysUntil <= alertDaysBefore) return { label: `${daysUntil} days`, variant: "destructive" };
+  if (daysUntil <= 30) return { label: `${daysUntil} days`, variant: "default" };
+  return { label: format(date, 'MMM dd, yyyy'), variant: "outline" };
+}
+Splitting Alerts
+
+const upcomingAlerts = alerts.filter(a => getDaysUntil(a.occasion_date) >= 0);
+const pastAlerts = alerts.filter(a => getDaysUntil(a.occasion_date) < 0);
+8. AUTH REQUIREMENT
+Both pages require authentication. The useAuth() hook provides profile.id which is used as user_id for all queries. Unauthenticated users cannot access these pages (guarded by AuthenticatedLayout and ProtectedRoute).
+
+Supabase connection:
+
+URL: https://eqikeuqwbphwongtfzhe.supabase.co
+Anon Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y
+9. MOBILE APP IMPLEMENTATION NOTES
+Occasions JSONB field — The occasions column on loved_ones is a JSONB array, not a separate table. Parse it as List<Map> in your mobile framework.
+Toggle alerts — A simple PATCH to occasion_alerts with { alert_enabled: bool }. Optimistically update UI.
+Stats cards — Computed client-side from the alerts array (upcoming count, this-week count, auto-send count). No separate API call needed.
+Empty state — When zero alerts exist, show a CTA button linking to the Loved Ones screen.
+Relationship dropdown values: Family, Friend, Partner, Colleague, Other.
+Occasion type values: Birthday, Anniversary, Custom (stored in the JSONB occasions array on loved_ones).
+Alert occasion_type values (in occasion_alerts table): birthday, anniversary, custom, celebrity_event.
