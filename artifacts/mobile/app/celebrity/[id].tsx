@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   Modal,
   Pressable,
@@ -20,6 +21,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Celebrity } from '@/hooks/useCelebrities';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
 interface Review {
   id: string;
   rating: number;
@@ -27,6 +30,39 @@ interface Review {
   created_at: string;
   profiles: { first_name: string; last_name: string } | null;
 }
+
+interface MediaItem {
+  id: string;
+  media_type: string;
+  media_url: string;
+  thumbnail_url?: string;
+  title?: string;
+}
+
+interface EventItem {
+  id: string;
+  title: string;
+  event_date: string;
+  location?: string;
+}
+
+type TabKey = 'overview' | 'media' | 'events' | 'releases' | 'about';
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'overview', label: 'Overview' },
+  { key: 'media', label: 'Media' },
+  { key: 'events', label: 'Events' },
+  { key: 'releases', label: 'Releases' },
+  { key: 'about', label: 'About' },
+];
+
+const BENEFITS = [
+  { emoji: '❤️', label: 'Personalised Video Wishes' },
+  { emoji: '🎬', label: 'UGC Brand Promotions' },
+  { emoji: '🖼', label: 'AI Image Promotions' },
+  { emoji: '💬', label: 'Occasion Greetings' },
+  { emoji: '✨', label: 'Lifetime Access' },
+];
 
 export default function CelebrityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -37,6 +73,8 @@ export default function CelebrityDetailScreen() {
   const [celebrity, setCelebrity] = useState<Celebrity | null>(null);
   const [loading, setCelebLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [ugcPrice, setUgcPrice] = useState<number>(25000);
+  const [promoPrice, setPromoPrice] = useState<number>(15000);
 
   const fetchCelebrity = useCallback(async () => {
     if (!id) return;
@@ -52,6 +90,9 @@ export default function CelebrityDetailScreen() {
         setCelebrity(null);
       } else {
         const raw = rows[0];
+        const sp = raw.service_prices ?? {};
+        setUgcPrice(sp.ugc_ad ?? 25000);
+        setPromoPrice(sp.image_promotion ?? 15000);
         setCelebrity({
           id: raw.id,
           name: raw.name,
@@ -65,7 +106,7 @@ export default function CelebrityDetailScreen() {
           deliveryTime: raw.delivery_time,
           isVerified: raw.is_verified ?? false,
           isAvailable: true,
-          pricePerWish: raw.service_prices?.general_wish ?? 0,
+          pricePerWish: sp.general_wish ?? 0,
           pricePerCall: raw.voice_call_price ?? 0,
           ratePerMinute: raw.voice_call_price ?? 0,
           tags: [],
@@ -94,10 +135,20 @@ export default function CelebrityDetailScreen() {
   const [subLoading, setSubLoading] = useState(false);
   const [pricingPrice, setPricingPrice] = useState<number | null>(null);
   const [isPricingDisabled, setIsPricingDisabled] = useState(false);
-  const [showSubSheet, setShowSubSheet] = useState(false);
+
+  const [showStep1, setShowStep1] = useState(false);
+  const [showStep2, setShowStep2] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const loadedTabsRef = useRef<Set<TabKey>>(new Set(['overview']));
+  const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
+  const [mediaLoading, setMediaLoading] = useState(false);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+
 
   const fetchSubscriptionData = useCallback(async () => {
     if (!id || !user?.profileId || !session?.access_token) return;
@@ -157,10 +208,61 @@ export default function CelebrityDetailScreen() {
     }
   }, [id, session?.access_token]);
 
+  const fetchMedia = useCallback(async () => {
+    if (!id) return;
+    setMediaLoading(true);
+    try {
+      const res = await supabaseFetch(
+        `/rest/v1/celebrity_media?celebrity_id=eq.${id}&is_public=eq.true&order=created_at.desc`,
+      );
+      if (res.ok) {
+        const data = await res.json() as MediaItem[];
+        setMediaItems(data ?? []);
+      }
+    } catch {
+    } finally {
+      setMediaLoading(false);
+    }
+  }, [id]);
+
+  const fetchEvents = useCallback(async () => {
+    if (!id) return;
+    setEventsLoading(true);
+    try {
+      const res = await supabaseFetch(
+        `/rest/v1/celebrity_events?celebrity_id=eq.${id}&is_public=eq.true&order=event_date.asc`,
+      );
+      if (res.ok) {
+        const data = await res.json() as EventItem[];
+        setEvents(data ?? []);
+      }
+    } catch {
+    } finally {
+      setEventsLoading(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchSubscriptionData();
     fetchReviews();
   }, [fetchSubscriptionData, fetchReviews]);
+
+  const handleTabPress = (tab: TabKey) => {
+    setActiveTab(tab);
+    if (!loadedTabsRef.current.has(tab)) {
+      loadedTabsRef.current.add(tab);
+      if (tab === 'media') fetchMedia();
+      if (tab === 'events') fetchEvents();
+    }
+  };
+
+  const openSubscriptionFlow = () => {
+    if (!user) {
+      router.push('/(auth)');
+      return;
+    }
+    setShowStep1(true);
+  };
 
   const handleSubscribe = async () => {
     if (pricingPrice === null) return;
@@ -180,7 +282,7 @@ export default function CelebrityDetailScreen() {
       );
       const data = await res.json() as Record<string, unknown>;
       if (res.ok && data.success) {
-        setShowSubSheet(false);
+        setShowStep2(false);
         setIsSubscribed(true);
         fetchSubscriptionData();
         Alert.alert('Subscribed!', 'You can now book services from this celebrity.');
@@ -208,7 +310,7 @@ export default function CelebrityDetailScreen() {
     if (isSubscribed || !hasPricing) {
       router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id } });
     } else {
-      setShowSubSheet(true);
+      setShowStep1(true);
     }
   };
 
@@ -259,6 +361,133 @@ export default function CelebrityDetailScreen() {
   const hasPricing = pricingPrice !== null && !isPricingDisabled;
   const bookBtnLabel = !isLoggedIn ? 'Book a Wish' : isSubscribed ? 'Book a Wish' : hasPricing ? 'Subscribe to Book' : 'Book a Wish';
   const showSubscribeBanner = isLoggedIn && !isSubscribed && !subLoading && hasPricing;
+  const walletBalance = user?.walletBalance ?? 0;
+  const canAffordWallet = pricingPrice !== null && walletBalance >= pricingPrice;
+
+  const serviceCards = [
+    {
+      key: 'wish',
+      emoji: '💜',
+      title: 'Wish a Friend',
+      price: celebrity.pricePerWish,
+      delivery: '3-5 days',
+      onPress: () => router.push({ pathname: '/wish-booking/[id]', params: { id: celebrity!.id, service: 'wish' } }),
+    },
+    {
+      key: 'ugc',
+      emoji: '🎬',
+      title: 'Make an Ad (UGC)',
+      price: ugcPrice,
+      delivery: '3-5 days',
+      onPress: () => router.push({ pathname: '/occasions', params: { celebrity: celebrity!.id } }),
+    },
+    {
+      key: 'promo',
+      emoji: '🖼',
+      title: 'Video Promotion',
+      price: promoPrice,
+      delivery: '3-5 days',
+      onPress: () => router.push({ pathname: '/image-promotions', params: { celebrity: celebrity!.id } }),
+    },
+  ];
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'overview':
+        return (
+          <View>
+            <Text style={[styles.bio, { color: colors.mutedForeground }]}>{celebrity.bio}</Text>
+            <View style={[styles.statRow, { backgroundColor: colors.backgroundSecondary }]}>
+              {celebrity.location && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statEmoji}>📍</Text>
+                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{celebrity.location}</Text>
+                </View>
+              )}
+              {celebrity.followers !== undefined && celebrity.followers !== null && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statEmoji}>👥</Text>
+                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{celebrity.followers.toLocaleString('en-IN')}</Text>
+                </View>
+              )}
+              {celebrity.deliveryTime && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statEmoji}>🚚</Text>
+                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>{celebrity.deliveryTime}</Text>
+                </View>
+              )}
+              {celebrity.isVerified && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statEmoji}>✅</Text>
+                  <Text style={[styles.statLabel, { color: colors.mutedForeground }]}>Verified</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        );
+      case 'media':
+        if (mediaLoading) {
+          return <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 24 }} />;
+        }
+        if (mediaItems.length === 0) {
+          return <Text style={[styles.emptyState, { color: colors.mutedForeground }]}>No media yet</Text>;
+        }
+        return (
+          <View style={styles.mediaGrid}>
+            {mediaItems.map((item) => (
+              <View key={item.id} style={[styles.mediaCell, { backgroundColor: colors.backgroundSecondary }]}>
+                {item.media_type === 'video' ? (
+                  <View style={styles.videoCellInner}>
+                    <Icon name="play-circle" size={36} color={colors.mutedForeground} />
+                  </View>
+                ) : (
+                  <Image source={{ uri: item.thumbnail_url ?? item.media_url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+                )}
+              </View>
+            ))}
+          </View>
+        );
+      case 'events':
+        if (eventsLoading) {
+          return <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 24 }} />;
+        }
+        if (events.length === 0) {
+          return <Text style={[styles.emptyState, { color: colors.mutedForeground }]}>No upcoming events</Text>;
+        }
+        return (
+          <View style={{ gap: 12 }}>
+            {events.map((ev) => {
+              const date = new Date(ev.event_date).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
+              return (
+                <View key={ev.id} style={[styles.eventRow, { backgroundColor: colors.backgroundSecondary }]}>
+                  <Text style={styles.statEmoji}>📅</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[{ fontSize: 14, fontFamily: 'Inter_600SemiBold', color: colors.foreground }]}>{ev.title}</Text>
+                    <Text style={[{ fontSize: 12, fontFamily: 'Inter_400Regular', color: colors.mutedForeground, marginTop: 2 }]}>{date}{ev.location ? ` · ${ev.location}` : ''}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        );
+      case 'releases':
+        return <Text style={[styles.emptyState, { color: colors.mutedForeground }]}>No releases available yet</Text>;
+      case 'about':
+        return (
+          <View style={{ gap: 12 }}>
+            <Text style={[styles.bio, { color: colors.mutedForeground }]}>{celebrity.bio}</Text>
+            {celebrity.location && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Icon name="globe" size={16} color={colors.mutedForeground} />
+                <Text style={[{ fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.mutedForeground }]}>{celebrity.location}</Text>
+              </View>
+            )}
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -314,7 +543,7 @@ export default function CelebrityDetailScreen() {
         {/* Subscribe banner for non-subscribers */}
         {showSubscribeBanner && (
           <TouchableOpacity
-            onPress={() => setShowSubSheet(true)}
+            onPress={openSubscriptionFlow}
             style={styles.subscribeBanner}
           >
             <Icon name="lock" size={16} color="#fff" />
@@ -371,26 +600,70 @@ export default function CelebrityDetailScreen() {
             </View>
           </View>
 
-          {/* Bio */}
-          <Text style={[styles.bioTitle, { color: colors.foreground }]}>About</Text>
-          <Text style={[styles.bio, { color: colors.mutedForeground }]}>{celebrity.bio}</Text>
-
-          {/* Tags */}
-          {celebrity.tags.length > 0 && (
-            <>
-              <Text style={[styles.bioTitle, { color: colors.foreground }]}>What I can do for you</Text>
-              <View style={styles.tagsWrap}>
-                {celebrity.tags.map((tag) => (
-                  <View key={tag} style={[styles.tag, { backgroundColor: colors.primary + '20', borderColor: colors.primary + '40' }]}>
-                    <Text style={[styles.tagText, { color: colors.primary }]}>{tag}</Text>
+          {/* Book a Service section */}
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Book a Service</Text>
+          <View style={{ gap: 12, marginBottom: 24 }}>
+            {serviceCards.map((card) => (
+              <TouchableOpacity
+                key={card.key}
+                activeOpacity={0.85}
+                onPress={isSubscribed ? card.onPress : openSubscriptionFlow}
+                style={[styles.serviceCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
+              >
+                <View style={styles.serviceCardLeft}>
+                  <Text style={styles.serviceEmoji}>{card.emoji}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.serviceTitle, { color: colors.foreground }]}>{card.title}</Text>
+                    <Text style={[styles.serviceDelivery, { color: colors.mutedForeground }]}>{card.delivery}</Text>
                   </View>
-                ))}
-              </View>
-            </>
-          )}
+                  <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                    <Text style={[styles.servicePrice, { color: colors.primary }]}>₹{card.price.toLocaleString('en-IN')}</Text>
+                    {isSubscribed ? (
+                      <View style={[styles.bookNowPill, { backgroundColor: colors.primary }]}>
+                        <Text style={styles.bookNowText}>Book Now</Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.lockPill, { borderColor: colors.border }]}>
+                        <Icon name="lock" size={11} color={colors.mutedForeground} />
+                        <Text style={[styles.lockPillText, { color: colors.mutedForeground }]}>Subscribe to Unlock</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+                {!isSubscribed && (
+                  <View style={styles.cardLockOverlay} pointerEvents="none">
+                    <View style={styles.cardLockOverlayInner} />
+                  </View>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Content Tabs */}
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16, marginHorizontal: -20 }} contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+            {TABS.map((tab) => (
+              <TouchableOpacity
+                key={tab.key}
+                onPress={() => handleTabPress(tab.key)}
+                style={[
+                  styles.tabPill,
+                  activeTab === tab.key
+                    ? { backgroundColor: colors.primary }
+                    : { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, borderWidth: 1 },
+                ]}
+              >
+                <Text style={[styles.tabLabel, { color: activeTab === tab.key ? '#fff' : colors.mutedForeground }]}>{tab.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {/* Tab content */}
+          <View style={{ marginBottom: 24 }}>
+            {renderTabContent()}
+          </View>
 
           {/* Reviews */}
-          <Text style={[styles.bioTitle, { color: colors.foreground }]}>Reviews</Text>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Reviews</Text>
           {reviewsLoading ? (
             <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
           ) : reviews.length === 0 ? (
@@ -455,66 +728,166 @@ export default function CelebrityDetailScreen() {
         )}
       </View>
 
-      {/* Subscription Gate Bottom Sheet */}
+      {/* Step 1: Info + Benefits Sheet */}
       <Modal
-        visible={showSubSheet}
+        visible={showStep1}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowSubSheet(false)}
+        onRequestClose={() => setShowStep1(false)}
       >
         <TouchableOpacity
           style={styles.sheetOverlay}
           activeOpacity={1}
-          onPress={() => setShowSubSheet(false)}
+          onPress={() => setShowStep1(false)}
         />
         <View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 20 }]}>
           <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.sheetTitle, { color: colors.foreground }]}>{celebrity.name}</Text>
-          <Text style={[styles.sheetSub, { color: colors.mutedForeground }]}>Subscribe to unlock all services</Text>
 
+          {/* Celebrity row */}
+          <View style={styles.step1CelebRow}>
+            {celebrity.imageUrl ? (
+              <Image source={{ uri: celebrity.imageUrl }} style={styles.step1Avatar} />
+            ) : (
+              <View style={[styles.step1Avatar, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
+                <Icon name="user" size={28} color={colors.mutedForeground} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.step1CelebName, { color: colors.foreground }]}>{celebrity.name}</Text>
+              <View style={[styles.step1CategoryBadge, { backgroundColor: colors.primary + '20' }]}>
+                <Text style={[styles.step1CategoryText, { color: colors.primary }]}>{celebrity.category}</Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Gradient price card */}
+          {pricingPrice !== null && (
+            <LinearGradient
+              colors={['#FF6B33', '#B44CFF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.step1PriceCard}
+            >
+              <Text style={styles.step1PriceAmount}>₹{pricingPrice.toLocaleString('en-IN')}</Text>
+              <Text style={styles.step1PriceSubtitle}>Lifetime Access — Pay Once, Use Forever</Text>
+            </LinearGradient>
+          )}
+
+          {/* Benefits list */}
+          <View style={{ gap: 10, marginBottom: 20 }}>
+            {BENEFITS.map((b) => (
+              <View key={b.label} style={styles.benefitRow}>
+                <Text style={styles.benefitEmoji}>{b.emoji}</Text>
+                <Text style={[styles.benefitLabel, { color: colors.foreground }]}>{b.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Subscribe Now button */}
           {isPricingDisabled ? (
             <View style={styles.unavailableBox}>
               <Icon name="info" size={20} color={colors.mutedForeground} />
               <Text style={[styles.unavailableText, { color: colors.mutedForeground }]}>
                 Subscription not available for this celebrity
               </Text>
-              <TouchableOpacity onPress={() => setShowSubSheet(false)} style={[styles.viewProfileBtn, { borderColor: colors.border }]}>
+              <TouchableOpacity onPress={() => setShowStep1(false)} style={[styles.viewProfileBtn, { borderColor: colors.border }]}>
                 <Text style={[styles.viewProfileText, { color: colors.foreground }]}>View Profile Only</Text>
               </TouchableOpacity>
             </View>
-          ) : pricingPrice !== null ? (
-            <>
-              <View style={[styles.priceBox, { backgroundColor: colors.backgroundSecondary }]}>
-                <Text style={[styles.priceBoxLabel, { color: colors.mutedForeground }]}>
-                  Subscription Price
-                </Text>
-                <Text style={[styles.priceBoxValue, { color: colors.primary }]}>₹{pricingPrice.toLocaleString('en-IN')}</Text>
-              </View>
+          ) : (
+            <Pressable
+              onPress={() => {
+                setShowStep1(false);
+                setShowStep2(true);
+              }}
+              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+            >
+              <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.payBtn}>
+                <Text style={styles.payBtnText}>Subscribe Now →</Text>
+              </LinearGradient>
+            </Pressable>
+          )}
 
+          <TouchableOpacity onPress={() => setShowStep1(false)} style={styles.cancelLink}>
+            <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Step 2: Payment Selector Sheet */}
+      <Modal
+        visible={showStep2}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowStep2(false)}
+      >
+        <TouchableOpacity
+          style={styles.sheetOverlay}
+          activeOpacity={1}
+          onPress={() => setShowStep2(false)}
+        />
+        <View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+          <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Complete Payment</Text>
+
+          {/* Amount card */}
+          {pricingPrice !== null && (
+            <View style={[styles.step2AmountCard, { backgroundColor: colors.backgroundSecondary }]}>
+              <Text style={[styles.step2AmountLabel, { color: colors.mutedForeground }]}>Amount</Text>
+              <Text style={[styles.step2AmountValue, { color: colors.foreground }]}>₹{pricingPrice.toLocaleString('en-IN')}</Text>
+            </View>
+          )}
+
+          {/* Wallet balance row */}
+          <View style={[styles.walletRow, { borderColor: colors.border }]}>
+            <Text style={[styles.walletLabel, { color: colors.foreground }]}>Wallet Balance</Text>
+            <Text style={[styles.walletAmount, { color: colors.primary }]}>₹{walletBalance.toLocaleString('en-IN')}</Text>
+          </View>
+
+          {/* Payment buttons grid */}
+          {pricingPrice !== null && (
+            <View style={styles.paymentGrid}>
+              {/* Wallet payment */}
               <Pressable
-                onPress={handleSubscribe}
-                disabled={payLoading}
-                style={({ pressed }) => [{ opacity: payLoading || pressed ? 0.75 : 1, marginBottom: 12 }]}
+                onPress={canAffordWallet ? handleSubscribe : undefined}
+                disabled={!canAffordWallet || payLoading}
+                style={({ pressed }) => [
+                  styles.paymentBtn,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: canAffordWallet ? colors.primary : colors.border, opacity: (!canAffordWallet || payLoading) && !pressed ? 0.6 : pressed ? 0.8 : 1 },
+                ]}
               >
-                <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.payBtn}>
-                  {payLoading ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Icon name="credit-card" size={18} color="#fff" />
-                      <Text style={styles.payBtnText}>Pay from Wallet (₹{pricingPrice.toLocaleString('en-IN')})</Text>
-                    </>
-                  )}
-                </LinearGradient>
+                {payLoading ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <>
+                    <Icon name="credit-card" size={24} color={canAffordWallet ? colors.primary : colors.mutedForeground} />
+                    <Text style={[styles.paymentBtnPrice, { color: canAffordWallet ? colors.foreground : colors.mutedForeground }]}>Pay ₹{pricingPrice.toLocaleString('en-IN')}</Text>
+                    <Text style={[styles.paymentBtnSub, { color: colors.mutedForeground }]}>Wallet</Text>
+                    {!canAffordWallet && (
+                      <View style={styles.insufficientBadge}>
+                        <Text style={styles.insufficientText}>Insufficient</Text>
+                      </View>
+                    )}
+                  </>
+                )}
               </Pressable>
 
-              <TouchableOpacity style={[styles.razorpayDisabledBtn, { borderColor: colors.border }]} disabled>
-                <Text style={[styles.razorpayDisabledText, { color: colors.mutedForeground }]}>Razorpay — Coming Soon</Text>
-              </TouchableOpacity>
-            </>
-          ) : null}
+              {/* Razorpay payment */}
+              <Pressable
+                onPress={() => Alert.alert('Coming Soon', 'Razorpay payments are coming soon!')}
+                style={({ pressed }) => [
+                  styles.paymentBtn,
+                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
+                ]}
+              >
+                <Icon name="credit-card" size={24} color={colors.mutedForeground} />
+                <Text style={[styles.paymentBtnPrice, { color: colors.foreground }]}>Pay ₹{pricingPrice.toLocaleString('en-IN')}</Text>
+                <Text style={[styles.paymentBtnSub, { color: colors.mutedForeground }]}>Razorpay</Text>
+              </Pressable>
+            </View>
+          )}
 
-          <TouchableOpacity onPress={() => setShowSubSheet(false)} style={styles.cancelLink}>
+          <TouchableOpacity onPress={() => setShowStep2(false)} style={styles.cancelLink}>
             <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
@@ -559,11 +932,31 @@ const styles = StyleSheet.create({
   priceDivider: { width: 1, marginHorizontal: 8 },
   priceLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 4 },
   priceValue: { fontSize: 20, fontFamily: 'Inter_700Bold' },
-  bioTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', marginBottom: 8, marginTop: 8 },
+  sectionTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', marginBottom: 12, marginTop: 4 },
   bio: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 22, marginBottom: 16 },
-  tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
-  tag: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, borderWidth: 1 },
-  tagText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
+  serviceCard: { borderRadius: 14, borderWidth: 1, padding: 14, overflow: 'hidden' },
+  serviceCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  serviceEmoji: { fontSize: 28 },
+  serviceTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  serviceDelivery: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
+  servicePrice: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  bookNowPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+  bookNowText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  lockPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9999, borderWidth: 1 },
+  lockPillText: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+  cardLockOverlay: { ...StyleSheet.absoluteFillObject },
+  cardLockOverlayInner: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.04)', borderRadius: 14 },
+  tabPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 9999 },
+  tabLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  statRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, borderRadius: 12, padding: 14, marginBottom: 8 },
+  statItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  statEmoji: { fontSize: 16 },
+  statLabel: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  mediaCell: { width: (SCREEN_WIDTH - 40 - 8) / 2, aspectRatio: 1, borderRadius: 10, overflow: 'hidden' },
+  videoCellInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  eventRow: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderRadius: 12 },
+  emptyState: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', marginVertical: 20 },
   reviewCard: { borderRadius: 12, padding: 14, borderWidth: 1, marginBottom: 12 },
   reviewHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 },
   reviewAvatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
@@ -582,19 +975,36 @@ const styles = StyleSheet.create({
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingTop: 12 },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
-  sheetTitle: { fontSize: 22, fontFamily: 'PlayfairDisplay_700Bold', marginBottom: 4 },
-  sheetSub: { fontSize: 14, fontFamily: 'Inter_400Regular', marginBottom: 24 },
-  priceBox: { borderRadius: 14, padding: 16, alignItems: 'center', marginBottom: 20 },
-  priceBoxLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 4 },
-  priceBoxValue: { fontSize: 32, fontFamily: 'Inter_700Bold' },
+  sheetTitle: { fontSize: 22, fontFamily: 'PlayfairDisplay_700Bold', marginBottom: 16 },
+  step1CelebRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 16 },
+  step1Avatar: { width: 64, height: 64, borderRadius: 32 },
+  step1CelebName: { fontSize: 18, fontFamily: 'Inter_700Bold', marginBottom: 6 },
+  step1CategoryBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 9999 },
+  step1CategoryText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  step1PriceCard: { borderRadius: 16, padding: 20, alignItems: 'center', marginBottom: 20 },
+  step1PriceAmount: { fontSize: 40, fontFamily: 'Inter_700Bold', color: '#fff', marginBottom: 4 },
+  step1PriceSubtitle: { fontSize: 13, fontFamily: 'Inter_500Medium', color: 'rgba(255,255,255,0.85)', textAlign: 'center' },
+  benefitRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  benefitEmoji: { fontSize: 20, width: 28, textAlign: 'center' },
+  benefitLabel: { fontSize: 14, fontFamily: 'Inter_500Medium', flex: 1 },
   payBtn: { height: 54, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
   payBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
-  razorpayDisabledBtn: { height: 48, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 8, opacity: 0.5 },
-  razorpayDisabledText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   cancelLink: { alignItems: 'center', paddingVertical: 12 },
   cancelLinkText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
   unavailableBox: { alignItems: 'center', gap: 12, paddingVertical: 20 },
   unavailableText: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' },
   viewProfileBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
   viewProfileText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  step2AmountCard: { borderRadius: 14, padding: 20, alignItems: 'center', marginBottom: 16 },
+  step2AmountLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 4 },
+  step2AmountValue: { fontSize: 36, fontFamily: 'Inter_700Bold' },
+  walletRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, marginBottom: 16 },
+  walletLabel: { fontSize: 14, fontFamily: 'Inter_500Medium' },
+  walletAmount: { fontSize: 16, fontFamily: 'Inter_700Bold' },
+  paymentGrid: { flexDirection: 'row', gap: 12, marginBottom: 8 },
+  paymentBtn: { flex: 1, height: 128, borderRadius: 14, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', gap: 6, position: 'relative', overflow: 'hidden' },
+  paymentBtnPrice: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  paymentBtnSub: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  insufficientBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: '#EF4444', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+  insufficientText: { color: '#fff', fontSize: 10, fontFamily: 'Inter_600SemiBold' },
 });
