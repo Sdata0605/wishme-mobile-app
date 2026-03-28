@@ -18,7 +18,7 @@ import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { useCelebrities } from '@/hooks/useCelebrities';
+import { Celebrity } from '@/hooks/useCelebrities';
 
 interface Review {
   id: string;
@@ -34,8 +34,60 @@ export default function CelebrityDetailScreen() {
   const insets = useSafeAreaInsets();
   const { user, session } = useAuth();
 
-  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
-  const celebrity = celebrities.find((c) => c.id === id);
+  const [celebrity, setCelebrity] = useState<Celebrity | null>(null);
+  const [loading, setCelebLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchCelebrity = useCallback(async () => {
+    if (!id) return;
+    setCelebLoading(true);
+    setError(null);
+    try {
+      const res = await supabaseFetch(
+        `/rest/v1/celebrities?id=eq.${id}&select=*&limit=1`,
+      );
+      if (!res.ok) throw new Error(`API error (${res.status})`);
+      const rows = await res.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        setCelebrity(null);
+      } else {
+        const raw = rows[0];
+        setCelebrity({
+          id: raw.id,
+          name: raw.name,
+          category: raw.category,
+          bio: raw.bio ?? '',
+          imageUrl: raw.image_url ?? '',
+          rating: raw.rating ?? 0,
+          reviewCount: raw.review_count ?? 0,
+          followers: raw.followers,
+          location: raw.location,
+          deliveryTime: raw.delivery_time,
+          isVerified: raw.is_verified ?? false,
+          isAvailable: true,
+          pricePerWish: raw.service_prices?.general_wish ?? 0,
+          pricePerCall: raw.voice_call_price ?? 0,
+          ratePerMinute: raw.voice_call_price ?? 0,
+          tags: [],
+          subscription: raw.subscription,
+          socialMedia: raw.social_media,
+          vapiVoiceId: raw.vapi_voice_id,
+          vapiPhoneId: raw.vapi_phone_id,
+        });
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load celebrity');
+      setCelebrity(null);
+    } finally {
+      setCelebLoading(false);
+    }
+  }, [id]);
+
+  const refetch = fetchCelebrity;
+
+  useEffect(() => {
+    fetchCelebrity();
+  }, [fetchCelebrity]);
 
   const [isFav, setIsFav] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
