@@ -131,14 +131,22 @@ function TransactionsTab({ colors, bottomPad, user, session }: TxTabProps) {
       return;
     }
 
-    Promise.all([
-      supabaseFetch(
-        `/rest/v1/wallet_transactions?user_id=eq.${profileId}&select=*&order=created_at.desc`,
+    const fetchWalletTxns = async (uid: string): Promise<TxItem[]> => {
+      const res = await supabaseFetch(
+        `/rest/v1/wallet_transactions?user_id=eq.${uid}&select=*&order=created_at.desc`,
         {},
-        session.access_token,
-      ).then(async (res) => {
-        if (!res.ok) return [] as TxItem[];
-        return ((await res.json()) as TxItem[]) ?? [];
+        session.access_token!,
+      );
+      if (!res.ok) return [];
+      return ((await res.json()) as TxItem[]) ?? [];
+    };
+
+    Promise.all([
+      fetchWalletTxns(profileId).then(async (rows) => {
+        if (rows.length === 0 && user?.id && user.id !== profileId) {
+          return fetchWalletTxns(user.id);
+        }
+        return rows;
       }).catch(() => [] as TxItem[]),
 
       supabaseFetch(
