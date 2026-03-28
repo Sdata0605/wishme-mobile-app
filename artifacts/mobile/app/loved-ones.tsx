@@ -30,7 +30,7 @@ interface OccasionItem {
 
 interface LovedOne {
   id: string;
-  profile_id: string;
+  user_id: string;
   first_name: string;
   last_name: string;
   date_of_birth: string | null;
@@ -133,7 +133,7 @@ export default function LovedOnesScreen() {
     setFetchError(null);
     try {
       const res = await supabaseFetch(
-        `/rest/v1/loved_ones?profile_id=eq.${user.profileId}&order=first_name.asc`,
+        `/rest/v1/loved_ones?user_id=eq.${user.profileId}&order=first_name.asc`,
         {},
         session?.access_token,
       );
@@ -191,7 +191,7 @@ export default function LovedOnesScreen() {
     setSaveError(null);
     try {
       const payload = {
-        profile_id: user.profileId,
+        user_id: user.profileId,
         first_name: draft.firstName.trim(),
         last_name: draft.lastName.trim(),
         email: draft.email.trim() || null,
