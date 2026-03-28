@@ -1,0 +1,426 @@
+Celebrity Subscription Pricing & Payment Flow — Complete Technical Spec for Replit
+1. How the Subscription Price is Fetched
+On /following page (Browse tab)
+When: On mount, in parallel with celebrities fetch.
+
+Query:
+
+GET /rest/v1/celebrity_favorite_pricing?is_enabled=eq.true&select=*
+Response (array):
+
+
+[
+  {
+    "id": "uuid",
+    "celebrity_id": "00865ec8-5b5e-435f-ae8f-625d343f02f6",
+    "price": 999,
+    "is_enabled": true,
+    "referrer_commission_percentage": 10,
+    "celebrity_commission_percentage": 5,
+    "created_at": "2025-01-20T..."
+  }
+]
+How price is matched to celebrity card: Client-side lookup:
+
+
+const getCelebrityPrice = (celebrityId) => 
+  pricing.find(p => p.celebrity_id === celebrityId)?.price || null;
+If getCelebrityPrice returns null (no pricing row), the card shows "View Profile" button instead of subscribe button. If it returns a number, the card shows ₹{price} - Subscribe.
+
+On /celebrity/:id page (Profile)
+When: On mount, only if user is logged in.
+
+Query:
+
+GET /rest/v1/celebrity_favorite_pricing?celebrity_id=eq.{id}&is_enabled=eq.true
+(maybeSingle — returns one row or null)
+SELECT price
+Response:
+
+
+{ "price": 999 }
+Or null if no pricing exists.
+
+Fallback: If null, defaults to 999:
+
+
+setSubscriptionPrice(data?.price || 999);
+This price is passed to the SubscriptionGate component as the subscriptionPrice prop.
+
+2. What Happens When User Taps "Subscribe to {Celebrity}"
+This is a 2-step modal flow:
+
+Step 1: SubscriptionGate Info Dialog
+Trigger: User taps "Subscribe to {name}" button on the profile page (or taps a locked service's "Book Now").
+
+UI Components:
+
+Dialog (from radix-ui) — modal overlay
+Celebrity info row: img (16x16 rounded avatar) + h3 (name) + Badge (category)
+Price card: gradient background, large ₹{price} text, "Lifetime Access" subtitle
+Benefits list: 5 items, each with icon (Heart, Video, Image, MessageSquare, Sparkles) + text
+Button "Subscribe Now" — opens Step 2
+Data used (all passed as props, no API call):
+
+celebrity.name, celebrity.image_url, celebrity.category
+subscriptionPrice (from the pricing query above)
+Step 2: PaymentMethodSelector Dialog
+Trigger: User taps "Subscribe Now" in Step 1.
+
+UI Components:
+
+Dialog modal
+Amount display: centered ₹{amount} in large bold text on muted background
+Wallet balance row: label + ₹{walletBalance} (fetched from profiles.wallet_balance)
+Two payment buttons in a 2-column grid, each 128px tall:
+Wallet button: Wallet icon + "Pay ₹{amount}". Disabled with red "Insufficient" badge if walletBalance < amount. Shows Loader2 spinner when processing.
+Razorpay button: CreditCard icon + "Pay ₹{amount}". Shows Loader2 spinner when processing.
+Insufficient balance message at bottom if applicable
+Data used:
+
+amount — the subscription price
+walletBalance — from useWalletBalance() hook which queries: GET /rest/v1/profiles?id=eq.{PROFILE_ID}&select=wallet_balance
+3. Payment Processing
+Option A: Wallet Payment
+Single API call — atomic server-side RPC:
+
+POST /rest/v1/rpc/purchase_celebrity_subscription
+Content-Type: application/json
+
+{
+  "p_celebrity_id": "00865ec8-5b5e-435f-ae8f-625d343f02f6",
+  "p_price": 999,
+  "p_payment_method": "wallet"
+}
+What the RPC does atomically (all-or-nothing):
+
+Validates pricing exists in celebrity_favorite_pricing for this celebrity
+Checks user wallet balance >= price
+Debits wallet (UPDATE profiles SET wallet_balance = wallet_balance - price)
+Inserts row into celebrity_favorites (status='active')
+Inserts row into wallet_transactions (type='service_payment')
+Handles referral commissions if user has referred_by
+Success response: null (no error means success)
+
+Error responses:
+
+"Subscription not available for this celebrity" — no celebrity_favorite_pricing row
+"Insufficient wallet balance" — wallet < price
+"Already subscribed" — active row exists in celebrity_favorites
+Post-payment actions (client-side):
+
+Fire-and-forget email notification:
+POST /functions/v1/send-celebrity-subscription-email
+{
+  "celebrity_id": "uuid",
+  "subscriber_name": "John Doe",
+  "subscriber_email": "john@example.com",
+  "price_paid": 999
+}
+Refetch wallet balance
+Refetch user favorites list
+Show success toast
+Close all modals
+Option B: Razorpay Payment (on /following page — full implementation)
+Step 1: Create Razorpay order:
+
+POST /functions/v1/create-razorpay-order
+{
+  "amount": 999,
+  "currency": "INR",
+  "receipt": "fav_12345678_abcdef",
+  "notes": {
+    "user_id": "profile-uuid",
+    "celebrity_id": "celebrity-uuid",
+    "type": "celebrity_favorite"
+  }
+}
+Response:
+
+
+{
+  "id": "order_XXXXXXXXX",
+  "amount": 99900,
+  "currency": "INR",
+  "key_id": "rzp_live_XXXXX"
+}
+Step 2: Open Razorpay native checkout with:
+
+
+{
+  key: response.key_id,
+  amount: response.amount,
+  currency: response.currency,
+  name: "Celebrity Favorites",
+  description: "Subscribe to {celebrity.name}",
+  order_id: response.id,
+  prefill: { name, email, contact },
+  theme: { color: "#3B82F6" }
+}
+Step 3: On Razorpay success callback, call the same RPC:
+
+POST /rest/v1/rpc/purchase_celebrity_subscription
+{
+  "p_celebrity_id": "uuid",
+  "p_price": 999,
+  "p_payment_method": "razorpay"
+}
+Note for mobile: On the /celebrity/:id SubscriptionGate, Razorpay currently shows a "coming soon" toast. The full Razorpay flow only works on the /following page. For mobile, implement Razorpay using the native Razorpay SDK in both places.
+
+4. Complete Data Flow Diagram
+
+User taps "Subscribe" on card or profile
+        │
+        ▼
+┌─SubscriptionGate Dialog──────────┐
+│  Celebrity avatar + name         │
+│  ₹999 price (from pricing query) │
+│  5 benefits list                 │
+│  [Subscribe Now] button          │
+└──────────┬───────────────────────┘
+           │ tap
+           ▼
+┌─PaymentMethodSelector Dialog─────┐
+│  ₹999 total                     │
+│  Wallet: ₹{balance}             │
+│  ┌────────┐  ┌────────┐         │
+│  │ Wallet │  │Razorpay│         │
+│  │ ₹999   │  │ ₹999   │         │
+│  └───┬────┘  └───┬────┘         │
+└──────┼───────────┼───────────────┘
+       │           │
+       ▼           ▼
+  RPC: purchase_   Edge: create-razorpay-order
+  celebrity_       → Razorpay SDK
+  subscription     → RPC: purchase_celebrity_subscription
+       │           │
+       ▼           ▼
+  ┌─Success─────────────────┐
+  │ Refetch wallet balance  │
+  │ Refetch favorites list  │
+  │ Email notification      │
+  │ Toast "Success! 🎉"    │
+  │ Close modals            │
+  └─────────────────────────┘
+5. Key Tables Summary
+Table	Purpose	Query Filter
+celebrity_favorite_pricing	Stores per-celebrity subscription price	celebrity_id + is_enabled=true
+celebrity_favorites	Tracks active subscriptions	user_id (PROFILE UUID) + status=active
+wallet_transactions	Ledger entry for payment	Created by RPC
+profiles	Wallet balance	id (PROFILE UUID)
+I now have all the information needed. Here's the complete documentation for Replit:
+
+Celebrity Subscription Pricing & Payment Flow — Complete Technical Spec for Replit
+1. How the Subscription Price is Fetched
+On /following page (Browse tab)
+When: On mount, in parallel with celebrities fetch.
+
+Query:
+
+GET /rest/v1/celebrity_favorite_pricing?is_enabled=eq.true&select=*
+Response (array):
+
+
+[
+  {
+    "id": "uuid",
+    "celebrity_id": "00865ec8-5b5e-435f-ae8f-625d343f02f6",
+    "price": 999,
+    "is_enabled": true,
+    "referrer_commission_percentage": 10,
+    "celebrity_commission_percentage": 5,
+    "created_at": "2025-01-20T..."
+  }
+]
+How price is matched to celebrity card: Client-side lookup:
+
+
+const getCelebrityPrice = (celebrityId) => 
+  pricing.find(p => p.celebrity_id === celebrityId)?.price || null;
+If getCelebrityPrice returns null (no pricing row), the card shows "View Profile" button instead of subscribe button. If it returns a number, the card shows ₹{price} - Subscribe.
+
+On /celebrity/:id page (Profile)
+When: On mount, only if user is logged in.
+
+Query:
+
+GET /rest/v1/celebrity_favorite_pricing?celebrity_id=eq.{id}&is_enabled=eq.true
+(maybeSingle — returns one row or null)
+SELECT price
+Response:
+
+
+{ "price": 999 }
+Or null if no pricing exists.
+
+Fallback: If null, defaults to 999:
+
+
+setSubscriptionPrice(data?.price || 999);
+This price is passed to the SubscriptionGate component as the subscriptionPrice prop.
+
+2. What Happens When User Taps "Subscribe to {Celebrity}"
+This is a 2-step modal flow:
+
+Step 1: SubscriptionGate Info Dialog
+Trigger: User taps "Subscribe to {name}" button on the profile page (or taps a locked service's "Book Now").
+
+UI Components:
+
+Dialog (from radix-ui) — modal overlay
+Celebrity info row: img (16x16 rounded avatar) + h3 (name) + Badge (category)
+Price card: gradient background, large ₹{price} text, "Lifetime Access" subtitle
+Benefits list: 5 items, each with icon (Heart, Video, Image, MessageSquare, Sparkles) + text
+Button "Subscribe Now" — opens Step 2
+Data used (all passed as props, no API call):
+
+celebrity.name, celebrity.image_url, celebrity.category
+subscriptionPrice (from the pricing query above)
+Step 2: PaymentMethodSelector Dialog
+Trigger: User taps "Subscribe Now" in Step 1.
+
+UI Components:
+
+Dialog modal
+Amount display: centered ₹{amount} in large bold text on muted background
+Wallet balance row: label + ₹{walletBalance} (fetched from profiles.wallet_balance)
+Two payment buttons in a 2-column grid, each 128px tall:
+Wallet button: Wallet icon + "Pay ₹{amount}". Disabled with red "Insufficient" badge if walletBalance < amount. Shows Loader2 spinner when processing.
+Razorpay button: CreditCard icon + "Pay ₹{amount}". Shows Loader2 spinner when processing.
+Insufficient balance message at bottom if applicable
+Data used:
+
+amount — the subscription price
+walletBalance — from useWalletBalance() hook which queries: GET /rest/v1/profiles?id=eq.{PROFILE_ID}&select=wallet_balance
+3. Payment Processing
+Option A: Wallet Payment
+Single API call — atomic server-side RPC:
+
+POST /rest/v1/rpc/purchase_celebrity_subscription
+Content-Type: application/json
+
+{
+  "p_celebrity_id": "00865ec8-5b5e-435f-ae8f-625d343f02f6",
+  "p_price": 999,
+  "p_payment_method": "wallet"
+}
+What the RPC does atomically (all-or-nothing):
+
+Validates pricing exists in celebrity_favorite_pricing for this celebrity
+Checks user wallet balance >= price
+Debits wallet (UPDATE profiles SET wallet_balance = wallet_balance - price)
+Inserts row into celebrity_favorites (status='active')
+Inserts row into wallet_transactions (type='service_payment')
+Handles referral commissions if user has referred_by
+Success response: null (no error means success)
+
+Error responses:
+
+"Subscription not available for this celebrity" — no celebrity_favorite_pricing row
+"Insufficient wallet balance" — wallet < price
+"Already subscribed" — active row exists in celebrity_favorites
+Post-payment actions (client-side):
+
+Fire-and-forget email notification:
+POST /functions/v1/send-celebrity-subscription-email
+{
+  "celebrity_id": "uuid",
+  "subscriber_name": "John Doe",
+  "subscriber_email": "john@example.com",
+  "price_paid": 999
+}
+Refetch wallet balance
+Refetch user favorites list
+Show success toast
+Close all modals
+Option B: Razorpay Payment (on /following page — full implementation)
+Step 1: Create Razorpay order:
+
+POST /functions/v1/create-razorpay-order
+{
+  "amount": 999,
+  "currency": "INR",
+  "receipt": "fav_12345678_abcdef",
+  "notes": {
+    "user_id": "profile-uuid",
+    "celebrity_id": "celebrity-uuid",
+    "type": "celebrity_favorite"
+  }
+}
+Response:
+
+
+{
+  "id": "order_XXXXXXXXX",
+  "amount": 99900,
+  "currency": "INR",
+  "key_id": "rzp_live_XXXXX"
+}
+Step 2: Open Razorpay native checkout with:
+
+
+{
+  key: response.key_id,
+  amount: response.amount,
+  currency: response.currency,
+  name: "Celebrity Favorites",
+  description: "Subscribe to {celebrity.name}",
+  order_id: response.id,
+  prefill: { name, email, contact },
+  theme: { color: "#3B82F6" }
+}
+Step 3: On Razorpay success callback, call the same RPC:
+
+POST /rest/v1/rpc/purchase_celebrity_subscription
+{
+  "p_celebrity_id": "uuid",
+  "p_price": 999,
+  "p_payment_method": "razorpay"
+}
+Note for mobile: On the /celebrity/:id SubscriptionGate, Razorpay currently shows a "coming soon" toast. The full Razorpay flow only works on the /following page. For mobile, implement Razorpay using the native Razorpay SDK in both places.
+
+4. Complete Data Flow Diagram
+
+User taps "Subscribe" on card or profile
+        │
+        ▼
+┌─SubscriptionGate Dialog──────────┐
+│  Celebrity avatar + name         │
+│  ₹999 price (from pricing query) │
+│  5 benefits list                 │
+│  [Subscribe Now] button          │
+└──────────┬───────────────────────┘
+           │ tap
+           ▼
+┌─PaymentMethodSelector Dialog─────┐
+│  ₹999 total                     │
+│  Wallet: ₹{balance}             │
+│  ┌────────┐  ┌────────┐         │
+│  │ Wallet │  │Razorpay│         │
+│  │ ₹999   │  │ ₹999   │         │
+│  └───┬────┘  └───┬────┘         │
+└──────┼───────────┼───────────────┘
+       │           │
+       ▼           ▼
+  RPC: purchase_   Edge: create-razorpay-order
+  celebrity_       → Razorpay SDK
+  subscription     → RPC: purchase_celebrity_subscription
+       │           │
+       ▼           ▼
+  ┌─Success─────────────────┐
+  │ Refetch wallet balance  │
+  │ Refetch favorites list  │
+  │ Email notification      │
+  │ Toast "Success! 🎉"    │
+  │ Close modals            │
+  └─────────────────────────┘
+5. Key Tables Summary
+Table	Purpose	Query Filter
+celebrity_favorite_pricing	Stores per-celebrity subscription price	celebrity_id + is_enabled=true
+celebrity_favorites	Tracks active subscriptions	user_id (PROFILE UUID) + status=active
+wallet_transactions	Ledger entry for payment	Created by RPC
+profiles	Wallet balance	id (PROFILE UUID)
+
+
+
+
