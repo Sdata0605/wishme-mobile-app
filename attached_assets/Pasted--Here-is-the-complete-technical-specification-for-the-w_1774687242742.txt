@@ -1,0 +1,243 @@
+
+Here is the complete technical specification for the /wallet page for Replit mobile app development.
+
+WALLET PAGE — COMPLETE TECHNICAL SPEC FOR MOBILE APP
+PURPOSE
+The /wallet page is the user's financial hub. It shows their current wallet balance, lets them add funds via Razorpay, view all transaction history (wallet + referral), search by WishMe Payment ID, and access referral earnings. It is wrapped in AuthenticatedLayout (requires login).
+
+PAGE LAYOUT
+Two-column layout on desktop (3/5 + 2/5 grid). On mobile, single column stacked.
+
+SECTION 1 — BALANCE CARD (Hero)
+Visual: Gradient card (from-pink-500/80 via-purple-500/60 to-purple-600/80), white text, large wallet icon watermark top-right.
+
+Data Source: useWalletBalance() hook → queries:
+
+GET /rest/v1/profiles?select=wallet_balance&id=eq.{profile.id}
+→ Response: { wallet_balance: number }
+Also subscribes to real-time changes on profiles table filtered by id=eq.{profile.id}.
+
+UI Elements:
+
+Label: "Total Balance"
+Value: ₹{balance} formatted with Indian locale, 2 decimals
+"Add Funds" button → opens deposit dialog
+"Withdraw" button → currently UI-only placeholder (no backend logic)
+SECTION 2 — ADD FUNDS DIALOG (Modal)
+Trigger: "Add Funds" button on balance card OR "Custom" in Quick Recharge.
+
+UI Elements:
+
+Input field: amount (min ₹100)
+Quick amount pills: [500, 1000, 2500, 5000]
+"Pay ₹X" button
+Payment method badges: UPI, Cards, NetBanking
+Payment Flow (Razorpay):
+
+Step 1 — Create Order:
+
+POST /functions/v1/create-razorpay-order
+Headers: Authorization: Bearer {session.access_token}
+Payload: {
+  amount: number,        // in INR (integer)
+  currency: "INR",
+  receipt: "wallet_{profile.id}_{timestamp}",
+  notes: { user_id: profile.id, type: "wallet_deposit" }
+}
+Response: {
+  id: string,            // Razorpay order ID
+  key_id: string,        // Razorpay public key
+  amount: number,        // in paise
+  currency: "INR"
+}
+Step 2 — Open Razorpay Checkout (native SDK on mobile):
+
+Options: {
+  key: response.key_id,
+  amount: response.amount,
+  currency: response.currency,
+  name: "WishMe",
+  description: "Add money to wallet",
+  order_id: response.id,
+  prefill: { name, email, contact },
+  theme: { color: "#EC4899" }
+}
+Step 3 — Verify Payment:
+
+POST /functions/v1/verify-razorpay-payment
+Payload: {
+  razorpay_order_id: string,
+  razorpay_payment_id: string,
+  razorpay_signature: string
+}
+Response: { success: true, wishme_payment_id: string }
+Step 4 — Record Transaction (client-side):
+
+POST /rest/v1/wallet_transactions
+Payload: {
+  user_id: profile.id,
+  transaction_type: "deposit",
+  amount: number,
+  status: "completed",
+  payment_method: "razorpay",
+  transaction_details: { razorpay_order_id, razorpay_payment_id }
+}
+Step 5 — Record Payment Transaction:
+
+POST /rest/v1/payment_transactions
+Payload: {
+  wishme_payment_id: generateWishMePaymentId(),  // "WM" + YYMM + 5 random chars
+  user_id: profile.id,
+  amount: number,
+  payment_method: "razorpay",
+  service_type: "deposit",
+  razorpay_payment_id: string,
+  razorpay_order_id: string,
+  description: "Wallet deposit of ₹{amount}",
+  status: "completed",
+  paid_at: ISO timestamp
+}
+SECTION 3 — QUICK RECHARGE
+Visual: Card with rounded pill buttons for [500, 1000, 2500, 5000] + "Custom" button.
+
+Action: Each button directly calls handleRazorpayPayment(amount) (same flow as above). "Custom" opens the Add Funds dialog.
+
+SECTION 4 — RECENT ACTIVITY (Transaction List)
+Visual: Card with search input + scrollable transaction list. Shows 5 by default, "View All" expands.
+
+Data Sources (3 parallel queries):
+
+Query 1 — Wallet Transactions:
+
+GET /rest/v1/wallet_transactions
+  ?select=*
+  &user_id=eq.{profile.id}
+  &order=created_at.desc
+
+Response: Array of {
+  id: string,
+  user_id: string,
+  transaction_type: string,  // deposit, booking, music_generation, photo_wish, etc.
+  amount: number,
+  status: string,            // completed, pending, rejected
+  payment_method: string,
+  created_at: string,
+  description: string,
+  transaction_details: JSON
+}
+Query 2 — Referral Transactions:
+
+GET /rest/v1/referral_transactions
+  ?select=*
+  &referrer_id=eq.{profile.id}
+  &order=created_at.desc
+
+Response: Array of {
+  id: string,
+  referrer_id: string,
+  referred_id: string,
+  commission_amount: number,
+  status: string,            // completed, pending
+  order_type: string,
+  created_at: string
+}
+These are mapped to: transaction_type: "referral_commission", amount: commission_amount.
+
+Query 3 — Payment Transactions (for WM IDs):
+
+GET /rest/v1/payment_transactions
+  ?select=wishme_payment_id,user_id,amount,paid_at
+  &user_id=eq.{profile.id}
+  &order=paid_at.desc
+
+Response: Array of { wishme_payment_id: string, amount: number, ... }
+Used to build a lookup map: {absoluteAmount → wishme_payment_id} displayed under each transaction.
+
+Merged & Sorted: All transactions merged into one array, sorted by created_at descending.
+
+Transaction Type Icons & Labels:
+
+transaction_type	Icon	Label	Credit?
+deposit	TrendingUp (green)	Wallet Top-up	Yes
+admin_credit	TrendingUp (green)	Admin Credit	Yes
+booking	Video (orange)	Video Shoutout	No
+music_generation	Music (purple)	Music Generation	No
+music_download	Music (purple)	Music Download	No
+greeting_card_generation	Gift (pink)	Greeting Card	No
+referral_commission	Users (pink)	Referral Bonus	Yes
+commission_earning	Users (pink)	Commission Earned	Yes
+image_promotion	Image (blue)	Image Promotion	No
+ugc_video	Video (orange)	UGC Video	No
+photo_wish	Image (cyan)	Photo Wish	No
+celebrity_call	Phone (yellow)	Celebrity Call	No
+voice_call	Phone (yellow)	Voice Call	No
+celebrity_subscription	Star (amber)	Celebrity Subscription	No
+plan_upgrade	Star (amber)	Plan Upgrade	No
+service_payment	ShoppingBag (indigo)	Service Payment	No
+Each Row Displays:
+
+Type-specific icon (colored, in circle)
+Label (from mapping above)
+Date: dd MMM yyyy, hh:mm a (date-fns format)
+WishMe Payment ID (if found in lookup, monospace, dimmed)
+Amount: +₹X green for credits, -₹X red for debits
+Status badge: green=completed, gray=pending, red=rejected
+Search: Filters transactions by WishMe Payment ID substring match.
+
+SECTION 5 — REFERRAL EARNINGS (Right Column)
+Visual: Card with gradient text header, large earned amount, 2-stat grid (Friends / Pending), "Invite Friends" button.
+
+Data Source:
+
+GET /rest/v1/referral_transactions
+  ?select=*
+  &referrer_id=eq.{profile.id}
+
+Response: Array of { status, commission_amount, referred_id, ... }
+Computed Stats:
+
+totalEarned: sum of commission_amount where status === 'completed'
+friends: count of unique referred_id from completed transactions
+pending: count where status === 'pending'
+Button: "Invite Friends" → navigates to /referrals
+
+SECTION 6 — SAVED METHODS (Right Column)
+Visual: Card with hardcoded placeholder entries (VISA ••••4242, UPI rahul@axl). "Add New Method" button.
+
+Note: This is currently static/placeholder UI. No backend integration. For mobile, you can show the same static UI or skip.
+
+SECTION 7 — NEED ASSISTANCE (Right Column)
+Visual: Simple card with support text and "Chat Now" button → navigates to /support.
+
+AUTHENTICATION REQUIREMENT
+The page requires authentication via useAuth(). The hook provides:
+
+
+{ user, session, profile, loading }
+// profile.id = UUID used for all queries
+// profile.user_id = Supabase auth user UUID
+// profile.first_name, last_name, email, phone
+All Supabase queries use profile.id (not user_id) as the foreign key.
+
+REAL-TIME UPDATES
+Wallet balance subscribes to Postgres changes:
+
+Channel: 'wallet-balance-changes'
+Event: * (INSERT/UPDATE/DELETE)
+Table: profiles
+Filter: id=eq.{profile.id}
+Field: wallet_balance
+WishMe Payment ID Format
+Generated client-side: "WM" + YYMM + 5 random alphanumeric chars Example: WM260328A7K2X
+
+SUMMARY OF ALL ENDPOINTS USED
+Endpoint	Method	Purpose
+/rest/v1/profiles?select=wallet_balance	GET	Fetch balance
+/rest/v1/wallet_transactions	GET	Fetch transaction history
+/rest/v1/wallet_transactions	POST	Record deposit after payment
+/rest/v1/referral_transactions	GET	Fetch referral earnings
+/rest/v1/payment_transactions	GET	Fetch WishMe payment IDs
+/rest/v1/payment_transactions	POST	Record payment transaction
+/functions/v1/create-razorpay-order	POST	Create Razorpay order
+/functions/v1/verify-razorpay-payment	POST	Verify payment signature
+All REST endpoints require header: Authorization: Bearer {access_token} and apikey: {anon_key}.
