@@ -23,6 +23,7 @@ import { useDrawer } from '@/context/DrawerContext';
 import { useTheme } from '@/context/ThemeContext';
 import { CATEGORIES } from '@/constants/mockData';
 import { useCelebrities } from '@/hooks/useCelebrities';
+import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 
 const { width: W } = Dimensions.get('window');
 const DASH_PAGE_SIZE = 4;
@@ -284,8 +285,12 @@ function GraduationVideoCard({ tag }: { tag: string }) {
 
 export default function HomeScreen() {
   const { colors } = useTheme();
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const { toggle } = useDrawer();
+  const { hasFavorite } = useCelebrityFavorites({
+    profileId: user?.profileId,
+    accessToken: session?.access_token,
+  });
   const insets = useSafeAreaInsets();
   const [refreshing, setRefreshing] = useState(false);
   const [activeBanner, setActiveBanner] = useState(0);
@@ -474,7 +479,7 @@ export default function HomeScreen() {
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
-              renderItem={({ item }) => <CelebCard celebrity={item} />}
+              renderItem={({ item }) => <CelebCard celebrity={item} isSubscribed={hasFavorite(item.id)} />}
               keyExtractor={(item) => item.id}
             />
           )}
@@ -542,7 +547,7 @@ export default function HomeScreen() {
             <>
               <View style={styles.celebGrid}>
                 {pagedCelebs.map((celeb) => (
-                  <CelebCard key={celeb.id} celebrity={celeb} width={(W - 52) / 2} />
+                  <CelebCard key={celeb.id} celebrity={celeb} width={(W - 52) / 2} isSubscribed={hasFavorite(celeb.id)} />
                 ))}
                 {pagedCelebs.length === 0 && (
                   <View style={styles.emptyState}>

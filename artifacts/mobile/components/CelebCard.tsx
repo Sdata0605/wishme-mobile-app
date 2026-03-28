@@ -68,8 +68,14 @@ export function CelebCard({
           <Icon name="star" size={10} color="#FFB347" />
           <Text style={[styles.rating, { color: colors.mutedForeground }]}>{celebrity.rating}</Text>
         </View>
-        {!!celebrity.subscription?.price && (
-          <Text style={[styles.price, { color: colors.primary }]}>₹{celebrity.subscription.price.toLocaleString('en-IN')}/mo</Text>
+        {isSubscribed ? (
+          <View style={styles.subscribedBadge}>
+            <Text style={styles.subscribedText}>Subscribed</Text>
+          </View>
+        ) : (
+          !!celebrity.subscription?.price && (
+            <Text style={[styles.price, { color: colors.primary }]}>₹{celebrity.subscription.price.toLocaleString('en-IN')}/mo</Text>
+          )
         )}
       </View>
     </Pressable>
@@ -152,4 +158,16 @@ const styles = StyleSheet.create({
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginBottom: 2 },
   rating: { fontSize: 11, fontFamily: 'Inter_400Regular' },
   price: { fontSize: 13, fontFamily: 'Inter_700Bold' },
+  subscribedBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#22C55E',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 9999,
+  },
+  subscribedText: {
+    color: '#fff',
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+  },
 });
