@@ -1,0 +1,344 @@
+/wish-orders Page — Complete Technical Specification for Replit Mobile App
+1. PAGE PURPOSE
+This page shows the authenticated user all their "Wish a Celebrity" orders — greeting cards they've created and sent (or are still processing) for celebrities on special occasions. It splits orders into two visual sections: Active/Pending and Completed.
+
+2. AUTHENTICATION & USER ID
+CRITICAL: The user_id column in wish_celebrity_orders stores the Profile UUID (profiles.id), NOT the Auth UUID.
+
+Step 1 — Resolve Profile UUID after login:
+
+GET /rest/v1/profiles?user_id=eq.{AUTH_UUID}&select=id
+Headers: apikey, Authorization: Bearer {session.access_token}
+Response: [{ "id": "profile-uuid-here" }]
+
+Use this profiles.id for ALL queries below.
+
+3. SINGLE API ENDPOINT — DATA FETCH
+There is only ONE query on this entire page. No tabs, no lazy loading needed.
+
+Endpoint:
+
+GET /rest/v1/wish_celebrity_orders?user_id=eq.{PROFILE_ID}&select=*,celebrities(id,name,image_url)&order=created_at.desc
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {access_token}
+Full Response Shape (array of objects):
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "profile-uuid",
+    "celebrity_id": "celebrity-uuid",
+    "occasion_type": "Birthday",
+    "recipient_name": "John",
+    "message": "Happy birthday! You're amazing...",
+    "status": "sent" | "pending" | "processing" | "completed" | "card_generated",
+    "payment_status": "completed" | "pending" | null,
+    "amount_paid": 99,
+    "payment_method": "wallet" | "razorpay",
+    "generated_card_image_url": "https://..../card.jpg" | null,
+    "greeting_text": "Generated greeting text..." | null,
+    "card_approved": true | false | null,
+    "card_generation_type": "ai" | "upload" | null,
+    "card_prompt": "A beautiful birthday card..." | null,
+    "card_url": "https://..." | null,
+    "user_uploaded_card_url": "https://..." | null,
+    "user_uploaded_video_url": "https://..." | null,
+    "reference_image_url": "https://..." | null,
+    "generated_card_text": "..." | null,
+    "generation_attempts": 1,
+    "razorpay_order_id": "order_xxx" | null,
+    "razorpay_payment_id": "pay_xxx" | null,
+    "wishme_payment_id": "WM2603ABCDE" | null,
+    "discount_amount": 0 | null,
+    "discount_percentage": 0 | null,
+    "completed_at": "2026-03-28T..." | null,
+    "created_at": "2026-03-28T...",
+    "updated_at": "2026-03-28T...",
+    "celebrities": {
+      "id": "celebrity-uuid",
+      "name": "Hari Raj Shetty",
+      "image_url": "https://..../avatar.jpg"
+    }
+  }
+]
+4. CLIENT-SIDE FILTERING (No separate queries)
+Split the single response array into two lists using local filters:
+
+
+// Section 1: Active/Pending
+const pendingOrders = orders.filter(order => 
+  order.payment_status === 'completed' && order.status !== 'sent'
+);
+
+// Section 2: Completed
+const completedOrders = orders.filter(order => 
+  order.status === 'sent'
+);
+5. UI STRUCTURE & COMPONENTS
+5A. Header Section
+Element	Details
+Title	"My Wish Orders" — bold, large
+Subtitle	"Track your celebrity wishes and greeting cards" — muted
+CTA Button	"Make New Wish" → navigates to /wish-celebrity
+5B. Empty State
+If orders.length === 0: Show a centered Card with text "No wishes yet" and a Button "Create Your First Wish" → /wish-celebrity.
+
+5C. Section 1 — Active/Pending Orders
+Only renders if pendingOrders.length > 0.
+
+Section Header: Spinner icon (orange) + text "Active/Pending Orders"
+
+Each Order Card (orange-tinted border):
+
+UI Element	Data Key	Notes
+Avatar (circle, 64px)	order.celebrities.image_url	Fallback: /placeholder.svg
+Celebrity Name	order.celebrities.name	Bold, large
+Occasion + Recipient	order.occasion_type + order.recipient_name	Format: "Birthday • To: John"
+Status Badge	order.status	Color mapping below
+Message Preview	order.message	2-line clamp
+"Continue Wish" Button	—	Navigate to /wish-confirmation/{order.id}
+"View Card" Button	order.generated_card_image_url	Only if URL exists. Opens in new tab
+Processing Indicator	—	Only if order.status === 'processing'. Shows spinner + "Generating your card..."
+5D. Section 2 — Completed Wishes
+Only renders if completedOrders.length > 0.
+
+Section Header: Green checkmark badge + text "Completed Wishes"
+
+Each Order Card (green-tinted border):
+
+UI Element	Data Key	Notes
+Avatar (circle, 64px)	order.celebrities.image_url	Fallback: /placeholder.svg
+Celebrity Name	order.celebrities.name	Bold
+Occasion + Recipient	order.occasion_type + order.recipient_name	Same format
+Status Badge	Fixed green "Sent"	Always green
+Message Preview	order.message	2-line clamp
+"View Conversation" Button	—	Navigate to /messages
+"View Card" Button	order.generated_card_image_url	Only if URL exists. Opens in browser
+"Download" Button	order.generated_card_image_url	Only if URL exists. Downloads as wish-card-{order.id}.jpg
+6. STATUS BADGE COLOR MAPPING
+
+function getStatusColor(status) {
+  switch (status) {
+    case 'completed': return 'default';    // solid dark
+    case 'processing': return 'secondary'; // gray
+    case 'pending': return 'outline';      // bordered
+    default: return 'outline';
+  }
+}
+7. DOWNLOAD CARD LOGIC (Mobile Implementation)
+For mobile, replace the browser blob download with a native share/save approach:
+
+
+// Web version fetches blob and creates download link
+// Mobile: use React Native's Share or file system to save
+async function downloadCard(cardUrl, orderId) {
+  const response = await fetch(cardUrl);
+  const blob = await response.blob();
+  // Save blob as `wish-card-${orderId}.jpg`
+}
+8. NAVIGATION MAP
+User Action	Destination
+"Make New Wish" button (header)	/wish-celebrity
+"Create Your First Wish" (empty state)	/wish-celebrity
+"Continue Wish" (pending card)	/wish-confirmation/{order.id}
+"View Card" (any card)	Opens generated_card_image_url in browser
+"View Conversation" (completed card)	/messages
+"Download" (completed card)	Downloads generated_card_image_url as JPG
+9. PERFORMANCE TIPS FOR MOBILE
+Single query — this page only makes 1 API call, so it's already fast
+Select only needed columns to reduce payload:
+select=id,status,payment_status,occasion_type,recipient_name,message,generated_card_image_url,created_at,celebrities(id,name,image_url)
+Add limit=50 to prevent loading hundreds of orders
+Cache the response — don't re-fetch on back navigation
+Lazy-load celebrity avatars using thumbnail/placeholder pattern
+10. COMPLETE FIELD-TO-COMPONENT MAPPING
+
+Response Key                    → Where to Show
+─────────────────────────────────────────────────
+celebrities.image_url           → CircleAvatar (64px)
+celebrities.name                → Title text (bold)
+occasion_type                   → Subtitle left of "•"
+recipient_name                  → Subtitle right of "• To:"
+status                          → Badge (top-right)
+message                         → Body text (2-line clamp)
+generated_card_image_url        → "View Card" / "Download" buttons (conditional)
+payment_status                  → Filter logic only (not displayed)
+id                              → Navigation param + download filename
+Now I have everything needed. Here's the complete specification:
+
+/wish-orders Page — Complete Technical Specification for Replit Mobile App
+1. PAGE PURPOSE
+This page shows the authenticated user all their "Wish a Celebrity" orders — greeting cards they've created and sent (or are still processing) for celebrities on special occasions. It splits orders into two visual sections: Active/Pending and Completed.
+
+2. AUTHENTICATION & USER ID
+CRITICAL: The user_id column in wish_celebrity_orders stores the Profile UUID (profiles.id), NOT the Auth UUID.
+
+Step 1 — Resolve Profile UUID after login:
+
+GET /rest/v1/profiles?user_id=eq.{AUTH_UUID}&select=id
+Headers: apikey, Authorization: Bearer {session.access_token}
+Response: [{ "id": "profile-uuid-here" }]
+
+Use this profiles.id for ALL queries below.
+
+3. SINGLE API ENDPOINT — DATA FETCH
+There is only ONE query on this entire page. No tabs, no lazy loading needed.
+
+Endpoint:
+
+GET /rest/v1/wish_celebrity_orders?user_id=eq.{PROFILE_ID}&select=*,celebrities(id,name,image_url)&order=created_at.desc
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {access_token}
+Full Response Shape (array of objects):
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "profile-uuid",
+    "celebrity_id": "celebrity-uuid",
+    "occasion_type": "Birthday",
+    "recipient_name": "John",
+    "message": "Happy birthday! You're amazing...",
+    "status": "sent" | "pending" | "processing" | "completed" | "card_generated",
+    "payment_status": "completed" | "pending" | null,
+    "amount_paid": 99,
+    "payment_method": "wallet" | "razorpay",
+    "generated_card_image_url": "https://..../card.jpg" | null,
+    "greeting_text": "Generated greeting text..." | null,
+    "card_approved": true | false | null,
+    "card_generation_type": "ai" | "upload" | null,
+    "card_prompt": "A beautiful birthday card..." | null,
+    "card_url": "https://..." | null,
+    "user_uploaded_card_url": "https://..." | null,
+    "user_uploaded_video_url": "https://..." | null,
+    "reference_image_url": "https://..." | null,
+    "generated_card_text": "..." | null,
+    "generation_attempts": 1,
+    "razorpay_order_id": "order_xxx" | null,
+    "razorpay_payment_id": "pay_xxx" | null,
+    "wishme_payment_id": "WM2603ABCDE" | null,
+    "discount_amount": 0 | null,
+    "discount_percentage": 0 | null,
+    "completed_at": "2026-03-28T..." | null,
+    "created_at": "2026-03-28T...",
+    "updated_at": "2026-03-28T...",
+    "celebrities": {
+      "id": "celebrity-uuid",
+      "name": "Hari Raj Shetty",
+      "image_url": "https://..../avatar.jpg"
+    }
+  }
+]
+4. CLIENT-SIDE FILTERING (No separate queries)
+Split the single response array into two lists using local filters:
+
+
+// Section 1: Active/Pending
+const pendingOrders = orders.filter(order => 
+  order.payment_status === 'completed' && order.status !== 'sent'
+);
+
+// Section 2: Completed
+const completedOrders = orders.filter(order => 
+  order.status === 'sent'
+);
+5. UI STRUCTURE & COMPONENTS
+5A. Header Section
+Element	Details
+Title	"My Wish Orders" — bold, large
+Subtitle	"Track your celebrity wishes and greeting cards" — muted
+CTA Button	"Make New Wish" → navigates to /wish-celebrity
+5B. Empty State
+If orders.length === 0: Show a centered Card with text "No wishes yet" and a Button "Create Your First Wish" → /wish-celebrity.
+
+5C. Section 1 — Active/Pending Orders
+Only renders if pendingOrders.length > 0.
+
+Section Header: Spinner icon (orange) + text "Active/Pending Orders"
+
+Each Order Card (orange-tinted border):
+
+UI Element	Data Key	Notes
+Avatar (circle, 64px)	order.celebrities.image_url	Fallback: /placeholder.svg
+Celebrity Name	order.celebrities.name	Bold, large
+Occasion + Recipient	order.occasion_type + order.recipient_name	Format: "Birthday • To: John"
+Status Badge	order.status	Color mapping below
+Message Preview	order.message	2-line clamp
+"Continue Wish" Button	—	Navigate to /wish-confirmation/{order.id}
+"View Card" Button	order.generated_card_image_url	Only if URL exists. Opens in new tab
+Processing Indicator	—	Only if order.status === 'processing'. Shows spinner + "Generating your card..."
+5D. Section 2 — Completed Wishes
+Only renders if completedOrders.length > 0.
+
+Section Header: Green checkmark badge + text "Completed Wishes"
+
+Each Order Card (green-tinted border):
+
+UI Element	Data Key	Notes
+Avatar (circle, 64px)	order.celebrities.image_url	Fallback: /placeholder.svg
+Celebrity Name	order.celebrities.name	Bold
+Occasion + Recipient	order.occasion_type + order.recipient_name	Same format
+Status Badge	Fixed green "Sent"	Always green
+Message Preview	order.message	2-line clamp
+"View Conversation" Button	—	Navigate to /messages
+"View Card" Button	order.generated_card_image_url	Only if URL exists. Opens in browser
+"Download" Button	order.generated_card_image_url	Only if URL exists. Downloads as wish-card-{order.id}.jpg
+6. STATUS BADGE COLOR MAPPING
+
+function getStatusColor(status) {
+  switch (status) {
+    case 'completed': return 'default';    // solid dark
+    case 'processing': return 'secondary'; // gray
+    case 'pending': return 'outline';      // bordered
+    default: return 'outline';
+  }
+}
+7. DOWNLOAD CARD LOGIC (Mobile Implementation)
+For mobile, replace the browser blob download with a native share/save approach:
+
+
+// Web version fetches blob and creates download link
+// Mobile: use React Native's Share or file system to save
+async function downloadCard(cardUrl, orderId) {
+  const response = await fetch(cardUrl);
+  const blob = await response.blob();
+  // Save blob as `wish-card-${orderId}.jpg`
+}
+8. NAVIGATION MAP
+User Action	Destination
+"Make New Wish" button (header)	/wish-celebrity
+"Create Your First Wish" (empty state)	/wish-celebrity
+"Continue Wish" (pending card)	/wish-confirmation/{order.id}
+"View Card" (any card)	Opens generated_card_image_url in browser
+"View Conversation" (completed card)	/messages
+"Download" (completed card)	Downloads generated_card_image_url as JPG
+9. PERFORMANCE TIPS FOR MOBILE
+Single query — this page only makes 1 API call, so it's already fast
+Select only needed columns to reduce payload:
+select=id,status,payment_status,occasion_type,recipient_name,message,generated_card_image_url,created_at,celebrities(id,name,image_url)
+Add limit=50 to prevent loading hundreds of orders
+Cache the response — don't re-fetch on back navigation
+Lazy-load celebrity avatars using thumbnail/placeholder pattern
+10. COMPLETE FIELD-TO-COMPONENT MAPPING
+
+Response Key                    → Where to Show
+─────────────────────────────────────────────────
+celebrities.image_url           → CircleAvatar (64px)
+celebrities.name                → Title text (bold)
+occasion_type                   → Subtitle left of "•"
+recipient_name                  → Subtitle right of "• To:"
+status                          → Badge (top-right)
+message                         → Body text (2-line clamp)
+generated_card_image_url        → "View Card" / "Download" buttons (conditional)
+payment_status                  → Filter logic only (not displayed)
+id                              → Navigation param + download filename
+
+
+
+
