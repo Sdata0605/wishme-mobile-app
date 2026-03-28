@@ -1,0 +1,972 @@
+/bookings Page — Complete Technical Specification for Replit Mobile App
+1. PAGE PURPOSE
+The /bookings page is the user's order history hub. It shows every order, generation, and creation the user has made across 12 different services. It uses a tabbed interface with lazy-loading — only the active tab's data is fetched. Tab badge counts are fetched upfront with lightweight head-only queries.
+
+2. AUTHENTICATION
+User must be logged in. The page uses useAuth() hook which provides profile.id (the user's UUID). All queries filter by user_id = profile.id.
+
+3. ALL 12 TABS — Complete Specification
+Tab Config Array
+
+[
+  { "key": "celebrity",    "label": "Celebrity" },
+  { "key": "wishes",       "label": "Wishes" },
+  { "key": "greeting",     "label": "Cards" },
+  { "key": "photo",        "label": "Photo" },
+  { "key": "calls",        "label": "Calls" },
+  { "key": "music",        "label": "Music" },
+  { "key": "image-music",  "label": "Img+Music" },
+  { "key": "tts",          "label": "TTS" },
+  { "key": "sfx",          "label": "SFX" },
+  { "key": "convert",      "label": "Convert" },
+  { "key": "isolate",      "label": "Isolate" },
+  { "key": "occasion",     "label": "Occasions" }
+]
+4. TAB BADGE COUNTS — Lightweight Head Queries
+On initial load, fetch counts for ALL 12 tabs simultaneously using head-only queries (no data returned, just count):
+
+GET /rest/v1/{table}?select=id&user_id=eq.{userId}
+Headers: Prefer: count=exact, head=true
+Tab Key	Table Name
+celebrity	bookings
+wishes	wish_celebrity_orders
+greeting	greeting_card_generations
+photo	photo_wishes
+calls	voice_call_wishes
+music	music_generations
+image-music	image_music_generations
+tts	tts_generations
+sfx	sound_effect_generations
+convert	voice_conversion_generations
+isolate	audio_isolation_generations
+occasion	occasion_bookings
+Response: HTTP header content-range: 0-0/5 — the number after / is the count. Display as "Celebrity (5)" on each tab pill.
+
+5. TAB DATA FETCHING — Lazy Load Per Tab
+Only fetch when user taps a tab. Cache results so re-tapping doesn't re-fetch. Default active tab: celebrity. Limit: 20 items per query. Order: created_at DESC.
+
+TAB 1: Celebrity Bookings (celebrity)
+Endpoint:
+
+GET /rest/v1/bookings?select=id,status,service_type,created_at,message,final_price,video_url,video_file_key,generation_status,video_status,video_sent_at,celebrities:celebrity_id(name,image_url,category)&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response shape:
+
+
+{
+  "id": "uuid",
+  "status": "pending|confirmed|video_sent|sent|completed|cancelled|failed",
+  "service_type": "video_wish|image_promotion|video_promotion|general_wish|text_message",
+  "created_at": "2026-03-28T...",
+  "message": "{\"requestDetails\":{\"recipientName\":\"John\",\"occasion\":\"Birthday\",\"message\":\"Happy bday!\"},\"creativeGuidelines\":{\"toneAndStyle\":\"funny\"},\"scriptBuilder\":{\"talkingPoints\":\"...\"}}",
+  "final_price": 5000,
+  "video_url": "https://...",
+  "video_file_key": "bookings/abc123/video.mp4",
+  "generation_status": "script_generating|video_generating|downloading|uploading|completed|failed|timeout|null",
+  "video_status": "ready|failed|timeout|null",
+  "video_sent_at": "2026-03-28T...|null",
+  "celebrities": { "name": "Hari Raj Shetty", "image_url": "https://...", "category": "Actor" }
+}
+UI Card Components:
+
+Celebrity avatar: celebrities.image_url (rounded image, 80x80)
+Celebrity name: celebrities.name (bold title)
+Category: celebrities.category (subtitle)
+Composite status badge: Priority engine using status + generation_status + video_status (see Section 6)
+Timeline stepper: 6-stage visual pipeline (see Section 7) — only shown when status !== 'pending'
+Service type label: Map service_type → "Video Wish", "Image Promotion", "Video Promotion", "General Wish", "Text Message"
+Date: format(created_at, 'PP') → "Mar 28, 2026"
+Message box: Parse message as JSON. If JSON with requestDetails, show recipientName, occasion, message. If plain string, show as-is.
+Video player: When status is video_sent|sent|completed AND video_file_key exists → show B2VideoPlayer. The video URL requires a signed URL from the edge function b2-get-signed-url with payload { fileKey: video_file_key }.
+"Video Under Review" notice: When status === 'confirmed' AND video_file_key exists AND video_status === 'ready'
+"Video Being Created" spinner: When status === 'confirmed' AND no video ready yet
+Order ID: id.slice(0, 8) (monospace)
+Amount: ₹{final_price.toLocaleString()}
+Empty state: Star icon + "No celebrity bookings yet" + link to /celebrities
+
+TAB 2: Wishes (wishes)
+Endpoint:
+
+GET /rest/v1/wish_celebrity_orders?select=id,status,occasion_type,recipient_name,message,amount_paid,created_at,generated_card_image_url,card_url,celebrities:celebrity_id(name,image_url)&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response shape:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "occasion_type": "Birthday",
+  "recipient_name": "John",
+  "message": "Happy birthday!",
+  "amount_paid": 999,
+  "created_at": "...",
+  "generated_card_image_url": "https://...|null",
+  "card_url": "https://...|null",
+  "celebrities": { "name": "...", "image_url": "..." }
+}
+UI Card:
+
+Celebrity avatar + name (from celebrities)
+occasion_type as subtitle
+Status badge (simple: completed/pending/failed)
+Recipient: "To: {recipient_name}"
+Date: format(created_at, 'PP')
+Message box if message exists
+Card image: Show generated_card_image_url || card_url as tappable image → opens full-screen preview
+Order ID + Amount (₹{amount_paid})
+Empty state: Heart icon + link to /wish-celebrity
+
+TAB 3: Greeting Cards (greeting)
+Endpoint:
+
+GET /rest/v1/greeting_card_generations?select=id,status,occasion_name,recipient_name,original_prompt,generated_image_url,created_at,amount_charged&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "occasion_name": "Birthday",
+  "recipient_name": "Jane",
+  "original_prompt": "A cute puppy with balloons",
+  "generated_image_url": "https://...|null",
+  "created_at": "...",
+  "amount_charged": 100
+}
+UI Card:
+
+Status icon (CheckCircle/Clock/XCircle)
+Title: "{occasion_name} - {original_prompt}"
+Subtitle: "For: {recipient_name}"
+Status badge
+Card image: generated_image_url → tappable for preview
+Date + Download link (href to generated_image_url) + Amount ₹{amount_charged || 100}
+Empty state: Gift icon + link to /greeting-cards
+
+TAB 4: Photo Wishes (photo)
+Endpoint:
+
+GET /rest/v1/photo_wishes?select=id,status,occasion_type,recipient_name,message,output_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "occasion_type": "Anniversary",
+  "recipient_name": "Mike",
+  "message": "...",
+  "output_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 150
+}
+UI Card:
+
+Title: "{occasion_type} Photo Wish"
+Subtitle: "For: {recipient_name}"
+Status badge
+Photo image: output_url → tappable for preview
+Date + Amount ₹{credits_used || 150}
+Empty state: ImageIcon + link to /photo-wish
+
+TAB 5: Celebrity Calls (calls)
+Endpoint:
+
+GET /rest/v1/voice_call_wishes?select=id,call_status,occasion,recipient_name,recipient_phone,sender_name,price_paid,created_at,scheduled_at,call_duration_seconds,vapi_voice_name,celebrities:celebrity_id(name,image_url)&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "call_status": "completed|scheduled|pending|failed",
+  "occasion": "Birthday",
+  "recipient_name": "Sam",
+  "recipient_phone": "+91...",
+  "sender_name": "Alex",
+  "price_paid": 499,
+  "created_at": "...",
+  "scheduled_at": "2026-04-01T10:00:00|null",
+  "call_duration_seconds": 120,
+  "vapi_voice_name": "Voice Name",
+  "celebrities": { "name": "...", "image_url": "..." }
+}
+UI Card:
+
+Celebrity avatar + name (fallback to vapi_voice_name)
+"Call to: {recipient_name}"
+Special badge: If call_status === 'scheduled' → blue badge with CalendarClock icon + "Scheduled"
+Phone number: recipient_phone
+Occasion: occasion
+Sender: "From: {sender_name}" (if exists)
+Scheduled info box (blue): If scheduled_at → "Scheduled for: {date} at {time}"
+Call duration: If call_status === 'completed' → "Duration: {min}m {sec}s"
+Date + Amount ₹{price_paid}
+Empty state: Phone icon + link to /celebrity-voice-call
+
+TAB 6: AI Music (music)
+Endpoint:
+
+GET /rest/v1/music_generations?select=id,status,title,genre,mood,audio_url,created_at,credits_used,has_vocals,lyrics&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|processing|failed",
+  "title": "My Song|null",
+  "genre": "Pop",
+  "mood": "Happy",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 200,
+  "has_vocals": true,
+  "lyrics": "La la la...|null"
+}
+UI Card:
+
+Title: title || "{genre} - {mood}"
+If has_vocals → show "🎤 With Vocals" badge
+Status badge
+Lyrics preview (3 lines max) if lyrics exists
+Audio player: Native <audio> element with audio_url when status === 'completed'
+Download link: href to audio_url, filename "music-{id.slice(0,8)}.mp3"
+Date + Amount ₹{credits_used || 200}
+Empty state: Music icon + link to /ai-music
+
+TAB 7: Image + Music (image-music)
+Endpoint:
+
+GET /rest/v1/image_music_generations?select=id,status,genre,mood,description,image_url,audio_url,created_at,amount_charged,has_vocals&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "genre": "Classical",
+  "mood": "Calm",
+  "description": "A sunset over mountains",
+  "image_url": "https://...",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "amount_charged": 300,
+  "has_vocals": false
+}
+UI Card:
+
+Title: "{genre} - {mood}"
+Vocals badge if has_vocals
+Status badge
+Image: image_url → tappable preview
+Description (2 lines max)
+Audio player when completed
+Download link for audio
+Date + Amount ₹{amount_charged}
+Empty state: ImageIcon + link to /music-studio
+
+TAB 8: Text-to-Speech (tts)
+Endpoint:
+
+GET /rest/v1/tts_generations?select=id,status,text,voice_name,audio_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "text": "Hello world, this is a test",
+  "voice_name": "Rachel",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 50
+}
+UI Card:
+
+Volume2 icon + "Text to Speech" title
+Subtitle: "Voice: {voice_name || 'Unknown'}"
+Status badge
+Text preview (3 lines max) in muted background box
+Audio player if audio_url exists
+Date + Amount ₹{credits_used || 50}
+Empty state: Volume2 icon + link to /music-studio
+
+TAB 9: Sound Effects (sfx)
+Endpoint:
+
+GET /rest/v1/sound_effect_generations?select=id,status,description,duration_seconds,audio_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "description": "Thunder rolling in distance",
+  "duration_seconds": 5,
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 60
+}
+UI Card:
+
+Wand2 icon + "Sound Effect" title
+Subtitle: "{duration_seconds}s duration"
+Status badge
+Description box (3 lines max)
+Audio player
+Date + Amount ₹{credits_used || 60}
+Empty state: Wand2 icon + link to /music-studio
+
+TAB 10: Voice Conversion (convert)
+Endpoint:
+
+GET /rest/v1/voice_conversion_generations?select=id,status,target_voice_name,original_file_name,audio_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "target_voice_name": "Adam",
+  "original_file_name": "recording.mp3",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 75
+}
+UI Card:
+
+Mic icon + "Voice Conversion" title
+Subtitle: "To: {target_voice_name || 'Unknown'}"
+Status badge
+Original file name in muted box
+Audio player
+Date + Amount ₹{credits_used || 75}
+Empty state: Mic icon + link to /music-studio
+
+TAB 11: Audio Isolation (isolate)
+Endpoint:
+
+GET /rest/v1/audio_isolation_generations?select=id,status,original_file_name,audio_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "original_file_name": "song.mp3",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 40
+}
+UI Card:
+
+FileAudio icon + "Audio Isolation" title
+Subtitle: "Noise removed"
+Status badge
+Original file name box
+Audio player
+Date + Amount ₹{credits_used || 40}
+Empty state: FileAudio icon + link to /music-studio
+
+TAB 12: Occasion Bookings (occasion)
+Endpoint:
+
+GET /rest/v1/occasion_bookings?select=id,status,recipient_name,message,price,created_at,celebrities:celebrity_id(name,image_url),occasions:occasion_id(name)&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|confirmed|failed",
+  "recipient_name": "Lisa",
+  "message": "Happy anniversary!",
+  "price": 1500,
+  "created_at": "...",
+  "celebrities": { "name": "Actor Name", "image_url": "https://..." },
+  "occasions": { "name": "Wedding Anniversary" }
+}
+UI Card:
+
+Celebrity avatar + occasions.name as title
+Subtitle: "Celebrity: {celebrities.name}"
+Status badge
+"Recipient: {recipient_name}"
+Message box (2 lines max)
+Date + Amount ₹{price}
+Empty state: Gift icon + link to /occasions
+
+6. COMPOSITE STATUS BADGE ENGINE (Celebrity Tab Only)
+The celebrity tab uses a priority-based status engine checking 3 fields in order:
+
+Priority (highest to lowest):
+1. status === 'cancelled'           → "❌ Cancelled" (red)
+2. video_status/generation_status === 'failed' → "⚠️ Failed" (red)
+3. generation_status/video_status === 'timeout' → "⚠️ Timed Out" (orange)
+4. status === 'completed'           → "✅ Completed" (green)
+5. status === 'video_sent' or 'sent' → "📤 Delivered to You" (green)
+6. generation_status === 'completed' AND video_status === 'ready' → "🎥 Video Ready — Pending Admin Review" (purple)
+7. generation_status === 'uploading' → "⬆️ Uploading Video" (blue, PULSE)
+8. generation_status === 'downloading' → "⬇️ Processing Video" (blue, PULSE)
+9. generation_status === 'video_generating' → "🎬 Creating Video..." (blue, PULSE)
+10. generation_status === 'script_generating' → "🤖 Writing Script..." (blue, PULSE)
+11. status === 'confirmed'          → "✅ Confirmed — In Queue" (blue)
+12. status === 'pending'            → "⏳ Awaiting Confirmation" (yellow)
+PULSE = animated pulsing dot indicator for active processing states.
+
+All other tabs use a simple status badge: completed → default, pending → secondary, failed/rejected → destructive.
+
+7. TIMELINE STEPPER (Celebrity Tab Only)
+A 6-stage horizontal progress bar shown only when status !== 'pending':
+
+Stage 1: "Booking Placed"      → always completed=true
+Stage 2: "Confirmed by Team"   → completed when status !== 'pending'
+Stage 3: "Script Generated"    → completed when generation_status in ['video_generating','downloading','uploading','completed']
+Stage 4: "Video Being Created" → completed when generation_status in ['downloading','uploading','completed']
+Stage 5: "Video Ready"         → completed when video_status === 'ready'
+Stage 6: "Delivered ✓"         → completed when status in ['video_sent','sent','completed']
+Each stage: green circle with ✓ if completed, red circle with ✕ if failed, gray numbered circle if pending. Connected by horizontal lines (green if completed, gray if not).
+
+8. PERFORMANCE OPTIMIZATIONS
+Lazy tab loading: Only fetch data when tab is tapped. Cache with loadedTabs Set.
+Head-only counts: 12 parallel queries returning only count, no data.
+Selective columns: Each tab fetches only the columns used in UI.
+Limit 20: Each query limited to 20 rows.
+Database indexes: Composite (user_id, created_at DESC) on all 12 tables for O(log n) lookups.
+Realtime targeted refetch: Supabase realtime channels on bookings and music_generations — only invalidates the specific tab, not all 12.
+useMemo: Status engine and timeline functions are memoized.
+9. REALTIME SUBSCRIPTIONS
+Two channels filtered by user_id:
+
+Channel 1: bookings UPDATE → invalidate 'celebrity' tab cache, refetch if active, refetch counts
+Channel 2: music_generations UPDATE → invalidate 'music' tab cache, refetch if active, refetch counts
+10. SHARED UI COMPONENTS
+Component	Usage
+Card + CardContent	Every order item wrapper
+Badge	Status badges on all tabs
+Tabs + TabsList + TabsTrigger + TabsContent	Main tab navigation
+Button	Actions
+B2VideoPlayer	Video playback (celebrity tab) — calls b2-get-signed-url edge function
+ImagePreviewModal	Full-screen image preview (wishes, greeting, photo, image-music tabs)
+Native <audio>	Audio playback (music, tts, sfx, convert, isolate tabs)
+Icons from lucide-react	Star, Clock, CheckCircle, XCircle, Video, Music, Gift, Calendar, Heart, ImageIcon, Download, Phone, CalendarClock, Volume2, Wand2, Mic, FileAudio
+11. VIDEO PLAYBACK — B2 Signed URL
+For celebrity tab videos, the video_file_key needs a signed URL:
+
+Edge Function: b2-get-signed-url
+
+POST /functions/v1/b2-get-signed-url
+Headers: Authorization: Bearer {user_jwt}, apikey: {anon_key}
+Body: { "fileKey": "bookings/abc123/video.mp4" }
+Response: { "signedUrl": "https://b2-storage.com/file/...?auth=..." }
+Use signedUrl as the video src.
+
+12. NAVIGATION LINKS FROM EMPTY STATES
+Tab	Empty State Link
+celebrity	/celebrities
+wishes	/wish-celebrity
+greeting	/greeting-cards
+photo	/photo-wish
+calls	/celebrity-voice-call
+music	/ai-music
+image-music	/music-studio
+tts	/music-studio
+sfx	/music-studio
+convert	/music-studio
+isolate	/music-studio
+occasion	/occasions
+13. DATE FORMATTING
+All dates use date-fns format: format(new Date(created_at), 'PP') → outputs "Mar 28, 2026".
+
+For scheduled calls: format(scheduled_at, "EEEE, MMMM do, yyyy") → "Saturday, April 1st, 2026" and format(scheduled_at, "h:mm a") → "10:00 AM".
+
+14. SUPABASE CONFIG
+URL: https://eqikeuqwbphwongtfzhe.supabase.co
+Anon Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y
+All REST queries: GET https://eqikeuqwbphwongtfzhe.supabase.co/rest/v1/{table}?{params} Headers: apikey: {anon_key}, Authorization: Bearer {user_jwt}
+
+Now I have the full picture. Here's the comprehensive specification:
+
+/bookings Page — Complete Technical Specification for Replit Mobile App
+1. PAGE PURPOSE
+The /bookings page is the user's order history hub. It shows every order, generation, and creation the user has made across 12 different services. It uses a tabbed interface with lazy-loading — only the active tab's data is fetched. Tab badge counts are fetched upfront with lightweight head-only queries.
+
+2. AUTHENTICATION
+User must be logged in. The page uses useAuth() hook which provides profile.id (the user's UUID). All queries filter by user_id = profile.id.
+
+3. ALL 12 TABS — Complete Specification
+Tab Config Array
+
+[
+  { "key": "celebrity",    "label": "Celebrity" },
+  { "key": "wishes",       "label": "Wishes" },
+  { "key": "greeting",     "label": "Cards" },
+  { "key": "photo",        "label": "Photo" },
+  { "key": "calls",        "label": "Calls" },
+  { "key": "music",        "label": "Music" },
+  { "key": "image-music",  "label": "Img+Music" },
+  { "key": "tts",          "label": "TTS" },
+  { "key": "sfx",          "label": "SFX" },
+  { "key": "convert",      "label": "Convert" },
+  { "key": "isolate",      "label": "Isolate" },
+  { "key": "occasion",     "label": "Occasions" }
+]
+4. TAB BADGE COUNTS — Lightweight Head Queries
+On initial load, fetch counts for ALL 12 tabs simultaneously using head-only queries (no data returned, just count):
+
+GET /rest/v1/{table}?select=id&user_id=eq.{userId}
+Headers: Prefer: count=exact, head=true
+Tab Key	Table Name
+celebrity	bookings
+wishes	wish_celebrity_orders
+greeting	greeting_card_generations
+photo	photo_wishes
+calls	voice_call_wishes
+music	music_generations
+image-music	image_music_generations
+tts	tts_generations
+sfx	sound_effect_generations
+convert	voice_conversion_generations
+isolate	audio_isolation_generations
+occasion	occasion_bookings
+Response: HTTP header content-range: 0-0/5 — the number after / is the count. Display as "Celebrity (5)" on each tab pill.
+
+5. TAB DATA FETCHING — Lazy Load Per Tab
+Only fetch when user taps a tab. Cache results so re-tapping doesn't re-fetch. Default active tab: celebrity. Limit: 20 items per query. Order: created_at DESC.
+
+TAB 1: Celebrity Bookings (celebrity)
+Endpoint:
+
+GET /rest/v1/bookings?select=id,status,service_type,created_at,message,final_price,video_url,video_file_key,generation_status,video_status,video_sent_at,celebrities:celebrity_id(name,image_url,category)&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response shape:
+
+
+{
+  "id": "uuid",
+  "status": "pending|confirmed|video_sent|sent|completed|cancelled|failed",
+  "service_type": "video_wish|image_promotion|video_promotion|general_wish|text_message",
+  "created_at": "2026-03-28T...",
+  "message": "{\"requestDetails\":{\"recipientName\":\"John\",\"occasion\":\"Birthday\",\"message\":\"Happy bday!\"},\"creativeGuidelines\":{\"toneAndStyle\":\"funny\"},\"scriptBuilder\":{\"talkingPoints\":\"...\"}}",
+  "final_price": 5000,
+  "video_url": "https://...",
+  "video_file_key": "bookings/abc123/video.mp4",
+  "generation_status": "script_generating|video_generating|downloading|uploading|completed|failed|timeout|null",
+  "video_status": "ready|failed|timeout|null",
+  "video_sent_at": "2026-03-28T...|null",
+  "celebrities": { "name": "Hari Raj Shetty", "image_url": "https://...", "category": "Actor" }
+}
+UI Card Components:
+
+Celebrity avatar: celebrities.image_url (rounded image, 80x80)
+Celebrity name: celebrities.name (bold title)
+Category: celebrities.category (subtitle)
+Composite status badge: Priority engine using status + generation_status + video_status (see Section 6)
+Timeline stepper: 6-stage visual pipeline (see Section 7) — only shown when status !== 'pending'
+Service type label: Map service_type → "Video Wish", "Image Promotion", "Video Promotion", "General Wish", "Text Message"
+Date: format(created_at, 'PP') → "Mar 28, 2026"
+Message box: Parse message as JSON. If JSON with requestDetails, show recipientName, occasion, message. If plain string, show as-is.
+Video player: When status is video_sent|sent|completed AND video_file_key exists → show B2VideoPlayer. The video URL requires a signed URL from the edge function b2-get-signed-url with payload { fileKey: video_file_key }.
+"Video Under Review" notice: When status === 'confirmed' AND video_file_key exists AND video_status === 'ready'
+"Video Being Created" spinner: When status === 'confirmed' AND no video ready yet
+Order ID: id.slice(0, 8) (monospace)
+Amount: ₹{final_price.toLocaleString()}
+Empty state: Star icon + "No celebrity bookings yet" + link to /celebrities
+
+TAB 2: Wishes (wishes)
+Endpoint:
+
+GET /rest/v1/wish_celebrity_orders?select=id,status,occasion_type,recipient_name,message,amount_paid,created_at,generated_card_image_url,card_url,celebrities:celebrity_id(name,image_url)&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response shape:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "occasion_type": "Birthday",
+  "recipient_name": "John",
+  "message": "Happy birthday!",
+  "amount_paid": 999,
+  "created_at": "...",
+  "generated_card_image_url": "https://...|null",
+  "card_url": "https://...|null",
+  "celebrities": { "name": "...", "image_url": "..." }
+}
+UI Card:
+
+Celebrity avatar + name (from celebrities)
+occasion_type as subtitle
+Status badge (simple: completed/pending/failed)
+Recipient: "To: {recipient_name}"
+Date: format(created_at, 'PP')
+Message box if message exists
+Card image: Show generated_card_image_url || card_url as tappable image → opens full-screen preview
+Order ID + Amount (₹{amount_paid})
+Empty state: Heart icon + link to /wish-celebrity
+
+TAB 3: Greeting Cards (greeting)
+Endpoint:
+
+GET /rest/v1/greeting_card_generations?select=id,status,occasion_name,recipient_name,original_prompt,generated_image_url,created_at,amount_charged&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "occasion_name": "Birthday",
+  "recipient_name": "Jane",
+  "original_prompt": "A cute puppy with balloons",
+  "generated_image_url": "https://...|null",
+  "created_at": "...",
+  "amount_charged": 100
+}
+UI Card:
+
+Status icon (CheckCircle/Clock/XCircle)
+Title: "{occasion_name} - {original_prompt}"
+Subtitle: "For: {recipient_name}"
+Status badge
+Card image: generated_image_url → tappable for preview
+Date + Download link (href to generated_image_url) + Amount ₹{amount_charged || 100}
+Empty state: Gift icon + link to /greeting-cards
+
+TAB 4: Photo Wishes (photo)
+Endpoint:
+
+GET /rest/v1/photo_wishes?select=id,status,occasion_type,recipient_name,message,output_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "occasion_type": "Anniversary",
+  "recipient_name": "Mike",
+  "message": "...",
+  "output_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 150
+}
+UI Card:
+
+Title: "{occasion_type} Photo Wish"
+Subtitle: "For: {recipient_name}"
+Status badge
+Photo image: output_url → tappable for preview
+Date + Amount ₹{credits_used || 150}
+Empty state: ImageIcon + link to /photo-wish
+
+TAB 5: Celebrity Calls (calls)
+Endpoint:
+
+GET /rest/v1/voice_call_wishes?select=id,call_status,occasion,recipient_name,recipient_phone,sender_name,price_paid,created_at,scheduled_at,call_duration_seconds,vapi_voice_name,celebrities:celebrity_id(name,image_url)&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "call_status": "completed|scheduled|pending|failed",
+  "occasion": "Birthday",
+  "recipient_name": "Sam",
+  "recipient_phone": "+91...",
+  "sender_name": "Alex",
+  "price_paid": 499,
+  "created_at": "...",
+  "scheduled_at": "2026-04-01T10:00:00|null",
+  "call_duration_seconds": 120,
+  "vapi_voice_name": "Voice Name",
+  "celebrities": { "name": "...", "image_url": "..." }
+}
+UI Card:
+
+Celebrity avatar + name (fallback to vapi_voice_name)
+"Call to: {recipient_name}"
+Special badge: If call_status === 'scheduled' → blue badge with CalendarClock icon + "Scheduled"
+Phone number: recipient_phone
+Occasion: occasion
+Sender: "From: {sender_name}" (if exists)
+Scheduled info box (blue): If scheduled_at → "Scheduled for: {date} at {time}"
+Call duration: If call_status === 'completed' → "Duration: {min}m {sec}s"
+Date + Amount ₹{price_paid}
+Empty state: Phone icon + link to /celebrity-voice-call
+
+TAB 6: AI Music (music)
+Endpoint:
+
+GET /rest/v1/music_generations?select=id,status,title,genre,mood,audio_url,created_at,credits_used,has_vocals,lyrics&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|processing|failed",
+  "title": "My Song|null",
+  "genre": "Pop",
+  "mood": "Happy",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 200,
+  "has_vocals": true,
+  "lyrics": "La la la...|null"
+}
+UI Card:
+
+Title: title || "{genre} - {mood}"
+If has_vocals → show "🎤 With Vocals" badge
+Status badge
+Lyrics preview (3 lines max) if lyrics exists
+Audio player: Native <audio> element with audio_url when status === 'completed'
+Download link: href to audio_url, filename "music-{id.slice(0,8)}.mp3"
+Date + Amount ₹{credits_used || 200}
+Empty state: Music icon + link to /ai-music
+
+TAB 7: Image + Music (image-music)
+Endpoint:
+
+GET /rest/v1/image_music_generations?select=id,status,genre,mood,description,image_url,audio_url,created_at,amount_charged,has_vocals&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "genre": "Classical",
+  "mood": "Calm",
+  "description": "A sunset over mountains",
+  "image_url": "https://...",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "amount_charged": 300,
+  "has_vocals": false
+}
+UI Card:
+
+Title: "{genre} - {mood}"
+Vocals badge if has_vocals
+Status badge
+Image: image_url → tappable preview
+Description (2 lines max)
+Audio player when completed
+Download link for audio
+Date + Amount ₹{amount_charged}
+Empty state: ImageIcon + link to /music-studio
+
+TAB 8: Text-to-Speech (tts)
+Endpoint:
+
+GET /rest/v1/tts_generations?select=id,status,text,voice_name,audio_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "text": "Hello world, this is a test",
+  "voice_name": "Rachel",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 50
+}
+UI Card:
+
+Volume2 icon + "Text to Speech" title
+Subtitle: "Voice: {voice_name || 'Unknown'}"
+Status badge
+Text preview (3 lines max) in muted background box
+Audio player if audio_url exists
+Date + Amount ₹{credits_used || 50}
+Empty state: Volume2 icon + link to /music-studio
+
+TAB 9: Sound Effects (sfx)
+Endpoint:
+
+GET /rest/v1/sound_effect_generations?select=id,status,description,duration_seconds,audio_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "description": "Thunder rolling in distance",
+  "duration_seconds": 5,
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 60
+}
+UI Card:
+
+Wand2 icon + "Sound Effect" title
+Subtitle: "{duration_seconds}s duration"
+Status badge
+Description box (3 lines max)
+Audio player
+Date + Amount ₹{credits_used || 60}
+Empty state: Wand2 icon + link to /music-studio
+
+TAB 10: Voice Conversion (convert)
+Endpoint:
+
+GET /rest/v1/voice_conversion_generations?select=id,status,target_voice_name,original_file_name,audio_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "target_voice_name": "Adam",
+  "original_file_name": "recording.mp3",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 75
+}
+UI Card:
+
+Mic icon + "Voice Conversion" title
+Subtitle: "To: {target_voice_name || 'Unknown'}"
+Status badge
+Original file name in muted box
+Audio player
+Date + Amount ₹{credits_used || 75}
+Empty state: Mic icon + link to /music-studio
+
+TAB 11: Audio Isolation (isolate)
+Endpoint:
+
+GET /rest/v1/audio_isolation_generations?select=id,status,original_file_name,audio_url,created_at,credits_used&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|failed",
+  "original_file_name": "song.mp3",
+  "audio_url": "https://...|null",
+  "created_at": "...",
+  "credits_used": 40
+}
+UI Card:
+
+FileAudio icon + "Audio Isolation" title
+Subtitle: "Noise removed"
+Status badge
+Original file name box
+Audio player
+Date + Amount ₹{credits_used || 40}
+Empty state: FileAudio icon + link to /music-studio
+
+TAB 12: Occasion Bookings (occasion)
+Endpoint:
+
+GET /rest/v1/occasion_bookings?select=id,status,recipient_name,message,price,created_at,celebrities:celebrity_id(name,image_url),occasions:occasion_id(name)&user_id=eq.{userId}&order=created_at.desc&limit=20
+Response:
+
+
+{
+  "id": "uuid",
+  "status": "completed|pending|confirmed|failed",
+  "recipient_name": "Lisa",
+  "message": "Happy anniversary!",
+  "price": 1500,
+  "created_at": "...",
+  "celebrities": { "name": "Actor Name", "image_url": "https://..." },
+  "occasions": { "name": "Wedding Anniversary" }
+}
+UI Card:
+
+Celebrity avatar + occasions.name as title
+Subtitle: "Celebrity: {celebrities.name}"
+Status badge
+"Recipient: {recipient_name}"
+Message box (2 lines max)
+Date + Amount ₹{price}
+Empty state: Gift icon + link to /occasions
+
+6. COMPOSITE STATUS BADGE ENGINE (Celebrity Tab Only)
+The celebrity tab uses a priority-based status engine checking 3 fields in order:
+
+Priority (highest to lowest):
+1. status === 'cancelled'           → "❌ Cancelled" (red)
+2. video_status/generation_status === 'failed' → "⚠️ Failed" (red)
+3. generation_status/video_status === 'timeout' → "⚠️ Timed Out" (orange)
+4. status === 'completed'           → "✅ Completed" (green)
+5. status === 'video_sent' or 'sent' → "📤 Delivered to You" (green)
+6. generation_status === 'completed' AND video_status === 'ready' → "🎥 Video Ready — Pending Admin Review" (purple)
+7. generation_status === 'uploading' → "⬆️ Uploading Video" (blue, PULSE)
+8. generation_status === 'downloading' → "⬇️ Processing Video" (blue, PULSE)
+9. generation_status === 'video_generating' → "🎬 Creating Video..." (blue, PULSE)
+10. generation_status === 'script_generating' → "🤖 Writing Script..." (blue, PULSE)
+11. status === 'confirmed'          → "✅ Confirmed — In Queue" (blue)
+12. status === 'pending'            → "⏳ Awaiting Confirmation" (yellow)
+PULSE = animated pulsing dot indicator for active processing states.
+
+All other tabs use a simple status badge: completed → default, pending → secondary, failed/rejected → destructive.
+
+7. TIMELINE STEPPER (Celebrity Tab Only)
+A 6-stage horizontal progress bar shown only when status !== 'pending':
+
+Stage 1: "Booking Placed"      → always completed=true
+Stage 2: "Confirmed by Team"   → completed when status !== 'pending'
+Stage 3: "Script Generated"    → completed when generation_status in ['video_generating','downloading','uploading','completed']
+Stage 4: "Video Being Created" → completed when generation_status in ['downloading','uploading','completed']
+Stage 5: "Video Ready"         → completed when video_status === 'ready'
+Stage 6: "Delivered ✓"         → completed when status in ['video_sent','sent','completed']
+Each stage: green circle with ✓ if completed, red circle with ✕ if failed, gray numbered circle if pending. Connected by horizontal lines (green if completed, gray if not).
+
+8. PERFORMANCE OPTIMIZATIONS
+Lazy tab loading: Only fetch data when tab is tapped. Cache with loadedTabs Set.
+Head-only counts: 12 parallel queries returning only count, no data.
+Selective columns: Each tab fetches only the columns used in UI.
+Limit 20: Each query limited to 20 rows.
+Database indexes: Composite (user_id, created_at DESC) on all 12 tables for O(log n) lookups.
+Realtime targeted refetch: Supabase realtime channels on bookings and music_generations — only invalidates the specific tab, not all 12.
+useMemo: Status engine and timeline functions are memoized.
+9. REALTIME SUBSCRIPTIONS
+Two channels filtered by user_id:
+
+Channel 1: bookings UPDATE → invalidate 'celebrity' tab cache, refetch if active, refetch counts
+Channel 2: music_generations UPDATE → invalidate 'music' tab cache, refetch if active, refetch counts
+10. SHARED UI COMPONENTS
+Component	Usage
+Card + CardContent	Every order item wrapper
+Badge	Status badges on all tabs
+Tabs + TabsList + TabsTrigger + TabsContent	Main tab navigation
+Button	Actions
+B2VideoPlayer	Video playback (celebrity tab) — calls b2-get-signed-url edge function
+ImagePreviewModal	Full-screen image preview (wishes, greeting, photo, image-music tabs)
+Native <audio>	Audio playback (music, tts, sfx, convert, isolate tabs)
+Icons from lucide-react	Star, Clock, CheckCircle, XCircle, Video, Music, Gift, Calendar, Heart, ImageIcon, Download, Phone, CalendarClock, Volume2, Wand2, Mic, FileAudio
+11. VIDEO PLAYBACK — B2 Signed URL
+For celebrity tab videos, the video_file_key needs a signed URL:
+
+Edge Function: b2-get-signed-url
+
+POST /functions/v1/b2-get-signed-url
+Headers: Authorization: Bearer {user_jwt}, apikey: {anon_key}
+Body: { "fileKey": "bookings/abc123/video.mp4" }
+Response: { "signedUrl": "https://b2-storage.com/file/...?auth=..." }
+Use signedUrl as the video src.
+
+12. NAVIGATION LINKS FROM EMPTY STATES
+Tab	Empty State Link
+celebrity	/celebrities
+wishes	/wish-celebrity
+greeting	/greeting-cards
+photo	/photo-wish
+calls	/celebrity-voice-call
+music	/ai-music
+image-music	/music-studio
+tts	/music-studio
+sfx	/music-studio
+convert	/music-studio
+isolate	/music-studio
+occasion	/occasions
+13. DATE FORMATTING
+All dates use date-fns format: format(new Date(created_at), 'PP') → outputs "Mar 28, 2026".
+
+For scheduled calls: format(scheduled_at, "EEEE, MMMM do, yyyy") → "Saturday, April 1st, 2026" and format(scheduled_at, "h:mm a") → "10:00 AM".
+
+14. SUPABASE CONFIG
+URL: https://eqikeuqwbphwongtfzhe.supabase.co
+Anon Key: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y
+All REST queries: GET https://eqikeuqwbphwongtfzhe.supabase.co/rest/v1/{table}?{params} Headers: apikey: {anon_key}, Authorization: Bearer {user_jwt}
+
+
+
+
+

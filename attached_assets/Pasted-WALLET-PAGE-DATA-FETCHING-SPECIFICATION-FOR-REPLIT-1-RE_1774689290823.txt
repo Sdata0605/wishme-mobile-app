@@ -1,0 +1,374 @@
+WALLET PAGE — DATA FETCHING SPECIFICATION FOR REPLIT
+1. REFERRAL EARNINGS CARD
+Purpose: Show total earned from referrals, number of referred friends, and pending referrals.
+
+When fetched: On mount, when profile.id is available.
+
+Endpoint: Supabase REST — referral_transactions table
+
+Query:
+
+GET /rest/v1/referral_transactions?referrer_id=eq.{profile.id}&select=*
+Headers:
+  apikey: {ANON_KEY}
+  Authorization: Bearer {user_jwt}
+Response — array of objects:
+
+
+[
+  {
+    "id": "uuid",
+    "referrer_id": "uuid",
+    "referred_id": "uuid",
+    "booking_id": "uuid-or-any-service-id",
+    "commission_level": 1,
+    "commission_amount": 150,
+    "commission_percentage": 10,
+    "order_type": "booking",
+    "status": "completed",
+    "created_at": "2026-03-25T10:00:00Z"
+  }
+]
+Client-side processing to build stats:
+
+
+const completed = data.filter(t => t.status === 'completed');
+const pending = data.filter(t => t.status === 'pending');
+const uniqueUsers = new Set(completed.map(t => t.referred_id));
+
+referralStats = {
+  totalEarned: completed.reduce((sum, t) => sum + (t.commission_amount || 0), 0),
+  friends: uniqueUsers.size,       // count of unique referred users
+  pending: pending.length           // count of pending referral transactions
+};
+UI mapping:
+
+Stat	Value	Display
+Total Earned	referralStats.totalEarned	₹{totalEarned.toLocaleString()}
+Friends Referred	referralStats.friends	number
+Pending	referralStats.pending	number
+2. RECENT ACTIVITY (TRANSACTION LIST)
+Purpose: Show a merged, time-sorted list of all wallet debits/credits AND referral commissions.
+
+When fetched: On mount, when profile.id is available.
+
+Three parallel queries are fired:
+
+Query A — Wallet Transactions (main ledger)
+GET /rest/v1/wallet_transactions?user_id=eq.{profile.id}&select=*&order=created_at.desc
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "transaction_type": "booking",
+    "amount": -999,
+    "status": "completed",
+    "payment_method": "wallet",
+    "transaction_details": { "razorpay_order_id": "..." },
+    "created_at": "2026-03-27T14:00:00Z",
+    "description": "Booking for Celebrity X"
+  }
+]
+Possible transaction_type values:
+
+Credits: deposit, admin_credit, commission_earning
+Debits: booking, music_generation, music_download, greeting_card_generation, celebrity_subscription, image_promotion, ugc_video, photo_wish, celebrity_call, voice_call, plan_upgrade, service_payment, debit, withdrawal
+Query B — Referral Transactions (commissions)
+GET /rest/v1/referral_transactions?referrer_id=eq.{profile.id}&select=*&order=created_at.desc
+Same response as Section 1 above.
+
+These are transformed before merging:
+
+
+refTxData.map(tx => ({
+  ...tx,
+  source: 'referral',
+  transaction_type: 'referral_commission',  // force this type
+  amount: tx.commission_amount,              // use commission_amount as amount
+  status: tx.status
+}))
+Query C — Payment Transactions (for WishMe Payment ID lookup)
+GET /rest/v1/payment_transactions?user_id=eq.{profile.id}&select=wishme_payment_id,user_id,amount,paid_at&order=paid_at.desc
+Response:
+
+
+[
+  {
+    "wishme_payment_id": "WM2603XYZAB",
+    "user_id": "uuid",
+    "amount": 999,
+    "paid_at": "2026-03-27T14:00:00Z"
+  }
+]
+This is NOT displayed as a list. It builds a lookup map so each wallet transaction can show its WishMe Payment ID:
+
+
+const lookup: Record<string, string> = {};
+ptData.forEach(pt => {
+  const key = `${Math.abs(pt.amount)}`;
+  if (!lookup[key]) lookup[key] = pt.wishme_payment_id;
+});
+// Usage: lookup["999"] → "WM2603XYZAB"
+3. MERGING & SORTING
+After all 3 queries return, merge wallet + referral into one array, sorted newest-first:
+
+
+const allTransactions = [
+  ...walletTxData.map(tx => ({ ...tx, source: 'wallet' })),
+  ...referralTxData.map(tx => ({
+    ...tx,
+    source: 'referral',
+    transaction_type: 'referral_commission',
+    amount: tx.commission_amount,
+    status: tx.status
+  }))
+].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+4. UI RENDERING PER TRANSACTION ROW
+Each row in "Recent Activity" shows:
+
+Element	Source field	Logic
+Icon	transaction_type	Map to icon+color (see table below)
+Label	transaction_type	Map to human label (see table below)
+Amount	amount	Green +₹X if credit, Red -₹X if debit
+Date	created_at	format(new Date(created_at), 'MMM dd, h:mm a')
+Status badge	status	Green for completed, Yellow for pending, Red for failed
+Payment ID	lookup by amount	Show WM ID if found in lookup map
+Credit check — these types show green + amount:
+
+
+const isCredit = ['deposit', 'admin_credit', 'commission_earning', 'referral_commission'].includes(type);
+Icon + Color mapping:
+
+transaction_type	Icon	Color
+deposit	TrendingUp	emerald-400
+admin_credit	TrendingUp	emerald-400
+booking	Video	orange-400
+music_generation	Music	purple-400
+greeting_card_generation	Gift	pink-400
+referral_commission	Users	pink-400
+image_promotion	Image	blue-400
+photo_wish	Image	cyan-400
+celebrity_call / voice_call	Phone	yellow-400
+celebrity_subscription	Star	amber-400
+plan_upgrade	Star	amber-400
+ugc_video	Video	orange-400
+Label mapping:
+
+transaction_type	Display Label
+deposit	Wallet Top-up
+booking	Video Shoutout
+referral_commission	Referral Bonus
+music_generation	Music Generation
+greeting_card_generation	Greeting Card
+celebrity_subscription	Celebrity Subscription
+photo_wish	Photo Wish
+voice_call	Voice Call
+plan_upgrade	Plan Upgrade
+admin_credit	Admin Credit
+5. FILTERING & PAGINATION
+Default: Show first 10 transactions
+"Show All" toggle: showAllTx boolean shows all
+Payment ID search: Filter by paymentIdSearch string matching against the WM ID lookup
+Filtered list logic:
+
+const filteredTx = transactions.filter(tx => {
+  if (!paymentIdSearch) return true;
+  const wmId = paymentTxLookup[`${Math.abs(tx.amount)}`] || '';
+  return wmId.toLowerCase().includes(paymentIdSearch.toLowerCase());
+});
+const displayedTx = showAllTx ? filteredTx : filteredTx.slice(0, 10);
+This covers the complete data flow for the Wallet screen's Referral Earnings card and Recent Activity list.
+
+Here is the complete documentation for Replit on how the Wallet screen fetches Referral Earnings and Recent Activity transactions:
+
+WALLET PAGE — DATA FETCHING SPECIFICATION FOR REPLIT
+1. REFERRAL EARNINGS CARD
+Purpose: Show total earned from referrals, number of referred friends, and pending referrals.
+
+When fetched: On mount, when profile.id is available.
+
+Endpoint: Supabase REST — referral_transactions table
+
+Query:
+
+GET /rest/v1/referral_transactions?referrer_id=eq.{profile.id}&select=*
+Headers:
+  apikey: {ANON_KEY}
+  Authorization: Bearer {user_jwt}
+Response — array of objects:
+
+
+[
+  {
+    "id": "uuid",
+    "referrer_id": "uuid",
+    "referred_id": "uuid",
+    "booking_id": "uuid-or-any-service-id",
+    "commission_level": 1,
+    "commission_amount": 150,
+    "commission_percentage": 10,
+    "order_type": "booking",
+    "status": "completed",
+    "created_at": "2026-03-25T10:00:00Z"
+  }
+]
+Client-side processing to build stats:
+
+
+const completed = data.filter(t => t.status === 'completed');
+const pending = data.filter(t => t.status === 'pending');
+const uniqueUsers = new Set(completed.map(t => t.referred_id));
+
+referralStats = {
+  totalEarned: completed.reduce((sum, t) => sum + (t.commission_amount || 0), 0),
+  friends: uniqueUsers.size,       // count of unique referred users
+  pending: pending.length           // count of pending referral transactions
+};
+UI mapping:
+
+Stat	Value	Display
+Total Earned	referralStats.totalEarned	₹{totalEarned.toLocaleString()}
+Friends Referred	referralStats.friends	number
+Pending	referralStats.pending	number
+2. RECENT ACTIVITY (TRANSACTION LIST)
+Purpose: Show a merged, time-sorted list of all wallet debits/credits AND referral commissions.
+
+When fetched: On mount, when profile.id is available.
+
+Three parallel queries are fired:
+
+Query A — Wallet Transactions (main ledger)
+GET /rest/v1/wallet_transactions?user_id=eq.{profile.id}&select=*&order=created_at.desc
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "transaction_type": "booking",
+    "amount": -999,
+    "status": "completed",
+    "payment_method": "wallet",
+    "transaction_details": { "razorpay_order_id": "..." },
+    "created_at": "2026-03-27T14:00:00Z",
+    "description": "Booking for Celebrity X"
+  }
+]
+Possible transaction_type values:
+
+Credits: deposit, admin_credit, commission_earning
+Debits: booking, music_generation, music_download, greeting_card_generation, celebrity_subscription, image_promotion, ugc_video, photo_wish, celebrity_call, voice_call, plan_upgrade, service_payment, debit, withdrawal
+Query B — Referral Transactions (commissions)
+GET /rest/v1/referral_transactions?referrer_id=eq.{profile.id}&select=*&order=created_at.desc
+Same response as Section 1 above.
+
+These are transformed before merging:
+
+
+refTxData.map(tx => ({
+  ...tx,
+  source: 'referral',
+  transaction_type: 'referral_commission',  // force this type
+  amount: tx.commission_amount,              // use commission_amount as amount
+  status: tx.status
+}))
+Query C — Payment Transactions (for WishMe Payment ID lookup)
+GET /rest/v1/payment_transactions?user_id=eq.{profile.id}&select=wishme_payment_id,user_id,amount,paid_at&order=paid_at.desc
+Response:
+
+
+[
+  {
+    "wishme_payment_id": "WM2603XYZAB",
+    "user_id": "uuid",
+    "amount": 999,
+    "paid_at": "2026-03-27T14:00:00Z"
+  }
+]
+This is NOT displayed as a list. It builds a lookup map so each wallet transaction can show its WishMe Payment ID:
+
+
+const lookup: Record<string, string> = {};
+ptData.forEach(pt => {
+  const key = `${Math.abs(pt.amount)}`;
+  if (!lookup[key]) lookup[key] = pt.wishme_payment_id;
+});
+// Usage: lookup["999"] → "WM2603XYZAB"
+3. MERGING & SORTING
+After all 3 queries return, merge wallet + referral into one array, sorted newest-first:
+
+
+const allTransactions = [
+  ...walletTxData.map(tx => ({ ...tx, source: 'wallet' })),
+  ...referralTxData.map(tx => ({
+    ...tx,
+    source: 'referral',
+    transaction_type: 'referral_commission',
+    amount: tx.commission_amount,
+    status: tx.status
+  }))
+].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+4. UI RENDERING PER TRANSACTION ROW
+Each row in "Recent Activity" shows:
+
+Element	Source field	Logic
+Icon	transaction_type	Map to icon+color (see table below)
+Label	transaction_type	Map to human label (see table below)
+Amount	amount	Green +₹X if credit, Red -₹X if debit
+Date	created_at	format(new Date(created_at), 'MMM dd, h:mm a')
+Status badge	status	Green for completed, Yellow for pending, Red for failed
+Payment ID	lookup by amount	Show WM ID if found in lookup map
+Credit check — these types show green + amount:
+
+
+const isCredit = ['deposit', 'admin_credit', 'commission_earning', 'referral_commission'].includes(type);
+Icon + Color mapping:
+
+transaction_type	Icon	Color
+deposit	TrendingUp	emerald-400
+admin_credit	TrendingUp	emerald-400
+booking	Video	orange-400
+music_generation	Music	purple-400
+greeting_card_generation	Gift	pink-400
+referral_commission	Users	pink-400
+image_promotion	Image	blue-400
+photo_wish	Image	cyan-400
+celebrity_call / voice_call	Phone	yellow-400
+celebrity_subscription	Star	amber-400
+plan_upgrade	Star	amber-400
+ugc_video	Video	orange-400
+Label mapping:
+
+transaction_type	Display Label
+deposit	Wallet Top-up
+booking	Video Shoutout
+referral_commission	Referral Bonus
+music_generation	Music Generation
+greeting_card_generation	Greeting Card
+celebrity_subscription	Celebrity Subscription
+photo_wish	Photo Wish
+voice_call	Voice Call
+plan_upgrade	Plan Upgrade
+admin_credit	Admin Credit
+5. FILTERING & PAGINATION
+Default: Show first 10 transactions
+"Show All" toggle: showAllTx boolean shows all
+Payment ID search: Filter by paymentIdSearch string matching against the WM ID lookup
+Filtered list logic:
+
+const filteredTx = transactions.filter(tx => {
+  if (!paymentIdSearch) return true;
+  const wmId = paymentTxLookup[`${Math.abs(tx.amount)}`] || '';
+  return wmId.toLowerCase().includes(paymentIdSearch.toLowerCase());
+});
+const displayedTx = showAllTx ? filteredTx : filteredTx.slice(0, 10);
+This covers the complete data flow for the Wallet screen's Referral Earnings card and Recent Activity list.
+
+
+
+
+
