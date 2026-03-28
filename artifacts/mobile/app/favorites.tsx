@@ -313,20 +313,22 @@ function BrowseTab({
                     </View>
                   )}
 
-                  <View style={styles.badgesRow}>
-                    <View style={[styles.featureBadge, { backgroundColor: '#FF6B3318' }]}>
-                      <Icon name="video" size={9} color="#FF6B33" />
-                      <Text style={[styles.featureBadgeText, { color: '#FF6B33' }]}>UGC</Text>
+                  {pricing && (
+                    <View style={styles.badgesRow}>
+                      <View style={[styles.featureBadge, { backgroundColor: '#FF6B3318' }]}>
+                        <Icon name="video" size={9} color="#FF6B33" />
+                        <Text style={[styles.featureBadgeText, { color: '#FF6B33' }]}>UGC</Text>
+                      </View>
+                      <View style={[styles.featureBadge, { backgroundColor: '#B44CFF18' }]}>
+                        <Icon name="zap" size={9} color="#B44CFF" />
+                        <Text style={[styles.featureBadgeText, { color: '#B44CFF' }]}>Wishes</Text>
+                      </View>
+                      <View style={[styles.featureBadge, { backgroundColor: '#22C55E18' }]}>
+                        <Icon name="image" size={9} color="#22C55E" />
+                        <Text style={[styles.featureBadgeText, { color: '#22C55E' }]}>Promo</Text>
+                      </View>
                     </View>
-                    <View style={[styles.featureBadge, { backgroundColor: '#B44CFF18' }]}>
-                      <Icon name="zap" size={9} color="#B44CFF" />
-                      <Text style={[styles.featureBadgeText, { color: '#B44CFF' }]}>Wishes</Text>
-                    </View>
-                    <View style={[styles.featureBadge, { backgroundColor: '#22C55E18' }]}>
-                      <Icon name="image" size={9} color="#22C55E" />
-                      <Text style={[styles.featureBadgeText, { color: '#22C55E' }]}>Promo</Text>
-                    </View>
-                  </View>
+                  )}
 
                   {pricing ? (
                     <View style={styles.priceRow}>
@@ -365,7 +367,7 @@ function BrowseTab({
                             : { color: colors.mutedForeground },
                       ]}
                     >
-                      {isSub ? 'Subscribed' : pricing ? 'Subscribe' : 'View Profile'}
+                      {isSub ? 'Subscribed' : pricing ? `₹${pricing.price.toLocaleString('en-IN')} - Subscribe` : 'View Profile'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -622,132 +624,29 @@ export default function FavoritesScreen() {
     setModalVisible(true);
   };
 
-  const processSubscription = useCallback(async (
+  const callPurchaseRpc = useCallback(async (
     celeb: Celebrity,
     pricing: CelebrityPricing,
+    paymentMethod: 'wallet' | 'razorpay',
   ) => {
     if (!profileId || !accessToken) return;
 
-    const referrerCommission = Math.floor(pricing.price * pricing.referrer_commission_percentage / 100);
-    const celebrityCommission = Math.floor(pricing.price * pricing.celebrity_commission_percentage / 100);
-
-    const favRes = await supabaseFetch(
-      '/rest/v1/celebrity_favorites',
+    const rpcRes = await supabaseFetch(
+      '/rest/v1/rpc/purchase_celebrity_subscription',
       {
         method: 'POST',
-        headers: { Prefer: 'return=minimal' } as Record<string, string>,
         body: JSON.stringify({
-          user_id: profileId,
-          celebrity_id: celeb.id,
-          price_paid: pricing.price,
-          referrer_commission: referrerCommission,
-          celebrity_commission: celebrityCommission,
-          status: 'active',
+          p_celebrity_id: celeb.id,
+          p_price: pricing.price,
+          p_payment_method: paymentMethod,
         }),
       },
       accessToken,
     );
-    if (!favRes.ok) {
-      const e = await favRes.json().catch(() => ({})) as Record<string, string>;
-      throw new Error(e.message ?? e.error ?? 'Failed to record subscription. Please contact support.');
-    }
 
-    try {
-      const profileRes = await supabaseFetch(
-        `/rest/v1/profiles?select=referred_by&id=eq.${profileId}&limit=1`,
-        {},
-        accessToken,
-      );
-      if (profileRes.ok) {
-        const profiles = await profileRes.json() as Array<{ referred_by: string | null }>;
-        const referredBy = profiles?.[0]?.referred_by;
-        if (referredBy) {
-          const refRes = await supabaseFetch(
-            '/rest/v1/referral_transactions',
-            {
-              method: 'POST',
-              headers: { Prefer: 'return=minimal' } as Record<string, string>,
-              body: JSON.stringify({
-                referrer_id: referredBy,
-                referred_id: profileId,
-                booking_id: null,
-                commission_level: 1,
-                commission_amount: referrerCommission,
-                status: 'completed',
-              }),
-            },
-            accessToken,
-          );
-          if (!refRes.ok) {
-            console.warn('Referral transaction insert failed:', await refRes.text().catch(() => ''));
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Referral processing error (non-critical):', err);
-    }
-
-    try {
-      const celebDetailsRes = await supabaseFetch(
-        `/rest/v1/celebrities?select=pan_verified,total_earnings,available_balance&id=eq.${celeb.id}&limit=1`,
-        {},
-        accessToken,
-      );
-      if (celebDetailsRes.ok) {
-        const celebDetails = await celebDetailsRes.json() as Array<{
-          pan_verified: boolean;
-          total_earnings: number;
-          available_balance: number;
-        }>;
-        const details = celebDetails?.[0];
-        if (details) {
-          const tdsRate = details.pan_verified ? 10 : 20;
-          const tdsAmount = Math.floor(celebrityCommission * tdsRate / 100);
-          const netCommission = celebrityCommission - tdsAmount;
-
-          const cwRes = await supabaseFetch(
-            '/rest/v1/celebrity_wallet_transactions',
-            {
-              method: 'POST',
-              headers: { Prefer: 'return=minimal' } as Record<string, string>,
-              body: JSON.stringify({
-                celebrity_id: celeb.id,
-                transaction_type: 'favorite_subscription',
-                gross_amount: celebrityCommission,
-                tds_percentage: tdsRate,
-                tds_amount: tdsAmount,
-                amount: netCommission,
-                description: `Favorite subscription commission (TDS ${tdsRate}% deducted)`,
-                status: 'completed',
-              }),
-            },
-            accessToken,
-          );
-          if (!cwRes.ok) {
-            console.warn('Celebrity wallet transaction insert failed:', await cwRes.text().catch(() => ''));
-          }
-
-          const patchRes = await supabaseFetch(
-            `/rest/v1/celebrities?id=eq.${celeb.id}`,
-            {
-              method: 'PATCH',
-              headers: { Prefer: 'return=minimal' } as Record<string, string>,
-              body: JSON.stringify({
-                total_earnings: (details.total_earnings ?? 0) + netCommission,
-                available_balance: (details.available_balance ?? 0) + netCommission,
-              }),
-            },
-            accessToken,
-          );
-          if (!patchRes.ok) {
-            console.warn('Celebrity earnings update failed:', await patchRes.text().catch(() => ''));
-          }
-        }
-      } else {
-        console.warn('Failed to fetch celebrity PAN details:', celebDetailsRes.status);
-      }
-    } catch (err) {
-      console.warn('Celebrity commission processing error (non-critical):', err);
+    if (!rpcRes.ok) {
+      const e = await rpcRes.json().catch(() => ({})) as Record<string, string>;
+      throw new Error(e.message ?? e.error ?? 'Subscription failed. Please try again.');
     }
 
     supabaseFetch(
@@ -775,33 +674,7 @@ export default function FavoritesScreen() {
     }
     setPayingWallet(true);
     try {
-      const txRes = await supabaseFetch(
-        '/rest/v1/wallet_transactions',
-        {
-          method: 'POST',
-          headers: { Prefer: 'return=minimal' } as Record<string, string>,
-          body: JSON.stringify({
-            user_id: profileId,
-            transaction_type: 'celebrity_subscription',
-            amount: selectedPricing.price,
-            status: 'completed',
-            payment_method: 'wallet',
-            transaction_details: {
-              celebrity_id: selectedCeleb.id,
-              celebrity_name: selectedCeleb.name,
-              subscription_type: 'favorite',
-            },
-          }),
-        },
-        accessToken,
-      );
-      if (!txRes.ok) {
-        const e = await txRes.json().catch(() => ({})) as Record<string, string>;
-        Alert.alert('Payment Failed', e.message ?? 'Could not deduct from wallet. Please try again.');
-        return;
-      }
-
-      updateUser({ walletBalance: walletBalance - selectedPricing.price });
+      await callPurchaseRpc(selectedCeleb, selectedPricing, 'wallet');
 
       supabaseFetch(
         `/rest/v1/profiles?select=wallet_balance&id=eq.${profileId}&limit=1`,
@@ -816,25 +689,15 @@ export default function FavoritesScreen() {
         }
       }).catch(() => {});
 
-      try {
-        await processSubscription(selectedCeleb, selectedPricing);
-      } catch (subErr) {
-        Alert.alert(
-          'Partial Payment Error',
-          'Your wallet was debited but the subscription could not be confirmed. Please contact support with your transaction details.',
-        );
-        console.error('processSubscription failed after wallet deduction:', subErr);
-        return;
-      }
-
       setModalVisible(false);
       Alert.alert('Subscribed!', `You are now subscribed to ${selectedCeleb.name}!`);
-    } catch {
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+    } catch (err) {
+      const errMsg = (err as Error)?.message ?? 'Something went wrong. Please try again.';
+      Alert.alert('Payment Failed', errMsg);
     } finally {
       setPayingWallet(false);
     }
-  }, [selectedCeleb, selectedPricing, profileId, accessToken, walletBalance, updateUser, processSubscription]);
+  }, [selectedCeleb, selectedPricing, profileId, accessToken, walletBalance, updateUser, callPurchaseRpc]);
 
   const handleRazorpayPay = useCallback(async () => {
     if (!selectedCeleb || !selectedPricing || !profileId || !accessToken) return;
@@ -870,15 +733,13 @@ export default function FavoritesScreen() {
 
       const onPaymentSuccess = async () => {
         try {
-          await processSubscription(selectedCeleb, selectedPricing);
+          await callPurchaseRpc(selectedCeleb, selectedPricing, 'razorpay');
           setModalVisible(false);
           Alert.alert('Subscribed!', `You are now subscribed to ${selectedCeleb.name}!`);
         } catch (subErr) {
-          Alert.alert(
-            'Partial Payment Error',
-            'Payment was received but the subscription could not be confirmed. Please contact support.',
-          );
-          console.error('processSubscription failed after Razorpay payment:', subErr);
+          const errMsg = (subErr as Error)?.message ?? 'Subscription could not be confirmed. Please contact support.';
+          Alert.alert('Partial Payment Error', errMsg);
+          console.error('callPurchaseRpc failed after Razorpay payment:', subErr);
         }
       };
 
@@ -952,7 +813,7 @@ export default function FavoritesScreen() {
     } finally {
       setPayingRazorpay(false);
     }
-  }, [selectedCeleb, selectedPricing, profileId, accessToken, user, processSubscription]);
+  }, [selectedCeleb, selectedPricing, profileId, accessToken, user, callPurchaseRpc]);
 
   if (loading) {
     return (
