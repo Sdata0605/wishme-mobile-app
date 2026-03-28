@@ -313,7 +313,10 @@ export default function HomeScreen() {
       c.category === catValue ||
       c.category.toLowerCase().includes(catValue.toLowerCase()) ||
       catValue.toLowerCase().includes(c.category.toLowerCase());
-    const matchPrice = c.pricePerWish >= priceRange.min && c.pricePerWish < priceRange.max;
+    const subPrice = c.subscription?.price;
+    const matchPrice = priceRange.label === 'All'
+      ? true
+      : subPrice != null && subPrice >= priceRange.min && subPrice < priceRange.max;
     return matchCat && matchPrice;
   });
 

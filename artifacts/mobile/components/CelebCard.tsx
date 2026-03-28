@@ -68,7 +68,9 @@ export function CelebCard({
           <Icon name="star" size={10} color="#FFB347" />
           <Text style={[styles.rating, { color: colors.mutedForeground }]}>{celebrity.rating}</Text>
         </View>
-        <Text style={[styles.price, { color: colors.primary }]}>₹{celebrity.pricePerWish.toLocaleString('en-IN')}</Text>
+        {!!celebrity.subscription?.price && (
+          <Text style={[styles.price, { color: colors.primary }]}>₹{celebrity.subscription.price.toLocaleString('en-IN')}/mo</Text>
+        )}
       </View>
     </Pressable>
   );
