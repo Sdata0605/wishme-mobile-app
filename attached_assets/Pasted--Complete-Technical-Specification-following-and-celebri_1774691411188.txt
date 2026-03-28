@@ -1,0 +1,319 @@
+
+
+# Complete Technical Specification: /following and /celebrity/:id Pages
+
+This is a documentation deliverable for Replit mobile app development. No code changes needed.
+
+---
+
+## PAGE 1: /following (Celebrity Favorites)
+
+### Purpose
+Allows users to browse all active celebrities, subscribe to them (one-time lifetime payment), and view their subscribed celebrities. Subscription unlocks services like UGC videos, wishes, and promotions on the celebrity profile page.
+
+### Authentication
+Requires login. Uses `useAuth()` to get `user` (Auth UUID) and `profile` (Profile row including `profile.id`).
+
+**CRITICAL**: All queries use `profile.id` (Profile UUID), NOT `auth.users.id`.
+
+---
+
+### Page Layout
+
+**Two tabs** using `Tabs` component:
+
+| Tab | Label | Badge |
+|-----|-------|-------|
+| `browse` | Browse (with Search icon) | none |
+| `my-favorites` | My Favorites (with Heart icon) | `({userFavorites.length})` |
+
+---
+
+### Tab 1: Browse
+
+**Components**: Search Input + Celebrity Card Grid (1 col mobile, 2 col tablet, 3 col desktop)
+
+**Data Fetching** (on mount, 2 parallel queries):
+
+#### Query 1 — All active celebrities
+```
+GET /rest/v1/celebrities?is_active=eq.true&order=name
+SELECT *
+```
+Response keys used in UI:
+- `id` — card key + navigation
+- `name` — card title
+- `image_url` — card image (aspect 4:3)
+- `category` — subtitle text
+- `rating` — star rating display (`.toFixed(1)`)
+- `review_count` — "(X)" next to rating
+- `is_verified` — shows "Verified" Badge top-right
+
+#### Query 2 — Subscription pricing
+```
+GET /rest/v1/celebrity_favorite_pricing?is_enabled=eq.true
+SELECT *
+```
+Response keys used:
+- `celebrity_id` — match to celebrity card
+- `price` — displayed as "₹{price} - Subscribe" on button
+- `referrer_commission_percentage` — used server-side only
+- `celebrity_commission_percentage` — used server-side only
+
+**Client-side logic**:
+- `filteredCelebrities` = filter by `searchTerm` against `name` and `category` (case-insensitive)
+- `isFavorite(id)` = check if `id` exists in `userFavorites` array
+- `getCelebrityPrice(id)` = lookup price from pricing array
+- `hasPricing(id)` = whether pricing row exists (shows benefits list)
+
+**Celebrity Card UI**:
+```
+┌─────────────────────────┐
+│  [Image 4:3 aspect]     │
+│  [Verified badge]  top-R│
+│  [Subscribed badge] top-L│
+├─────────────────────────┤
+│  Name                   │
+│  Category               │
+│  ★ 4.5 (12)             │
+│  ✓ UGC Videos           │  ← only if hasPricing
+│  ✓ AI Image Promotions  │
+│  ✓ Occasion Wishes      │
+│─────────────────────────│
+│  [₹999 - Subscribe]     │  ← or "View Profile" if subscribed/no pricing
+└─────────────────────────┘
+```
+
+---
+
+### Tab 2: My Favorites
+
+**Data Fetching**:
+```
+GET /rest/v1/celebrity_favorites?user_id=eq.{PROFILE_ID}&status=eq.active&select=*,celebrities(*)
+```
+Response keys used:
+- `id` — card key
+- `celebrity_id` — navigation to `/celebrity/{celebrity_id}`
+- `price_paid` — not displayed but available
+- `created_at` — not displayed but available
+- `celebrities.name` — card title
+- `celebrities.category` — subtitle
+- `celebrities.image_url` — card image
+
+**Card UI**: Same layout as Browse but always shows "Subscribed" badge + "Use Services" button (navigates to `/celebrity/{celebrity_id}`).
+
+---
+
+### Subscription Payment Flow
+
+When user taps "Subscribe" button:
+
+1. **PaymentMethodSelector** dialog opens showing:
+   - Total amount (`₹{price}`)
+   - Wallet balance
+   - Two buttons: Wallet | Razorpay
+
+2. **Wallet Payment** calls:
+```
+POST /rest/v1/rpc/purchase_celebrity_subscription
+Payload: {
+  "p_celebrity_id": "uuid",
+  "p_price": 999,
+  "p_payment_method": "wallet"
+}
+```
+This RPC atomically: validates pricing, checks wallet balance, debits wallet, creates `celebrity_favorites` row, creates `wallet_transactions` row, handles referral commissions.
+
+3. **Razorpay Payment** calls Edge Function first:
+```
+POST /functions/v1/create-razorpay-order
+Payload: {
+  "amount": 999,
+  "currency": "INR",
+  "receipt": "fav_{timestamp}_{userShort}",
+  "notes": {
+    "user_id": "profile_uuid",
+    "celebrity_id": "celebrity_uuid",
+    "type": "celebrity_favorite"
+  }
+}
+Response: { "id": "order_xxx", "key_id": "rzp_xxx", "amount": 99900, "currency": "INR" }
+```
+Then opens Razorpay checkout. On success, calls same `purchase_celebrity_subscription` RPC with `p_payment_method: 'razorpay'`.
+
+4. **Post-payment** (fire-and-forget email):
+```
+POST /functions/v1/send-celebrity-subscription-email
+Payload: {
+  "celebrity_id": "uuid",
+  "subscriber_name": "John Doe",
+  "subscriber_email": "john@example.com",
+  "price_paid": 999
+}
+```
+
+---
+
+## PAGE 2: /celebrity/:id (Celebrity Profile)
+
+### Purpose
+Public celebrity profile page showing bio, media, events, services, and subscription CTA. Services are locked behind subscription.
+
+### Data Fetching (on mount, 3 queries):
+
+#### Query 1 — Celebrity data
+```
+GET /rest/v1/celebrities?id=eq.{id}
+SELECT * (single row)
+```
+Response keys used in UI:
+- `id`, `name`, `category`, `image_url`, `bio`, `location`, `rating`, `review_count`, `followers`, `delivery_time`, `is_verified`, `verification_status`
+- `service_prices` (JSONB) — keys: `general_wish` (default 5000), `ugc_ad` (default 25000), `image_promotion` (default 15000)
+
+#### Query 2 — Public events
+```
+GET /rest/v1/celebrity_events?celebrity_id=eq.{id}&is_public=eq.true&order=event_date.asc
+SELECT *
+```
+Response keys: `id`, `title`, `event_date`, `location`
+
+#### Query 3 — Public media
+```
+GET /rest/v1/celebrity_media?celebrity_id=eq.{id}&is_public=eq.true&order=created_at.desc
+SELECT *
+```
+Response keys: `id`, `media_type` ("video"|"image"), `file_url`, `title`
+
+#### Query 4 — Subscription price (if logged in)
+```
+GET /rest/v1/celebrity_favorite_pricing?celebrity_id=eq.{id}&is_enabled=eq.true (maybeSingle)
+SELECT price
+```
+Response: `{ "price": 999 }` or null (defaults to 999)
+
+#### Subscription check (via `useCelebritySubscription` hook)
+```
+GET /rest/v1/celebrity_favorites?user_id=eq.{PROFILE_ID}&celebrity_id=eq.{id}&status=eq.active (maybeSingle)
+```
+Returns row if subscribed, null if not. Sets `isSubscribed` boolean.
+
+---
+
+### Page Layout
+
+**Mobile layout** (shown first in code):
+```
+┌─────────────────────────┐
+│ [Cover image blurred]   │
+│ [Share] [Heart] buttons │
+├─────────────────────────┤
+│ ┌─Profile Card────────┐ │
+│ │ [Avatar] Name ✓     │ │
+│ │ Category            │ │
+│ │ ★ 4.5 (12) • 5K fol │ │
+│ │ 📍India  🎬 3-5 days│ │
+│ └─────────────────────┘ │
+├─────────────────────────┤
+│ Subscribe CTA Card      │  ← if NOT subscribed
+│ "₹999 One-time"         │
+│ ✓ Video wishes          │
+│ ✓ UGC promotions        │
+│ ✓ Image promotions      │
+│ [Subscribe to {name}]   │
+├─────────────────────────┤
+│ OR: "Subscribed ✓" card │  ← if subscribed (green)
+├─────────────────────────┤
+│ Book a Service section  │
+│ ┌─Wish a Friend──────┐ │
+│ │ 💜 ₹5000  3-5 days  │ │  ← locked overlay if not subscribed
+│ │ [Book Now]          │ │
+│ └─────────────────────┘ │
+│ ┌─Make an Ad──────────┐ │
+│ │ 🎬 ₹25000 3-5 days  │ │
+│ │ [Book Now]          │ │
+│ └─────────────────────┘ │
+│ ┌─Video Promo─────────┐ │
+│ │ 🖼 ₹15000 3-5 days  │ │
+│ │ [Book Now]          │ │
+│ └─────────────────────┘ │
+├─────────────────────────┤
+│ [Overview|Media|Events| │
+│  Releases|About] tabs   │
+└─────────────────────────┘
+```
+
+**Desktop layout**: 75/25 split. Left = header + BookAServiceSection + tabs. Right = sticky sidebar with subscription CTA + service cards.
+
+---
+
+### 5 Content Tabs
+
+| Tab | Content | Data Source |
+|-----|---------|-------------|
+| Overview | Bio text + 4-stat grid (location, followers, delivery_time, verification_status) | `celebrity.*` |
+| Media | Image/video grid (2-3 cols). Images show `file_url`, videos show Video icon placeholder | `celebrity_media` |
+| Events | List of events with Calendar icon, title, date, location | `celebrity_events` |
+| Releases | Static "No releases available" placeholder | none |
+| About | Bio + location with MapPin icon | `celebrity.*` |
+
+---
+
+### Service Booking Navigation
+
+When "Book Now" is tapped:
+1. **Not logged in** → stores redirect in `sessionStorage.setItem('redirectAfterAuth', '/celebrity/{id}')` → navigates to `/auth`
+2. **Logged in but not subscribed** → opens `SubscriptionGate` modal
+3. **Subscribed** → navigates based on service type:
+   - `wish` → `/booking/{id}?service=wish`
+   - `ugc` → `/ugc-ads?celebrity={id}`
+   - `image` → `/booking/{id}?service=image`
+
+---
+
+### SubscriptionGate Modal (2-step dialog)
+
+**Step 1**: Info dialog showing:
+- Celebrity avatar, name, category
+- Price in large text ("₹999")
+- "Lifetime Access - Pay Once, Use Forever"
+- 5 benefits list (wishes, UGC, image promos, occasion greetings, lifetime access)
+- "Subscribe Now" button → opens Step 2
+
+**Step 2**: `PaymentMethodSelector` dialog (same as /following page):
+- Wallet payment → `purchase_celebrity_subscription` RPC
+- Razorpay → "Coming soon" toast (in this component; full Razorpay is only on /following page)
+
+---
+
+### Performance Tips for Mobile App
+
+1. **Cache celebrity data** by ID — profile pages are visited repeatedly
+2. **Lazy-load media tab** — only fetch `celebrity_media` when Media tab is tapped
+3. **Lazy-load events tab** — only fetch `celebrity_events` when Events tab is tapped
+4. **Subscription check** can be cached per session — it rarely changes
+5. **Image optimization** — celebrity `image_url` values are full-size; use image resizing on mobile
+
+---
+
+### Key Tables Reference
+
+| Table | Purpose | Filter Column | Value |
+|-------|---------|---------------|-------|
+| `celebrities` | Celebrity profile | `id` | celebrity UUID |
+| `celebrity_events` | Public events | `celebrity_id` + `is_public=true` | celebrity UUID |
+| `celebrity_media` | Public media | `celebrity_id` + `is_public=true` | celebrity UUID |
+| `celebrity_favorite_pricing` | Subscription price | `celebrity_id` + `is_enabled=true` | celebrity UUID |
+| `celebrity_favorites` | User subscriptions | `user_id` (PROFILE UUID) + `celebrity_id` + `status=active` | profile UUID |
+
+### Key RPC
+| Function | Purpose | Params |
+|----------|---------|--------|
+| `purchase_celebrity_subscription` | Atomic subscribe | `p_celebrity_id`, `p_price`, `p_payment_method` |
+
+### Key Edge Functions
+| Function | Purpose |
+|----------|---------|
+| `create-razorpay-order` | Create Razorpay order for non-wallet payment |
+| `send-celebrity-subscription-email` | Notify celebrity of new subscriber |
+
