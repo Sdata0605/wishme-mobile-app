@@ -1,14 +1,16 @@
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -70,6 +72,21 @@ function fmtDate(iso: string): string {
   });
 }
 
+function dateToISO(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function dateToDisplay(date: Date): string {
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
 function formatOrderType(orderType: string | null): string | null {
   if (!orderType) return null;
   return orderType
@@ -115,6 +132,12 @@ export default function CommissionScreen() {
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [startDateObj, setStartDateObj] = useState<Date | null>(null);
+  const [endDateObj, setEndDateObj] = useState<Date | null>(null);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
+  const [draftStartDate, setDraftStartDate] = useState<Date | null>(null);
+  const [draftEndDate, setDraftEndDate] = useState<Date | null>(null);
 
   const [referralTxns, setReferralTxns] = useState<ReferralTransaction[]>([]);
   const [pendingReferralTxns, setPendingReferralTxns] = useState<ReferralTransaction[]>([]);
@@ -275,26 +298,32 @@ export default function CommissionScreen() {
         <View style={[s.dateFilter, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <Text style={[s.dateFilterTitle, { color: colors.foreground }]}>Filter by Date</Text>
           <View style={s.dateInputRow}>
-            <View style={[s.dateInput, { backgroundColor: colors.input, borderColor: colors.border }]}>
+            <TouchableOpacity
+              style={[s.dateInput, { backgroundColor: colors.input, borderColor: colors.border }]}
+              onPress={() => {
+                setDraftStartDate(startDateObj ?? new Date());
+                setShowStartPicker(true);
+              }}
+              activeOpacity={0.7}
+            >
               <Icon name="calendar" size={14} color={colors.mutedForeground} />
-              <TextInput
-                style={[s.dateInputText, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
-                placeholder="Start Date"
-                placeholderTextColor={colors.mutedForeground}
-                value={startDate}
-                onChangeText={setStartDate}
-              />
-            </View>
-            <View style={[s.dateInput, { backgroundColor: colors.input, borderColor: colors.border }]}>
+              <Text style={[s.dateInputText, { color: startDateObj ? colors.foreground : colors.mutedForeground, fontFamily: 'Inter_400Regular' }]}>
+                {startDateObj ? dateToDisplay(startDateObj) : 'Start Date'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.dateInput, { backgroundColor: colors.input, borderColor: colors.border }]}
+              onPress={() => {
+                setDraftEndDate(endDateObj ?? new Date());
+                setShowEndPicker(true);
+              }}
+              activeOpacity={0.7}
+            >
               <Icon name="calendar" size={14} color={colors.mutedForeground} />
-              <TextInput
-                style={[s.dateInputText, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
-                placeholder="End Date"
-                placeholderTextColor={colors.mutedForeground}
-                value={endDate}
-                onChangeText={setEndDate}
-              />
-            </View>
+              <Text style={[s.dateInputText, { color: endDateObj ? colors.foreground : colors.mutedForeground, fontFamily: 'Inter_400Regular' }]}>
+                {endDateObj ? dateToDisplay(endDateObj) : 'End Date'}
+              </Text>
+            </TouchableOpacity>
           </View>
           {(startDate || endDate) ? (
             <TouchableOpacity
@@ -302,12 +331,112 @@ export default function CommissionScreen() {
               onPress={() => {
                 setStartDate('');
                 setEndDate('');
+                setStartDateObj(null);
+                setEndDateObj(null);
               }}
             >
               <Text style={[s.clearBtnText, { color: colors.mutedForeground }]}>Clear Filters</Text>
             </TouchableOpacity>
           ) : null}
         </View>
+
+        {/* Native date pickers */}
+        {Platform.OS === 'android' && showStartPicker && (
+          <DateTimePicker
+            value={startDateObj ?? new Date()}
+            mode="date"
+            display="default"
+            onChange={(event: DateTimePickerEvent, date?: Date) => {
+              setShowStartPicker(false);
+              if (event.type === 'set' && date) {
+                setStartDateObj(date);
+                setStartDate(dateToISO(date));
+              }
+            }}
+          />
+        )}
+        {Platform.OS === 'android' && showEndPicker && (
+          <DateTimePicker
+            value={endDateObj ?? new Date()}
+            mode="date"
+            display="default"
+            onChange={(event: DateTimePickerEvent, date?: Date) => {
+              setShowEndPicker(false);
+              if (event.type === 'set' && date) {
+                setEndDateObj(date);
+                setEndDate(dateToISO(date));
+              }
+            }}
+          />
+        )}
+        {Platform.OS === 'ios' && (
+          <Modal visible={showStartPicker} transparent animationType="slide">
+            <Pressable style={s.iosPickerOverlay} onPress={() => setShowStartPicker(false)}>
+              <Pressable style={[s.iosPickerContainer, { backgroundColor: colors.card }]}>
+                <View style={[s.iosPickerHeader, { borderBottomColor: colors.border }]}>
+                  <TouchableOpacity onPress={() => setShowStartPicker(false)}>
+                    <Text style={[s.iosPickerCancel, { color: colors.mutedForeground }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={[s.iosPickerTitle, { color: colors.foreground }]}>Start Date</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (draftStartDate) {
+                        setStartDateObj(draftStartDate);
+                        setStartDate(dateToISO(draftStartDate));
+                      }
+                      setShowStartPicker(false);
+                    }}
+                  >
+                    <Text style={[s.iosPickerDone, { color: '#FF6B33' }]}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={draftStartDate ?? new Date()}
+                  mode="date"
+                  display="spinner"
+                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
+                    if (date) setDraftStartDate(date);
+                  }}
+                  style={s.iosDatePicker}
+                />
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
+        {Platform.OS === 'ios' && (
+          <Modal visible={showEndPicker} transparent animationType="slide">
+            <Pressable style={s.iosPickerOverlay} onPress={() => setShowEndPicker(false)}>
+              <Pressable style={[s.iosPickerContainer, { backgroundColor: colors.card }]}>
+                <View style={[s.iosPickerHeader, { borderBottomColor: colors.border }]}>
+                  <TouchableOpacity onPress={() => setShowEndPicker(false)}>
+                    <Text style={[s.iosPickerCancel, { color: colors.mutedForeground }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <Text style={[s.iosPickerTitle, { color: colors.foreground }]}>End Date</Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (draftEndDate) {
+                        setEndDateObj(draftEndDate);
+                        setEndDate(dateToISO(draftEndDate));
+                      }
+                      setShowEndPicker(false);
+                    }}
+                  >
+                    <Text style={[s.iosPickerDone, { color: '#FF6B33' }]}>Done</Text>
+                  </TouchableOpacity>
+                </View>
+                <DateTimePicker
+                  value={draftEndDate ?? new Date()}
+                  mode="date"
+                  display="spinner"
+                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
+                    if (date) setDraftEndDate(date);
+                  }}
+                  style={s.iosDatePicker}
+                />
+              </Pressable>
+            </Pressable>
+          </Modal>
+        )}
 
         {/* Loading state */}
         {loading ? (
@@ -509,4 +638,18 @@ const s = StyleSheet.create({
   emptyState: { alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12, paddingHorizontal: 32 },
   emptyTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   emptySubtitle: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  iosPickerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  iosPickerContainer: { borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 24 },
+  iosPickerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  iosPickerTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  iosPickerCancel: { fontSize: 15, fontFamily: 'Inter_400Regular' },
+  iosPickerDone: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  iosDatePicker: { width: '100%' },
 });
