@@ -137,19 +137,12 @@ export default function WishFriendScreen() {
       }
 
       setHasSubscriptions(true);
-      const celebIds = favRows.map(r => r.celebrity_id);
-      const idsParam = `(${celebIds.join(',')})`;
       const today = new Date().toISOString().split('T')[0];
 
-      // Steps 2, 3, 4 in parallel
-      const [celebRes, occRes, wishRes] = await Promise.all([
+      // Steps 2, 3 in parallel
+      const [occRes, wishRes] = await Promise.all([
         supabaseFetch(
-          `/rest/v1/celebrities?select=id,name,image_url,category&id=in.${idsParam}&is_active=eq.true`,
-          {},
-          accessToken,
-        ),
-        supabaseFetch(
-          `/rest/v1/celebrity_occasions?select=*,celebrities:celebrity_id(id,name,image_url,category)&celebrity_id=in.${idsParam}&is_public=eq.true&occasion_date=gte.${today}&order=occasion_date.asc`,
+          `/rest/v1/celebrity_occasions?select=*,celebrities:celebrity_id(id,name,image_url,category)&is_public=eq.true&occasion_date=gte.${today}&order=occasion_date.asc`,
           {},
           accessToken,
         ),
@@ -160,13 +153,17 @@ export default function WishFriendScreen() {
         ),
       ]);
 
-      if (celebRes.ok) {
-        const rows = await celebRes.json() as Celebrity[];
-        setCelebrities(rows ?? []);
-      }
       if (occRes.ok) {
         const rows = await occRes.json() as CelebOccasion[];
         setOccasions(rows ?? []);
+        const uniqueCelebs = [
+          ...new Map(
+            (rows ?? [])
+              .filter(o => o.celebrities)
+              .map(o => [o.celebrities.id, o.celebrities])
+          ).values(),
+        ];
+        setCelebrities(uniqueCelebs);
       }
       if (wishRes.ok) {
         const rows = await wishRes.json() as Wish[];
@@ -432,6 +429,14 @@ export default function WishFriendScreen() {
 
           {/* Celebrity Picker */}
           <Text style={[s.sectionLabel, { color: colors.foreground }]}>Choose a Celebrity</Text>
+          {celebrities.length === 0 ? (
+            <View style={[s.noOccasionWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Icon name="calendar" size={28} color={colors.mutedForeground} />
+              <Text style={[s.noOccasionText, { color: colors.mutedForeground }]}>
+                No upcoming occasions right now. Check back soon.
+              </Text>
+            </View>
+          ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipScroll}>
             {celebrities.map(celeb => {
               const isSelected = selectedCeleb?.id === celeb.id;
@@ -462,6 +467,7 @@ export default function WishFriendScreen() {
               );
             })}
           </ScrollView>
+          )}
 
           {/* Occasion List */}
           {selectedCeleb && (
