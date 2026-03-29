@@ -1,0 +1,156 @@
+/image-promotions — AI Image Promotions Page
+Purpose
+Lets authenticated users generate AI-powered promotional images featuring celebrities they've subscribed to. Users select a celebrity, describe a promotion concept, optionally upload a reference image, pay from their wallet, and receive an AI-generated promotional image they can download.
+
+Page Structure & UI Components
+Layout: Wrapped in AuthenticatedLayout (Header + Sidebar + Footer + MobileBottomNav)
+
+UI Library: All from shadcn/ui + Lucide icons
+
+Section 1: Loading State
+Loader spinner centered while data loads
+Section 2: Subscription Gate (if user has 0 favorites)
+Card with Lock icon, title "Subscribe to Celebrities First"
+Lists benefits, Button → navigates to /following
+Section 3: Header
+Gradient text title "AI Image Promotions"
+Subtitle paragraph
+Section 4: Stats Cards (3-column grid → stacks on mobile)
+Card	Icon	Data
+Wallet Balance	Wallet	₹{walletBalance} + "Add Funds" Button → /wallet
+Today's Generations	Image	Count of history items created today
+Completed	Star	Count of history items with status === 'completed'
+Section 5: Promo Alert
+Alert component (green) showing free period notice + plan discount info
+Section 6: Generator Form (left column of 2-col grid)
+Inside a Card:
+
+Celebrity Select: Select dropdown of subscribed celebrities with trained avatars
+Reference Image Tabs: Tabs with 2 tabs:
+"Upload Reference" — file Input (hidden) + Label click target, shows preview
+"AI Only" — text description
+Concept (Textarea, required, max 500 chars, with counter)
+Branding Details (Textarea, optional, max 300 chars, with counter)
+Pricing: PricingDisplay component showing base price, discounted price, plan name
+Generate Button: Button showing price, disabled if generating/insufficient balance/no celebrity
+Section 7: Preview Column (right column)
+If generation exists: Card with img + Download button
+If no generation: placeholder Card with faded Image icon
+Section 8: Generation History
+Card with title "Generation History"
+Empty state: faded icon + text
+Grid of Cards (1/2/3 columns responsive), each showing:
+Thumbnail img (h-48, object-cover)
+Status badge (green/red/yellow span)
+Date
+Concept text (line-clamp-2)
+Download Button
+Data Fetching — Exact Endpoints & Payloads
+1. Get Current User (auth check)
+POST /auth/v1/user
+Headers: { Authorization: Bearer <access_token> }
+Response: { user: { id: "uuid" } }
+2. Fetch Platform Pricing
+GET /rest/v1/platform_settings?setting_key=eq.image_promotion_price&select=setting_value
+Headers: { apikey: <anon_key>, Authorization: Bearer <token> }
+Response: [{ "setting_value": "25" }]
+Default fallback: 25 if no row found.
+
+3. Fetch User Profile ID
+GET /rest/v1/profiles?user_id=eq.<auth_user_id>&select=id
+Headers: { apikey: <anon_key>, Authorization: Bearer <token> }
+Response: [{ "id": "profile-uuid" }]
+4. Fetch Generation History
+GET /rest/v1/image_promotions?user_id=eq.<profile_id>&select=*&order=created_at.desc&limit=50
+Headers: { apikey: <anon_key>, Authorization: Bearer <token> }
+Response: [
+  {
+    "id": "uuid",
+    "user_id": "profile-uuid",
+    "celebrity_id": "celeb-uuid",
+    "concept": "New phone launch...",
+    "branding_details": "Brand X, blue theme",
+    "generated_image_url": "https://...png",
+    "status": "completed" | "pending" | "failed",
+    "price_paid": 25,
+    "error_message": null,
+    "wishme_payment_id": "WM-...",
+    "created_at": "2025-01-20T...",
+    "completed_at": "2025-01-20T..."
+  }
+]
+5. Fetch Subscribed Celebrities (with trained avatars)
+GET /rest/v1/celebrities?is_active=eq.true&avatar_trained=eq.true&id=in.(<fav1>,<fav2>)&select=id,name,category,avatar_trained,image_url&order=name
+Headers: { apikey: <anon_key>, Authorization: Bearer <token> }
+Response: [
+  {
+    "id": "celeb-uuid",
+    "name": "Hari Raj Shetty",
+    "category": "Actor",
+    "avatar_trained": true,
+    "image_url": "https://..."
+  }
+]
+Note: favorites come from the useCelebrityFavorites hook which queries:
+
+GET /rest/v1/celebrity_favorites?user_id=eq.<profile_id>&select=celebrity_id
+6. Generate Image Promotion (Edge Function)
+POST /functions/v1/generate-image-promotion
+Headers: {
+  Authorization: Bearer <access_token>,
+  Content-Type: application/json
+}
+Body: {
+  "celebrityId": "celeb-uuid",
+  "concept": "New smartphone launch with futuristic design",
+  "brandingDetails": "Brand X, blue and silver theme",
+  "referenceImageUrl": "data:image/png;base64,..." | null,
+  "referenceImageSource": "upload" | "none"
+}
+Response (success): {
+  "success": true,
+  "generation": {
+    "id": "gen-uuid",
+    "user_id": "profile-uuid",
+    "celebrity_id": "celeb-uuid",
+    "concept": "...",
+    "branding_details": "...",
+    "generated_image_url": "https://...supabase.co/storage/.../promotions/....png",
+    "status": "completed",
+    "price_paid": 25,
+    "completed_at": "2025-01-20T..."
+  }
+}
+Response (error): { "error": "Insufficient balance. Need ₹25, have ₹10" }
+7. Record Payment Transaction (after successful generation)
+POST /rest/v1/payment_transactions
+Headers: { apikey: <anon_key>, Authorization: Bearer <token> }
+Body: {
+  "wishme_payment_id": "WM-20250120-XXXX",
+  "user_id": "profile-uuid",
+  "amount": 25,
+  "payment_method": "wallet",
+  "service_type": "image_promotion",
+  "image_promotion_id": "gen-uuid",
+  "description": "Image Promotion",
+  "status": "completed",
+  "paid_at": "2025-01-20T..."
+}
+8. Update Promotion with Payment ID
+PATCH /rest/v1/image_promotions?id=eq.<gen-uuid>
+Headers: { apikey: <anon_key>, Authorization: Bearer <token> }
+Body: { "wishme_payment_id": "WM-20250120-XXXX" }
+Payment Flow
+User clicks "Generate Image - ₹{price}"
+Frontend checks walletBalance >= imagePrice (client-side guard)
+Edge function generate-image-promotion re-checks server-side via profiles.wallet_balance
+Edge function deducts via wallet_transactions insert (DB trigger updates balance)
+AI generates image via Lovable AI Gateway (Gemini 2.5 Flash Image Preview)
+Image uploaded to Supabase Storage bucket greeting-card-uploads under promotions/{userId}/{genId}.png
+Frontend records payment_transactions row + updates image_promotions.wishme_payment_id
+Hooks Used
+Hook	Purpose
+useWalletBalance()	Returns { balance, loading } from profiles table
+usePlanDiscount()	Returns { discountPercentage, planName, getDiscountedPrice(price) }
+useCelebrityFavorites()	Returns { favorites: string[], loading } — array of celebrity IDs
+useToast()	Toast notifications
