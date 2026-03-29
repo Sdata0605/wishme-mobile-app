@@ -96,7 +96,6 @@ export default function WishFriendScreen() {
 
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [hasSubscriptions, setHasSubscriptions] = useState(true);
 
   const [celebrities, setCelebrities] = useState<Celebrity[]>([]);
   const [occasions, setOccasions] = useState<CelebOccasion[]>([]);
@@ -120,27 +119,14 @@ export default function WishFriendScreen() {
     if (!profileId || !accessToken) return;
 
     try {
-      // Step 1: Get subscribed celebrity IDs
-      const favRes = await supabaseFetch(
-        `/rest/v1/celebrity_favorites?select=celebrity_id&user_id=eq.${profileId}&status=eq.active`,
-        {},
-        accessToken,
-      );
-      if (!favRes.ok) return;
-      const favRows = await favRes.json() as Array<{ celebrity_id: string }>;
-
-      if (!favRows || favRows.length === 0) {
-        setHasSubscriptions(false);
-        setCelebrities([]);
-        setOccasions([]);
-        return;
-      }
-
-      setHasSubscriptions(true);
       const today = new Date().toISOString().split('T')[0];
 
-      // Steps 2, 3 in parallel
-      const [occRes, wishRes] = await Promise.all([
+      const [celebRes, occRes, wishRes] = await Promise.all([
+        supabaseFetch(
+          `/rest/v1/celebrities?select=id,name,image_url,category&is_active=eq.true&order=name.asc`,
+          {},
+          accessToken,
+        ),
         supabaseFetch(
           `/rest/v1/celebrity_occasions?select=*,celebrities:celebrity_id(id,name,image_url,category)&is_public=eq.true&occasion_date=gte.${today}&order=occasion_date.asc`,
           {},
@@ -153,22 +139,9 @@ export default function WishFriendScreen() {
         ),
       ]);
 
-      if (occRes.ok) {
-        const rows = await occRes.json() as CelebOccasion[];
-        setOccasions(rows ?? []);
-        const uniqueCelebs = [
-          ...new Map(
-            (rows ?? [])
-              .filter(o => o.celebrities)
-              .map(o => [o.celebrities.id, o.celebrities])
-          ).values(),
-        ];
-        setCelebrities(uniqueCelebs);
-      }
-      if (wishRes.ok) {
-        const rows = await wishRes.json() as Wish[];
-        setWishes(rows ?? []);
-      }
+      if (celebRes.ok) setCelebrities(await celebRes.json());
+      if (occRes.ok) setOccasions(await occRes.json());
+      if (wishRes.ok) setWishes(await wishRes.json());
     } catch {
       // fail silently — user sees empty states
     }
@@ -311,35 +284,6 @@ export default function WishFriendScreen() {
     );
   }
 
-  // ── Subscription gate ────────────────────────────────────────────────────────
-  if (!hasSubscriptions) {
-    return (
-      <View style={[s.container, { backgroundColor: colors.background }]}>
-        <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Icon name="arrow-left" size={22} color={colors.foreground} />
-          </TouchableOpacity>
-          <Text style={[s.headerTitle, { color: colors.foreground }]}>Wish a Friend</Text>
-          <View style={{ width: 22 }} />
-        </View>
-        <View style={s.gateWrap}>
-          <Icon name="heart" size={52} color={colors.mutedForeground} />
-          <Text style={[s.gateTitle, { color: colors.foreground }]}>No Favourite Celebrities Yet</Text>
-          <Text style={[s.gateText, { color: colors.mutedForeground }]}>
-            Follow some celebrities to start sending them wishes on their special occasions
-          </Text>
-          <TouchableOpacity
-            style={[s.gateBtn, { backgroundColor: colors.primary }]}
-            onPress={() => router.push('/favorites' as never)}
-          >
-            <Icon name="heart" size={16} color="#fff" />
-            <Text style={s.gateBtnText}>Browse Celebrities</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
-  }
-
   // ── Main content ─────────────────────────────────────────────────────────────
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
@@ -431,9 +375,9 @@ export default function WishFriendScreen() {
           <Text style={[s.sectionLabel, { color: colors.foreground }]}>Choose a Celebrity</Text>
           {celebrities.length === 0 ? (
             <View style={[s.noOccasionWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Icon name="calendar" size={28} color={colors.mutedForeground} />
+              <Icon name="star" size={28} color={colors.mutedForeground} />
               <Text style={[s.noOccasionText, { color: colors.mutedForeground }]}>
-                No upcoming occasions right now. Check back soon.
+                No celebrities available right now.
               </Text>
             </View>
           ) : (
