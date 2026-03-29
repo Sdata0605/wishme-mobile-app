@@ -1,0 +1,102 @@
+For Replit: /occasion-wishes Subscription Pricing & Payment Flow
+Important Context
+The /occasion-wishes page itself has NO payment or subscription logic. It is a post-subscription page — it only shows celebrities the user has already subscribed to. The subscription and payment happen on the /celebrity/:id (CelebrityProfile) page.
+
+1. How Subscription Price Is Fetched
+Where: CelebrityProfile.tsx → fetchSubscriptionPrice()
+
+API Call:
+
+GET /rest/v1/celebrity_favorite_pricing
+  ?celebrity_id=eq.{celebrityId}
+  &is_enabled=eq.true
+  &select=price
+Response:
+
+
+{ "price": 999 }
+If no pricing row exists → defaults to 999. This price is stored in state as subscriptionPrice and passed to the SubscriptionGate component.
+
+2. What Happens When User Taps "Subscribe to [Celebrity]"
+Flow: 2 Dialogs in sequence
+
+Dialog 1: SubscriptionGate component (src/components/celebrity/SubscriptionGate.tsx)
+Props received: celebrity (id, name, image_url, category), subscriptionPrice, onSubscribed callback
+UI Elements:
+Celebrity avatar + name + category Badge
+Price display: ₹{subscriptionPrice} with "Lifetime Access • Pay Once, Use Forever"
+Benefits list (5 items with icons: Heart, Video, Image, MessageSquare, Sparkles)
+"Subscribe Now" Button → opens Dialog 2
+Dialog 2: PaymentMethodSelector component (src/components/payment/PaymentMethodSelector.tsx)
+Props received: amount (the subscriptionPrice), walletBalance (from useWalletBalance hook)
+UI Elements:
+Total Amount display: ₹{amount}
+Wallet Balance display: ₹{walletBalance}
+Two payment buttons in a 2-column grid (each 128px tall):
+Wallet button — enabled only if walletBalance >= amount, shows "Insufficient" Badge if not
+Razorpay button — always enabled (currently shows "coming soon" toast)
+3. Wallet Payment Flow (Primary Method)
+When user taps Wallet button:
+
+API Call — Single atomic RPC:
+
+POST /rest/v1/rpc/purchase_celebrity_subscription
+Body: {
+  "p_celebrity_id": "celebrity-uuid",
+  "p_price": 999,
+  "p_payment_method": "wallet"
+}
+This RPC does everything atomically inside the database:
+
+Checks wallet balance ≥ price
+Deducts from profiles.wallet_balance
+Creates wallet_transactions record (type: celebrity_subscription, status: completed)
+Creates celebrity_favorites record (status: active)
+Creates earnings/commission records
+After success:
+
+Fire-and-forget email notification via Edge Function:
+POST /functions/v1/send-celebrity-subscription-email
+Body: {
+  "celebrity_id": "...",
+  "subscriber_name": "John Doe",
+  "subscriber_email": "john@example.com",
+  "price_paid": 999
+}
+Refetches wallet balance via useWalletBalance().refetch()
+Shows success toast
+Calls onSubscribed() callback → refreshes subscription status
+Closes both dialogs
+4. Razorpay Payment Flow (Placeholder)
+Currently shows a toast: "Razorpay integration coming soon. Please use wallet payment."
+
+To implement it properly, you would:
+
+Call POST /functions/v1/create-razorpay-order with { amount: subscriptionPrice, currency: "INR", receipt: "sub_xxx" }
+Open native Razorpay SDK with the returned order.id and key_id
+On success, call POST /functions/v1/verify-razorpay-payment with the signature
+Then call the same purchase_celebrity_subscription RPC with p_payment_method: 'razorpay'
+5. How /occasion-wishes Uses Subscription Data
+The page uses useCelebrityFavorites() hook which queries:
+
+GET /rest/v1/celebrity_favorites
+  ?user_id=eq.{profileId}
+  &status=eq.active
+  &select=celebrity_id
+Returns array of subscribed celebrity IDs like ["uuid1", "uuid2"].
+
+Then fetches celebrity details:
+
+GET /rest/v1/celebrities
+  ?id=in.(uuid1,uuid2)
+  &is_active=eq.true
+  &select=id,name,image_url,category
+If favorites.length === 0, shows "No Favorite Celebrities" empty state with a "Browse Celebrities" button navigating to /favorites.
+
+6. Key Response Fields Summary
+Table	Key Fields Your App Needs
+celebrity_favorite_pricing	price, is_enabled, celebrity_id
+celebrity_favorites	celebrity_id, user_id, status ("active")
+celebrities	id, name, image_url, category, is_active
+profiles	wallet_balance, id, first_name, last_name, email
+purchase_celebrity_subscription RPC	Returns success/error, handles all DB writes atomically
