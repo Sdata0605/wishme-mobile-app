@@ -953,7 +953,7 @@ export default function BookingsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const { user, session } = useAuth();
+  const { user, getValidSession } = useAuth();
   const [activeTab, setActiveTab] = useState<BookingTab>('Celebrity');
   const [tabLoading, setTabLoading] = useState<Partial<Record<BookingTab, boolean>>>({});
   const [fetchError, setFetchError] = useState(false);
@@ -965,11 +965,18 @@ export default function BookingsScreen() {
   });
   const loadedTabsRef = useRef<Set<BookingTab>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [realtimeToken, setRealtimeToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    getValidSession().then(s => setRealtimeToken(s?.access_token ?? null));
+  }, [getValidSession]);
 
   const fetchBadgeCounts = useCallback(async () => {
-    if (!user?.profileId || !session?.access_token) return;
+    if (!user?.profileId) return;
+    const validSession = await getValidSession();
+    if (!validSession?.access_token) return;
     const pid = user.profileId;
-    const tok = session.access_token;
+    const tok = validSession.access_token;
 
     const countFetches = BOOKING_TABS.map(async (tab) => {
       const configs = TAB_TO_TABLES[tab];
@@ -997,14 +1004,17 @@ export default function BookingsScreen() {
       counts[tab] = count;
     }
     setBadgeCounts(counts);
-  }, [user?.profileId, session?.access_token]);
+  }, [user?.profileId, getValidSession]);
 
   const fetchTab = useCallback(async (tab: BookingTab, force = false) => {
-    if (!user?.profileId || !session?.access_token) return;
+    if (!user?.profileId) return;
     if (!force && loadedTabsRef.current.has(tab)) return;
 
+    const validSession = await getValidSession();
+    if (!validSession?.access_token) return;
+
     const pid = user.profileId;
-    const tok = session.access_token;
+    const tok = validSession.access_token;
     setTabLoading(prev => ({ ...prev, [tab]: true }));
 
     const configs = TAB_TO_TABLES[tab];
@@ -1026,7 +1036,7 @@ export default function BookingsScreen() {
     } finally {
       setTabLoading(prev => ({ ...prev, [tab]: false }));
     }
-  }, [user?.profileId, session?.access_token]);
+  }, [user?.profileId, getValidSession]);
 
   const handleRefreshButton = useCallback(async () => {
     setRefreshing(true);
@@ -1056,7 +1066,7 @@ export default function BookingsScreen() {
 
   useRealtimeBookings(
     user?.profileId ?? null,
-    session?.access_token ?? null,
+    realtimeToken,
     handleRealtimeUpdate,
   );
 
@@ -1073,7 +1083,7 @@ export default function BookingsScreen() {
     switch (tab) {
       case 'Celebrity':
         return data.celeb.length === 0 ? (showEmpty ? <EmptyState tab="Celebrity" colors={colors} /> : null) :
-          data.celeb.map(item => <CelebCard key={item.id} item={item} colors={colors} accessToken={session?.access_token ?? null} />);
+          data.celeb.map(item => <CelebCard key={item.id} item={item} colors={colors} accessToken={realtimeToken} />);
       case 'Wishes':
         return data.wishes.length === 0 ? (showEmpty ? <EmptyState tab="Wishes" colors={colors} /> : null) :
           data.wishes.map(item => <WishCard key={item.id} item={item} colors={colors} />);

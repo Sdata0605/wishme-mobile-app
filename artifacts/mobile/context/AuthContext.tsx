@@ -99,6 +99,7 @@ interface AuthContextValue {
     password: string,
     otp: string,
   ) => Promise<{ error: string | null }>;
+  getValidSession: () => Promise<Session | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -106,6 +107,63 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const STORAGE_SESSION = '@wishme/session';
 const STORAGE_USER = '@wishme/user';
 const STORAGE_PENDING = '@wishme/pending_signup';
+
+/** Pure-JS base64 character set used as fallback decoder. */
+const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+
+/** Decode a base64url string to a binary string without relying on atob or Buffer. */
+function decodeBase64Url(base64url: string): string {
+  // Convert base64url to standard base64 and pad to multiple of 4
+  let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4 !== 0) base64 += '=';
+
+  // Use atob if available (Hermes on modern RN)
+  try {
+    if (typeof atob === 'function') return atob(base64);
+  } catch {}
+
+  // Pure-JS fallback — works in any JS environment
+  try {
+    let result = '';
+    let buf = 0;
+    let bits = 0;
+    for (let i = 0; i < base64.length; i++) {
+      const ch = base64[i];
+      if (ch === '=') break;
+      const idx = BASE64_CHARS.indexOf(ch);
+      if (idx === -1) continue;
+      buf = (buf << 6) | idx;
+      bits += 6;
+      if (bits >= 8) {
+        bits -= 8;
+        result += String.fromCharCode((buf >> bits) & 0xff);
+      }
+    }
+    return result;
+  } catch {
+    return '';
+  }
+}
+
+/** Decode exp claim from a Supabase JWT. Returns ms timestamp or 0 on error. */
+function getTokenExpiry(token: string): number {
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return 0;
+    const decoded = decodeBase64Url(parts[1]);
+    if (!decoded) return 0;
+    const payload = JSON.parse(decoded) as { exp?: number };
+    return payload.exp ? payload.exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** True if the token is expired or will expire within 5 minutes. */
+function isTokenStale(token: string): boolean {
+  const exp = getTokenExpiry(token);
+  return exp === 0 || Date.now() > exp - 5 * 60 * 1000;
+}
 
 function buildUserFromSupabase(supaUser: Record<string, unknown>, fallback: Partial<User> = {}): User {
   const meta = (supaUser.user_metadata ?? {}) as Record<string, unknown>;
@@ -143,29 +201,143 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const pairs = await AsyncStorage.multiGet([STORAGE_SESSION, STORAGE_USER, STORAGE_PENDING]);
         const sessionStr = pairs[0][1];
-        const userStr = pairs[1][1];
+        const userStr    = pairs[1][1];
         const pendingStr = pairs[2][1];
 
-        if (userStr) setUser(JSON.parse(userStr));
-        if (sessionStr) setSession(JSON.parse(sessionStr));
         if (pendingStr) setPendingSignup(JSON.parse(pendingStr));
 
+        if (userStr && sessionStr) {
+          const storedSession = JSON.parse(sessionStr) as Session;
+          const storedUser    = JSON.parse(userStr) as User;
+
+          if (!isTokenStale(storedSession.access_token)) {
+            setSession(storedSession);
+            sessionRef.current = storedSession;
+            setUser(storedUser);
+          } else {
+            // Token expired — try to refresh inline before showing the app
+            try {
+              const res = await supabaseFetch('/auth/v1/token?grant_type=refresh_token', {
+                method: 'POST',
+                body: JSON.stringify({ refresh_token: storedSession.refresh_token }),
+              });
+              if (res.ok) {
+                const data = await res.json() as Record<string, unknown>;
+                if (data.access_token) {
+                  const refreshed: Session = {
+                    access_token: data.access_token as string,
+                    refresh_token: (data.refresh_token as string) ?? storedSession.refresh_token,
+                  };
+                  setSession(refreshed);
+                  sessionRef.current = refreshed;
+                  await AsyncStorage.setItem(STORAGE_SESSION, JSON.stringify(refreshed));
+
+                  // Re-fetch profile to ensure profileId is fresh
+                  try {
+                    const profileRes = await supabaseFetch(
+                      `/rest/v1/profiles?select=id,wallet_balance,first_name,last_name,phone,role,member_since,referral_code&user_id=eq.${storedUser.id}&limit=1`,
+                      {},
+                      refreshed.access_token,
+                    );
+                    if (profileRes.ok) {
+                      const rows = await profileRes.json() as Array<Record<string, unknown>>;
+                      if (rows?.length > 0) {
+                        const p = rows[0];
+                        const freshUser: User = {
+                          ...storedUser,
+                          profileId: (p.id as string) ?? storedUser.profileId,
+                          firstName: (p.first_name as string) ?? storedUser.firstName,
+                          lastName:  (p.last_name  as string) ?? storedUser.lastName,
+                          phone:     (p.phone      as string) ?? storedUser.phone,
+                          role: ((p.role as string) === 'celebrity' ? 'celebrity' : 'user'),
+                          walletBalance: (p.wallet_balance as number) ?? storedUser.walletBalance,
+                          memberSince:   (p.member_since as string)   ?? storedUser.memberSince,
+                          referralCode:  (p.referral_code as string)  ?? storedUser.referralCode,
+                        };
+                        setUser(freshUser);
+                        await AsyncStorage.setItem(STORAGE_USER, JSON.stringify(freshUser));
+                      } else {
+                        setUser(storedUser);
+                      }
+                    } else {
+                      setUser(storedUser);
+                    }
+                  } catch {
+                    setUser(storedUser);
+                  }
+                } else {
+                  // Refresh returned ok but no token — clear session
+                  setUser(null);
+                  setSession(null);
+                  await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
+                }
+              } else {
+                // Refresh failed (revoked/expired) — clear session, show login
+                setUser(null);
+                setSession(null);
+                await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
+              }
+            } catch {
+              // Network error during refresh — clear session to be safe
+              setUser(null);
+              setSession(null);
+              await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
+            }
+          }
+        } else if (userStr && !sessionStr) {
+          // Legacy: had user but no session — clear both
+          await AsyncStorage.removeItem(STORAGE_USER);
+        }
+
+        // Legacy key migration
         if (!userStr) {
           const oldUser = await AsyncStorage.getItem('user');
           if (oldUser) {
-            const parsed = JSON.parse(oldUser) as User;
-            setUser(parsed);
             await AsyncStorage.setItem(STORAGE_USER, oldUser);
             await AsyncStorage.removeItem('user');
+            // Still need session to be useful — skip hydration without it
           }
         }
       } catch {
+        // Don't block the app if restore fails
       } finally {
         setIsLoading(false);
       }
     };
     restore();
   }, []);
+
+  const refreshSession = useCallback(async (
+    currentSession: Session,
+  ): Promise<Session | null> => {
+    try {
+      const res = await supabaseFetch('/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        body: JSON.stringify({ refresh_token: currentSession.refresh_token }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json() as Record<string, unknown>;
+      if (!data.access_token) return null;
+      const newSession: Session = {
+        access_token: data.access_token as string,
+        refresh_token: (data.refresh_token as string) ?? currentSession.refresh_token,
+      };
+      setSession(newSession);
+      sessionRef.current = newSession;
+      await AsyncStorage.setItem(STORAGE_SESSION, JSON.stringify(newSession));
+      return newSession;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const getValidSession = useCallback(async (): Promise<Session | null> => {
+    const current = sessionRef.current;
+    if (!current?.access_token) return null;
+    if (!isTokenStale(current.access_token)) return current;
+    const refreshed = await refreshSession(current);
+    return refreshed;
+  }, [refreshSession]);
 
   const login = useCallback(async (
     email: string,
@@ -392,6 +564,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         [STORAGE_USER, JSON.stringify(u)],
       ]);
       await AsyncStorage.removeItem(STORAGE_PENDING);
+
+      // Fetch profileId after signup (profile created by DB trigger, may take a moment)
+      ;(async () => {
+        const fetchProfileId = async (token: string): Promise<void> => {
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const res = await supabaseFetch(
+                `/rest/v1/profiles?select=id,wallet_balance,referral_code&user_id=eq.${supaUser.id}&limit=1`,
+                {},
+                token,
+              );
+              if (res.ok) {
+                const rows = await res.json() as Array<Record<string, unknown>>;
+                if (rows?.length > 0) {
+                  const profileId = rows[0].id as string;
+                  const referralCodeFromDb = (rows[0].referral_code as string) ?? u.referralCode;
+                  const walletBalance = (rows[0].wallet_balance as number) ?? 0;
+                  setUser(prev => {
+                    if (!prev) return prev;
+                    const updated = { ...prev, profileId, referralCode: referralCodeFromDb, walletBalance };
+                    AsyncStorage.setItem(STORAGE_USER, JSON.stringify(updated));
+                    return updated;
+                  });
+                  return;
+                }
+              }
+            } catch {}
+            // Wait 1.5s between retries (DB trigger may be slow)
+            await new Promise(r => setTimeout(r, 1500));
+          }
+        };
+        await fetchProfileId(newSession.access_token);
+      })();
 
       const formattedPhone = internal.phone.startsWith('+91')
         ? internal.phone
@@ -661,6 +866,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         checkCelebrityStatus,
         sendCelebOtp,
         applyCelebrityWithAuth,
+        getValidSession,
       }}
     >
       {children}

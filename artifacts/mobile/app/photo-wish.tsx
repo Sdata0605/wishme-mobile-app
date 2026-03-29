@@ -99,7 +99,7 @@ function statusLabel(s: string) {
 export default function PhotoWishScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { session, user } = useAuth();
+  const { user, getValidSession } = useAuth();
   const wallet = useWallet();
   const { discountPercentage, getDiscountedPrice } = usePlan();
 
@@ -158,10 +158,11 @@ export default function PhotoWishScreen() {
   const fetchPrice = useCallback(async () => {
     setPriceLoading(true);
     try {
+      const validSession = await getValidSession();
       const res = await supabaseFetch(
         '/rest/v1/platform_settings?select=setting_value&setting_key=eq.photo_wish_price&limit=1',
         {},
-        session?.access_token,
+        validSession?.access_token,
       );
       if (res.ok) {
         const rows = await res.json() as Array<{ setting_value: string }>;
@@ -172,24 +173,28 @@ export default function PhotoWishScreen() {
       }
     } catch {}
     setPriceLoading(false);
-  }, [session]);
+  }, [getValidSession]);
 
   const fetchHistory = useCallback(async () => {
-    if (!session?.access_token || !wallet.profileId) return;
+    if (!wallet.profileId) return;
     setHistoryLoading(true);
     try {
+      const validSession = await getValidSession();
+      if (!validSession?.access_token) return;
       const res = await supabaseFetch(
         `/rest/v1/photo_wishes?user_id=eq.${wallet.profileId}&order=created_at.desc&limit=20&select=*`,
         {},
-        session.access_token,
+        validSession.access_token,
       );
       if (res.ok) {
         const rows = await res.json() as PhotoWishRecord[];
         setHistory(rows ?? []);
       }
     } catch {}
-    setHistoryLoading(false);
-  }, [session, wallet.profileId]);
+    finally {
+      setHistoryLoading(false);
+    }
+  }, [getValidSession, wallet.profileId]);
 
   const pickImage = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -250,7 +255,9 @@ export default function PhotoWishScreen() {
       showToast('Insufficient wallet balance. Please top up your wallet.');
       return;
     }
-    if (!session?.access_token) {
+
+    const validSession = await getValidSession();
+    if (!validSession?.access_token) {
       showToast('Please log in to continue.');
       return;
     }
@@ -267,7 +274,7 @@ export default function PhotoWishScreen() {
         signal: controller.signal,
         headers: {
           apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${validSession.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -327,7 +334,7 @@ export default function PhotoWishScreen() {
                 status: 'completed',
                 paid_at: new Date().toISOString(),
               }),
-            }, session.access_token);
+            }, validSession.access_token);
 
             if (txRes.ok) {
               await supabaseFetch(
@@ -336,7 +343,7 @@ export default function PhotoWishScreen() {
                   method: 'PATCH',
                   body: JSON.stringify({ wishme_payment_id: paymentId }),
                 },
-                session.access_token,
+                validSession.access_token,
               );
             } else {
               console.warn('[PhotoWish] payment_transactions insert failed:', txRes.status);
@@ -357,7 +364,7 @@ export default function PhotoWishScreen() {
     }
 
     setGenerating(false);
-  }, [pickedImageBase64, occasion, recipient, message, sender, textStyle, wallet, finalPrice, session, user, fetchHistory]);
+  }, [pickedImageBase64, occasion, recipient, message, sender, textStyle, wallet, finalPrice, getValidSession, user, fetchHistory]);
 
   const downloadImage = useCallback(async (url: string) => {
     try {
