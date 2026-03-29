@@ -54,6 +54,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="celebrity/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="booking/[id]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="booking-summary" options={{ presentation: 'card' }} />
       <Stack.Screen name="chat/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="bookings" />
       <Stack.Screen name="favorites" />

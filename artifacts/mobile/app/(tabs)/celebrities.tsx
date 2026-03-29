@@ -23,7 +23,7 @@ import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 
 const { width: W } = Dimensions.get('window');
 const CARD_WIDTH = (W - 52) / 2;
-const PAGE_SIZE = 6;
+const PAGE_SIZE = 8;
 
 const CATEGORY_MAP: Record<string, string> = {
   'All': '',
@@ -50,6 +50,7 @@ export default function CelebritiesScreen() {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeDelivery, setActiveDelivery] = useState('All');
+  const [sortOrder, setSortOrder] = useState<'rating' | 'price_asc' | 'price_desc'>('rating');
   const [page, setPage] = useState(1);
 
   const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
@@ -69,7 +70,7 @@ export default function CelebritiesScreen() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const filtered = useMemo(() => {
-    return celebrities.filter((c) => {
+    const list = celebrities.filter((c) => {
       const matchSearch =
         c.name.toLowerCase().includes(search.toLowerCase()) ||
         c.category.toLowerCase().includes(search.toLowerCase());
@@ -90,7 +91,14 @@ export default function CelebritiesScreen() {
 
       return matchSearch && matchCat && matchDelivery;
     });
-  }, [celebrities, search, activeCategory, activeDelivery]);
+
+    if (sortOrder === 'price_asc') {
+      return [...list].sort((a, b) => a.pricePerWish - b.pricePerWish);
+    } else if (sortOrder === 'price_desc') {
+      return [...list].sort((a, b) => b.pricePerWish - a.pricePerWish);
+    }
+    return list;
+  }, [celebrities, search, activeCategory, activeDelivery, sortOrder]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -104,6 +112,17 @@ export default function CelebritiesScreen() {
     setActiveDelivery(label);
     setPage(1);
   };
+
+  const onSortChange = (order: 'rating' | 'price_asc' | 'price_desc') => {
+    setSortOrder(order);
+    setPage(1);
+  };
+
+  const SORT_OPTIONS: { key: 'rating' | 'price_asc' | 'price_desc'; label: string }[] = [
+    { key: 'rating', label: 'Rating ↓' },
+    { key: 'price_asc', label: 'Price ↑' },
+    { key: 'price_desc', label: 'Price ↓' },
+  ];
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -169,6 +188,31 @@ export default function CelebritiesScreen() {
               >
                 <Text style={[styles.chipText, { fontSize: 11, color: activeDelivery === dt.label ? '#fff' : colors.foreground }]}>
                   {dt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Sort chips */}
+        <View style={[styles.deliveryRow, { marginTop: 4 }]}>
+          <Text style={[styles.sortLabel, { color: colors.mutedForeground }]}>Sort:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { marginLeft: 4 }]}>
+            {SORT_OPTIONS.map((so) => (
+              <TouchableOpacity
+                key={so.key}
+                style={[
+                  styles.chip,
+                  styles.chipSm,
+                  {
+                    backgroundColor: sortOrder === so.key ? '#B44CFF' : colors.muted,
+                    borderColor: sortOrder === so.key ? '#B44CFF' : colors.border,
+                  },
+                ]}
+                onPress={() => onSortChange(so.key)}
+              >
+                <Text style={[styles.chipText, { fontSize: 11, color: sortOrder === so.key ? '#fff' : colors.foreground }]}>
+                  {so.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -267,6 +311,7 @@ const styles = StyleSheet.create({
   chipSm: { paddingHorizontal: 12, paddingVertical: 6 },
   chipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   deliveryRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 4 },
+  sortLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginRight: 2 },
   scrollContent: { paddingHorizontal: 20 },
   loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12 },
   loadingText: { fontSize: 14, fontFamily: 'Inter_400Regular' },

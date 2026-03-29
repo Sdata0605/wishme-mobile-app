@@ -92,7 +92,7 @@ export default function CelebrityDetailScreen() {
         const raw = rows[0];
         const sp = raw.service_prices ?? {};
         setUgcPrice(sp.ugc_ad ?? 25000);
-        setPromoPrice(sp.image_promotion ?? 15000);
+        setPromoPrice(sp.video_promotion ?? sp.image_promotion ?? 50000);
         setCelebrity({
           id: raw.id,
           name: raw.name,
@@ -312,7 +312,7 @@ export default function CelebrityDetailScreen() {
       return;
     }
     if (isSubscribed) {
-      router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id } });
+      router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: 'wish' } });
     } else {
       setShowStep1(true);
     }
@@ -375,7 +375,7 @@ export default function CelebrityDetailScreen() {
       title: 'Wish a Friend',
       price: celebrity.pricePerWish,
       delivery: '3-5 days',
-      onPress: () => router.push({ pathname: '/wish-booking/[id]', params: { id: celebrity!.id, service: 'wish' } }),
+      onPress: () => router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: 'wish' } }),
     },
     {
       key: 'ugc',
@@ -383,7 +383,7 @@ export default function CelebrityDetailScreen() {
       title: 'Make an Ad (UGC)',
       price: ugcPrice,
       delivery: '3-5 days',
-      onPress: () => router.push({ pathname: '/occasions', params: { celebrity: celebrity!.id } }),
+      onPress: () => router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: 'ad' } }),
     },
     {
       key: 'promo',
@@ -391,7 +391,7 @@ export default function CelebrityDetailScreen() {
       title: 'Video Promotion',
       price: promoPrice,
       delivery: '3-5 days',
-      onPress: () => router.push({ pathname: '/image-promotions', params: { celebrity: celebrity!.id } }),
+      onPress: () => router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: 'video' } }),
     },
   ];
 
