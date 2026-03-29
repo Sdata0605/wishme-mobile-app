@@ -1,0 +1,240 @@
+Here is the complete technical breakdown of the /support page for Replit mobile app integration:
+
+/support Page — Full Technical Documentation
+Purpose
+Help & Support page where users can search FAQs, view contact channels, submit support requests, and access legal/policy quick links.
+
+Route
+/support — Public access, no authentication required.
+
+UI Structure (Top to Bottom)
+1. Header
+Component: <Header /> — shared app navigation bar
+Fixed top, mt-16 offset on main content
+2. Hero Banner
+Gradient background: from-primary/15 via-primary/5 to-background
+Badge pill: "Help Centre" with HelpCircle icon
+Title: "How Can We Help You?"
+Subtitle text
+Search bar: Input with Search icon, filters FAQs client-side
+Padding: py-16 md:py-24
+3. Support Channels Grid
+Layout: grid md:grid-cols-3 gap-4
+3 static cards:
+Channel	Icon	Contact	Response Time
+Email Support	Mail	support@wishme.today	Within 24 hours
+Phone Support	Phone	+91 98765 43210	Mon-Fri, 9 AM - 6 PM IST
+Live Chat	MessageCircle	Available in dashboard	Instant
+Each card: Card > CardContent with colored icon container (w-12 h-12 rounded-xl), title, description, contact info, Clock icon + response time
+Data source: Hardcoded array, no API call
+4. FAQ Accordion
+Layout: max-w-3xl mx-auto
+
+Component: Accordion type="single" collapsible
+
+Each item: AccordionItem with rounded-lg border px-4, opens with data-[state=open]:bg-accent/30
+
+6 hardcoded FAQs:
+
+Celebrity video delivery time (7-14 days)
+Celebrity declines request (full refund)
+Video revision policy (48 hours for minor)
+AI music generation explanation
+Real vs AI-generated videos
+How to become a celebrity
+Search/filter logic (client-side only):
+
+
+const filteredFaqs = searchQuery
+  ? faqs.filter(f => 
+      f.question.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      f.answer.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  : faqs;
+Empty state: "No results found. Try a different search term or contact us below."
+Data source: Hardcoded array, no API call
+5. Contact Form ("Send Us a Message")
+Layout: max-w-2xl mx-auto, wrapped in Card
+Fields:
+Field	Type	Placeholder	Required
+name	text (Input)	"John Doe"	Yes
+email	email (Input)	"john@example.com"	Yes
+subject	text (Input)	"What do you need help with?"	Yes
+message	textarea (Textarea, 5 rows)	"Describe your issue in detail..."	Yes
+Name + Email in grid sm:grid-cols-2
+
+Submit button: Button size="lg" className="w-full" with Send icon
+
+Form state:
+
+
+const [formData, setFormData] = useState({
+  name: "",
+  email: "",
+  subject: "",
+  message: ""
+});
+Submit handler:
+
+const handleSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+  toast.success("Support request submitted! We'll get back to you within 24 hours.");
+  setFormData({ name: "", email: "", subject: "", message: "" });
+};
+IMPORTANT: Currently NO backend API call. The form just shows a success toast and resets. No data is saved to any database or sent to any endpoint.
+For mobile: You should wire this to a Supabase table (e.g., support_requests) or an Edge Function to actually process submissions.
+6. Quick Links
+Layout: rounded-xl border bg-card, inner grid sm:grid-cols-2 gap-3
+4 navigation links:
+Label	Route
+Privacy Policy	/privacy-policy
+Terms & Conditions	/terms
+Refund Policy	/refund-policy
+How It Works	/how-it-works
+Each link: <a> with rounded-lg border hover:bg-accent/50, text + ChevronRight icon
+Footer info: Email (support@wishme.today) and website (wishme.today) with Mail and Globe icons
+7. Footer
+Component: <Footer /> — shared app footer
+API Integrations Summary
+This page has ZERO API calls. Everything is static/hardcoded:
+
+FAQs: hardcoded array (6 items)
+Support channels: hardcoded array (3 items)
+Quick links: hardcoded array (4 items)
+Contact form: client-side only, no backend submission
+For Mobile Integration
+Since everything is static, you can hardcode the same data. If you want a functional contact form, create a REST endpoint:
+
+POST /rest/v1/support_requests
+Headers: apikey, Authorization (Bearer token)
+Body: {
+  "name": "John Doe",
+  "email": "john@example.com", 
+  "subject": "Help with booking",
+  "message": "I need help with...",
+  "user_id": "optional-profile-id"
+}
+This table doesn't exist yet — it would need to be created if you want form submissions to persist.
+
+Here is the complete technical breakdown of the /support page for Replit mobile app integration:
+
+/support Page — Full Technical Documentation
+Purpose
+Help & Support page where users can search FAQs, view contact channels, submit support requests, and access legal/policy quick links.
+
+Route
+/support — Public access, no authentication required.
+
+UI Structure (Top to Bottom)
+1. Header
+Component: <Header /> — shared app navigation bar
+Fixed top, mt-16 offset on main content
+2. Hero Banner
+Gradient background: from-primary/15 via-primary/5 to-background
+Badge pill: "Help Centre" with HelpCircle icon
+Title: "How Can We Help You?"
+Subtitle text
+Search bar: Input with Search icon, filters FAQs client-side
+Padding: py-16 md:py-24
+3. Support Channels Grid
+Layout: grid md:grid-cols-3 gap-4
+3 static cards:
+Channel	Icon	Contact	Response Time
+Email Support	Mail	support@wishme.today	Within 24 hours
+Phone Support	Phone	+91 98765 43210	Mon-Fri, 9 AM - 6 PM IST
+Live Chat	MessageCircle	Available in dashboard	Instant
+Each card: Card > CardContent with colored icon container (w-12 h-12 rounded-xl), title, description, contact info, Clock icon + response time
+Data source: Hardcoded array, no API call
+4. FAQ Accordion
+Layout: max-w-3xl mx-auto
+
+Component: Accordion type="single" collapsible
+
+Each item: AccordionItem with rounded-lg border px-4, opens with data-[state=open]:bg-accent/30
+
+6 hardcoded FAQs:
+
+Celebrity video delivery time (7-14 days)
+Celebrity declines request (full refund)
+Video revision policy (48 hours for minor)
+AI music generation explanation
+Real vs AI-generated videos
+How to become a celebrity
+Search/filter logic (client-side only):
+
+
+const filteredFaqs = searchQuery
+  ? faqs.filter(f => 
+      f.question.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      f.answer.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  : faqs;
+Empty state: "No results found. Try a different search term or contact us below."
+Data source: Hardcoded array, no API call
+5. Contact Form ("Send Us a Message")
+Layout: max-w-2xl mx-auto, wrapped in Card
+Fields:
+Field	Type	Placeholder	Required
+name	text (Input)	"John Doe"	Yes
+email	email (Input)	"john@example.com"	Yes
+subject	text (Input)	"What do you need help with?"	Yes
+message	textarea (Textarea, 5 rows)	"Describe your issue in detail..."	Yes
+Name + Email in grid sm:grid-cols-2
+
+Submit button: Button size="lg" className="w-full" with Send icon
+
+Form state:
+
+
+const [formData, setFormData] = useState({
+  name: "",
+  email: "",
+  subject: "",
+  message: ""
+});
+Submit handler:
+
+const handleSubmit = (e: React.FormEvent) => {
+  e.preventDefault();
+  toast.success("Support request submitted! We'll get back to you within 24 hours.");
+  setFormData({ name: "", email: "", subject: "", message: "" });
+};
+IMPORTANT: Currently NO backend API call. The form just shows a success toast and resets. No data is saved to any database or sent to any endpoint.
+For mobile: You should wire this to a Supabase table (e.g., support_requests) or an Edge Function to actually process submissions.
+6. Quick Links
+Layout: rounded-xl border bg-card, inner grid sm:grid-cols-2 gap-3
+4 navigation links:
+Label	Route
+Privacy Policy	/privacy-policy
+Terms & Conditions	/terms
+Refund Policy	/refund-policy
+How It Works	/how-it-works
+Each link: <a> with rounded-lg border hover:bg-accent/50, text + ChevronRight icon
+Footer info: Email (support@wishme.today) and website (wishme.today) with Mail and Globe icons
+7. Footer
+Component: <Footer /> — shared app footer
+API Integrations Summary
+This page has ZERO API calls. Everything is static/hardcoded:
+
+FAQs: hardcoded array (6 items)
+Support channels: hardcoded array (3 items)
+Quick links: hardcoded array (4 items)
+Contact form: client-side only, no backend submission
+For Mobile Integration
+Since everything is static, you can hardcode the same data. If you want a functional contact form, create a REST endpoint:
+
+POST /rest/v1/support_requests
+Headers: apikey, Authorization (Bearer token)
+Body: {
+  "name": "John Doe",
+  "email": "john@example.com", 
+  "subject": "Help with booking",
+  "message": "I need help with...",
+  "user_id": "optional-profile-id"
+}
+This table doesn't exist yet — it would need to be created if you want form submissions to persist.
+
+
+
+
+
