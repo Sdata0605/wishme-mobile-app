@@ -3,6 +3,8 @@ import { router } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Linking,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
-import { supabaseFetch } from '@/constants/supabase';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useWallet } from '@/hooks/useWallet';
@@ -30,6 +32,15 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const LEVEL_COLORS: Record<number, string> = { 1: '#FF6B33', 2: '#B44CFF' };
+
+const QUICK_AMOUNTS = [100, 500, 1000, 2000, 5000];
+
+function generateWMId(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id = 'WM';
+  for (let i = 0; i < 8; i++) id += chars[Math.floor(Math.random() * chars.length)];
+  return id;
+}
 
 function fmtDate(iso: string) {
   try {
@@ -446,6 +457,15 @@ function ReferralEarningsTab({ colors, bottomPad, user, session }: RefTabProps) 
   );
 }
 
+interface BankDetails {
+  id: string;
+  account_number: string;
+  bank_name: string;
+  ifsc_code: string;
+  account_holder_name: string;
+  is_default?: boolean;
+}
+
 export default function WalletScreen() {
   const { colors } = useTheme();
   const { user, session } = useAuth();
@@ -456,9 +476,284 @@ export default function WalletScreen() {
 
   const { balance, refetch } = useWallet();
 
+  // Deposit state
+  const [depositModal, setDepositModal] = useState(false);
+  const [depositAmt, setDepositAmt] = useState('');
+  const [depositStep, setDepositStep] = useState<'amount' | 'processing' | 'success'>('amount');
+  const [depositPaymentId, setDepositPaymentId] = useState('');
+  const [depositError, setDepositError] = useState('');
+  const [depositLoading, setDepositLoading] = useState(false);
+
+  // Withdraw state
+  const [withdrawModal, setWithdrawModal] = useState(false);
+  const [withdrawAmt, setWithdrawAmt] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawSuccess, setWithdrawSuccess] = useState(false);
+  const [celebAvailableBalance, setCelebAvailableBalance] = useState<number>(0);
+  const [celebId, setCelebId] = useState<string>('');
+  const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
+  const [bankLoading, setBankLoading] = useState(false);
+
   useEffect(() => {
     refetch();
   }, [refetch]);
+
+  const handleDeposit = async () => {
+    const amount = parseInt(depositAmt, 10);
+    if (!amount || amount < 100) {
+      setDepositError('Minimum deposit is ₹100');
+      return;
+    }
+    setDepositLoading(true);
+    setDepositError('');
+
+    const profileId = user?.profileId ?? '';
+    const receipt = `wallet_${profileId}_${Date.now()}`.slice(0, 40);
+
+    try {
+      const orderRes = await fetch(`${SUPABASE_URL}/functions/v1/create-razorpay-order`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          amount,
+          currency: 'INR',
+          receipt,
+          notes: { user_id: profileId, type: 'wallet_deposit' },
+        }),
+      });
+      if (!orderRes.ok) throw new Error('Could not create payment order. Please try again.');
+      const order = await orderRes.json() as { id: string; amount: number; key_id: string };
+
+      setDepositStep('processing');
+      const RazorpayCheckout = require('react-native-razorpay').default;
+      const paymentData = await RazorpayCheckout.open({
+        key: order.key_id,
+        amount: order.amount,
+        currency: 'INR',
+        name: 'WishMe',
+        description: 'Add money to wallet',
+        order_id: order.id,
+        prefill: {
+          name: `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim(),
+          email: user?.email ?? '',
+          contact: user?.phone ?? '',
+        },
+        theme: { color: '#FF6B33' },
+      });
+
+      const verifyRes = await fetch(`${SUPABASE_URL}/functions/v1/verify-razorpay-payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          razorpay_order_id: paymentData.razorpay_order_id,
+          razorpay_payment_id: paymentData.razorpay_payment_id,
+          razorpay_signature: paymentData.razorpay_signature,
+        }),
+      });
+      const verifyData = await verifyRes.json() as { success?: boolean; wishme_payment_id?: string; error?: string };
+      if (!verifyData.success) throw new Error(verifyData.error ?? 'Payment verification failed');
+
+      const wmId = verifyData.wishme_payment_id ?? generateWMId();
+
+      await fetch(`${SUPABASE_URL}/rest/v1/wallet_transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          user_id: profileId,
+          transaction_type: 'deposit',
+          amount,
+          status: 'completed',
+          payment_method: 'razorpay',
+          description: `Wallet deposit of ₹${amount}`,
+          transaction_details: {
+            razorpay_order_id: paymentData.razorpay_order_id,
+            razorpay_payment_id: paymentData.razorpay_payment_id,
+          },
+        }),
+      });
+
+      await fetch(`${SUPABASE_URL}/rest/v1/payment_transactions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          wishme_payment_id: wmId,
+          user_id: profileId,
+          amount,
+          payment_method: 'razorpay',
+          service_type: 'deposit',
+          razorpay_payment_id: paymentData.razorpay_payment_id,
+          razorpay_order_id: paymentData.razorpay_order_id,
+          description: `Wallet deposit of ₹${amount}`,
+          status: 'completed',
+          paid_at: new Date().toISOString(),
+        }),
+      });
+
+      setDepositPaymentId(wmId);
+      setDepositStep('success');
+      refetch();
+
+    } catch (err: unknown) {
+      const msg = (err as { description?: string })?.description;
+      if (msg?.toLowerCase().includes('cancel')) {
+        setDepositStep('amount');
+        setDepositLoading(false);
+        return;
+      }
+      setDepositError(err instanceof Error ? err.message : 'Payment failed. Please try again.');
+      setDepositStep('amount');
+    } finally {
+      setDepositLoading(false);
+    }
+  };
+
+  const closeDepositModal = () => {
+    setDepositModal(false);
+    setDepositAmt('');
+    setDepositStep('amount');
+    setDepositPaymentId('');
+    setDepositError('');
+    setDepositLoading(false);
+  };
+
+  const openWithdrawModal = async () => {
+    setWithdrawModal(true);
+    setWithdrawSuccess(false);
+    setWithdrawError('');
+    setWithdrawAmt('');
+
+    if (user?.role === 'celebrity') {
+      setBankLoading(true);
+      const profileId = user?.profileId ?? '';
+      try {
+        const [celebRes, bankRes] = await Promise.all([
+          fetch(`${SUPABASE_URL}/rest/v1/celebrities?profile_id=eq.${profileId}&select=id,available_balance&limit=1`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${session?.access_token}`,
+            },
+          }),
+          fetch(`${SUPABASE_URL}/rest/v1/bank_details?user_id=eq.${profileId}&order=is_default.desc&select=*&limit=1`, {
+            headers: {
+              'apikey': SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${session?.access_token}`,
+            },
+          }),
+        ]);
+
+        if (celebRes.ok) {
+          const celebRows = await celebRes.json() as Array<{ id: string; available_balance: number }>;
+          if (celebRows?.length) {
+            setCelebId(celebRows[0].id);
+            setCelebAvailableBalance(celebRows[0].available_balance ?? 0);
+          }
+        }
+
+        if (bankRes.ok) {
+          const bankRows = await bankRes.json() as BankDetails[];
+          setBankDetails(bankRows?.length ? bankRows[0] : null);
+        }
+      } catch {}
+      setBankLoading(false);
+    }
+  };
+
+  const closeWithdrawModal = () => {
+    setWithdrawModal(false);
+    setWithdrawAmt('');
+    setWithdrawError('');
+    setWithdrawSuccess(false);
+    setWithdrawLoading(false);
+    setCelebAvailableBalance(0);
+    setCelebId('');
+    setBankDetails(null);
+  };
+
+  const handleWithdraw = async () => {
+    const amount = parseInt(withdrawAmt, 10);
+    if (!amount || amount <= 0) {
+      setWithdrawError('Please enter a valid amount');
+      return;
+    }
+    if (amount > celebAvailableBalance) {
+      setWithdrawError(`Amount exceeds available balance of ₹${celebAvailableBalance}`);
+      return;
+    }
+    if (!bankDetails) {
+      setWithdrawError('No bank details found. Please add bank details in Edit Profile.');
+      return;
+    }
+
+    setWithdrawLoading(true);
+    setWithdrawError('');
+
+    try {
+      const profileId = user?.profileId ?? '';
+
+      const payoutRes = await fetch(`${SUPABASE_URL}/rest/v1/payout_requests`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          celebrity_id: celebId,
+          profile_id: profileId,
+          requested_amount: amount,
+          bank_account_number: bankDetails.account_number,
+          bank_name: bankDetails.bank_name,
+          ifsc_code: bankDetails.ifsc_code,
+          account_holder_name: bankDetails.account_holder_name,
+          status: 'pending',
+        }),
+      });
+
+      if (!payoutRes.ok) throw new Error('Failed to submit withdrawal request. Please try again.');
+
+      await fetch(`${SUPABASE_URL}/rest/v1/celebrities?id=eq.${celebId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${session?.access_token}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({ available_balance: celebAvailableBalance - amount }),
+      });
+
+      setWithdrawSuccess(true);
+    } catch (err: unknown) {
+      setWithdrawError(err instanceof Error ? err.message : 'Request failed. Please try again.');
+    } finally {
+      setWithdrawLoading(false);
+    }
+  };
+
+  const maskAccount = (acc: string) => {
+    if (!acc || acc.length < 4) return acc;
+    return 'XXXX XXXX ' + acc.slice(-4);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -483,6 +778,26 @@ export default function WalletScreen() {
       >
         <Text style={styles.heroBalanceLabel}>Total Balance</Text>
         <Text style={styles.heroBalanceAmt}>₹{balance.toLocaleString('en-IN')}</Text>
+
+        <View style={styles.heroActionRow}>
+          <TouchableOpacity
+            style={styles.heroActionBtn}
+            onPress={() => setDepositModal(true)}
+            activeOpacity={0.85}
+          >
+            <Icon name="plus" size={15} color="#fff" />
+            <Text style={styles.heroActionBtnText}>Add Money</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.heroActionBtn}
+            onPress={openWithdrawModal}
+            activeOpacity={0.85}
+          >
+            <Icon name="chevron-up" size={15} color="#fff" />
+            <Text style={styles.heroActionBtnText}>Withdraw</Text>
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       <View style={[styles.tabBar, { borderBottomColor: colors.border, backgroundColor: colors.background }]}>
@@ -514,6 +829,285 @@ export default function WalletScreen() {
       {activeTab === 'Referral Earnings' && (
         <ReferralEarningsTab colors={colors} bottomPad={bottomPad} user={user} session={session} />
       )}
+
+      {/* Deposit Modal */}
+      <Modal
+        visible={depositModal}
+        animationType="slide"
+        transparent
+        onRequestClose={() => depositStep !== 'processing' && closeDepositModal()}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.background }]}>
+            {depositStep === 'amount' && (
+              <>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Add Money to Wallet</Text>
+
+                <View style={styles.modalBalanceRow}>
+                  <Icon name="wallet" size={14} color={colors.mutedForeground} />
+                  <Text style={[styles.modalBalanceText, { color: colors.mutedForeground }]}>
+                    Current Balance: ₹{balance.toLocaleString('en-IN')}
+                  </Text>
+                </View>
+
+                <Text style={[styles.modalLabel, { color: colors.mutedForeground }]}>Quick Amount</Text>
+                <View style={styles.chipsRow}>
+                  {QUICK_AMOUNTS.map((amt) => (
+                    <TouchableOpacity
+                      key={amt}
+                      style={[
+                        styles.chip,
+                        {
+                          backgroundColor: depositAmt === String(amt) ? colors.primary : colors.card,
+                          borderColor: depositAmt === String(amt) ? colors.primary : colors.border,
+                        },
+                      ]}
+                      onPress={() => { setDepositAmt(String(amt)); setDepositError(''); }}
+                    >
+                      <Text
+                        style={[
+                          styles.chipText,
+                          { color: depositAmt === String(amt) ? '#fff' : colors.foreground },
+                        ]}
+                      >
+                        ₹{amt.toLocaleString('en-IN')}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+
+                <Text style={[styles.modalLabel, { color: colors.mutedForeground }]}>Or enter amount</Text>
+                <View style={[styles.amtInputWrap, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                  <Text style={[styles.amtCurrency, { color: colors.foreground }]}>₹</Text>
+                  <TextInput
+                    value={depositAmt}
+                    onChangeText={(v) => { setDepositAmt(v.replace(/[^0-9]/g, '')); setDepositError(''); }}
+                    keyboardType="numeric"
+                    placeholder="Enter amount"
+                    placeholderTextColor={colors.mutedForeground}
+                    style={[styles.amtInput, { color: colors.foreground }]}
+                  />
+                </View>
+
+                {depositError ? (
+                  <Text style={styles.errorText}>{depositError}</Text>
+                ) : null}
+
+                <TouchableOpacity
+                  onPress={handleDeposit}
+                  disabled={depositLoading}
+                  style={{ marginTop: 16, borderRadius: 14, overflow: 'hidden' }}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={['#FF6B33', '#B44CFF']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.payBtn}
+                  >
+                    {depositLoading ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text style={styles.payBtnText}>Pay Now</Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={closeDepositModal} style={styles.cancelLink}>
+                  <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            {depositStep === 'processing' && (
+              <View style={styles.centeredSection}>
+                <ActivityIndicator size="large" color="#FF6B33" />
+                <Text style={[styles.processingText, { color: colors.foreground }]}>Processing payment...</Text>
+                <Text style={[styles.processingSubText, { color: colors.mutedForeground }]}>
+                  Please do not close this screen
+                </Text>
+              </View>
+            )}
+
+            {depositStep === 'success' && (
+              <View style={styles.centeredSection}>
+                <View style={styles.successIconCircle}>
+                  <Icon name="check" size={36} color="#fff" />
+                </View>
+                <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment Successful!</Text>
+                <Text style={[styles.successSubText, { color: colors.mutedForeground }]}>
+                  WishMe ID: {depositPaymentId}
+                </Text>
+                <Text style={[styles.successAmt, { color: '#22C55E' }]}>
+                  ₹{parseInt(depositAmt, 10).toLocaleString('en-IN')} added to wallet
+                </Text>
+                <TouchableOpacity
+                  onPress={closeDepositModal}
+                  style={{ marginTop: 24, borderRadius: 14, overflow: 'hidden', width: '100%' }}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={['#22C55E', '#16A34A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.payBtn}
+                  >
+                    <Text style={styles.payBtnText}>Done</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Withdraw Modal */}
+      <Modal
+        visible={withdrawModal}
+        animationType="slide"
+        transparent
+        onRequestClose={closeWithdrawModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { backgroundColor: colors.background }]}>
+            {user?.role !== 'celebrity' ? (
+              <>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Withdraw Funds</Text>
+                <View style={styles.centeredSection}>
+                  <View style={[styles.infoIconCircle, { backgroundColor: '#FF6B3320' }]}>
+                    <Icon name="info" size={32} color="#FF6B33" />
+                  </View>
+                  <Text style={[styles.infoText, { color: colors.foreground }]}>
+                    Withdrawals are available for celebrity accounts. Regular users can use their wallet balance to book services.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.supportBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    onPress={() => Linking.openURL('mailto:support@wishme.today')}
+                    activeOpacity={0.85}
+                  >
+                    <Icon name="mail" size={16} color={colors.primary} />
+                    <Text style={[styles.supportBtnText, { color: colors.primary }]}>Contact Support</Text>
+                  </TouchableOpacity>
+                </View>
+                <TouchableOpacity onPress={closeWithdrawModal} style={styles.cancelLink}>
+                  <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Close</Text>
+                </TouchableOpacity>
+              </>
+            ) : withdrawSuccess ? (
+              <View style={styles.centeredSection}>
+                <View style={styles.successIconCircle}>
+                  <Icon name="check" size={36} color="#fff" />
+                </View>
+                <Text style={[styles.successTitle, { color: colors.foreground }]}>Request Submitted!</Text>
+                <Text style={[styles.infoText, { color: colors.mutedForeground, textAlign: 'center' }]}>
+                  Withdrawal request submitted! Admin will process it within 3-5 business days.
+                </Text>
+                <TouchableOpacity
+                  onPress={closeWithdrawModal}
+                  style={{ marginTop: 24, borderRadius: 14, overflow: 'hidden', width: '100%' }}
+                  activeOpacity={0.85}
+                >
+                  <LinearGradient
+                    colors={['#22C55E', '#16A34A']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.payBtn}
+                  >
+                    <Text style={styles.payBtnText}>Done</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <Text style={[styles.modalTitle, { color: colors.foreground }]}>Withdraw Funds</Text>
+
+                {bankLoading ? (
+                  <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                    <ActivityIndicator color="#FF6B33" />
+                  </View>
+                ) : (
+                  <>
+                    <View style={[styles.celebBalanceCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                      <Text style={[styles.modalLabel, { color: colors.mutedForeground }]}>Available Balance</Text>
+                      <Text style={[styles.celebBalanceAmt, { color: '#22C55E' }]}>
+                        ₹{celebAvailableBalance.toLocaleString('en-IN')}
+                      </Text>
+                    </View>
+
+                    {bankDetails ? (
+                      <View style={[styles.bankCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={[styles.modalLabel, { color: colors.mutedForeground }]}>Bank Account</Text>
+                        <Text style={[styles.bankName, { color: colors.foreground }]}>{bankDetails.bank_name}</Text>
+                        <Text style={[styles.bankAcc, { color: colors.mutedForeground }]}>
+                          {maskAccount(bankDetails.account_number)}
+                        </Text>
+                        <Text style={[styles.bankIfsc, { color: colors.mutedForeground }]}>
+                          IFSC: {bankDetails.ifsc_code}
+                        </Text>
+                        <Text style={[styles.bankHolder, { color: colors.mutedForeground }]}>
+                          {bankDetails.account_holder_name}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={[styles.bankCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <Text style={[styles.infoText, { color: colors.mutedForeground }]}>
+                          No bank details found.
+                        </Text>
+                        <TouchableOpacity onPress={() => { closeWithdrawModal(); router.push('/edit-profile' as never); }}>
+                          <Text style={[styles.linkText, { color: colors.primary }]}>
+                            Please add bank details in Edit Profile
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+
+                    <Text style={[styles.modalLabel, { color: colors.mutedForeground }]}>Amount to Withdraw</Text>
+                    <View style={[styles.amtInputWrap, { borderColor: colors.border, backgroundColor: colors.card }]}>
+                      <Text style={[styles.amtCurrency, { color: colors.foreground }]}>₹</Text>
+                      <TextInput
+                        value={withdrawAmt}
+                        onChangeText={(v) => { setWithdrawAmt(v.replace(/[^0-9]/g, '')); setWithdrawError(''); }}
+                        keyboardType="numeric"
+                        placeholder={`Max ₹${celebAvailableBalance.toLocaleString('en-IN')}`}
+                        placeholderTextColor={colors.mutedForeground}
+                        style={[styles.amtInput, { color: colors.foreground }]}
+                      />
+                    </View>
+
+                    {withdrawError ? (
+                      <Text style={styles.errorText}>{withdrawError}</Text>
+                    ) : null}
+
+                    <TouchableOpacity
+                      onPress={handleWithdraw}
+                      disabled={withdrawLoading || !bankDetails}
+                      style={{ marginTop: 16, borderRadius: 14, overflow: 'hidden', opacity: !bankDetails ? 0.5 : 1 }}
+                      activeOpacity={0.85}
+                    >
+                      <LinearGradient
+                        colors={['#FF6B33', '#B44CFF']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.payBtn}
+                      >
+                        {withdrawLoading ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text style={styles.payBtnText}>Request Withdrawal</Text>
+                        )}
+                      </LinearGradient>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={closeWithdrawModal} style={styles.cancelLink}>
+                      <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -535,7 +1129,8 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderRadius: 20,
     paddingHorizontal: 24,
-    paddingVertical: 28,
+    paddingTop: 28,
+    paddingBottom: 20,
   },
   heroBalanceLabel: {
     color: 'rgba(255,255,255,0.8)',
@@ -543,7 +1138,27 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_500Medium',
     marginBottom: 6,
   },
-  heroBalanceAmt: { color: '#fff', fontSize: 40, fontFamily: 'Inter_700Bold' },
+  heroBalanceAmt: { color: '#fff', fontSize: 40, fontFamily: 'Inter_700Bold', marginBottom: 20 },
+  heroActionRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  heroActionBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+  },
+  heroActionBtnText: {
+    color: '#fff',
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+  },
   tabBar: { flexDirection: 'row', borderBottomWidth: 1 },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 14, position: 'relative' },
   tabItemActive: {},
@@ -619,4 +1234,205 @@ const styles = StyleSheet.create({
   levelBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 9999 },
   levelText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
   emptyText: { marginTop: 12, fontSize: 14, fontFamily: 'Inter_400Regular' },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'Inter_700Bold',
+    marginBottom: 16,
+  },
+  modalBalanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 20,
+  },
+  modalBalanceText: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+  },
+  modalLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter_600SemiBold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 20,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  amtInputWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    height: 52,
+    marginBottom: 4,
+  },
+  amtCurrency: {
+    fontSize: 18,
+    fontFamily: 'Inter_600SemiBold',
+    marginRight: 6,
+  },
+  amtInput: {
+    flex: 1,
+    fontSize: 18,
+    fontFamily: 'Inter_400Regular',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  payBtn: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 14,
+  },
+  payBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter_700Bold',
+  },
+  cancelLink: {
+    alignItems: 'center',
+    paddingVertical: 14,
+  },
+  cancelLinkText: {
+    fontSize: 14,
+    fontFamily: 'Inter_500Medium',
+  },
+  centeredSection: {
+    alignItems: 'center',
+    paddingVertical: 24,
+    width: '100%',
+  },
+  processingText: {
+    fontSize: 17,
+    fontFamily: 'Inter_600SemiBold',
+    marginTop: 16,
+  },
+  processingSubText: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    marginTop: 8,
+  },
+  successIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#22C55E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  successTitle: {
+    fontSize: 22,
+    fontFamily: 'Inter_700Bold',
+    marginBottom: 8,
+  },
+  successSubText: {
+    fontSize: 13,
+    fontFamily: 'Inter_400Regular',
+    marginBottom: 8,
+  },
+  successAmt: {
+    fontSize: 18,
+    fontFamily: 'Inter_700Bold',
+  },
+  infoIconCircle: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  infoText: {
+    fontSize: 14,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 22,
+    marginBottom: 16,
+  },
+  supportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  supportBtnText: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+  },
+  celebBalanceCard: {
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+  },
+  celebBalanceAmt: {
+    fontSize: 28,
+    fontFamily: 'Inter_700Bold',
+    marginTop: 4,
+  },
+  bankCard: {
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+    gap: 4,
+  },
+  bankName: {
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
+    marginTop: 4,
+  },
+  bankAcc: {
+    fontSize: 13,
+    fontFamily: 'Inter_500Medium',
+    fontVariant: ['tabular-nums'],
+  },
+  bankIfsc: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+  },
+  bankHolder: {
+    fontSize: 12,
+    fontFamily: 'Inter_400Regular',
+  },
+  linkText: {
+    fontSize: 13,
+    fontFamily: 'Inter_600SemiBold',
+    marginTop: 4,
+  },
 });
