@@ -593,7 +593,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     height: 42,
   },
-  dateInputText: { flex: 1, fontSize: 13, height: 42 },
+  dateInputText: { flex: 1, fontSize: 13, textAlignVertical: 'center' },
   clearBtn: { marginTop: 10, alignSelf: 'center' },
   clearBtnText: { fontSize: 13, fontFamily: 'Inter_500Medium', textDecorationLine: 'underline' },
   sectionTitle: {
