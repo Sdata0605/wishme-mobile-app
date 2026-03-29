@@ -329,8 +329,12 @@ export default function PhotoWishScreen() {
                 },
                 session.access_token,
               );
+            } else {
+              console.warn('[PhotoWish] payment_transactions insert failed:', txRes.status);
             }
-          } catch {}
+          } catch (payErr) {
+            console.warn('[PhotoWish] payment recording error:', payErr);
+          }
         }
 
         fetchHistory();
