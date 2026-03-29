@@ -1,0 +1,796 @@
+Complete Celebrity Discovery & Booking Flow — Technical Specification for Replit Mobile App
+OVERVIEW — PURPOSE
+The /celebrities page is a discovery hub where users browse all active celebrities, then navigate to a celebrity's profile, subscribe (one-time payment), and book services (Wish, Ad, Video Promo, UGC). The booking is a 6-step wizard that collects request details, delivery type, creative guidelines, script content, review, and checkout. All bookings are created with status='pending' and require admin approval before any AI video generation begins.
+
+SCREEN FLOW (Navigation Chain)
+
+/celebrities
+    ↓ tap celebrity card
+/celebrity/{id}
+    ↓ tap "Subscribe" (if not subscribed)
+    → SubscriptionGate modal → Payment → subscribed
+    ↓ tap "Book Now" on a service
+/booking/{id}?service=wish|ad|video
+    Step 1: Request Details
+    Step 2: Delivery Type
+    Step 3: Creative Guidelines
+    Step 4: Script Builder
+    Step 5: Review
+    Step 6: Checkout → Payment
+    ↓ success
+/booking-summary?bookingId={id}&paymentId={wmId}
+    ↓ admin approves (admin panel)
+    → AI video generation triggers
+    ↓ video ready
+/bookings (user sees video under "Video Sent" status)
+SCREEN 1: /celebrities — Discovery Page
+UI Components:
+
+Hero Header: Title + subtitle text
+Search Bar: Debounced (500ms) text input, filters by name ILIKE
+Category Pills: Horizontal scroll — ["All", "Actors", "Singers", "Comedians", "Athletes", "Creators"]
+Sort Dropdowns: Price (Low→High / High→Low), Delivery time
+Celebrity Grid: grid-cols-2 mobile, grid-cols-4 desktop
+Celebrity Card: Image (200px mobile / 260px desktop), price badge (top-right), lock overlay if not subscribed, name, rating star, category
+Pagination: 8 items per page, numbered buttons with prev/next arrows
+Endpoint — Fetch Celebrities:
+
+GET /rest/v1/celebrities
+  ?is_active=eq.true
+  &or=(consent_status.eq.approved,consent_status.is.null)
+  &category=eq.{selectedCategory}         // optional, skip if "All"
+  &name=ilike.*{searchTerm}*              // optional
+  &order=rating.desc
+  &offset={page * 8}&limit=8
+  &select=*
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}  // optional for public browse
+  Prefer: count=exact                        // to get totalCount for pagination
+Response:
+
+
+[
+  {
+    "id": "685ca0c9-...",
+    "name": "Priya Sharma",
+    "image_url": "https://...",
+    "category": "Actors",
+    "rating": 4.8,
+    "review_count": 12,
+    "bio": "Award-winning actress...",
+    "delivery_time": "24 hours",
+    "is_active": true,
+    "is_verified": true,
+    "service_prices": {
+      "general_wish": 5000,
+      "image_promotion": 25000,
+      "video_promotion": 50000,
+      "ugc_ad": 25000
+    },
+    "followers": "1.2M",
+    "location": "Mumbai"
+  }
+]
+Endpoint — Check User Subscriptions:
+
+GET /rest/v1/celebrity_favorites
+  ?user_id=eq.{profile.id}
+  &status=eq.active
+  &select=celebrity_id
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}
+Response:
+
+
+[
+  { "celebrity_id": "685ca0c9-..." },
+  { "celebrity_id": "abc12345-..." }
+]
+Lock Logic: If user exists but celebrity_id NOT in subscriptions array → show blur + Lock icon + "Subscription Required" overlay on the card image.
+
+SCREEN 2: /celebrity/{id} — Celebrity Profile
+UI Components:
+
+Mobile Layout: Cover image (blurred bg), overlapping profile card with avatar, name, category, rating, followers, location, delivery time
+Desktop Layout: Side-by-side hero with large image + info panel
+Subscribe CTA Card: Shows price from celebrity_favorite_pricing, benefits list, "Subscribe Now" button
+"Subscribed ✓" Badge: Green card if already subscribed
+Book a Service Section: 3 service cards (Wish, Ad, Video Promo) with prices from service_prices JSONB
+Tabs: Overview (bio + services), Media, Events, Releases, About
+Endpoints Used:
+
+Fetch Celebrity:
+GET /rest/v1/celebrities?id=eq.{id}&select=*
+→ single row with all celebrity fields
+Fetch Subscription Price:
+GET /rest/v1/celebrity_favorite_pricing
+  ?celebrity_id=eq.{id}
+  &is_enabled=eq.true
+  &select=price
+→ { "price": 999 }   // defaults to ₹999 if not found
+Check Subscription Status:
+GET /rest/v1/celebrity_favorites
+  ?user_id=eq.{profile.id}
+  &celebrity_id=eq.{id}
+  &status=eq.active
+  &select=*
+→ null (not subscribed) or single row (subscribed)
+Fetch Events:
+GET /rest/v1/celebrity_events
+  ?celebrity_id=eq.{id}
+  &is_public=eq.true
+  &order=event_date.asc
+  &select=*
+Fetch Media:
+GET /rest/v1/celebrity_media
+  ?celebrity_id=eq.{id}
+  &is_public=eq.true
+  &order=created_at.desc
+  &select=*
+SUBSCRIPTION PURCHASE (SubscriptionGate Modal)
+UI: Dialog with celebrity avatar, benefits list, price display, "Subscribe Now" → PaymentMethodSelector (Wallet or Razorpay)
+
+Wallet Payment — RPC Call:
+
+POST /rest/v1/rpc/purchase_celebrity_subscription
+Body:
+{
+  "p_celebrity_id": "{celebrity_id}",
+  "p_price": 999,
+  "p_payment_method": "wallet"
+}
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}
+This RPC internally: deducts wallet, inserts into celebrity_favorites with status='active', creates wallet transaction, handles commission splits.
+
+Post-subscription email (fire-and-forget):
+
+POST /functions/v1/send-celebrity-subscription-email
+Body:
+{
+  "celebrity_id": "{id}",
+  "subscriber_name": "John Doe",
+  "subscriber_email": "john@example.com",
+  "price_paid": 999
+}
+SCREEN 3: /booking/{id}?service=wish|ad|video — 6-Step Booking Wizard
+Navigation: handleBookNow('wish') on profile page → navigates to /booking/{celebrityId}?service=wish
+
+Layout: 75% main content (step form) + 25% sidebar (celebrity info + live price summary)
+
+Sidebar shows: celebrity avatar, name, rating, service title, base price, discount badge (if user has a plan), service fee (10%), total.
+
+STEP 1: Request Details (RequestDetailsStep)
+For service=wish:
+
+recipientName (required)
+recipientRelation (optional)
+occasion (required) — text input
+message (optional) — textarea
+preferredLanguage — dropdown
+For service=video:
+
+videoType: RadioGroup → "marketing" | "business_event" (required)
+businessName (required)
+businessPronunciation (optional)
+preferredLanguage — dropdown
+For service=ad:
+
+businessName (required)
+message — textarea for ad description
+Language Dropdown — Endpoint:
+
+POST /functions/v1/heygen-get-languages
+Body: {}
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}
+Response:
+
+
+{
+  "languages": [
+    { "language": "English", "locale": "en-US" },
+    { "language": "Hindi", "locale": "hi-IN" },
+    ...
+  ]
+}
+Fallback: 39 hardcoded languages if the API fails.
+
+STEP 2: Delivery Type (DeliveryTypeStep)
+RadioGroup with 3 options:
+
+video — "Video Message" (default)
+card — "Digital Greeting Card"
+both — "Video + Card Combo"
+No API calls. Pure client-side state.
+
+STEP 3: Creative Guidelines (CreativeGuidelinesStep)
+Goal: Select dropdown (e.g., "Promote a product", "Celebrate occasion") + "Other" text input
+Tone: Dropdown (funny, heartfelt, professional, etc.)
+Filming requirements: Textarea (for service=video only)
+Things to avoid: Checkbox list (competitor mentions, profanity, etc.)
+No API calls. Pure client-side state.
+
+STEP 4: Script Builder (ScriptBuilderStep)
+Script type: RadioGroup → "talking_points" | "exact_script"
+Talking points / exact script: Textarea
+AI Generate button: Calls edge function
+For service=ad: Simplified form — ad description + image style dropdown.
+
+AI Script Generation — Endpoint:
+
+POST /functions/v1/generate-script
+Body:
+{
+  "celebrityName": "Priya Sharma",
+  "serviceType": "wish",
+  "requestDetails": { "recipientName": "Rahul", "occasion": "birthday", ... },
+  "creativeGuidelines": { "goal": "celebrate", "tone": "heartfelt", ... },
+  "talkingPoints": "mention our childhood memories..."
+}
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}
+Response:
+
+
+{
+  "script": "Hey Rahul! It's Priya Sharma here..."
+}
+STEP 5: Review (ReviewStep)
+Displays all collected data in read-only cards:
+
+Request details summary
+Creative guidelines summary
+Script/content preview
+Pricing breakdown: Base Price → Discount (if plan) → Service Fee (10%) → Total
+No API calls. Pure display from bookingData state.
+
+STEP 6: Checkout (CheckoutStep)
+UI Components:
+
+Order summary card with pricing
+RecipientScheduling toggle (gift delivery: name, email, phone, scheduled date/time)
+Wallet balance display
+Terms & Conditions checkbox
+"Pay" button → opens PaymentMethodSelector modal
+PAYMENT FLOW
+Option A: Wallet Payment
+Step 1 — Insert booking:
+
+POST /rest/v1/bookings
+Body:
+{
+  "celebrity_id": "{celebrity_id}",
+  "user_id": "{profile.id}",
+  "service_type": "video_wish",          // mapped: wish→video_wish, ad→image_promotion, video→video_promotion
+  "original_price": 5000,
+  "discount_amount": 500,
+  "final_price": 4950,                   // discounted + 10% fee
+  "status": "pending",                   // ALWAYS pending — admin approval required
+  "message": "{JSON.stringify(bookingData)}",
+  "instructions": "celebrate birthday",
+  "delivery_type": "video",
+  "generated_prompt": "Hey Rahul! It's Priya..."
+}
+→ Returns: { "id": "booking-uuid-...", ... }
+Step 2 — Wallet transaction:
+
+POST /rest/v1/wallet_transactions
+Body:
+{
+  "user_id": "{profile.id}",
+  "transaction_type": "booking",
+  "amount": 4950,
+  "status": "completed",
+  "payment_method": "wallet",
+  "transaction_details": {
+    "booking_id": "booking-uuid",
+    "celebrity_id": "{celebrity_id}",
+    "service_type": "wish",
+    "base_price": 5000,
+    "discount_percentage": 10,
+    "discount_amount": 500,
+    "plan": "Gold"
+  }
+}
+Step 3 — Payment transaction:
+
+POST /rest/v1/payment_transactions
+Body:
+{
+  "wishme_payment_id": "WM2603A7K3P",
+  "user_id": "{profile.id}",
+  "amount": 4950,
+  "payment_method": "wallet",
+  "service_type": "booking",
+  "booking_id": "booking-uuid",
+  "description": "Booking for Priya Sharma - wish",
+  "status": "completed",
+  "paid_at": "2026-03-29T..."
+}
+Step 4 — Update booking with payment ID:
+
+PATCH /rest/v1/bookings?id=eq.{booking_id}
+Body: { "wishme_payment_id": "WM2603A7K3P" }
+Step 5 — Navigate to:
+
+/booking-summary?bookingId={booking_id}&paymentId=WM2603A7K3P
+Option B: Razorpay Payment
+Step 1 — Insert booking (same as wallet, status='pending')
+
+Step 2 — Create Razorpay order:
+
+POST /functions/v1/create-razorpay-order
+Body:
+{
+  "amount": 4950,
+  "currency": "INR",
+  "receipt": "booking_{booking_id}",
+  "notes": {
+    "booking_id": "booking-uuid",
+    "celebrity_id": "{celebrity_id}",
+    "service_type": "wish"
+  }
+}
+→ Response:
+{
+  "id": "order_razorpay123",
+  "amount": 495000,         // in paise
+  "currency": "INR",
+  "key_id": "rzp_test_SWcF0o0gYq1y2O"
+}
+Step 3 — Open Razorpay SDK with order_id, amount, key_id
+
+Step 4 — On success, verify:
+
+POST /functions/v1/verify-razorpay-payment
+Body:
+{
+  "razorpay_payment_id": "pay_abc123",
+  "razorpay_order_id": "order_razorpay123",
+  "razorpay_signature": "hmac_sha256_signature",
+  "booking_id": "booking-uuid"
+}
+→ Response:
+{
+  "success": true,
+  "message": "Payment verified",
+  "wishme_payment_id": "WM2603A7K3P"
+}
+POST-CHECKOUT: Admin Approval → Video Generation
+Booking sits in status='pending' — visible in admin panel at /admin/bookings
+Admin clicks "Approve Order" → calls:
+POST /functions/v1/update-booking-status
+Body:
+{
+  "bookingId": "booking-uuid",
+  "status": "confirmed",
+  "adminNotes": "Approved",
+  "deliveryDate": "2026-04-01"
+}
+This triggers process-video-order edge function → calls HeyGen API → generates AI video
+HeyGen webhook calls back → video uploaded to B2 storage → booking status → video_ready
+Admin manually sends video → status → video_sent → user gets notification
+User views video on /bookings page (gated by verify-video-access edge function)
+BOOKING SUMMARY: /booking-summary
+Endpoint:
+
+GET /rest/v1/bookings?id=eq.{bookingId}&select=*
+GET /rest/v1/celebrities?id=eq.{celebrity_id}&select=*
+Displays: success animation, WishMe Payment ID, celebrity name, service type, amount paid, delivery estimate, and optional video/card preview links.
+
+KEY DATABASE TABLES INVOLVED
+Table	Purpose
+celebrities	Celebrity profiles + service_prices JSONB
+celebrity_favorite_pricing	Subscription price per celebrity
+celebrity_favorites	User↔Celebrity subscription records
+bookings	All service bookings (status lifecycle)
+wallet_transactions	Wallet debit/credit logs
+payment_transactions	Universal WishMe payment ID ledger
+scheduled_messages	Gift delivery scheduling
+Now I have all the information needed. Here's the complete technical breakdown:
+
+Complete Celebrity Discovery & Booking Flow — Technical Specification for Replit Mobile App
+OVERVIEW — PURPOSE
+The /celebrities page is a discovery hub where users browse all active celebrities, then navigate to a celebrity's profile, subscribe (one-time payment), and book services (Wish, Ad, Video Promo, UGC). The booking is a 6-step wizard that collects request details, delivery type, creative guidelines, script content, review, and checkout. All bookings are created with status='pending' and require admin approval before any AI video generation begins.
+
+SCREEN FLOW (Navigation Chain)
+
+/celebrities
+    ↓ tap celebrity card
+/celebrity/{id}
+    ↓ tap "Subscribe" (if not subscribed)
+    → SubscriptionGate modal → Payment → subscribed
+    ↓ tap "Book Now" on a service
+/booking/{id}?service=wish|ad|video
+    Step 1: Request Details
+    Step 2: Delivery Type
+    Step 3: Creative Guidelines
+    Step 4: Script Builder
+    Step 5: Review
+    Step 6: Checkout → Payment
+    ↓ success
+/booking-summary?bookingId={id}&paymentId={wmId}
+    ↓ admin approves (admin panel)
+    → AI video generation triggers
+    ↓ video ready
+/bookings (user sees video under "Video Sent" status)
+SCREEN 1: /celebrities — Discovery Page
+UI Components:
+
+Hero Header: Title + subtitle text
+Search Bar: Debounced (500ms) text input, filters by name ILIKE
+Category Pills: Horizontal scroll — ["All", "Actors", "Singers", "Comedians", "Athletes", "Creators"]
+Sort Dropdowns: Price (Low→High / High→Low), Delivery time
+Celebrity Grid: grid-cols-2 mobile, grid-cols-4 desktop
+Celebrity Card: Image (200px mobile / 260px desktop), price badge (top-right), lock overlay if not subscribed, name, rating star, category
+Pagination: 8 items per page, numbered buttons with prev/next arrows
+Endpoint — Fetch Celebrities:
+
+GET /rest/v1/celebrities
+  ?is_active=eq.true
+  &or=(consent_status.eq.approved,consent_status.is.null)
+  &category=eq.{selectedCategory}         // optional, skip if "All"
+  &name=ilike.*{searchTerm}*              // optional
+  &order=rating.desc
+  &offset={page * 8}&limit=8
+  &select=*
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}  // optional for public browse
+  Prefer: count=exact                        // to get totalCount for pagination
+Response:
+
+
+[
+  {
+    "id": "685ca0c9-...",
+    "name": "Priya Sharma",
+    "image_url": "https://...",
+    "category": "Actors",
+    "rating": 4.8,
+    "review_count": 12,
+    "bio": "Award-winning actress...",
+    "delivery_time": "24 hours",
+    "is_active": true,
+    "is_verified": true,
+    "service_prices": {
+      "general_wish": 5000,
+      "image_promotion": 25000,
+      "video_promotion": 50000,
+      "ugc_ad": 25000
+    },
+    "followers": "1.2M",
+    "location": "Mumbai"
+  }
+]
+Endpoint — Check User Subscriptions:
+
+GET /rest/v1/celebrity_favorites
+  ?user_id=eq.{profile.id}
+  &status=eq.active
+  &select=celebrity_id
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}
+Response:
+
+
+[
+  { "celebrity_id": "685ca0c9-..." },
+  { "celebrity_id": "abc12345-..." }
+]
+Lock Logic: If user exists but celebrity_id NOT in subscriptions array → show blur + Lock icon + "Subscription Required" overlay on the card image.
+
+SCREEN 2: /celebrity/{id} — Celebrity Profile
+UI Components:
+
+Mobile Layout: Cover image (blurred bg), overlapping profile card with avatar, name, category, rating, followers, location, delivery time
+Desktop Layout: Side-by-side hero with large image + info panel
+Subscribe CTA Card: Shows price from celebrity_favorite_pricing, benefits list, "Subscribe Now" button
+"Subscribed ✓" Badge: Green card if already subscribed
+Book a Service Section: 3 service cards (Wish, Ad, Video Promo) with prices from service_prices JSONB
+Tabs: Overview (bio + services), Media, Events, Releases, About
+Endpoints Used:
+
+Fetch Celebrity:
+GET /rest/v1/celebrities?id=eq.{id}&select=*
+→ single row with all celebrity fields
+Fetch Subscription Price:
+GET /rest/v1/celebrity_favorite_pricing
+  ?celebrity_id=eq.{id}
+  &is_enabled=eq.true
+  &select=price
+→ { "price": 999 }   // defaults to ₹999 if not found
+Check Subscription Status:
+GET /rest/v1/celebrity_favorites
+  ?user_id=eq.{profile.id}
+  &celebrity_id=eq.{id}
+  &status=eq.active
+  &select=*
+→ null (not subscribed) or single row (subscribed)
+Fetch Events:
+GET /rest/v1/celebrity_events
+  ?celebrity_id=eq.{id}
+  &is_public=eq.true
+  &order=event_date.asc
+  &select=*
+Fetch Media:
+GET /rest/v1/celebrity_media
+  ?celebrity_id=eq.{id}
+  &is_public=eq.true
+  &order=created_at.desc
+  &select=*
+SUBSCRIPTION PURCHASE (SubscriptionGate Modal)
+UI: Dialog with celebrity avatar, benefits list, price display, "Subscribe Now" → PaymentMethodSelector (Wallet or Razorpay)
+
+Wallet Payment — RPC Call:
+
+POST /rest/v1/rpc/purchase_celebrity_subscription
+Body:
+{
+  "p_celebrity_id": "{celebrity_id}",
+  "p_price": 999,
+  "p_payment_method": "wallet"
+}
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}
+This RPC internally: deducts wallet, inserts into celebrity_favorites with status='active', creates wallet transaction, handles commission splits.
+
+Post-subscription email (fire-and-forget):
+
+POST /functions/v1/send-celebrity-subscription-email
+Body:
+{
+  "celebrity_id": "{id}",
+  "subscriber_name": "John Doe",
+  "subscriber_email": "john@example.com",
+  "price_paid": 999
+}
+SCREEN 3: /booking/{id}?service=wish|ad|video — 6-Step Booking Wizard
+Navigation: handleBookNow('wish') on profile page → navigates to /booking/{celebrityId}?service=wish
+
+Layout: 75% main content (step form) + 25% sidebar (celebrity info + live price summary)
+
+Sidebar shows: celebrity avatar, name, rating, service title, base price, discount badge (if user has a plan), service fee (10%), total.
+
+STEP 1: Request Details (RequestDetailsStep)
+For service=wish:
+
+recipientName (required)
+recipientRelation (optional)
+occasion (required) — text input
+message (optional) — textarea
+preferredLanguage — dropdown
+For service=video:
+
+videoType: RadioGroup → "marketing" | "business_event" (required)
+businessName (required)
+businessPronunciation (optional)
+preferredLanguage — dropdown
+For service=ad:
+
+businessName (required)
+message — textarea for ad description
+Language Dropdown — Endpoint:
+
+POST /functions/v1/heygen-get-languages
+Body: {}
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}
+Response:
+
+
+{
+  "languages": [
+    { "language": "English", "locale": "en-US" },
+    { "language": "Hindi", "locale": "hi-IN" },
+    ...
+  ]
+}
+Fallback: 39 hardcoded languages if the API fails.
+
+STEP 2: Delivery Type (DeliveryTypeStep)
+RadioGroup with 3 options:
+
+video — "Video Message" (default)
+card — "Digital Greeting Card"
+both — "Video + Card Combo"
+No API calls. Pure client-side state.
+
+STEP 3: Creative Guidelines (CreativeGuidelinesStep)
+Goal: Select dropdown (e.g., "Promote a product", "Celebrate occasion") + "Other" text input
+Tone: Dropdown (funny, heartfelt, professional, etc.)
+Filming requirements: Textarea (for service=video only)
+Things to avoid: Checkbox list (competitor mentions, profanity, etc.)
+No API calls. Pure client-side state.
+
+STEP 4: Script Builder (ScriptBuilderStep)
+Script type: RadioGroup → "talking_points" | "exact_script"
+Talking points / exact script: Textarea
+AI Generate button: Calls edge function
+For service=ad: Simplified form — ad description + image style dropdown.
+
+AI Script Generation — Endpoint:
+
+POST /functions/v1/generate-script
+Body:
+{
+  "celebrityName": "Priya Sharma",
+  "serviceType": "wish",
+  "requestDetails": { "recipientName": "Rahul", "occasion": "birthday", ... },
+  "creativeGuidelines": { "goal": "celebrate", "tone": "heartfelt", ... },
+  "talkingPoints": "mention our childhood memories..."
+}
+Headers:
+  apikey: {SUPABASE_ANON_KEY}
+  Authorization: Bearer {user_access_token}
+Response:
+
+
+{
+  "script": "Hey Rahul! It's Priya Sharma here..."
+}
+STEP 5: Review (ReviewStep)
+Displays all collected data in read-only cards:
+
+Request details summary
+Creative guidelines summary
+Script/content preview
+Pricing breakdown: Base Price → Discount (if plan) → Service Fee (10%) → Total
+No API calls. Pure display from bookingData state.
+
+STEP 6: Checkout (CheckoutStep)
+UI Components:
+
+Order summary card with pricing
+RecipientScheduling toggle (gift delivery: name, email, phone, scheduled date/time)
+Wallet balance display
+Terms & Conditions checkbox
+"Pay" button → opens PaymentMethodSelector modal
+PAYMENT FLOW
+Option A: Wallet Payment
+Step 1 — Insert booking:
+
+POST /rest/v1/bookings
+Body:
+{
+  "celebrity_id": "{celebrity_id}",
+  "user_id": "{profile.id}",
+  "service_type": "video_wish",          // mapped: wish→video_wish, ad→image_promotion, video→video_promotion
+  "original_price": 5000,
+  "discount_amount": 500,
+  "final_price": 4950,                   // discounted + 10% fee
+  "status": "pending",                   // ALWAYS pending — admin approval required
+  "message": "{JSON.stringify(bookingData)}",
+  "instructions": "celebrate birthday",
+  "delivery_type": "video",
+  "generated_prompt": "Hey Rahul! It's Priya..."
+}
+→ Returns: { "id": "booking-uuid-...", ... }
+Step 2 — Wallet transaction:
+
+POST /rest/v1/wallet_transactions
+Body:
+{
+  "user_id": "{profile.id}",
+  "transaction_type": "booking",
+  "amount": 4950,
+  "status": "completed",
+  "payment_method": "wallet",
+  "transaction_details": {
+    "booking_id": "booking-uuid",
+    "celebrity_id": "{celebrity_id}",
+    "service_type": "wish",
+    "base_price": 5000,
+    "discount_percentage": 10,
+    "discount_amount": 500,
+    "plan": "Gold"
+  }
+}
+Step 3 — Payment transaction:
+
+POST /rest/v1/payment_transactions
+Body:
+{
+  "wishme_payment_id": "WM2603A7K3P",
+  "user_id": "{profile.id}",
+  "amount": 4950,
+  "payment_method": "wallet",
+  "service_type": "booking",
+  "booking_id": "booking-uuid",
+  "description": "Booking for Priya Sharma - wish",
+  "status": "completed",
+  "paid_at": "2026-03-29T..."
+}
+Step 4 — Update booking with payment ID:
+
+PATCH /rest/v1/bookings?id=eq.{booking_id}
+Body: { "wishme_payment_id": "WM2603A7K3P" }
+Step 5 — Navigate to:
+
+/booking-summary?bookingId={booking_id}&paymentId=WM2603A7K3P
+Option B: Razorpay Payment
+Step 1 — Insert booking (same as wallet, status='pending')
+
+Step 2 — Create Razorpay order:
+
+POST /functions/v1/create-razorpay-order
+Body:
+{
+  "amount": 4950,
+  "currency": "INR",
+  "receipt": "booking_{booking_id}",
+  "notes": {
+    "booking_id": "booking-uuid",
+    "celebrity_id": "{celebrity_id}",
+    "service_type": "wish"
+  }
+}
+→ Response:
+{
+  "id": "order_razorpay123",
+  "amount": 495000,         // in paise
+  "currency": "INR",
+  "key_id": "rzp_test_SWcF0o0gYq1y2O"
+}
+Step 3 — Open Razorpay SDK with order_id, amount, key_id
+
+Step 4 — On success, verify:
+
+POST /functions/v1/verify-razorpay-payment
+Body:
+{
+  "razorpay_payment_id": "pay_abc123",
+  "razorpay_order_id": "order_razorpay123",
+  "razorpay_signature": "hmac_sha256_signature",
+  "booking_id": "booking-uuid"
+}
+→ Response:
+{
+  "success": true,
+  "message": "Payment verified",
+  "wishme_payment_id": "WM2603A7K3P"
+}
+POST-CHECKOUT: Admin Approval → Video Generation
+Booking sits in status='pending' — visible in admin panel at /admin/bookings
+Admin clicks "Approve Order" → calls:
+POST /functions/v1/update-booking-status
+Body:
+{
+  "bookingId": "booking-uuid",
+  "status": "confirmed",
+  "adminNotes": "Approved",
+  "deliveryDate": "2026-04-01"
+}
+This triggers process-video-order edge function → calls HeyGen API → generates AI video
+HeyGen webhook calls back → video uploaded to B2 storage → booking status → video_ready
+Admin manually sends video → status → video_sent → user gets notification
+User views video on /bookings page (gated by verify-video-access edge function)
+BOOKING SUMMARY: /booking-summary
+Endpoint:
+
+GET /rest/v1/bookings?id=eq.{bookingId}&select=*
+GET /rest/v1/celebrities?id=eq.{celebrity_id}&select=*
+Displays: success animation, WishMe Payment ID, celebrity name, service type, amount paid, delivery estimate, and optional video/card preview links.
+
+KEY DATABASE TABLES INVOLVED
+Table	Purpose
+celebrities	Celebrity profiles + service_prices JSONB
+celebrity_favorite_pricing	Subscription price per celebrity
+celebrity_favorites	User↔Celebrity subscription records
+bookings	All service bookings (status lifecycle)
+wallet_transactions	Wallet debit/credit logs
+payment_transactions	Universal WishMe payment ID ledger
+scheduled_messages	Gift delivery scheduling
+
+
+
+
