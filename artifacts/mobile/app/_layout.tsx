@@ -13,6 +13,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect } from 'react';
 import { AppState, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { DraggableMoreButton } from '@/components/DraggableMoreButton';
@@ -118,18 +119,20 @@ export default function RootLayout() {
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>
-            <ThemeProvider>
-              <AuthProvider>
-                <AIAssistantProvider>
-                  <DrawerProvider>
-                    <View style={{ flex: 1 }}>
-                      <RootLayoutNav />
-                      <FloatingButtons />
-                    </View>
-                  </DrawerProvider>
-                </AIAssistantProvider>
-              </AuthProvider>
-            </ThemeProvider>
+            <KeyboardProvider>
+              <ThemeProvider>
+                <AuthProvider>
+                  <AIAssistantProvider>
+                    <DrawerProvider>
+                      <View style={{ flex: 1 }}>
+                        <RootLayoutNav />
+                        <FloatingButtons />
+                      </View>
+                    </DrawerProvider>
+                  </AIAssistantProvider>
+                </AuthProvider>
+              </ThemeProvider>
+            </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>
       </ErrorBoundary>

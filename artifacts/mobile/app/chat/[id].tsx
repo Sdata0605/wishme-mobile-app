@@ -10,7 +10,6 @@ import {
   AppState,
   Dimensions,
   FlatList,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -19,6 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
@@ -84,8 +84,11 @@ function parseMsgContent(text: string): { type: MsgContentType; url?: string; pl
   if (text.startsWith('[Voice Note: ') && text.endsWith(']')) {
     return { type: 'voice', url: text.slice('[Voice Note: '.length, -1) };
   }
-  if (text.startsWith('[Greeting Card: ') && text.endsWith(']')) {
-    return { type: 'card', url: text.slice('[Greeting Card: '.length, -1) };
+  const cardMatch = text.match(/\[Greeting Card:\s*(https?:\/\/[^\]]+)\]/);
+  if (cardMatch) {
+    const cardUrl = cardMatch[1].trim();
+    const plain = text.replace(cardMatch[0], '').trim();
+    return { type: 'card', url: cardUrl, plain: plain || undefined };
   }
   return { type: 'text', plain: text };
 }
@@ -268,23 +271,32 @@ function MessageBubble({
         {parsed.type === 'voice' && parsed.url && (
           <VoiceNotePlayer url={parsed.url} isMe={isMe} colors={colors} />
         )}
-        {parsed.type === 'card' && parsed.url && (
-          <View style={mb.cardWrap}>
-            <Image
-              source={{ uri: parsed.url }}
-              style={[mb.cardImg, { width: Math.min(Dimensions.get('window').width * 0.75, 320) }]}
-              contentFit="cover"
-            />
-            <TouchableOpacity
-              style={mb.cardLink}
-              onPress={() => WebBrowser.openBrowserAsync(parsed.url!)}
-            >
-              <Icon name="eye" size={13} color={isMe ? '#fff' : colors.primary} />
-              <Text style={[mb.cardLinkText, { color: isMe ? '#fff' : colors.primary }]}>
-                View Full Card
+        {parsed.type === 'card' && (
+          <>
+            {parsed.plain && (
+              <Text style={[mb.text, { color: isMe ? '#fff' : colors.foreground }]}>
+                {parsed.plain}
               </Text>
-            </TouchableOpacity>
-          </View>
+            )}
+            {parsed.url && (
+              <View style={mb.cardWrap}>
+                <Image
+                  source={{ uri: parsed.url }}
+                  style={[mb.cardImg, { width: Math.min(Dimensions.get('window').width * 0.75, 320) }]}
+                  contentFit="cover"
+                />
+                <TouchableOpacity
+                  style={mb.cardLink}
+                  onPress={() => WebBrowser.openBrowserAsync(parsed.url!)}
+                >
+                  <Icon name="eye" size={13} color={isMe ? '#fff' : colors.primary} />
+                  <Text style={[mb.cardLinkText, { color: isMe ? '#fff' : colors.primary }]}>
+                    View Full Card
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
         {!isMe && msg.is_ai_generated && (
           <View style={mb.aiBadge}>
