@@ -552,10 +552,10 @@ export default function PhotoWishScreen() {
                     {history.map((item, idx) => (
                       <View key={item.id} style={[s.histCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                         {item.edited_image_url ? (
-                          <Image source={{ uri: item.edited_image_url }} style={s.histThumbImg} resizeMode="cover" />
+                          <Image source={{ uri: item.edited_image_url }} style={s.histCardImg} resizeMode="cover" />
                         ) : (
-                          <LinearGradient colors={GRAD_COLORS[idx % GRAD_COLORS.length]} style={s.histThumb}>
-                            <Icon name="image" size={24} color="rgba(255,255,255,0.8)" />
+                          <LinearGradient colors={GRAD_COLORS[idx % GRAD_COLORS.length]} style={s.histCardPlaceholder}>
+                            <Icon name="image" size={40} color="rgba(255,255,255,0.8)" />
                           </LinearGradient>
                         )}
                         <View style={s.histInfo}>
@@ -649,10 +649,10 @@ const s = StyleSheet.create({
   historyWrap: { padding: 20 },
   histCount: { fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 14 },
   histGrid: { gap: 12 },
-  histCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden', flexDirection: 'row' },
-  histThumb: { width: 90, alignItems: 'center', justifyContent: 'center' },
-  histThumbImg: { width: 90, height: 90 },
-  histInfo: { flex: 1, padding: 12, gap: 6 },
+  histCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
+  histCardImg: { width: '100%', aspectRatio: 1, backgroundColor: '#111' },
+  histCardPlaceholder: { width: '100%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  histInfo: { padding: 12, gap: 6 },
   histBadgeRow: { flexDirection: 'row', gap: 6, flexWrap: 'wrap' },
   badge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
