@@ -30,6 +30,7 @@ interface WishOrder {
   generated_card_image_url?: string;
   greeting_text?: string;
   generation_attempts?: number;
+  card_approved?: boolean;
   celebrities: {
     id: string;
     name: string;
@@ -60,7 +61,7 @@ export default function WishConfirmationScreen() {
     setOrderLoading(true);
     try {
       const res = await supabaseFetch(
-        `/rest/v1/wish_celebrity_orders?id=eq.${id}&select=id,occasion_type,recipient_name,message,card_prompt,amount_paid,payment_status,status,generated_card_image_url,greeting_text,generation_attempts,celebrities(id,name,category,image_url)&limit=1`,
+        `/rest/v1/wish_celebrity_orders?id=eq.${id}&select=id,occasion_type,recipient_name,message,card_prompt,amount_paid,payment_status,status,generated_card_image_url,greeting_text,generation_attempts,card_approved,celebrities(id,name,category,image_url)&limit=1`,
         {},
         session?.access_token,
       );
@@ -90,17 +91,18 @@ export default function WishConfirmationScreen() {
       }, session?.access_token);
 
       if (!res.ok) throw new Error('Card generation failed');
-      const data = await res.json() as { card_image_url?: string; greeting_text?: string; image_url?: string };
-      const imgUrl = data.card_image_url ?? data.image_url ?? null;
+      const data = await res.json() as { card_url?: string; card_image_url?: string; greeting_text?: string; image_url?: string };
+      const imgUrl = data.card_url ?? data.card_image_url ?? data.image_url ?? null;
       const gText = data.greeting_text ?? null;
       if (imgUrl) setCardImageUrl(imgUrl);
       if (gText) setGreetingText(gText);
       setRegenerationCount(prev => prev + 1);
+      await loadOrder();
     } catch (e: unknown) {
       setGenError(e instanceof Error ? e.message : 'Failed to generate card');
     }
     setGenerating(false);
-  }, [id, order, session, regenerationCount]);
+  }, [id, order, session, regenerationCount, loadOrder]);
 
   useEffect(() => {
     loadOrder();
@@ -110,7 +112,7 @@ export default function WishConfirmationScreen() {
     if (order && order.payment_status === 'completed' && !order.generated_card_image_url) {
       generateCard();
     }
-  }, [order]);
+  }, [order, generateCard]);
 
   const handleApproveAndSend = async () => {
     if (!id) return;
@@ -162,6 +164,16 @@ export default function WishConfirmationScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
+          {order.payment_status === 'completed' && (
+            <View style={s.paymentBanner}>
+              <Icon name="check-circle" size={18} color="#16A34A" />
+              <View style={{ flex: 1 }}>
+                <Text style={s.paymentBannerTitle}>Payment Successful</Text>
+                <Text style={s.paymentBannerSubtitle}>Your order is confirmed and the AI card is being generated</Text>
+              </View>
+            </View>
+          )}
+
           {order.celebrities && (
             <View style={[s.celebRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
               {celebImageUri ? (
@@ -190,10 +202,16 @@ export default function WishConfirmationScreen() {
               <Text style={[s.infoLabel, { color: colors.mutedForeground }]}>Recipient</Text>
               <Text style={[s.infoValue, { color: colors.foreground }]}>{order.recipient_name}</Text>
             </View>
-            <View style={[s.infoRow, { borderBottomWidth: 0 }]}>
+            <View style={order.card_prompt ? s.infoRow : [s.infoRow, { borderBottomWidth: 0 }]}>
               <Text style={[s.infoLabel, { color: colors.mutedForeground }]}>Message</Text>
               <Text style={[s.infoValue, { color: colors.foreground, flex: 1, textAlign: 'right' }]} numberOfLines={3}>{order.message}</Text>
             </View>
+            {order.card_prompt ? (
+              <View style={[s.infoRow, { borderBottomWidth: 0 }]}>
+                <Text style={[s.infoLabel, { color: colors.mutedForeground }]}>Card Prompt</Text>
+                <Text style={[s.infoValue, { color: colors.foreground, flex: 1, textAlign: 'right' }]} numberOfLines={3}>{order.card_prompt}</Text>
+              </View>
+            ) : null}
           </View>
 
           <Text style={[s.sectionTitle, { color: colors.foreground }]}>AI Greeting Card</Text>
@@ -223,36 +241,43 @@ export default function WishConfirmationScreen() {
             </View>
           )}
 
-          {maxRegenReached && (
+          {maxRegenReached && !order.card_approved && (
             <View style={[s.maxRegenBanner, { backgroundColor: colors.muted }]}>
               <Icon name="info" size={14} color={colors.mutedForeground} />
               <Text style={[s.maxRegenText, { color: colors.mutedForeground }]}>Maximum regenerations reached (3/3)</Text>
             </View>
           )}
 
-          <View style={s.actions}>
-            <TouchableOpacity
-              style={[s.regenBtn, { backgroundColor: colors.card, borderColor: colors.border, opacity: maxRegenReached || generating ? 0.5 : 1 }]}
-              onPress={generateCard}
-              disabled={generating || sending || maxRegenReached}
-            >
-              {generating ? (
-                <ActivityIndicator size="small" color={colors.primary} />
-              ) : (
-                <Icon name="refresh-cw" size={16} color={colors.primary} />
-              )}
-              <Text style={[s.regenText, { color: colors.primary }]}>Regenerate Card</Text>
-            </TouchableOpacity>
+          {order.card_approved ? (
+            <View style={s.sentBanner}>
+              <Icon name="check-circle" size={18} color="#16A34A" />
+              <Text style={s.sentBannerText}>Wish sent to {order.celebrities?.name ?? 'celebrity'}!</Text>
+            </View>
+          ) : (
+            <View style={s.actions}>
+              <TouchableOpacity
+                style={[s.regenBtn, { backgroundColor: colors.card, borderColor: colors.border, opacity: maxRegenReached || generating ? 0.5 : 1 }]}
+                onPress={generateCard}
+                disabled={generating || sending || maxRegenReached}
+              >
+                {generating ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Icon name="refresh-cw" size={16} color={colors.primary} />
+                )}
+                <Text style={[s.regenText, { color: colors.primary }]}>Regenerate Card</Text>
+              </TouchableOpacity>
 
-            <GradientButton
-              title="Approve & Send"
-              onPress={handleApproveAndSend}
-              loading={sending}
-              disabled={!cardImageUrl || generating}
-              style={{ flex: 1 }}
-              icon={<Icon name="send" size={16} color="#fff" />}
-            />
-          </View>
+              <GradientButton
+                title="Approve & Send"
+                onPress={handleApproveAndSend}
+                loading={sending}
+                disabled={!cardImageUrl || generating}
+                style={{ flex: 1 }}
+                icon={<Icon name="send" size={16} color="#fff" />}
+              />
+            </View>
+          )}
 
           {sendError ? (
             <View style={s.sendErrorRow}>
@@ -275,6 +300,9 @@ const s = StyleSheet.create({
   errorTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   retryText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  paymentBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#86EFAC', backgroundColor: '#F0FDF4', padding: 14, marginBottom: 16 },
+  paymentBannerTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#16A34A' },
+  paymentBannerSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#15803D', marginTop: 2 },
   celebRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
   celebAvatar: { width: 48, height: 48, borderRadius: 24 },
   celebAvatarPlaceholder: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
@@ -295,6 +323,8 @@ const s = StyleSheet.create({
   genErrorText: { color: '#EF4444', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 16 },
   maxRegenBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, padding: 10, marginBottom: 12 },
   maxRegenText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+  sentBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#86EFAC', backgroundColor: '#F0FDF4', padding: 14, marginBottom: 12 },
+  sentBannerText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#16A34A', flex: 1 },
   actions: { flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'center' },
   regenBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: 9999, paddingVertical: 12, paddingHorizontal: 16 },
   regenText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
