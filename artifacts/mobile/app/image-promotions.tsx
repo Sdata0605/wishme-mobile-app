@@ -108,7 +108,7 @@ export default function ImagePromotionsScreen() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const isLoggedIn = !!(user && session);
-  const noSubscriptions = isLoggedIn && !celebsLoading && !favLoading && celebrities.length === 0;
+  const noSubscriptions = isLoggedIn && !favLoading && favoriteIds.size === 0;
 
   const todayCount = history.filter(p => isToday(p.created_at)).length;
   const completedCount = history.filter(p => p.status === 'completed').length;
@@ -122,7 +122,7 @@ export default function ImagePromotionsScreen() {
     try {
       const ids = Array.from(favoriteIds).join(',');
       const celebRes = await supabaseFetch(
-        `/rest/v1/celebrities?select=id,name,category,image_url&id=in.(${ids})&avatar_trained=eq.true`,
+        `/rest/v1/celebrities?select=id,name,category,image_url&id=in.(${ids})`,
         {},
         session.access_token,
       );
