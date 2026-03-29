@@ -146,17 +146,21 @@ export default function BookingWizardScreen() {
         let resolvedProfileId = '';
         let walletBal = 0;
         let discPct = 0;
+        let profileFetched = false;
 
         if (profRes.status === 'fulfilled' && profRes.value && (profRes.value as Response).ok) {
           const prows: { id?: string; wallet_balance?: number }[] =
             await (profRes.value as Response).json().catch(() => []);
           if (Array.isArray(prows) && prows.length > 0) {
-            resolvedProfileId = prows[0].id ?? user?.profileId ?? '';
-            walletBal = prows[0].wallet_balance ?? user?.walletBalance ?? 0;
+            resolvedProfileId = prows[0].id ?? '';
+            walletBal = prows[0].wallet_balance ?? 0;
+            profileFetched = true;
           }
         }
-        if (!resolvedProfileId) resolvedProfileId = user?.profileId ?? '';
-        if (!walletBal) walletBal = user?.walletBalance ?? 0;
+        if (!profileFetched) {
+          resolvedProfileId = user?.profileId ?? '';
+          walletBal = user?.walletBalance ?? 0;
+        }
         setProfileId(resolvedProfileId);
         setWalletBalance(walletBal);
         setDiscountPct(discPct);
