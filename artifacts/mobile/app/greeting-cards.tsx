@@ -4,7 +4,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as MediaLibrary from 'expo-media-library';
 import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -108,6 +108,7 @@ export default function GreetingCardsScreen() {
 
   const [generating, setGenerating] = useState(false);
   const [currentGeneration, setCurrentGeneration] = useState<Generation | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const savedCards = history.filter(h => h.saved_to_library);
   const todayCards = history.filter(h => h.created_at.startsWith(todayIso()));
@@ -176,6 +177,54 @@ export default function GreetingCardsScreen() {
       fetchHistory();
     }
   }, [wallet.profileId, fetchHistory]);
+
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, []);
+
+  const startPolling = useCallback((generationId: string) => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    let attempts = 0;
+    const MAX_ATTEMPTS = 20;
+    pollingRef.current = setInterval(async () => {
+      attempts += 1;
+      try {
+        const res = await supabaseFetch(
+          `/rest/v1/greeting_card_generations?id=eq.${generationId}&select=status,generated_image_url,greeting_text,refined_prompt&limit=1`,
+          {},
+          session?.access_token,
+        );
+        if (res.ok) {
+          const rows = await res.json() as Array<Pick<Generation, 'status' | 'generated_image_url' | 'greeting_text' | 'refined_prompt'>>;
+          if (rows?.length) {
+            const row = rows[0];
+            if (row.status === 'completed' && row.generated_image_url) {
+              clearInterval(pollingRef.current!);
+              pollingRef.current = null;
+              setCurrentGeneration(prev => prev ? { ...prev, ...row } : prev);
+              showToast('Card generated successfully!');
+              wallet.refetch();
+              fetchHistory();
+              return;
+            }
+            if (row.status === 'failed') {
+              clearInterval(pollingRef.current!);
+              pollingRef.current = null;
+              setCurrentGeneration(prev => prev ? { ...prev, status: 'failed' } : prev);
+              return;
+            }
+          }
+        }
+      } catch {}
+      if (attempts >= MAX_ATTEMPTS) {
+        clearInterval(pollingRef.current!);
+        pollingRef.current = null;
+        setCurrentGeneration(prev => prev ? { ...prev, status: 'failed', error_message: 'Generation timed out. Please try again.' } : prev);
+      }
+    }, 3000);
+  }, [session, wallet, fetchHistory]);
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -266,10 +315,14 @@ export default function GreetingCardsScreen() {
       const data = await res.json() as { generation?: Generation };
       if (data.generation) {
         setCurrentGeneration(data.generation);
-        showToast('Card generated successfully!');
+        if (data.generation.status === 'completed' && data.generation.generated_image_url) {
+          showToast('Card generated successfully!');
+          wallet.refetch();
+          fetchHistory();
+        } else {
+          startPolling(data.generation.id);
+        }
       }
-      wallet.refetch();
-      fetchHistory();
     } catch {
       Alert.alert('Error', 'Network error. Please check your connection.');
     }
@@ -707,55 +760,89 @@ export default function GreetingCardsScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Generated preview */}
-            {currentGeneration && currentGeneration.status === 'completed' && currentGeneration.generated_image_url && (
-              <View style={[s.previewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <View style={s.previewImgWrap}>
-                  <Image
-                    source={{ uri: currentGeneration.generated_image_url }}
-                    style={{ height: 280, width: '100%' }}
-                    contentFit="cover"
-                  />
-                  {currentGeneration.greeting_text ? (
-                    <LinearGradient
-                      colors={['transparent', 'rgba(0,0,0,0.72)']}
-                      style={s.greetingOverlay}
-                    >
-                      <Text style={s.greetingText}>{currentGeneration.greeting_text}</Text>
-                    </LinearGradient>
-                  ) : null}
-                </View>
-
-                {currentGeneration.refined_prompt ? (
-                  <View style={[s.refinedBox, { backgroundColor: '#4B83FF10', borderColor: '#4B83FF30' }]}>
-                    <Icon name="info" size={14} color="#4B83FF" />
-                    <Text style={[s.refinedText, { color: '#4B83FF' }]}>
-                      AI refined your prompt: {currentGeneration.refined_prompt}
-                    </Text>
+            {/* Generated preview — 4-state section */}
+            {(generating || currentGeneration) ? (
+              generating ? (
+                /* State A — Generating (initial API call in progress) */
+                <LinearGradient
+                  colors={['#FF6B3320', '#E8527A20']}
+                  style={s.previewPlaceholder}
+                >
+                  <ActivityIndicator color="#E8527A" size="large" />
+                  <Text style={[s.previewPlaceholderTitle, { color: colors.foreground }]}>✦ Generating your card...</Text>
+                  <Text style={[s.previewPlaceholderSub, { color: colors.mutedForeground }]}>This may take ~30 seconds</Text>
+                </LinearGradient>
+              ) : currentGeneration?.status === 'processing' ? (
+                /* State B — Polling (edge function returned processing) */
+                <LinearGradient
+                  colors={['#4B83FF20', '#7B2FFF20']}
+                  style={s.previewPlaceholder}
+                >
+                  <ActivityIndicator color="#4B83FF" size="large" />
+                  <Text style={[s.previewPlaceholderTitle, { color: colors.foreground }]}>Processing card...</Text>
+                  <Text style={[s.previewPlaceholderSub, { color: colors.mutedForeground }]}>Checking every few seconds</Text>
+                </LinearGradient>
+              ) : currentGeneration?.status === 'completed' && currentGeneration.generated_image_url ? (
+                /* State C — Completed */
+                <View style={[s.previewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <View style={s.previewImgWrap}>
+                    <Image
+                      source={{ uri: currentGeneration.generated_image_url }}
+                      style={{ height: 280, width: '100%' }}
+                      contentFit="cover"
+                    />
+                    {currentGeneration.greeting_text ? (
+                      <LinearGradient
+                        colors={['transparent', 'rgba(0,0,0,0.72)']}
+                        style={s.greetingOverlay}
+                      >
+                        <Text style={s.greetingText}>{currentGeneration.greeting_text}</Text>
+                      </LinearGradient>
+                    ) : null}
                   </View>
-                ) : null}
 
-                <View style={s.previewActions}>
-                  <TouchableOpacity
-                    style={[s.actionBtn, { borderColor: currentGeneration.saved_to_library ? '#F59E0B' : colors.border }]}
-                    onPress={() => handleToggleSave(currentGeneration)}
-                  >
-                    <Icon name={currentGeneration.saved_to_library ? 'star' : 'star-outline'} size={16} color={currentGeneration.saved_to_library ? '#F59E0B' : colors.mutedForeground} />
-                    <Text style={[s.actionBtnText, { color: currentGeneration.saved_to_library ? '#F59E0B' : colors.mutedForeground }]}>
-                      {currentGeneration.saved_to_library ? 'Remove from Library' : 'Save to Library'}
-                    </Text>
-                  </TouchableOpacity>
+                  {currentGeneration.refined_prompt ? (
+                    <View style={[s.refinedBox, { backgroundColor: '#4B83FF10', borderColor: '#4B83FF30' }]}>
+                      <Icon name="info" size={14} color="#4B83FF" />
+                      <Text style={[s.refinedText, { color: '#4B83FF' }]}>
+                        AI refined your prompt: {currentGeneration.refined_prompt}
+                      </Text>
+                    </View>
+                  ) : null}
 
-                  <TouchableOpacity
-                    style={[s.actionBtn, { borderColor: '#E8527A' }]}
-                    onPress={() => handleDownload(currentGeneration.generated_image_url!)}
-                  >
-                    <Icon name="download" size={16} color="#E8527A" />
-                    <Text style={[s.actionBtnText, { color: '#E8527A' }]}>Download Card</Text>
+                  <View style={s.previewActions}>
+                    <TouchableOpacity
+                      style={[s.actionBtn, { borderColor: currentGeneration.saved_to_library ? '#F59E0B' : colors.border }]}
+                      onPress={() => handleToggleSave(currentGeneration)}
+                    >
+                      <Icon name={currentGeneration.saved_to_library ? 'star' : 'star-outline'} size={16} color={currentGeneration.saved_to_library ? '#F59E0B' : colors.mutedForeground} />
+                      <Text style={[s.actionBtnText, { color: currentGeneration.saved_to_library ? '#F59E0B' : colors.mutedForeground }]}>
+                        {currentGeneration.saved_to_library ? 'Remove from Library' : 'Save to Library'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[s.actionBtn, { borderColor: '#E8527A' }]}
+                      onPress={() => handleDownload(currentGeneration.generated_image_url!)}
+                    >
+                      <Icon name="download" size={16} color="#E8527A" />
+                      <Text style={[s.actionBtnText, { color: '#E8527A' }]}>Download Card</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : currentGeneration?.status === 'failed' ? (
+                /* State D — Failed */
+                <View style={[s.previewError, { backgroundColor: '#ef444420', borderColor: '#ef444440' }]}>
+                  <Icon name="alert-circle" size={24} color="#ef4444" />
+                  <Text style={[s.previewErrorText, { color: '#ef4444' }]}>
+                    {currentGeneration.error_message ?? 'Card generation failed. Please try again.'}
+                  </Text>
+                  <TouchableOpacity onPress={() => setCurrentGeneration(null)}>
+                    <Text style={[s.previewErrorRetry, { color: '#ef4444' }]}>Try Again</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
-            )}
+              ) : null
+            ) : null}
           </View>
         ) : (
           <View style={s.historyWrap}>
@@ -843,6 +930,12 @@ const s = StyleSheet.create({
   genBtn: { height: 52, borderRadius: 9999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   genBtnText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   genBtnStrike: { color: 'rgba(255,255,255,0.6)', textDecorationLine: 'line-through', fontSize: 13 },
+  previewPlaceholder: { borderRadius: 16, height: 200, alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 20 },
+  previewPlaceholderTitle: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  previewPlaceholderSub: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  previewError: { borderRadius: 16, borderWidth: 1, padding: 24, alignItems: 'center', gap: 10, marginTop: 20 },
+  previewErrorText: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  previewErrorRetry: { fontSize: 14, fontFamily: 'Inter_600SemiBold', textDecorationLine: 'underline', marginTop: 4 },
   previewCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginTop: 20 },
   previewImgWrap: { position: 'relative' },
   greetingOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 16 },
