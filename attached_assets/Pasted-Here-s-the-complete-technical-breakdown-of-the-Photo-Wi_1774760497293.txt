@@ -1,0 +1,158 @@
+Here's the complete technical breakdown of the Photo Wish History section for Replit integration:
+
+Photo Wish History Section — Data Flow & Integration Guide
+1. Data Fetching
+Endpoint:
+
+GET https://eqikeuqwbphwongtfzhe.supabase.co/rest/v1/photo_wishes?user_id=eq.{profile_id}&select=*&order=created_at.desc&limit=20
+Headers:
+
+
+{
+  "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y",
+  "Authorization": "Bearer {user_session_access_token}"
+}
+Important: The user_id here is profiles.id (NOT auth.uid()). The RLS policy uses public.get_my_profile_id() to match, so the auth token handles access control automatically.
+
+2. Response Shape
+
+[
+  {
+    "id": "uuid",
+    "user_id": "profile-uuid",
+    "original_image_url": "uploaded",
+    "edited_image_url": "https://eqikeuqwbphwongtfzhe.supabase.co/storage/v1/object/public/greeting-card-uploads/photo-wishes/{user_id}/{wish_id}-{timestamp}.png",
+    "occasion": "Birthday",
+    "recipient_name": "Rahul",
+    "wish_message": "Happy Birthday! Wishing you joy and happiness.",
+    "sender_name": "Amit",
+    "text_style": "elegant",
+    "amount_charged": 99,
+    "status": "completed",
+    "completed_at": "2026-03-29T04:30:00.000Z",
+    "created_at": "2026-03-29T04:29:50.000Z",
+    "wishme_payment_id": "WM-PW-1234567890"
+  }
+]
+3. UI Rendering Logic
+Empty state: If array length is 0 → show placeholder icon + "No photo wishes yet" message.
+
+Grid layout: grid sm:grid-cols-2 lg:grid-cols-3 gap-4
+
+Each card renders:
+
+Element	Source	Component
+Image thumbnail	wish.edited_image_url	<img> in aspect-square container
+Loading spinner	When edited_image_url is null	Loader2 icon
+Status badge	wish.status → "completed" = default variant, others = secondary	<Badge>
+Date	wish.created_at → toLocaleDateString()	Plain text
+Recipient name	wish.recipient_name	Truncated <p>
+Occasion	wish.occasion	Truncated <p>
+Download button	Only shown if edited_image_url exists	<Button variant="ghost">
+4. Download Logic
+
+const handleDownload = (imageUrl) => {
+  const link = document.createElement("a");
+  link.href = imageUrl;
+  link.download = `photo-wish-${recipientName}-${occasion}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+For mobile app: use the edited_image_url directly to download/save to device gallery.
+
+5. Stats Derived from History
+
+// Today's generations count
+const todayGenerations = history.filter(h => {
+  return new Date().toDateString() === new Date(h.created_at).toDateString();
+}).length;
+
+// Total completed count
+const completedCount = history.filter(h => h.status === "completed").length;
+These feed into the stats cards at the top of the page (Wallet Balance, Today's Generations, Total Completed).
+
+6. Key Notes for Mobile Integration
+RLS enforced: The auth token automatically scopes results to the logged-in user — no need to filter client-side for security
+Image URLs: edited_image_url is a public Supabase Storage URL, directly loadable in <Image> components
+Possible edited_image_url values: a full URL (normal), "processing" (still generating), "base64-returned-to-client" (was returned inline, not stored) — handle the non-URL cases as a loading/unavailable state
+Pagination: Currently limited to 20 most recent; add offset param if you need infinite scroll
+Here's the complete technical breakdown of the Photo Wish History section for Replit integration:
+
+Photo Wish History Section — Data Flow & Integration Guide
+1. Data Fetching
+Endpoint:
+
+GET https://eqikeuqwbphwongtfzhe.supabase.co/rest/v1/photo_wishes?user_id=eq.{profile_id}&select=*&order=created_at.desc&limit=20
+Headers:
+
+
+{
+  "apikey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y",
+  "Authorization": "Bearer {user_session_access_token}"
+}
+Important: The user_id here is profiles.id (NOT auth.uid()). The RLS policy uses public.get_my_profile_id() to match, so the auth token handles access control automatically.
+
+2. Response Shape
+
+[
+  {
+    "id": "uuid",
+    "user_id": "profile-uuid",
+    "original_image_url": "uploaded",
+    "edited_image_url": "https://eqikeuqwbphwongtfzhe.supabase.co/storage/v1/object/public/greeting-card-uploads/photo-wishes/{user_id}/{wish_id}-{timestamp}.png",
+    "occasion": "Birthday",
+    "recipient_name": "Rahul",
+    "wish_message": "Happy Birthday! Wishing you joy and happiness.",
+    "sender_name": "Amit",
+    "text_style": "elegant",
+    "amount_charged": 99,
+    "status": "completed",
+    "completed_at": "2026-03-29T04:30:00.000Z",
+    "created_at": "2026-03-29T04:29:50.000Z",
+    "wishme_payment_id": "WM-PW-1234567890"
+  }
+]
+3. UI Rendering Logic
+Empty state: If array length is 0 → show placeholder icon + "No photo wishes yet" message.
+
+Grid layout: grid sm:grid-cols-2 lg:grid-cols-3 gap-4
+
+Each card renders:
+
+Element	Source	Component
+Image thumbnail	wish.edited_image_url	<img> in aspect-square container
+Loading spinner	When edited_image_url is null	Loader2 icon
+Status badge	wish.status → "completed" = default variant, others = secondary	<Badge>
+Date	wish.created_at → toLocaleDateString()	Plain text
+Recipient name	wish.recipient_name	Truncated <p>
+Occasion	wish.occasion	Truncated <p>
+Download button	Only shown if edited_image_url exists	<Button variant="ghost">
+4. Download Logic
+
+const handleDownload = (imageUrl) => {
+  const link = document.createElement("a");
+  link.href = imageUrl;
+  link.download = `photo-wish-${recipientName}-${occasion}.png`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+For mobile app: use the edited_image_url directly to download/save to device gallery.
+
+5. Stats Derived from History
+
+// Today's generations count
+const todayGenerations = history.filter(h => {
+  return new Date().toDateString() === new Date(h.created_at).toDateString();
+}).length;
+
+// Total completed count
+const completedCount = history.filter(h => h.status === "completed").length;
+These feed into the stats cards at the top of the page (Wallet Balance, Today's Generations, Total Completed).
+
+6. Key Notes for Mobile Integration
+RLS enforced: The auth token automatically scopes results to the logged-in user — no need to filter client-side for security
+Image URLs: edited_image_url is a public Supabase Storage URL, directly loadable in <Image> components
+Possible edited_image_url values: a full URL (normal), "processing" (still generating), "base64-returned-to-client" (was returned inline, not stored) — handle the non-URL cases as a loading/unavailable state
+Pagination: Currently limited to 20 most recent; add offset param if you need infinite scroll
