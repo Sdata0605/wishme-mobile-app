@@ -612,7 +612,7 @@ export default function CelebrityDetailScreen() {
               <TouchableOpacity
                 key={card.key}
                 activeOpacity={0.85}
-                onPress={isSubscribed ? card.onPress : openSubscriptionFlow}
+                onPress={isSubscribed ? card.onPress : handleBookOrSubscribe}
                 style={[styles.serviceCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
               >
                 <View style={styles.serviceCardLeft}>
