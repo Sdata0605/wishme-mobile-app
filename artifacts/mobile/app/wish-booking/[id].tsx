@@ -43,14 +43,13 @@ interface ServicePrice {
 interface ProfileRow {
   id: string;
   wallet_balance: number;
-  plan_discount_pct?: number;
 }
 
 export default function WishBookingScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { session, user } = useAuth();
+  const { session, user, getValidSession } = useAuth();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [celeb, setCeleb] = useState<CelebrityDetail | null>(null);
@@ -105,23 +104,31 @@ export default function WishBookingScreen() {
   }, [id, session]);
 
   const loadWallet = useCallback(async () => {
-    if (!session?.access_token || !user?.id) return;
+    if (!user?.id) return;
     try {
+      const vs = await getValidSession();
+      const tok = vs?.access_token ?? session?.access_token;
+      if (!tok) { setWalletBalance(user?.walletBalance ?? 0); setProfileId(user?.profileId ?? ''); return; }
       const res = await supabaseFetch(
-        `/rest/v1/profiles?select=id,wallet_balance,plan_discount_pct&user_id=eq.${user.id}&limit=1`,
+        `/rest/v1/profiles?select=id,wallet_balance&user_id=eq.${user.id}&limit=1`,
         {},
-        session.access_token,
+        tok,
       );
       if (res.ok) {
         const rows = await res.json() as ProfileRow[];
         if (rows?.length) {
-          setWalletBalance(rows[0].wallet_balance ?? 0);
-          setProfileId(rows[0].id);
-          setPlanDiscountPct(rows[0].plan_discount_pct ?? 0);
+          setWalletBalance(rows[0].wallet_balance ?? user?.walletBalance ?? 0);
+          setProfileId(rows[0].id ?? user?.profileId ?? '');
         }
+      } else {
+        setWalletBalance(user?.walletBalance ?? 0);
+        setProfileId(user?.profileId ?? '');
       }
-    } catch {}
-  }, [session, user]);
+    } catch {
+      setWalletBalance(user?.walletBalance ?? 0);
+      setProfileId(user?.profileId ?? '');
+    }
+  }, [session, user, getValidSession]);
 
   useEffect(() => {
     loadCeleb();

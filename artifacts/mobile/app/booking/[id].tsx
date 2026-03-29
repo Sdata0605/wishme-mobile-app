@@ -138,7 +138,7 @@ export default function BookingWizardScreen() {
       try {
         const [celebRes, profRes, langRes] = await Promise.allSettled([
           sbFetch(`/rest/v1/celebrities?id=eq.${id}&select=*&limit=1`, {}, token),
-          uid ? sbFetch(`/rest/v1/profiles?user_id=eq.${uid}&select=id,wallet_balance,plan_discount_pct&limit=1`, {}, token) : Promise.resolve(null),
+          uid ? sbFetch(`/rest/v1/profiles?user_id=eq.${uid}&select=id,wallet_balance&limit=1`, {}, token) : Promise.resolve(null),
           sbFetch('/functions/v1/heygen-get-languages', { method: 'POST', body: '{}' }, token),
         ]);
 
@@ -148,14 +148,15 @@ export default function BookingWizardScreen() {
         let discPct = 0;
 
         if (profRes.status === 'fulfilled' && profRes.value && (profRes.value as Response).ok) {
-          const prows: { id?: string; wallet_balance?: number; plan_discount_pct?: number }[] =
+          const prows: { id?: string; wallet_balance?: number }[] =
             await (profRes.value as Response).json().catch(() => []);
           if (Array.isArray(prows) && prows.length > 0) {
-            resolvedProfileId = prows[0].id ?? '';
-            walletBal = prows[0].wallet_balance ?? 0;
-            discPct = prows[0].plan_discount_pct ?? 0;
+            resolvedProfileId = prows[0].id ?? user?.profileId ?? '';
+            walletBal = prows[0].wallet_balance ?? user?.walletBalance ?? 0;
           }
         }
+        if (!resolvedProfileId) resolvedProfileId = user?.profileId ?? '';
+        if (!walletBal) walletBal = user?.walletBalance ?? 0;
         setProfileId(resolvedProfileId);
         setWalletBalance(walletBal);
         setDiscountPct(discPct);
