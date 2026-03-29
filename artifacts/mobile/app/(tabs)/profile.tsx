@@ -116,7 +116,7 @@ export default function ProfileScreen() {
 
       {/* Actions */}
       <View style={[styles.actionsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <ProfileItem icon="edit-2" label="Edit Profile" onPress={() => {}} />
+        <ProfileItem icon="edit-2" label="Edit Profile" onPress={() => router.push('/edit-profile')} />
         <ProfileItem icon="shopping-bag" label="My Orders" onPress={() => router.push('/bookings')} />
         <ProfileItem icon="heart" label="Saved Celebrities" onPress={() => router.push('/favorites')} />
         <ProfileItem icon="bell" label="Notifications" onPress={() => router.push('/occasion-alerts')} />
