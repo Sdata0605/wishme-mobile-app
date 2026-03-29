@@ -138,6 +138,7 @@ export default function CelebrityDetailScreen() {
 
   const [showStep1, setShowStep1] = useState(false);
   const [showStep2, setShowStep2] = useState(false);
+  const [showServiceSheet, setShowServiceSheet] = useState(false);
   const [payLoading, setPayLoading] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -312,7 +313,7 @@ export default function CelebrityDetailScreen() {
       return;
     }
     if (isSubscribed) {
-      router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: 'wish' } });
+      setShowServiceSheet(true);
     } else {
       setShowStep1(true);
     }
@@ -363,7 +364,7 @@ export default function CelebrityDetailScreen() {
 
   const isLoggedIn = !!user;
   const hasPricing = pricingPrice !== null && !isPricingDisabled;
-  const bookBtnLabel = !isLoggedIn ? 'Book a Wish' : isSubscribed ? 'Book a Wish' : !hasPricing ? 'Subscription Not Available' : 'Subscribe to Book';
+  const bookBtnLabel = !isLoggedIn ? 'Book a Service' : isSubscribed ? 'Book a Service' : !hasPricing ? 'Subscription Not Available' : 'Subscribe to Book';
   const showSubscribeBanner = isLoggedIn && !isSubscribed && !subLoading && hasPricing;
   const walletBalance = user?.walletBalance ?? 0;
   const canAffordWallet = pricingPrice !== null && walletBalance >= pricingPrice;
@@ -900,6 +901,61 @@ export default function CelebrityDetailScreen() {
           )}
 
           <TouchableOpacity onPress={() => setShowStep2(false)} style={styles.cancelLink}>
+            <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </Modal>
+
+      {/* Service Selection Sheet */}
+      <Modal
+        visible={showServiceSheet}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowServiceSheet(false)}
+      >
+        <TouchableOpacity
+          style={styles.sheetOverlay}
+          activeOpacity={1}
+          onPress={() => setShowServiceSheet(false)}
+        />
+        <View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 20 }]}>
+          <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
+          <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Book a Service</Text>
+          <Text style={[{ color: colors.mutedForeground, fontSize: 13, fontFamily: 'Inter_400Regular', marginBottom: 16 }]}>
+            Select a service to book with {celebrity?.name}
+          </Text>
+
+          {([
+            { key: 'wish' as const, emoji: '💜', title: 'Wish a Friend', subtitle: 'Personalised video wish', price: celebrity?.pricePerWish ?? 5000 },
+            { key: 'ad' as const, emoji: '🎬', title: 'Make an Ad (UGC)', subtitle: 'Brand promotion video', price: ugcPrice },
+            { key: 'video' as const, emoji: '🎥', title: 'Video Promo', subtitle: 'Video promotion campaign', price: promoPrice },
+          ]).map((svc) => (
+            <TouchableOpacity
+              key={svc.key}
+              activeOpacity={0.85}
+              onPress={() => {
+                setShowServiceSheet(false);
+                router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: svc.key } });
+              }}
+              style={[styles.serviceCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.primary, borderWidth: 1, marginBottom: 10 }]}
+            >
+              <View style={styles.serviceCardLeft}>
+                <Text style={[styles.serviceEmoji, { fontSize: 28 }]}>{svc.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.serviceTitle, { color: colors.foreground }]}>{svc.title}</Text>
+                  <Text style={[styles.serviceDelivery, { color: colors.mutedForeground }]}>{svc.subtitle}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                  <Text style={[styles.servicePrice, { color: colors.primary }]}>₹{svc.price.toLocaleString('en-IN')}</Text>
+                  <View style={[styles.bookNowPill, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.bookNowText}>Book Now</Text>
+                  </View>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity onPress={() => setShowServiceSheet(false)} style={styles.cancelLink}>
             <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
           </TouchableOpacity>
         </View>

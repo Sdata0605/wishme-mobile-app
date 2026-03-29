@@ -28,9 +28,16 @@ const FALLBACK_LANGUAGES = [
   'Gujarati','Punjabi','Odia','Assamese','Urdu','Rajasthani','Bhojpuri','Sanskrit',
 ];
 
-const GOALS = ['Promote a product','Celebrate occasion','Business announcement','Raise awareness','Other'];
+const GOALS = [
+  'Birthday wish for a friend','Anniversary celebration','Product launch promotion',
+  'Brand ambassador campaign','Social media content','Event invitation',
+  'Thank you message','Motivational message','Other',
+];
 const TONES = ['Funny','Heartfelt','Professional','Inspirational','Casual'];
-const AVOID_OPTIONS = ['Competitor mentions','Profanity','Sensitive topics','Pricing mentions'];
+const AVOID_OPTIONS = [
+  'Visible brand logos','Political references','Religious content','Controversial topics',
+  'Competitor mentions','Profanity or explicit content','Alcohol or tobacco products','Other',
+];
 const STEP_LABELS = ['Details','Delivery','Guidelines','Script','Review','Checkout'];
 
 type ServiceType = 'wish' | 'ad' | 'video';
@@ -69,7 +76,7 @@ export default function BookingWizardScreen() {
   const service: ServiceType = (svc === 'ad' || svc === 'video') ? svc : 'wish';
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, session } = useAuth();
+  const { user, getValidSession } = useAuth();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [step, setStep] = useState<1|2|3|4|5|6>(1);
@@ -122,11 +129,12 @@ export default function BookingWizardScreen() {
 
   useEffect(() => {
     if (!id) return;
-    const token = session?.access_token;
-    const uid = user?.id;
 
     const init = async () => {
       setLoadingInit(true);
+      const validSession = await getValidSession();
+      const token = validSession?.access_token ?? null;
+      const uid = user?.id;
       try {
         const [celebRes, profRes, langRes] = await Promise.allSettled([
           sbFetch(`/rest/v1/celebrities?id=eq.${id}&select=*&limit=1`, {}, token),
@@ -197,7 +205,7 @@ export default function BookingWizardScreen() {
       setLoadingInit(false);
     };
     init();
-  }, [id, user, session]);
+  }, [id, user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const basePrice = celebrity
     ? service === 'wish'
@@ -224,9 +232,9 @@ export default function BookingWizardScreen() {
       }
     }
     if (step === 6) {
-      if (!isSubscribed) { showToast('You must subscribe to this celebrity to book'); return false; }
+      if (service === 'wish' && !isSubscribed) { showToast('You must subscribe to this celebrity to book'); return false; }
       if (!step6.termsAccepted) { showToast('Please accept the Terms & Conditions'); return false; }
-      if (walletBalance < finalPrice) { showToast('Insufficient wallet balance'); return false; }
+      if (service === 'wish' && walletBalance < finalPrice) { showToast('Insufficient wallet balance'); return false; }
     }
     return true;
   };
@@ -244,6 +252,8 @@ export default function BookingWizardScreen() {
     if (!celebrity) return;
     setAiLoading(true);
     try {
+      const vs = await getValidSession();
+      const tok = vs?.access_token ?? null;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 30000);
       const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-script`, {
@@ -251,7 +261,7 @@ export default function BookingWizardScreen() {
         signal: controller.signal,
         headers: {
           apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${session?.access_token ?? SUPABASE_ANON_KEY}`,
+          Authorization: `Bearer ${tok ?? SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -279,8 +289,10 @@ export default function BookingWizardScreen() {
 
   const handlePay = async () => {
     if (!celebrity || !profileId) { showToast('Missing booking information'); return; }
-    if (!isSubscribed) { showToast('You must subscribe to this celebrity to book'); return; }
+    if (service === 'wish' && !isSubscribed) { showToast('You must subscribe to this celebrity to book'); return; }
     setPaying(true);
+    const vs = await getValidSession();
+    const tok = vs?.access_token ?? null;
     try {
       const serviceTypeMap = { wish: 'video_wish', ad: 'image_promotion', video: 'video_promotion' };
       const bookingData = {
@@ -297,7 +309,7 @@ export default function BookingWizardScreen() {
         generated_prompt: step4.scriptText,
       };
 
-      const bookRes = await sbFetch('/rest/v1/bookings', { method: 'POST', body: JSON.stringify(bookingData) }, session?.access_token);
+      const bookRes = await sbFetch('/rest/v1/bookings', { method: 'POST', body: JSON.stringify(bookingData) }, tok);
       if (!bookRes.ok) {
         const err = await bookRes.json().catch(() => ({}));
         showToast(err.message ?? 'Booking failed. Please try again.');
@@ -312,13 +324,13 @@ export default function BookingWizardScreen() {
         method: 'POST',
         body: JSON.stringify({
           user_id: profileId,
-          transaction_type: 'booking',
+          transaction_type: 'withdrawal',
           amount: finalPrice,
           status: 'completed',
           payment_method: 'wallet',
           description: `Booking: ${celebrity.name} - ${service}`,
         }),
-      }, session?.access_token);
+      }, tok);
       if (!walTxRes.ok) {
         const err = await walTxRes.json().catch(() => ({}));
         showToast(err.message ?? 'Wallet deduction failed');
@@ -339,7 +351,7 @@ export default function BookingWizardScreen() {
           status: 'completed',
           paid_at: new Date().toISOString(),
         }),
-      }, session?.access_token);
+      }, tok);
       if (!payTxRes.ok) {
         const err = await payTxRes.json().catch(() => ({}));
         showToast(err.message ?? 'Payment recording failed');
@@ -349,7 +361,7 @@ export default function BookingWizardScreen() {
       await sbFetch(`/rest/v1/bookings?id=eq.${bookingId}`, {
         method: 'PATCH',
         body: JSON.stringify({ wishme_payment_id: wmPaymentId }),
-      }, session?.access_token);
+      }, tok);
 
       router.replace({ pathname: '/booking-summary', params: { bookingId, paymentId: wmPaymentId } });
     } catch (e) {
@@ -468,24 +480,28 @@ export default function BookingWizardScreen() {
         </>
       )}
 
-      <Text style={[styles.label, { color: colors.foreground }]}>Preferred Language</Text>
-      <TouchableOpacity
-        style={[styles.dropdown, { backgroundColor: colors.input, borderColor: colors.border }]}
-        onPress={() => setShowLangDropdown(v => !v)}
-      >
-        <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 14 }}>{step1.preferredLanguage}</Text>
-        <Icon name="chevron-down" size={16} color={colors.mutedForeground} />
-      </TouchableOpacity>
-      {showLangDropdown && (
-        <View style={[styles.dropdownList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
-            {languages.map((lang) => (
-              <TouchableOpacity key={lang} style={styles.dropdownItem} onPress={() => { setStep1(s => ({ ...s, preferredLanguage: lang })); setShowLangDropdown(false); }}>
-                <Text style={{ color: step1.preferredLanguage === lang ? colors.primary : colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 14 }}>{lang}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+      {service !== 'ad' && (
+        <>
+          <Text style={[styles.label, { color: colors.foreground }]}>Preferred Language</Text>
+          <TouchableOpacity
+            style={[styles.dropdown, { backgroundColor: colors.input, borderColor: colors.border }]}
+            onPress={() => setShowLangDropdown(v => !v)}
+          >
+            <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 14 }}>{step1.preferredLanguage}</Text>
+            <Icon name="chevron-down" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
+          {showLangDropdown && (
+            <View style={[styles.dropdownList, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
+                {languages.map((lang) => (
+                  <TouchableOpacity key={lang} style={styles.dropdownItem} onPress={() => { setStep1(s => ({ ...s, preferredLanguage: lang })); setShowLangDropdown(false); }}>
+                    <Text style={{ color: step1.preferredLanguage === lang ? colors.primary : colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 14 }}>{lang}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -703,7 +719,7 @@ export default function BookingWizardScreen() {
     <View style={styles.stepContent}>
       <Text style={[styles.stepHeading, { color: colors.foreground }]}>Checkout</Text>
 
-      {!isSubscribed && (
+      {service === 'wish' && !isSubscribed && (
         <View style={[styles.infoBox, { backgroundColor: '#EF444415', borderColor: '#EF4444', marginBottom: 12 }]}>
           <Icon name="alert-circle" size={18} color="#EF4444" />
           <Text style={[styles.infoBoxText, { color: '#EF4444' }]}>
@@ -746,13 +762,18 @@ export default function BookingWizardScreen() {
         )}
       </View>
 
-      <View style={[styles.walletRow, { backgroundColor: walletBalance >= finalPrice ? '#22C55E15' : '#EF444415', borderColor: walletBalance >= finalPrice ? '#22C55E' : '#EF4444' }]}>
-        <Icon name="wallet" size={18} color={walletBalance >= finalPrice ? '#22C55E' : '#EF4444'} />
-        <Text style={[styles.walletLabel, { color: walletBalance >= finalPrice ? '#22C55E' : '#EF4444' }]}>
-          Wallet Balance: ₹{walletBalance.toLocaleString('en-IN')}
-          {walletBalance < finalPrice ? ' (Insufficient)' : ''}
-        </Text>
-      </View>
+      {(() => {
+        const insufficient = service === 'wish' && walletBalance < finalPrice;
+        return (
+          <View style={[styles.walletRow, { backgroundColor: insufficient ? '#EF444415' : '#22C55E15', borderColor: insufficient ? '#EF4444' : '#22C55E' }]}>
+            <Icon name="wallet" size={18} color={insufficient ? '#EF4444' : '#22C55E'} />
+            <Text style={[styles.walletLabel, { color: insufficient ? '#EF4444' : '#22C55E' }]}>
+              Wallet Balance: ₹{walletBalance.toLocaleString('en-IN')}
+              {insufficient ? ' (Insufficient)' : ''}
+            </Text>
+          </View>
+        );
+      })()}
 
       <TouchableOpacity style={styles.termsRow} onPress={() => setStep6(s => ({ ...s, termsAccepted: !s.termsAccepted }))}>
         <View style={[styles.checkbox, { borderColor: colors.border, backgroundColor: step6.termsAccepted ? colors.primary : 'transparent' }]}>
@@ -763,19 +784,24 @@ export default function BookingWizardScreen() {
         </Text>
       </TouchableOpacity>
 
-      <Pressable
-        style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginTop: 8 }]}
-        onPress={handlePay}
-        disabled={!step6.termsAccepted || walletBalance < finalPrice || paying}
-      >
-        <LinearGradient
-          colors={(!step6.termsAccepted || walletBalance < finalPrice) ? ['#ccc','#ccc'] : ['#FF6B33','#B44CFF']}
-          start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          style={styles.payBtn}
-        >
-          {paying ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.payBtnText}>Pay ₹{finalPrice.toLocaleString('en-IN')} via Wallet</Text>}
-        </LinearGradient>
-      </Pressable>
+      {(() => {
+        const isPayDisabled = !step6.termsAccepted || (service === 'wish' && walletBalance < finalPrice) || paying;
+        return (
+          <Pressable
+            style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginTop: 8 }]}
+            onPress={handlePay}
+            disabled={isPayDisabled}
+          >
+            <LinearGradient
+              colors={isPayDisabled ? ['#ccc','#ccc'] : ['#FF6B33','#B44CFF']}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.payBtn}
+            >
+              {paying ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.payBtnText}>Pay ₹{finalPrice.toLocaleString('en-IN')} via Wallet</Text>}
+            </LinearGradient>
+          </Pressable>
+        );
+      })()}
 
       <TouchableOpacity style={[styles.razorpayBtn, { borderColor: colors.border }]} onPress={() => Alert.alert('Coming Soon', 'Razorpay integration is coming soon!')}>
         <Text style={[styles.razorpayBtnText, { color: colors.mutedForeground }]}>Pay via Razorpay</Text>
