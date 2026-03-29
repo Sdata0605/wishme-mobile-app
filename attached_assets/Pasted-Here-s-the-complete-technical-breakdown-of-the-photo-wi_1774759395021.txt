@@ -1,0 +1,414 @@
+Here's the complete technical breakdown of the /photo-wish page for Replit integration:
+
+Purpose
+The Photo Wish page lets authenticated users upload a personal photo and generate an AI-styled greeting image with text overlay (occasion, recipient name, message). It uses wallet-based payment and stores generation history.
+
+UI Components Used (shadcn/ui + Lucide icons)
+Component	Source	Usage
+AuthenticatedLayout	Custom	Page wrapper with nav/sidebar
+Card, CardContent, CardHeader, CardTitle, CardDescription	shadcn/ui	Stats cards, form card, preview card, history cards
+Button	shadcn/ui	Generate, Download, Add Funds, Clear image
+Input	shadcn/ui	Recipient name, Sender name
+Textarea	shadcn/ui	Wish message
+Label	shadcn/ui	Field labels
+Select, SelectTrigger, SelectValue, SelectContent, SelectItem	shadcn/ui	Occasion dropdown
+Tabs, TabsList, TabsTrigger, TabsContent	shadcn/ui	"Create" / "History" tabs
+Badge	shadcn/ui	Status badge on history cards
+PricingDisplay	Custom (discount-badge)	Shows base price, discounted price, plan name
+Icons	Lucide	Wand2, Wallet, Send, Star, Sparkles, Upload, ImageIcon, Download, History, X, Loader2, BadgePercent
+Page Sections
+1. Header
+Static title "Photo Wish" with Wand2 icon and description text.
+
+2. Stats Cards Row (3 cards)
+Wallet Balance: from useWalletBalance() hook → shows ₹{balance} + "Add Funds" button → navigates to /wallet
+Today's Generations: client-side filter of history where created_at matches today
+Total Created: client-side filter of history where status === "completed"
+3. Tabs: "Create" and "History"
+Tab 1: Create (two-column layout on desktop)
+Left Column — Form Card:
+
+Upload Photo: Hidden <input type="file" accept="image/*"> triggered by click on dashed border area. Max 10MB. Client-side compression to JPEG (max 1200px width, 0.8 quality).
+Occasion: Select dropdown with hardcoded list: ["Birthday", "Anniversary", "Wedding", "Graduation", "New Year", "Diwali", "Christmas", "Valentine's Day", "Mother's Day", "Father's Day", "Friendship Day", "Congratulations", "Get Well Soon", "Thank You", "Other"]
+Recipient's Name: Input text field (required)
+Wish Message: Textarea (required)
+Your Name: Input text field (optional)
+Text Style: Grid of 5 selectable style cards (tap to select): elegant, playful, modern, classic, festive — each with name + description
+Pricing Display: Shows base price, discounted price if user has a plan
+Validation Helper: Amber warning box listing incomplete fields
+Generate Button: Disabled until all required fields filled + sufficient balance. Shows ₹{discountedPrice}
+Right Column — Preview Card:
+
+Empty state: placeholder icon
+Generating state: spinner
+Generated state: image + "Download Photo Wish" button
+Tab 2: History
+Grid of cards (2 cols on sm, 3 on lg)
+Each card: image thumbnail (aspect-square), status Badge, date, recipient name, occasion, download button
+Empty state: "No photo wishes yet"
+Data Fetching — Exact Endpoints
+1. Fetch Pricing (on page load)
+Endpoint: GET /rest/v1/platform_settings?setting_key=eq.photo_wish_price&select=setting_value
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_access_token}
+Response:
+
+
+{
+  "setting_value": "99"
+}
+Default fallback: 99 if not found.
+
+2. Fetch History (on page load)
+Endpoint: GET /rest/v1/photo_wishes?user_id=eq.{profile_id}&select=*&order=created_at.desc&limit=20
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_access_token}
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "original_image_url": "string",
+    "edited_image_url": "https://...storage-url.png",
+    "occasion": "Birthday",
+    "recipient_name": "Mom",
+    "wish_message": "Happy Birthday!",
+    "sender_name": "Rahul",
+    "text_style": "elegant",
+    "amount_charged": 99,
+    "status": "completed",
+    "created_at": "2025-01-15T10:30:00Z",
+    "completed_at": "2025-01-15T10:30:15Z",
+    "wishme_payment_id": "WM-XXXXXX"
+  }
+]
+3. Fetch Wallet Balance (realtime hook)
+Endpoint: GET /rest/v1/profiles?id=eq.{profile_id}&select=wallet_balance
+
+Response:
+
+
+{ "wallet_balance": 500.00 }
+Also subscribes to realtime channel postgres_changes on profiles table filtered by id=eq.{profile_id}.
+
+4. Fetch Plan Discount (hook: usePlanDiscount)
+Endpoint: GET /rest/v1/user_plans?user_id=eq.{profile_id}&status=eq.active&select=*,plans(*)
+
+Response: Returns active plan with discount percentage. Used to compute discountedPrice = basePrice * (1 - discountPercentage/100).
+
+5. Generate Photo Wish (on button tap)
+Endpoint: POST /functions/v1/generate-photo-wish
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_access_token}
+Content-Type: application/json
+Payload:
+
+
+{
+  "originalImageBase64": "data:image/jpeg;base64,/9j/4AAQ...",
+  "occasion": "Birthday",
+  "recipientName": "Mom",
+  "wishMessage": "Happy Birthday! Wishing you love and joy!",
+  "senderName": "Rahul",
+  "textStyle": "elegant"
+}
+What it does internally:
+
+Validates auth + required fields
+Fetches pricing from platform_settings
+Checks wallet balance from profiles
+Calls AI Gateway (google/gemini-2.5-flash-image-preview) with the image + text overlay prompt
+Creates photo_wishes DB record
+Uploads generated image to Supabase Storage (greeting-card-uploads bucket)
+Deducts wallet balance from profiles
+Inserts wallet_transactions record
+Fires notification via send-wishme-notification
+Success Response:
+
+
+{
+  "success": true,
+  "photoWishId": "uuid-of-record",
+  "editedImageUrl": "https://eqikeuqwbphwongtfzhe.supabase.co/storage/v1/object/public/greeting-card-uploads/photo-wishes/{userId}/{wishId}-{timestamp}.png",
+  "amountCharged": 99
+}
+Error Responses:
+
+
+// 401
+{ "error": "Authorization required" }
+
+// 400
+{ "error": "Missing required fields" }
+{ "error": "Insufficient wallet balance", "currentBalance": 50, "required": 99 }
+{ "error": "Profile not found" }
+
+// 500
+{ "error": "Rate limit exceeded. Please try again later." }
+{ "error": "AI Gateway error: 500" }
+{ "error": "AI did not generate an image" }
+6. Record Payment Transaction (client-side, after successful generation)
+Endpoint: POST /rest/v1/payment_transactions
+
+Payload:
+
+
+{
+  "wishme_payment_id": "WM-XXXXXX",
+  "user_id": "{profile_id}",
+  "amount": 99,
+  "payment_method": "wallet",
+  "service_type": "photo_wish",
+  "photo_wish_id": "{photoWishId from response}",
+  "description": "Photo Wish - Birthday for Mom",
+  "status": "completed",
+  "paid_at": "2025-01-15T10:30:15Z"
+}
+Then updates the photo wish record:
+
+Endpoint: PATCH /rest/v1/photo_wishes?id=eq.{photoWishId}
+
+Payload:
+
+
+{
+  "wishme_payment_id": "WM-XXXXXX"
+}
+7. Download (client-side only)
+No API call. Creates a temporary <a> element with href = imageUrl and triggers .click().
+
+Data Flow Summary
+
+Page Load:
+  ├── GET platform_settings (pricing) 
+  ├── GET photo_wishes (history, last 20)
+  ├── GET profiles (wallet balance + realtime subscription)
+  └── GET user_plans + plans (discount)
+
+Generate:
+  1. Client validates fields + balance
+  2. Client compresses image to base64 JPEG (max 1200px)
+  3. POST /functions/v1/generate-photo-wish (sends base64 + form data)
+  4. Edge function: checks balance → calls AI → uploads to storage → deducts wallet → returns URL
+  5. Client displays generated image in preview
+  6. Client inserts payment_transactions record
+  7. Client patches photo_wishes with wishme_payment_id
+  8. Client reloads history
+Here's the complete technical breakdown of the /photo-wish page for Replit integration:
+
+Purpose
+The Photo Wish page lets authenticated users upload a personal photo and generate an AI-styled greeting image with text overlay (occasion, recipient name, message). It uses wallet-based payment and stores generation history.
+
+UI Components Used (shadcn/ui + Lucide icons)
+Component	Source	Usage
+AuthenticatedLayout	Custom	Page wrapper with nav/sidebar
+Card, CardContent, CardHeader, CardTitle, CardDescription	shadcn/ui	Stats cards, form card, preview card, history cards
+Button	shadcn/ui	Generate, Download, Add Funds, Clear image
+Input	shadcn/ui	Recipient name, Sender name
+Textarea	shadcn/ui	Wish message
+Label	shadcn/ui	Field labels
+Select, SelectTrigger, SelectValue, SelectContent, SelectItem	shadcn/ui	Occasion dropdown
+Tabs, TabsList, TabsTrigger, TabsContent	shadcn/ui	"Create" / "History" tabs
+Badge	shadcn/ui	Status badge on history cards
+PricingDisplay	Custom (discount-badge)	Shows base price, discounted price, plan name
+Icons	Lucide	Wand2, Wallet, Send, Star, Sparkles, Upload, ImageIcon, Download, History, X, Loader2, BadgePercent
+Page Sections
+1. Header
+Static title "Photo Wish" with Wand2 icon and description text.
+
+2. Stats Cards Row (3 cards)
+Wallet Balance: from useWalletBalance() hook → shows ₹{balance} + "Add Funds" button → navigates to /wallet
+Today's Generations: client-side filter of history where created_at matches today
+Total Created: client-side filter of history where status === "completed"
+3. Tabs: "Create" and "History"
+Tab 1: Create (two-column layout on desktop)
+Left Column — Form Card:
+
+Upload Photo: Hidden <input type="file" accept="image/*"> triggered by click on dashed border area. Max 10MB. Client-side compression to JPEG (max 1200px width, 0.8 quality).
+Occasion: Select dropdown with hardcoded list: ["Birthday", "Anniversary", "Wedding", "Graduation", "New Year", "Diwali", "Christmas", "Valentine's Day", "Mother's Day", "Father's Day", "Friendship Day", "Congratulations", "Get Well Soon", "Thank You", "Other"]
+Recipient's Name: Input text field (required)
+Wish Message: Textarea (required)
+Your Name: Input text field (optional)
+Text Style: Grid of 5 selectable style cards (tap to select): elegant, playful, modern, classic, festive — each with name + description
+Pricing Display: Shows base price, discounted price if user has a plan
+Validation Helper: Amber warning box listing incomplete fields
+Generate Button: Disabled until all required fields filled + sufficient balance. Shows ₹{discountedPrice}
+Right Column — Preview Card:
+
+Empty state: placeholder icon
+Generating state: spinner
+Generated state: image + "Download Photo Wish" button
+Tab 2: History
+Grid of cards (2 cols on sm, 3 on lg)
+Each card: image thumbnail (aspect-square), status Badge, date, recipient name, occasion, download button
+Empty state: "No photo wishes yet"
+Data Fetching — Exact Endpoints
+1. Fetch Pricing (on page load)
+Endpoint: GET /rest/v1/platform_settings?setting_key=eq.photo_wish_price&select=setting_value
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_access_token}
+Response:
+
+
+{
+  "setting_value": "99"
+}
+Default fallback: 99 if not found.
+
+2. Fetch History (on page load)
+Endpoint: GET /rest/v1/photo_wishes?user_id=eq.{profile_id}&select=*&order=created_at.desc&limit=20
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_access_token}
+Response:
+
+
+[
+  {
+    "id": "uuid",
+    "user_id": "uuid",
+    "original_image_url": "string",
+    "edited_image_url": "https://...storage-url.png",
+    "occasion": "Birthday",
+    "recipient_name": "Mom",
+    "wish_message": "Happy Birthday!",
+    "sender_name": "Rahul",
+    "text_style": "elegant",
+    "amount_charged": 99,
+    "status": "completed",
+    "created_at": "2025-01-15T10:30:00Z",
+    "completed_at": "2025-01-15T10:30:15Z",
+    "wishme_payment_id": "WM-XXXXXX"
+  }
+]
+3. Fetch Wallet Balance (realtime hook)
+Endpoint: GET /rest/v1/profiles?id=eq.{profile_id}&select=wallet_balance
+
+Response:
+
+
+{ "wallet_balance": 500.00 }
+Also subscribes to realtime channel postgres_changes on profiles table filtered by id=eq.{profile_id}.
+
+4. Fetch Plan Discount (hook: usePlanDiscount)
+Endpoint: GET /rest/v1/user_plans?user_id=eq.{profile_id}&status=eq.active&select=*,plans(*)
+
+Response: Returns active plan with discount percentage. Used to compute discountedPrice = basePrice * (1 - discountPercentage/100).
+
+5. Generate Photo Wish (on button tap)
+Endpoint: POST /functions/v1/generate-photo-wish
+
+Headers:
+
+apikey: {SUPABASE_ANON_KEY}
+Authorization: Bearer {user_access_token}
+Content-Type: application/json
+Payload:
+
+
+{
+  "originalImageBase64": "data:image/jpeg;base64,/9j/4AAQ...",
+  "occasion": "Birthday",
+  "recipientName": "Mom",
+  "wishMessage": "Happy Birthday! Wishing you love and joy!",
+  "senderName": "Rahul",
+  "textStyle": "elegant"
+}
+What it does internally:
+
+Validates auth + required fields
+Fetches pricing from platform_settings
+Checks wallet balance from profiles
+Calls AI Gateway (google/gemini-2.5-flash-image-preview) with the image + text overlay prompt
+Creates photo_wishes DB record
+Uploads generated image to Supabase Storage (greeting-card-uploads bucket)
+Deducts wallet balance from profiles
+Inserts wallet_transactions record
+Fires notification via send-wishme-notification
+Success Response:
+
+
+{
+  "success": true,
+  "photoWishId": "uuid-of-record",
+  "editedImageUrl": "https://eqikeuqwbphwongtfzhe.supabase.co/storage/v1/object/public/greeting-card-uploads/photo-wishes/{userId}/{wishId}-{timestamp}.png",
+  "amountCharged": 99
+}
+Error Responses:
+
+
+// 401
+{ "error": "Authorization required" }
+
+// 400
+{ "error": "Missing required fields" }
+{ "error": "Insufficient wallet balance", "currentBalance": 50, "required": 99 }
+{ "error": "Profile not found" }
+
+// 500
+{ "error": "Rate limit exceeded. Please try again later." }
+{ "error": "AI Gateway error: 500" }
+{ "error": "AI did not generate an image" }
+6. Record Payment Transaction (client-side, after successful generation)
+Endpoint: POST /rest/v1/payment_transactions
+
+Payload:
+
+
+{
+  "wishme_payment_id": "WM-XXXXXX",
+  "user_id": "{profile_id}",
+  "amount": 99,
+  "payment_method": "wallet",
+  "service_type": "photo_wish",
+  "photo_wish_id": "{photoWishId from response}",
+  "description": "Photo Wish - Birthday for Mom",
+  "status": "completed",
+  "paid_at": "2025-01-15T10:30:15Z"
+}
+Then updates the photo wish record:
+
+Endpoint: PATCH /rest/v1/photo_wishes?id=eq.{photoWishId}
+
+Payload:
+
+
+{
+  "wishme_payment_id": "WM-XXXXXX"
+}
+7. Download (client-side only)
+No API call. Creates a temporary <a> element with href = imageUrl and triggers .click().
+
+Data Flow Summary
+
+Page Load:
+  ├── GET platform_settings (pricing) 
+  ├── GET photo_wishes (history, last 20)
+  ├── GET profiles (wallet balance + realtime subscription)
+  └── GET user_plans + plans (discount)
+
+Generate:
+  1. Client validates fields + balance
+  2. Client compresses image to base64 JPEG (max 1200px)
+  3. POST /functions/v1/generate-photo-wish (sends base64 + form data)
+  4. Edge function: checks balance → calls AI → uploads to storage → deducts wallet → returns URL
+  5. Client displays generated image in preview
+  6. Client inserts payment_transactions record
+  7. Client patches photo_wishes with wishme_payment_id
+  8. Client reloads history
