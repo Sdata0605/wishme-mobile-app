@@ -6,6 +6,7 @@ import * as MediaLibrary from 'expo-media-library';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Platform,
@@ -19,10 +20,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
-import { supabaseFetch } from '@/constants/supabase';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useWallet } from '@/hooks/useWallet';
+import { usePlan } from '@/hooks/usePlan';
 
 const OCCASIONS = [
   'Birthday', 'Anniversary', 'Wedding', 'Graduation', 'Baby Shower',
@@ -67,7 +69,23 @@ interface PhotoWishRecord {
   recipient_name: string;
   status: string;
   created_at: string;
-  generated_image_url: string | null;
+  edited_image_url: string | null;
+  wishme_payment_id?: string;
+  amount_charged?: number;
+}
+
+function statusColor(s: string) {
+  if (s === 'completed') return '#22c55e';
+  if (s === 'processing') return '#f59e0b';
+  if (s === 'failed') return '#ef4444';
+  return '#6b7280';
+}
+
+function statusLabel(s: string) {
+  if (s === 'completed') return 'Completed';
+  if (s === 'processing') return 'Processing';
+  if (s === 'failed') return 'Failed';
+  return s;
 }
 
 export default function PhotoWishScreen() {
@@ -75,6 +93,7 @@ export default function PhotoWishScreen() {
   const insets = useSafeAreaInsets();
   const { session, user } = useAuth();
   const wallet = useWallet();
+  const { discountPercentage, getDiscountedPrice } = usePlan();
 
   const [tab, setTab] = useState<'create' | 'history'>('create');
 
@@ -90,10 +109,9 @@ export default function PhotoWishScreen() {
   const [pickedImageName, setPickedImageName] = useState<string>('photo.jpg');
 
   const [generating, setGenerating] = useState(false);
-  const [generatedImageBase64, setGeneratedImageBase64] = useState<string | null>(null);
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
 
-  const [basePrice, setBasePrice] = useState<number>(299);
-  const [discountPct, setDiscountPct] = useState<number>(0);
+  const [basePrice, setBasePrice] = useState<number>(99);
   const [priceLoading, setPriceLoading] = useState(true);
 
   const [history, setHistory] = useState<PhotoWishRecord[]>([]);
@@ -101,7 +119,8 @@ export default function PhotoWishScreen() {
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
-  const finalPrice = Math.round(basePrice * (1 - discountPct / 100));
+  const discountPct = discountPercentage;
+  const finalPrice = getDiscountedPrice(basePrice);
   const discountAmt = basePrice - finalPrice;
 
   const todayCount = history.filter(h => {
@@ -143,24 +162,8 @@ export default function PhotoWishScreen() {
         }
       }
     } catch {}
-
-    if (session?.access_token && user?.id) {
-      try {
-        const profileRes = await supabaseFetch(
-          `/rest/v1/profiles?select=plan_discount&user_id=eq.${user.id}&limit=1`,
-          {},
-          session.access_token,
-        );
-        if (profileRes.ok) {
-          const rows = await profileRes.json() as Array<{ plan_discount?: number }>;
-          if (rows?.length && rows[0].plan_discount != null) {
-            setDiscountPct(rows[0].plan_discount);
-          }
-        }
-      } catch {}
-    }
     setPriceLoading(false);
-  }, [session, user]);
+  }, [session]);
 
   const fetchHistory = useCallback(async () => {
     if (!session?.access_token || !wallet.profileId) return;
@@ -244,24 +247,30 @@ export default function PhotoWishScreen() {
     }
 
     setGenerating(true);
-    setGeneratedImageBase64(null);
+    setGeneratedUrl(null);
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 120_000);
 
     try {
-      const res = await supabaseFetch(
-        '/functions/v1/generate-photo-wish',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            originalImageBase64: pickedImageBase64,
-            occasion,
-            recipientName: recipient.trim(),
-            wishMessage: message.trim(),
-            senderName: sender.trim(),
-            textStyle,
-          }),
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-photo-wish`, {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
         },
-        session.access_token,
-      );
+        body: JSON.stringify({
+          originalImageBase64: pickedImageBase64,
+          occasion,
+          recipientName: recipient.trim(),
+          wishMessage: message.trim(),
+          senderName: sender.trim(),
+          textStyle,
+        }),
+      });
+      clearTimeout(timer);
 
       if (!res.ok) {
         let errMsg = `Request failed (${res.status})`;
@@ -274,7 +283,14 @@ export default function PhotoWishScreen() {
         return;
       }
 
-      const data = await res.json() as { editedImageUrl?: string; error?: string };
+      const data = await res.json() as {
+        success?: boolean;
+        photoWishId?: string;
+        editedImageUrl?: string;
+        amountCharged?: number;
+        error?: string;
+      };
+
       if (data.error) {
         showToast(data.error);
         setGenerating(false);
@@ -282,18 +298,55 @@ export default function PhotoWishScreen() {
       }
 
       if (data.editedImageUrl) {
-        setGeneratedImageBase64(data.editedImageUrl);
+        setGeneratedUrl(data.editedImageUrl);
         wallet.refetch();
+
+        const paymentId = `WM-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+        if (user?.profileId && data.photoWishId) {
+          try {
+            const txRes = await supabaseFetch('/rest/v1/payment_transactions', {
+              method: 'POST',
+              body: JSON.stringify({
+                wishme_payment_id: paymentId,
+                user_id: user.profileId,
+                amount: data.amountCharged ?? finalPrice,
+                payment_method: 'wallet',
+                service_type: 'photo_wish',
+                photo_wish_id: data.photoWishId,
+                description: `Photo Wish - ${occasion} for ${recipient.trim()}`,
+                status: 'completed',
+                paid_at: new Date().toISOString(),
+              }),
+            }, session.access_token);
+
+            if (txRes.ok) {
+              await supabaseFetch(
+                `/rest/v1/photo_wishes?id=eq.${data.photoWishId}`,
+                {
+                  method: 'PATCH',
+                  body: JSON.stringify({ wishme_payment_id: paymentId }),
+                },
+                session.access_token,
+              );
+            }
+          } catch {}
+        }
+
         fetchHistory();
       }
-    } catch {
-      showToast('Network error. Please check your connection.');
+    } catch (err: unknown) {
+      clearTimeout(timer);
+      const msg = (err as Error)?.name === 'AbortError'
+        ? 'Generation timed out. Please try again.'
+        : 'Network error. Please check your connection.';
+      showToast(msg);
     }
 
     setGenerating(false);
-  }, [pickedImageBase64, occasion, recipient, message, sender, textStyle, wallet, finalPrice, session, fetchHistory]);
+  }, [pickedImageBase64, occasion, recipient, message, sender, textStyle, wallet, finalPrice, session, user, fetchHistory]);
 
-  const downloadImage = useCallback(async (base64DataUrl: string) => {
+  const downloadImage = useCallback(async (url: string) => {
     try {
       const { status } = await MediaLibrary.requestPermissionsAsync();
       if (status !== 'granted') {
@@ -301,30 +354,19 @@ export default function PhotoWishScreen() {
         return;
       }
 
-      const base64Data = base64DataUrl.startsWith('data:')
-        ? base64DataUrl.split(',')[1]
-        : base64DataUrl;
-
       const fileUri = FileSystem.cacheDirectory + `photo_wish_${Date.now()}.jpg`;
-      await FileSystem.writeAsStringAsync(fileUri, base64Data, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      const asset = await MediaLibrary.createAssetAsync(fileUri);
-      await MediaLibrary.createAlbumAsync('WishMe', asset, false);
-      showToast('Photo saved to your gallery!');
+      const { uri } = await FileSystem.downloadAsync(url, fileUri);
+      await MediaLibrary.saveToLibraryAsync(uri);
+      showToast('Photo wish saved to your gallery!');
     } catch {
-      showToast('Failed to save photo. Please try again.');
+      showToast('Failed to download image.');
     }
   }, []);
 
-  const statusColor = (s: string) => s === 'completed' || s === 'Completed' ? '#22c55e' : s === 'processing' || s === 'Processing' ? '#FF6B33' : '#6b7280';
-  const statusLabel = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
   return (
     <View style={[s.container, { backgroundColor: colors.background }]}>
-      <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()}>
+      <View style={[s.header, { paddingTop: topPad + 14, borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
         </TouchableOpacity>
         <Text style={[s.headerTitle, { color: colors.foreground }]}>Photo Wish</Text>
@@ -335,7 +377,7 @@ export default function PhotoWishScreen() {
         <View style={s.statsRow}>
           {[
             { label: 'Wallet Balance', value: `₹${wallet.balance.toLocaleString('en-IN')}`, icon: 'credit-card' as const, color: '#4B83FF' },
-            { label: "Today's Generations", value: String(todayCount), icon: 'zap' as const, color: '#FF6B33' },
+            { label: "Today's", value: String(todayCount), icon: 'zap' as const, color: '#FF6B33' },
             { label: 'Total Created', value: String(history.length), icon: 'image' as const, color: '#B44CFF' },
           ].map(st => (
             <View key={st.label} style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -443,26 +485,48 @@ export default function PhotoWishScreen() {
               )}
             </View>
 
-            {generatedImageBase64 && (
-              <View style={[s.previewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Image
-                  source={{ uri: generatedImageBase64 }}
-                  style={s.previewImg}
-                  resizeMode="cover"
-                />
-                <View style={s.previewActions}>
-                  <TouchableOpacity style={[s.previewBtn, { backgroundColor: colors.muted }]} onPress={() => downloadImage(generatedImageBase64)}>
-                    <Icon name="download" size={15} color={colors.foreground} />
-                    <Text style={[s.previewBtnText, { color: colors.foreground }]}>Download</Text>
-                  </TouchableOpacity>
+            {/* Preview Card — always visible */}
+            <View style={[s.previewCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[s.previewTitle, { color: colors.foreground }]}>Preview</Text>
+              {generating ? (
+                <View style={s.previewEmpty}>
+                  <ActivityIndicator size="large" color="#FF6B33" />
+                  <Text style={[s.previewEmptyText, { color: colors.mutedForeground }]}>
+                    Generating your photo wish...
+                  </Text>
+                  <Text style={[s.previewEmptySub, { color: colors.mutedForeground }]}>
+                    This may take up to 60 seconds
+                  </Text>
                 </View>
-              </View>
-            )}
+              ) : generatedUrl ? (
+                <>
+                  <Image
+                    source={{ uri: generatedUrl }}
+                    style={s.previewImg}
+                    resizeMode="contain"
+                  />
+                  <TouchableOpacity
+                    style={[s.previewBtn, { backgroundColor: '#FF6B3320' }]}
+                    onPress={() => downloadImage(generatedUrl)}
+                  >
+                    <Icon name="download" size={15} color="#FF6B33" />
+                    <Text style={[s.previewBtnText, { color: '#FF6B33' }]}>Download Photo Wish</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={s.previewEmpty}>
+                  <Icon name="image" size={40} color={colors.mutedForeground} />
+                  <Text style={[s.previewEmptyText, { color: colors.mutedForeground }]}>
+                    Your generated photo wish will appear here
+                  </Text>
+                </View>
+              )}
+            </View>
 
             <TouchableOpacity onPress={generate} disabled={generating} activeOpacity={0.85} style={{ opacity: generating ? 0.7 : 1 }}>
               <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.genBtn}>
                 <Icon name="image" size={18} color="#fff" />
-                <Text style={s.genBtnText}>{generating ? 'Generating...' : 'Generate Photo Wish'}</Text>
+                <Text style={s.genBtnText}>{generating ? 'Generating...' : `Generate Photo Wish  ₹${finalPrice}`}</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -483,8 +547,8 @@ export default function PhotoWishScreen() {
                   <View style={s.histGrid}>
                     {history.map((item, idx) => (
                       <View key={item.id} style={[s.histCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                        {item.generated_image_url ? (
-                          <Image source={{ uri: item.generated_image_url }} style={s.histThumbImg} resizeMode="cover" />
+                        {item.edited_image_url ? (
+                          <Image source={{ uri: item.edited_image_url }} style={s.histThumbImg} resizeMode="cover" />
                         ) : (
                           <LinearGradient colors={GRAD_COLORS[idx % GRAD_COLORS.length]} style={s.histThumb}>
                             <Icon name="image" size={24} color="rgba(255,255,255,0.8)" />
@@ -502,8 +566,8 @@ export default function PhotoWishScreen() {
                           <Text style={[s.histRecipient, { color: colors.foreground }]}>{item.recipient_name}</Text>
                           <View style={s.histFooter}>
                             <Text style={[s.histDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-                            {item.generated_image_url && (
-                              <TouchableOpacity style={s.dlBtn} onPress={() => downloadImage(item.generated_image_url!)}>
+                            {item.edited_image_url && (
+                              <TouchableOpacity style={s.dlBtn} onPress={() => downloadImage(item.edited_image_url!)}>
                                 <Icon name="download" size={13} color="#FF6B33" />
                                 <Text style={s.dlText}>Download</Text>
                               </TouchableOpacity>
@@ -568,10 +632,13 @@ const s = StyleSheet.create({
   pricingDivider: { height: 1 },
   pricingFinalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold' },
   pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FF6B33' },
-  previewCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginTop: 16 },
-  previewImg: { width: '100%', height: 220 },
-  previewActions: { flexDirection: 'row', gap: 10, padding: 12 },
-  previewBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 12, borderRadius: 10 },
+  previewCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginTop: 16 },
+  previewTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 12 },
+  previewEmpty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 10 },
+  previewEmptyText: { fontSize: 14, fontFamily: 'Inter_500Medium', textAlign: 'center' },
+  previewEmptySub: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  previewImg: { width: '100%', aspectRatio: 1, borderRadius: 10, marginVertical: 8 },
+  previewBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 10, marginTop: 4 },
   previewBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   genBtn: { height: 52, borderRadius: 9999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginTop: 20 },
   genBtnText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
