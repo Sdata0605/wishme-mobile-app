@@ -133,7 +133,7 @@ export default function ProfileScreen() {
             />
           }
         />
-        <ProfileItem icon="help-circle" label="Help & Support" onPress={() => {}} />
+        <ProfileItem icon="help-circle" label="Help & Support" onPress={() => router.push('/support')} />
       </View>
 
       {!celebrityLoading && isCelebrity && (
