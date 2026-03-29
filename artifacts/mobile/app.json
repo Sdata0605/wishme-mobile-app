@@ -2,7 +2,7 @@
   "expo": {
     "name": "WishMe",
     "slug": "mobile",
-    "owner": "prashantuser1",
+    "owner": "prashantuser2",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -16,7 +16,11 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.prashantuser1.wishme"
+      "bundleIdentifier": "com.prashantuser1.wishme",
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow WishMe to recognise your speech so you can use the voice assistant.",
+        "NSMicrophoneUsageDescription": "Allow WishMe to use the microphone for voice commands."
+      }
     },
     "android": {
       "package": "com.prashantuser1.wishme",
@@ -24,7 +28,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "permissions": [
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_MEDIA_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -54,7 +67,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "e0cbf685-8521-4aaa-91a9-8d7c8cfc2100"
+        "projectId": "a4a952d8-74d7-4754-ac6a-22b49744f2e7"
       }
     }
   }
