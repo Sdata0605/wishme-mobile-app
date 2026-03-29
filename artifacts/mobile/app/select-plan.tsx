@@ -84,7 +84,7 @@ export default function SelectPlanScreen() {
 
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentPlan, setCurrentPlan] = useState<string>('basic');
+  const [currentPlan, setCurrentPlan] = useState<string>('');
   const [purchasingPlanId, setPurchasingPlanId] = useState<string | null>(null);
 
   const profileId = user?.profileId ?? '';
