@@ -67,11 +67,19 @@ interface PhotoWishRecord {
   id: string;
   occasion: string;
   recipient_name: string;
+  wish_message?: string;
+  sender_name?: string;
+  text_style?: string;
   status: string;
   created_at: string;
+  completed_at?: string;
   edited_image_url: string | null;
-  wishme_payment_id?: string;
   amount_charged?: number;
+  wishme_payment_id?: string;
+}
+
+function isValidUrl(url: string | null | undefined): boolean {
+  return typeof url === 'string' && url.startsWith('https://');
 }
 
 function statusColor(s: string) {
@@ -128,6 +136,7 @@ export default function PhotoWishScreen() {
     const now = new Date();
     return d.toDateString() === now.toDateString();
   }).length;
+  const completedCount = history.filter(h => h.status === 'completed').length;
 
   useEffect(() => {
     wallet.refetch();
@@ -382,7 +391,7 @@ export default function PhotoWishScreen() {
           {[
             { label: 'Wallet Balance', value: `₹${wallet.balance.toLocaleString('en-IN')}`, icon: 'credit-card' as const, color: '#4B83FF' },
             { label: "Today's", value: String(todayCount), icon: 'zap' as const, color: '#FF6B33' },
-            { label: 'Total Created', value: String(history.length), icon: 'image' as const, color: '#B44CFF' },
+            { label: 'Total Created', value: String(completedCount), icon: 'image' as const, color: '#B44CFF' },
           ].map(st => (
             <View key={st.label} style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[s.statIcon, { backgroundColor: st.color + '20' }]}>
@@ -551,11 +560,15 @@ export default function PhotoWishScreen() {
                   <View style={s.histGrid}>
                     {history.map((item, idx) => (
                       <View key={item.id} style={[s.histCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                        {item.edited_image_url ? (
-                          <Image source={{ uri: item.edited_image_url }} style={s.histCardImg} resizeMode="cover" />
+                        {isValidUrl(item.edited_image_url) ? (
+                          <Image source={{ uri: item.edited_image_url! }} style={s.histCardImg} resizeMode="cover" />
                         ) : (
                           <LinearGradient colors={GRAD_COLORS[idx % GRAD_COLORS.length]} style={s.histCardPlaceholder}>
-                            <Icon name="image" size={40} color="rgba(255,255,255,0.8)" />
+                            {item.edited_image_url === 'processing' ? (
+                              <ActivityIndicator size="small" color="rgba(255,255,255,0.8)" />
+                            ) : (
+                              <Icon name="image" size={40} color="rgba(255,255,255,0.8)" />
+                            )}
                           </LinearGradient>
                         )}
                         <View style={s.histInfo}>
@@ -570,7 +583,7 @@ export default function PhotoWishScreen() {
                           <Text style={[s.histRecipient, { color: colors.foreground }]}>{item.recipient_name}</Text>
                           <View style={s.histFooter}>
                             <Text style={[s.histDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-                            {item.edited_image_url && (
+                            {isValidUrl(item.edited_image_url) && (
                               <TouchableOpacity style={s.dlBtn} onPress={() => downloadImage(item.edited_image_url!)}>
                                 <Icon name="download" size={13} color="#FF6B33" />
                                 <Text style={s.dlText}>Download</Text>
