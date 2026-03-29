@@ -137,17 +137,10 @@ export default function WishFriendScreen() {
       }
 
       setHasSubscriptions(true);
-      const celebIds = favRows.map(r => r.celebrity_id);
-      const idsParam = `(${celebIds.join(',')})`;
       const today = new Date().toISOString().split('T')[0];
 
-      // Fetch all 3 in parallel: subscribed celebrities, all public occasions, sent wishes
-      const [celebRes, occRes, wishRes] = await Promise.all([
-        supabaseFetch(
-          `/rest/v1/celebrities?select=id,name,image_url,category&id=in.${idsParam}&is_active=eq.true`,
-          {},
-          accessToken,
-        ),
+      // Steps 2, 3 in parallel
+      const [occRes, wishRes] = await Promise.all([
         supabaseFetch(
           `/rest/v1/celebrity_occasions?select=*,celebrities:celebrity_id(id,name,image_url,category)&is_public=eq.true&occasion_date=gte.${today}&order=occasion_date.asc`,
           {},
@@ -160,13 +153,17 @@ export default function WishFriendScreen() {
         ),
       ]);
 
-      if (celebRes.ok) {
-        const rows = await celebRes.json() as Celebrity[];
-        setCelebrities(rows ?? []);
-      }
       if (occRes.ok) {
         const rows = await occRes.json() as CelebOccasion[];
         setOccasions(rows ?? []);
+        const uniqueCelebs = [
+          ...new Map(
+            (rows ?? [])
+              .filter(o => o.celebrities)
+              .map(o => [o.celebrities.id, o.celebrities])
+          ).values(),
+        ];
+        setCelebrities(uniqueCelebs);
       }
       if (wishRes.ok) {
         const rows = await wishRes.json() as Wish[];
