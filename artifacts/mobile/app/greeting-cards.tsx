@@ -356,29 +356,19 @@ export default function GreetingCardsScreen() {
   const handleDownload = async (imageUrl: string) => {
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Permission denied', 'Please allow access to save images.');
+      Alert.alert('Permission denied', 'Please allow access to save images to your gallery.');
       return;
     }
     try {
-      let base64Data: string;
+      const fileUri = FileSystem.cacheDirectory + `wishme_card_${Date.now()}.png`;
       if (imageUrl.startsWith('data:')) {
-        base64Data = imageUrl.split(',')[1];
+        const base64Data = imageUrl.split(',')[1];
+        await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
+        await MediaLibrary.saveToLibraryAsync(fileUri);
       } else {
-        const fetchRes = await fetch(imageUrl);
-        const blob = await fetchRes.blob();
-        base64Data = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const result = reader.result as string;
-            resolve(result.split(',')[1]);
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+        const { uri } = await FileSystem.downloadAsync(imageUrl, fileUri);
+        await MediaLibrary.saveToLibraryAsync(uri);
       }
-      const fileUri = FileSystem.cacheDirectory + `card_${Date.now()}.png`;
-      await FileSystem.writeAsStringAsync(fileUri, base64Data, { encoding: FileSystem.EncodingType.Base64 });
-      await MediaLibrary.saveToLibraryAsync(fileUri);
       showToast('Card saved to your gallery!');
     } catch {
       showToast('Failed to save card. Please try again.');
