@@ -1,0 +1,278 @@
+Here's the exact technical breakdown of the /wish-confirmation/:orderId page for your Replit developer:
+
+Route & Entry Point
+Route: /wish-confirmation/:orderId Component: src/pages/WishConfirmation.tsx Route param: orderId = UUID of the wish_celebrity_orders row (e.g., 0bb686c8-57d6-40c1-a65c-ed5310decc56)
+
+Step 1: Authentication Check
+Uses useAuth() hook. If user is null after auth loads, redirects to /auth.
+
+Step 2: Fetch Order Details
+Table: wish_celebrity_orders with joined celebrities
+
+GET https://eqikeuqwbphwongtfzhe.supabase.co/rest/v1/wish_celebrity_orders?id=eq.{orderId}&select=*,celebrities(id,name,image_url,category)
+
+Headers:
+  apikey: <SUPABASE_ANON_KEY>
+  Authorization: Bearer <user_jwt_token>
+Response shape:
+
+
+{
+  "id": "0bb686c8-...",
+  "user_id": "uuid",
+  "celebrity_id": "uuid",
+  "occasion_type": "Birthday",
+  "recipient_name": "John",
+  "message": "Happy birthday!",
+  "card_prompt": "Elegant golden theme",
+  "payment_status": "completed",
+  "generated_card_image_url": null or "https://...",
+  "is_approved": false,
+  "status": "pending" | "generated" | "sent",
+  "celebrities": {
+    "id": "uuid",
+    "name": "Hari Raj Shetty",
+    "image_url": "https://...",
+    "category": "Actor"
+  }
+}
+Auto-trigger logic: If payment_status === 'completed' AND generated_card_image_url is null, it automatically calls handleGenerateCard().
+
+Step 3: Generate Greeting Card
+Edge Function: generate-wish-celebrity-card
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/generate-wish-celebrity-card
+
+Headers:
+  apikey: <SUPABASE_ANON_KEY>
+  Authorization: Bearer <user_jwt_token>
+  Content-Type: application/json
+
+Body:
+  { "orderId": "0bb686c8-..." }
+What it does internally:
+
+Fetches the order + celebrity from DB (using SUPABASE_SERVICE_ROLE_KEY)
+Runs profanity filter on message/recipient/prompt
+Calls Lovable AI Gateway (https://ai.gateway.lovable.dev/v1/chat/completions) with model google/gemini-2.5-flash to generate greeting text
+Calls the same gateway with model google/gemini-2.5-flash-image-preview to generate a card image (multimodal — sends celebrity's photo if available)
+Uploads generated image to Supabase Storage bucket greeting-card-uploads at path ai-cards/{orderId}-{timestamp}.png
+Updates the order row: greeting_text, generated_card_image_url, generation_attempts, status: 'generated'
+Response:
+
+
+{
+  "success": true,
+  "greeting_text": "Dear Hari Raj Shetty, wishing you...",
+  "card_url": "https://eqikeuqwbphwongtfzhe.supabase.co/storage/v1/object/public/greeting-card-uploads/ai-cards/...",
+  "generation_attempts": 1
+}
+After success, the page re-fetches order details to display the card image.
+
+Step 4: Approve & Send
+Edge Function: send-wish-to-celebrity
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/send-wish-to-celebrity
+
+Headers:
+  apikey: <SUPABASE_ANON_KEY>
+  Authorization: Bearer <user_jwt_token>
+  Content-Type: application/json
+
+Body:
+  { "orderId": "0bb686c8-..." }
+What it does internally:
+
+Fetches order with celebrities and profiles joins
+Validates: card must be generated (generated_card_image_url + greeting_text exist), not already sent
+Finds or creates a conversations row between user_id and celebrity_id
+Inserts a messages row (sender = user, text = greeting + card URL)
+Inserts a thank-you messages row (sender = celebrity, AI-generated)
+Updates order: card_approved: true, status: 'sent', completed_at: now()
+Response:
+
+
+{
+  "success": true,
+  "message": "Greeting card sent successfully to celebrity",
+  "conversation_id": "uuid"
+}
+After success, navigates to /wish-congratulations?orderId={orderId}.
+
+UI Elements Displayed
+Section	Data Source	UI Component
+Payment success banner	Static	Green div with border
+Celebrity avatar + name + category	celebrities join	img + text
+Occasion type	order.occasion_type	Label + text
+Recipient name	order.recipient_name	Label + text
+User's message	order.message	Label + text
+Card design prompt	order.card_prompt	Label + text
+Loading spinner (generating)	generating state	Loader2 icon
+Generated card image	order.generated_card_image_url	img tag
+"Generate" button	Shows when no card yet	Button
+"Regenerate" button	Shows when card exists + not approved	Button variant=outline
+"Approve & Send" button	Shows when card exists + not approved	Button with Send icon
+"Already sent" banner	Shows when is_approved === true	Green div
+Complete Data Flow Diagram
+
+Page Load
+  → useAuth() → get JWT
+  → GET wish_celebrity_orders (id=orderId, join celebrities)
+  → If payment_status=completed AND no card → auto-generate
+  
+Generate Card (button or auto)
+  → POST /functions/v1/generate-wish-celebrity-card { orderId }
+     → Gemini text generation (greeting)
+     → Gemini image generation (card with celebrity photo)
+     → Upload to greeting-card-uploads bucket
+     → UPDATE wish_celebrity_orders (greeting_text, card_url, status=generated)
+  → Re-fetch order → display card image
+
+Approve & Send (button)
+  → POST /functions/v1/send-wish-to-celebrity { orderId }
+     → Find/create conversations row
+     → INSERT messages (user→celebrity with card)
+     → INSERT messages (celebrity→user thank-you)
+     → UPDATE wish_celebrity_orders (card_approved=true, status=sent)
+  → Navigate to /wish-congratulations?orderId=...
+Here's the exact technical breakdown of the /wish-confirmation/:orderId page for your Replit developer:
+
+Route & Entry Point
+Route: /wish-confirmation/:orderId Component: src/pages/WishConfirmation.tsx Route param: orderId = UUID of the wish_celebrity_orders row (e.g., 0bb686c8-57d6-40c1-a65c-ed5310decc56)
+
+Step 1: Authentication Check
+Uses useAuth() hook. If user is null after auth loads, redirects to /auth.
+
+Step 2: Fetch Order Details
+Table: wish_celebrity_orders with joined celebrities
+
+GET https://eqikeuqwbphwongtfzhe.supabase.co/rest/v1/wish_celebrity_orders?id=eq.{orderId}&select=*,celebrities(id,name,image_url,category)
+
+Headers:
+  apikey: <SUPABASE_ANON_KEY>
+  Authorization: Bearer <user_jwt_token>
+Response shape:
+
+
+{
+  "id": "0bb686c8-...",
+  "user_id": "uuid",
+  "celebrity_id": "uuid",
+  "occasion_type": "Birthday",
+  "recipient_name": "John",
+  "message": "Happy birthday!",
+  "card_prompt": "Elegant golden theme",
+  "payment_status": "completed",
+  "generated_card_image_url": null or "https://...",
+  "is_approved": false,
+  "status": "pending" | "generated" | "sent",
+  "celebrities": {
+    "id": "uuid",
+    "name": "Hari Raj Shetty",
+    "image_url": "https://...",
+    "category": "Actor"
+  }
+}
+Auto-trigger logic: If payment_status === 'completed' AND generated_card_image_url is null, it automatically calls handleGenerateCard().
+
+Step 3: Generate Greeting Card
+Edge Function: generate-wish-celebrity-card
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/generate-wish-celebrity-card
+
+Headers:
+  apikey: <SUPABASE_ANON_KEY>
+  Authorization: Bearer <user_jwt_token>
+  Content-Type: application/json
+
+Body:
+  { "orderId": "0bb686c8-..." }
+What it does internally:
+
+Fetches the order + celebrity from DB (using SUPABASE_SERVICE_ROLE_KEY)
+Runs profanity filter on message/recipient/prompt
+Calls Lovable AI Gateway (https://ai.gateway.lovable.dev/v1/chat/completions) with model google/gemini-2.5-flash to generate greeting text
+Calls the same gateway with model google/gemini-2.5-flash-image-preview to generate a card image (multimodal — sends celebrity's photo if available)
+Uploads generated image to Supabase Storage bucket greeting-card-uploads at path ai-cards/{orderId}-{timestamp}.png
+Updates the order row: greeting_text, generated_card_image_url, generation_attempts, status: 'generated'
+Response:
+
+
+{
+  "success": true,
+  "greeting_text": "Dear Hari Raj Shetty, wishing you...",
+  "card_url": "https://eqikeuqwbphwongtfzhe.supabase.co/storage/v1/object/public/greeting-card-uploads/ai-cards/...",
+  "generation_attempts": 1
+}
+After success, the page re-fetches order details to display the card image.
+
+Step 4: Approve & Send
+Edge Function: send-wish-to-celebrity
+
+POST https://eqikeuqwbphwongtfzhe.supabase.co/functions/v1/send-wish-to-celebrity
+
+Headers:
+  apikey: <SUPABASE_ANON_KEY>
+  Authorization: Bearer <user_jwt_token>
+  Content-Type: application/json
+
+Body:
+  { "orderId": "0bb686c8-..." }
+What it does internally:
+
+Fetches order with celebrities and profiles joins
+Validates: card must be generated (generated_card_image_url + greeting_text exist), not already sent
+Finds or creates a conversations row between user_id and celebrity_id
+Inserts a messages row (sender = user, text = greeting + card URL)
+Inserts a thank-you messages row (sender = celebrity, AI-generated)
+Updates order: card_approved: true, status: 'sent', completed_at: now()
+Response:
+
+
+{
+  "success": true,
+  "message": "Greeting card sent successfully to celebrity",
+  "conversation_id": "uuid"
+}
+After success, navigates to /wish-congratulations?orderId={orderId}.
+
+UI Elements Displayed
+Section	Data Source	UI Component
+Payment success banner	Static	Green div with border
+Celebrity avatar + name + category	celebrities join	img + text
+Occasion type	order.occasion_type	Label + text
+Recipient name	order.recipient_name	Label + text
+User's message	order.message	Label + text
+Card design prompt	order.card_prompt	Label + text
+Loading spinner (generating)	generating state	Loader2 icon
+Generated card image	order.generated_card_image_url	img tag
+"Generate" button	Shows when no card yet	Button
+"Regenerate" button	Shows when card exists + not approved	Button variant=outline
+"Approve & Send" button	Shows when card exists + not approved	Button with Send icon
+"Already sent" banner	Shows when is_approved === true	Green div
+Complete Data Flow Diagram
+
+Page Load
+  → useAuth() → get JWT
+  → GET wish_celebrity_orders (id=orderId, join celebrities)
+  → If payment_status=completed AND no card → auto-generate
+  
+Generate Card (button or auto)
+  → POST /functions/v1/generate-wish-celebrity-card { orderId }
+     → Gemini text generation (greeting)
+     → Gemini image generation (card with celebrity photo)
+     → Upload to greeting-card-uploads bucket
+     → UPDATE wish_celebrity_orders (greeting_text, card_url, status=generated)
+  → Re-fetch order → display card image
+
+Approve & Send (button)
+  → POST /functions/v1/send-wish-to-celebrity { orderId }
+     → Find/create conversations row
+     → INSERT messages (user→celebrity with card)
+     → INSERT messages (celebrity→user thank-you)
+     → UPDATE wish_celebrity_orders (card_approved=true, status=sent)
+  → Navigate to /wish-congratulations?orderId=...
+
+
+
+

@@ -1,0 +1,176 @@
+Here's the exact technical breakdown for Replit:
+
+How /occasion-wishes Fetches Occasions
+Step 1: Fetch All Public Upcoming Occasions (on page load)
+Endpoint:
+
+GET https://eqikeuqwbphwongtfzhe.supabase.co/rest/v1/celebrity_occasions?is_public=eq.true&occasion_date=gte.{today}&order=occasion_date.asc&select=*,celebrities:celebrity_id(id,name,image_url,category)
+Headers:
+
+apikey: <SUPABASE_ANON_KEY>
+Authorization: Bearer <USER_JWT_TOKEN>
+Content-Type: application/json
+Supabase JS equivalent:
+
+
+const today = new Date().toISOString().split('T')[0]; // e.g. "2026-03-29"
+
+const { data, error } = await supabase
+  .from('celebrity_occasions')
+  .select('*, celebrities:celebrity_id(id, name, image_url, category)')
+  .eq('is_public', true)
+  .gte('occasion_date', today)
+  .order('occasion_date', { ascending: true });
+Response shape:
+
+
+[
+  {
+    "id": "uuid-occasion-1",
+    "celebrity_id": "uuid-celeb-1",
+    "occasion_name": "Birthday Celebration",
+    "occasion_type": "birthday",
+    "occasion_date": "2026-05-15",
+    "is_public": true,
+    "auto_reply_enabled": true,
+    "created_at": "2026-01-10T...",
+    "celebrities": {
+      "id": "uuid-celeb-1",
+      "name": "Hari Raj Shetty",
+      "image_url": "https://...",
+      "category": "Actor"
+    }
+  },
+  {
+    "id": "uuid-occasion-2",
+    "celebrity_id": "uuid-celeb-2",
+    "occasion_name": "Wedding Anniversary",
+    "occasion_type": "anniversary",
+    "occasion_date": "2026-06-20",
+    "is_public": true,
+    "auto_reply_enabled": false,
+    "celebrities": {
+      "id": "uuid-celeb-2",
+      "name": "Priya Sharma",
+      "image_url": "https://...",
+      "category": "Singer"
+    }
+  }
+]
+Step 2: Derive Celebrity List from Occasions (client-side)
+No separate API call. Unique celebrities are extracted from the occasions response:
+
+
+const uniqueCelebs = [
+  ...new Map(
+    occasions.map(o => [o.celebrities.id, o.celebrities])
+  ).values()
+];
+// Result: [{id, name, image_url, category}, ...]
+Step 3: Filter Occasions by Selected Celebrity (client-side)
+When the user picks a celebrity from the dropdown, occasions are filtered locally — no additional API call:
+
+
+const filteredOccasions = celebrityOccasions.filter(
+  o => o.celebrity_id === selectedCelebrityId
+);
+This filtered list populates the "Select Occasion" dropdown.
+
+Summary Flow
+
+Page loads → GET celebrity_occasions (all public, future dates, joined with celebrities)
+           → Derive unique celebrity list (client-side)
+User picks celebrity → Filter occasions by celebrity_id (client-side, no API call)
+User picks occasion → Occasion ID ready for wish submission
+No occasion-specific endpoint is called after selecting a celebrity — it's all filtered from the initial fetch.
+
+Here's the exact technical breakdown for Replit:
+
+How /occasion-wishes Fetches Occasions
+Step 1: Fetch All Public Upcoming Occasions (on page load)
+Endpoint:
+
+GET https://eqikeuqwbphwongtfzhe.supabase.co/rest/v1/celebrity_occasions?is_public=eq.true&occasion_date=gte.{today}&order=occasion_date.asc&select=*,celebrities:celebrity_id(id,name,image_url,category)
+Headers:
+
+apikey: <SUPABASE_ANON_KEY>
+Authorization: Bearer <USER_JWT_TOKEN>
+Content-Type: application/json
+Supabase JS equivalent:
+
+
+const today = new Date().toISOString().split('T')[0]; // e.g. "2026-03-29"
+
+const { data, error } = await supabase
+  .from('celebrity_occasions')
+  .select('*, celebrities:celebrity_id(id, name, image_url, category)')
+  .eq('is_public', true)
+  .gte('occasion_date', today)
+  .order('occasion_date', { ascending: true });
+Response shape:
+
+
+[
+  {
+    "id": "uuid-occasion-1",
+    "celebrity_id": "uuid-celeb-1",
+    "occasion_name": "Birthday Celebration",
+    "occasion_type": "birthday",
+    "occasion_date": "2026-05-15",
+    "is_public": true,
+    "auto_reply_enabled": true,
+    "created_at": "2026-01-10T...",
+    "celebrities": {
+      "id": "uuid-celeb-1",
+      "name": "Hari Raj Shetty",
+      "image_url": "https://...",
+      "category": "Actor"
+    }
+  },
+  {
+    "id": "uuid-occasion-2",
+    "celebrity_id": "uuid-celeb-2",
+    "occasion_name": "Wedding Anniversary",
+    "occasion_type": "anniversary",
+    "occasion_date": "2026-06-20",
+    "is_public": true,
+    "auto_reply_enabled": false,
+    "celebrities": {
+      "id": "uuid-celeb-2",
+      "name": "Priya Sharma",
+      "image_url": "https://...",
+      "category": "Singer"
+    }
+  }
+]
+Step 2: Derive Celebrity List from Occasions (client-side)
+No separate API call. Unique celebrities are extracted from the occasions response:
+
+
+const uniqueCelebs = [
+  ...new Map(
+    occasions.map(o => [o.celebrities.id, o.celebrities])
+  ).values()
+];
+// Result: [{id, name, image_url, category}, ...]
+Step 3: Filter Occasions by Selected Celebrity (client-side)
+When the user picks a celebrity from the dropdown, occasions are filtered locally — no additional API call:
+
+
+const filteredOccasions = celebrityOccasions.filter(
+  o => o.celebrity_id === selectedCelebrityId
+);
+This filtered list populates the "Select Occasion" dropdown.
+
+Summary Flow
+
+Page loads → GET celebrity_occasions (all public, future dates, joined with celebrities)
+           → Derive unique celebrity list (client-side)
+User picks celebrity → Filter occasions by celebrity_id (client-side, no API call)
+User picks occasion → Occasion ID ready for wish submission
+No occasion-specific endpoint is called after selecting a celebrity — it's all filtered from the initial fetch.
+
+
+
+
+
