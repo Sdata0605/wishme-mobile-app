@@ -23,6 +23,8 @@ import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
+import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 
 interface ImagePromotion {
@@ -37,6 +39,7 @@ interface ImagePromotion {
   error_message: string | null;
   completed_at: string | null;
   created_at: string;
+  wishme_payment_id?: string;
 }
 
 interface SubscribedCeleb {
@@ -72,6 +75,11 @@ export default function ImagePromotionsScreen() {
   const insets = useSafeAreaInsets();
   const { user, session } = useAuth();
   const wallet = useWallet();
+  const { discountPercentage, getDiscountedPrice } = usePlan();
+  const { favoriteIds, loading: favLoading } = useCelebrityFavorites({
+    profileId: user?.profileId,
+    accessToken: session?.access_token,
+  });
 
   const [tab, setTab] = useState<'create' | 'history'>('create');
 
@@ -88,8 +96,8 @@ export default function ImagePromotionsScreen() {
   const [refImgUri, setRefImgUri] = useState<string | null>(null);
 
   const [basePrice, setBasePrice] = useState(25);
-  const [discountPct, setDiscountPct] = useState(0);
-  const finalPrice = Math.round(basePrice * (1 - discountPct / 100));
+  const finalPrice = getDiscountedPrice(basePrice);
+  const discountPct = discountPercentage;
 
   const [history, setHistory] = useState<ImagePromotion[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -100,25 +108,19 @@ export default function ImagePromotionsScreen() {
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const isLoggedIn = !!(user && session);
-  const noSubscriptions = isLoggedIn && !celebsLoading && celebrities.length === 0;
+  const noSubscriptions = isLoggedIn && !celebsLoading && !favLoading && celebrities.length === 0;
 
   const todayCount = history.filter(p => isToday(p.created_at)).length;
   const completedCount = history.filter(p => p.status === 'completed').length;
 
   const fetchCelebrities = useCallback(async () => {
-    if (!session?.access_token || !user?.profileId) return;
+    if (!session?.access_token || !favoriteIds.size) {
+      setCelebrities([]);
+      return;
+    }
     setCelebsLoading(true);
     try {
-      const favsRes = await supabaseFetch(
-        `/rest/v1/celebrity_favorites?select=celebrity_id&user_id=eq.${user.profileId}&status=eq.active`,
-        {},
-        session.access_token,
-      );
-      if (!favsRes.ok) { setCelebsLoading(false); return; }
-      const favRows = await favsRes.json() as Array<{ celebrity_id: string }>;
-      if (!favRows.length) { setCelebrities([]); setCelebsLoading(false); return; }
-
-      const ids = favRows.map(r => r.celebrity_id).join(',');
+      const ids = Array.from(favoriteIds).join(',');
       const celebRes = await supabaseFetch(
         `/rest/v1/celebrities?select=id,name,category,image_url&id=in.(${ids})&avatar_trained=eq.true`,
         {},
@@ -131,7 +133,7 @@ export default function ImagePromotionsScreen() {
       }
     } catch {}
     setCelebsLoading(false);
-  }, [session, user]);
+  }, [session, favoriteIds]);
 
   const fetchPricing = useCallback(async () => {
     try {
@@ -148,34 +150,7 @@ export default function ImagePromotionsScreen() {
         }
       }
     } catch {}
-
-    if (session?.access_token && user?.id) {
-      try {
-        const profileRes = await supabaseFetch(
-          `/rest/v1/profiles?select=plan&user_id=eq.${user.id}&limit=1`,
-          {},
-          session.access_token,
-        );
-        if (profileRes.ok) {
-          const rows = await profileRes.json() as Array<{ plan?: string }>;
-          const planName = rows?.[0]?.plan;
-          if (planName) {
-            const plansRes = await supabaseFetch(
-              `/rest/v1/plans?name=eq.${encodeURIComponent(planName)}&select=service_discount_percentage&limit=1`,
-              {},
-              session.access_token,
-            );
-            if (plansRes.ok) {
-              const planRows = await plansRes.json() as Array<{ service_discount_percentage?: number }>;
-              if (planRows?.length && planRows[0].service_discount_percentage != null) {
-                setDiscountPct(planRows[0].service_discount_percentage);
-              }
-            }
-          }
-        }
-      } catch {}
-    }
-  }, [session, user]);
+  }, [session]);
 
   const fetchHistory = useCallback(async () => {
     if (!session?.access_token || !user?.profileId) return;
@@ -200,7 +175,7 @@ export default function ImagePromotionsScreen() {
     void fetchPricing();
     void fetchHistory();
     wallet.refetch();
-  }, [isLoggedIn, user?.profileId]);
+  }, [isLoggedIn, user?.profileId, favoriteIds]);
 
   const pickImage = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -292,7 +267,50 @@ export default function ImagePromotionsScreen() {
       }
 
       if (data.generation) {
-        setCurrentGeneration(data.generation);
+        const gen = data.generation;
+
+        const now = new Date();
+        const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+        const randPart = String(Math.floor(1000 + Math.random() * 9000));
+        const wishmePaymentId = `WM-${datePart}-${randPart}`;
+
+        let paymentRecorded = false;
+        try {
+          const txRes = await supabaseFetch(
+            '/rest/v1/payment_transactions',
+            {
+              method: 'POST',
+              body: JSON.stringify({
+                wishme_payment_id: wishmePaymentId,
+                user_id: user?.profileId,
+                amount: finalPrice,
+                payment_method: 'wallet',
+                service_type: 'image_promotion',
+                image_promotion_id: gen.id,
+                description: 'Image Promotion',
+                status: 'completed',
+                paid_at: now.toISOString(),
+              }),
+            },
+            session.access_token,
+          );
+          if (txRes.ok) paymentRecorded = true;
+        } catch {}
+
+        if (paymentRecorded) {
+          try {
+            await supabaseFetch(
+              `/rest/v1/image_promotions?id=eq.${gen.id}`,
+              {
+                method: 'PATCH',
+                body: JSON.stringify({ wishme_payment_id: wishmePaymentId }),
+              },
+              session.access_token,
+            );
+          } catch {}
+        }
+
+        setCurrentGeneration({ ...gen, wishme_payment_id: paymentRecorded ? wishmePaymentId : undefined });
         wallet.refetch();
         void fetchHistory();
       }
@@ -301,7 +319,7 @@ export default function ImagePromotionsScreen() {
     }
 
     setGenerating(false);
-  }, [selectedCelebId, concept, branding, refImgBase64, wallet, finalPrice, session, fetchHistory]);
+  }, [selectedCelebId, concept, branding, refImgBase64, wallet, finalPrice, session, user, fetchHistory]);
 
   const downloadPromo = useCallback(async (imgUrl: string, promoId: string) => {
     if (Platform.OS === 'web') {
