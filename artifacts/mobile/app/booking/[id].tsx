@@ -130,9 +130,28 @@ export default function BookingWizardScreen() {
       try {
         const [celebRes, profRes, langRes] = await Promise.allSettled([
           sbFetch(`/rest/v1/celebrities?id=eq.${id}&select=*&limit=1`, {}, token),
-          uid ? sbFetch(`/rest/v1/profiles?user_id=eq.${uid}&select=id,wallet_balance,plan_discount&limit=1`, {}, token) : Promise.resolve(null),
+          uid ? sbFetch(`/rest/v1/profiles?user_id=eq.${uid}&select=id,wallet_balance,plan_discount_pct&limit=1`, {}, token) : Promise.resolve(null),
           sbFetch('/functions/v1/heygen-get-languages', { method: 'POST', body: '{}' }, token),
         ]);
+
+        // ── Parse profile (read body exactly once) ──────────────────────────────
+        let resolvedProfileId = '';
+        let walletBal = 0;
+        let discPct = 0;
+
+        if (profRes.status === 'fulfilled' && profRes.value && (profRes.value as Response).ok) {
+          const prows: { id?: string; wallet_balance?: number; plan_discount_pct?: number }[] =
+            await (profRes.value as Response).json().catch(() => []);
+          if (Array.isArray(prows) && prows.length > 0) {
+            resolvedProfileId = prows[0].id ?? '';
+            walletBal = prows[0].wallet_balance ?? 0;
+            discPct = prows[0].plan_discount_pct ?? 0;
+          }
+        }
+        setProfileId(resolvedProfileId);
+        setWalletBalance(walletBal);
+        setDiscountPct(discPct);
+        // ────────────────────────────────────────────────────────────────────────
 
         if (celebRes.status === 'fulfilled' && celebRes.value.ok) {
           const rows: Record<string, unknown>[] = await celebRes.value.json();
@@ -146,13 +165,6 @@ export default function BookingWizardScreen() {
               pricePerWish: (raw.price_per_wish ?? raw.pricePerWish ?? 1500) as number,
               service_prices: (raw.service_prices ?? {}) as Celebrity['service_prices'],
             });
-
-            const resolvedProfileId =
-              profRes.status === 'fulfilled' && profRes.value && (profRes.value as Response).ok
-                ? await (profRes.value as Response).clone().json()
-                    .then((r: { id?: string }[]) => r[0]?.id ?? '')
-                    .catch(() => '')
-                : '';
 
             const [subPriceRes, subStatusRes] = await Promise.allSettled([
               sbFetch(`/rest/v1/celebrity_favorite_pricing?celebrity_id=eq.${raw.id}&is_enabled=eq.true&select=price&limit=1`, {}, token),
@@ -170,16 +182,6 @@ export default function BookingWizardScreen() {
               const favRows: { id: string }[] = await (subStatusRes.value as Response).json().catch(() => []);
               setIsSubscribed(Array.isArray(favRows) && favRows.length > 0);
             }
-          }
-        }
-
-        if (profRes.status === 'fulfilled' && profRes.value && (profRes.value as Response).ok) {
-          const prows: { id?: string; wallet_balance?: number; plan_discount?: number }[] =
-            await (profRes.value as Response).json().catch(() => []);
-          if (Array.isArray(prows) && prows.length > 0) {
-            setProfileId(prows[0].id ?? '');
-            setWalletBalance(prows[0].wallet_balance ?? 0);
-            setDiscountPct(prows[0].plan_discount ?? 0);
           }
         }
 
