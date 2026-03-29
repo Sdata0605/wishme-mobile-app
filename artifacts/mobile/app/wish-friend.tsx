@@ -382,6 +382,54 @@ export default function WishFriendScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
+          {/* Step Progress Indicator */}
+          {(() => {
+            const currentStep = !selectedCeleb ? 1 : !selectedOccasion ? 2 : 3;
+            const steps = [
+              { num: 1, label: 'Select Celebrity' },
+              { num: 2, label: 'Select Occasion' },
+              { num: 3, label: 'Write Wish' },
+            ];
+            return (
+              <View style={s.stepRow}>
+                {steps.map((step, i) => {
+                  const isActive = currentStep === step.num;
+                  const isDone = currentStep > step.num;
+                  return (
+                    <React.Fragment key={step.num}>
+                      <View style={[
+                        s.stepChip,
+                        isDone && { backgroundColor: colors.primary + '22', borderColor: colors.primary + '44' },
+                        isActive && { backgroundColor: colors.primary, borderColor: colors.primary },
+                        !isActive && !isDone && { backgroundColor: colors.card, borderColor: colors.border },
+                      ]}>
+                        <Text style={[
+                          s.stepNum,
+                          isActive && { color: '#fff' },
+                          isDone && { color: colors.primary },
+                          !isActive && !isDone && { color: colors.mutedForeground },
+                        ]}>
+                          {isDone ? '✓' : step.num}
+                        </Text>
+                        <Text style={[
+                          s.stepLabel,
+                          isActive && { color: '#fff' },
+                          isDone && { color: colors.primary },
+                          !isActive && !isDone && { color: colors.mutedForeground },
+                        ]} numberOfLines={1}>
+                          {step.label}
+                        </Text>
+                      </View>
+                      {i < steps.length - 1 && (
+                        <View style={[s.stepDivider, { backgroundColor: currentStep > step.num ? colors.primary + '44' : colors.border }]} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </View>
+            );
+          })()}
+
           {/* Celebrity Picker */}
           <Text style={[s.sectionLabel, { color: colors.foreground }]}>Choose a Celebrity</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipScroll}>
@@ -427,6 +475,14 @@ export default function WishFriendScreen() {
                   <Text style={[s.noOccasionText, { color: colors.mutedForeground }]}>
                     No upcoming occasions right now
                   </Text>
+                  <TouchableOpacity
+                    style={[s.noOccasionBtn, { borderColor: colors.primary }]}
+                    onPress={() => { setSelectedCeleb(null); setSelectedOccasion(null); }}
+                    activeOpacity={0.8}
+                  >
+                    <Icon name="arrow-left" size={14} color={colors.primary} />
+                    <Text style={[s.noOccasionBtnText, { color: colors.primary }]}>Choose Another Celebrity</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
                 <View style={s.occasionList}>
@@ -503,20 +559,27 @@ export default function WishFriendScreen() {
                 { backgroundColor: colors.input ?? colors.card, borderColor: colors.border, color: colors.foreground },
               ]}
               placeholder={
-                selectedCeleb
-                  ? `Write your wish for ${selectedCeleb.name}...`
-                  : 'Select a celebrity first, then write your wish...'
+                !selectedCeleb
+                  ? 'Select a celebrity above to begin your wish...'
+                  : !selectedOccasion
+                  ? 'Select an occasion above, then write your wish...'
+                  : `Write your heartfelt wish for ${selectedCeleb.name}...`
               }
               placeholderTextColor={colors.mutedForeground}
               value={message}
               onChangeText={t => setMessage(t.slice(0, 500))}
               multiline
               textAlignVertical="top"
-              editable={!!selectedCeleb && !!selectedOccasion}
+              editable
             />
-            <Text style={[s.charCount, { color: message.length > 450 ? '#EF4444' : colors.mutedForeground }]}>
-              {message.length} / 500
-            </Text>
+            <View style={s.charCountRow}>
+              <Text style={[s.charCount, { color: message.length > 450 ? '#EF4444' : colors.mutedForeground }]}>
+                {message.length} / 500
+              </Text>
+              {message.length > 0 && message.length < 10 && (
+                <Text style={s.minCharHint}>Minimum 10 characters</Text>
+              )}
+            </View>
           </View>
 
           {/* Send Button */}
@@ -721,6 +784,29 @@ const s = StyleSheet.create({
   chipAvatarPlaceholder: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   chipName: { fontSize: 11, fontFamily: 'Inter_500Medium', textAlign: 'center' },
 
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 4,
+    gap: 0,
+  },
+  stepChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: 'center',
+  },
+  stepNum: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  stepLabel: { fontSize: 11, fontFamily: 'Inter_500Medium' },
+  stepDivider: { height: 1.5, width: 8 },
+
   noOccasionWrap: {
     marginHorizontal: 16,
     padding: 20,
@@ -730,6 +816,17 @@ const s = StyleSheet.create({
     gap: 8,
   },
   noOccasionText: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
+  noOccasionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  noOccasionBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 
   occasionList: { paddingHorizontal: 16, gap: 10 },
   occasionCard: {
@@ -767,7 +864,9 @@ const s = StyleSheet.create({
     minHeight: 120,
     lineHeight: 20,
   },
-  charCount: { fontSize: 12, fontFamily: 'Inter_400Regular', textAlign: 'right', marginTop: 6 },
+  charCountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 },
+  charCount: { fontSize: 12, fontFamily: 'Inter_400Regular' },
+  minCharHint: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#EF4444' },
 
   sendBtn: {
     flexDirection: 'row',
