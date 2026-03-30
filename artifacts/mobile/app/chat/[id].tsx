@@ -10,6 +10,7 @@ import {
   AppState,
   Dimensions,
   FlatList,
+  Keyboard,
   Platform,
   ScrollView,
   StyleSheet,
@@ -352,6 +353,7 @@ export default function ChatScreen() {
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSecs, setRecordingSecs] = useState(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   const flatListRef = useRef<FlatList<ChatMessage>>(null);
   const inputRef = useRef<TextInput>(null);
@@ -509,6 +511,12 @@ export default function ChatScreen() {
       recordingRef.current?.stopAndUnloadAsync().catch(() => {});
     };
   }, [bootstrap, fetchNewMessages]);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   const loadOlderMessages = useCallback(async () => {
     if (isLoadingMore || !hasMoreMessages || !convId || !accessToken) return;
@@ -863,7 +871,7 @@ export default function ChatScreen() {
             {
               backgroundColor: colors.card,
               borderTopColor: colors.border,
-              paddingBottom: insets.bottom + 8,
+              paddingBottom: keyboardVisible ? 8 : insets.bottom + 8,
               opacity: isClosed ? 0.5 : 1,
             },
           ]}
