@@ -760,12 +760,13 @@ export default function ChatScreen() {
     );
   }
 
+  const ChatWrapper = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+  const chatWrapperProps = Platform.OS === 'ios'
+    ? { behavior: 'padding' as const, keyboardVerticalOffset: insets.top }
+    : {};
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior="padding"
-      keyboardVerticalOffset={insets.top}
-    >
+    <ChatWrapper style={{ flex: 1 }} {...chatWrapperProps}>
       <View style={[s.container, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border, backgroundColor: colors.background }]}>
@@ -947,7 +948,7 @@ export default function ChatScreen() {
           )}
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </ChatWrapper>
   );
 }
 
