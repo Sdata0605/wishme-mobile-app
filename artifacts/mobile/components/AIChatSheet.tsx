@@ -209,7 +209,7 @@ export function AIChatSheet() {
             by keyboard height so the sheet lifts and the input stays visible. */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
           style={{ height: SHEET_HEIGHT }}
         >
           {/* Sheet fills the KAV — flex: 1 lets it shrink with KAV */}

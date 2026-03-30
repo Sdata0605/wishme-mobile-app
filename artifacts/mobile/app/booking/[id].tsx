@@ -497,7 +497,7 @@ export default function BookingWizardScreen() {
           </TouchableOpacity>
           {showLangDropdown && (
             <View style={[styles.dropdownList, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
+              <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled keyboardShouldPersistTaps="handled">
                 {languages.map((lang) => (
                   <TouchableOpacity key={lang} style={styles.dropdownItem} onPress={() => { setStep1(s => ({ ...s, preferredLanguage: lang })); setShowLangDropdown(false); }}>
                     <Text style={{ color: step1.preferredLanguage === lang ? colors.primary : colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 14 }}>{lang}</Text>
