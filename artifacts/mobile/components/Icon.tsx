@@ -564,6 +564,16 @@ const ICONS = {
       <Line x1={8} y1={23} x2={16} y2={23} {...p(c)} />
     </Svg>
   ),
+  list: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Line x1={8} y1={6} x2={21} y2={6} {...p(c)} />
+      <Line x1={8} y1={12} x2={21} y2={12} {...p(c)} />
+      <Line x1={8} y1={18} x2={21} y2={18} {...p(c)} />
+      <Line x1={3} y1={6} x2={3.01} y2={6} {...p(c)} />
+      <Line x1={3} y1={12} x2={3.01} y2={12} {...p(c)} />
+      <Line x1={3} y1={18} x2={3.01} y2={18} {...p(c)} />
+    </Svg>
+  ),
 } satisfies Record<string, RenderFn>;
 
 const ALIASES = {

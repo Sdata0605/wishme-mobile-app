@@ -97,7 +97,7 @@ export function DraggableMoreButton() {
 
   const navigateQuick = (route: Href) => {
     setQuickMenuVisible(false);
-    setTimeout(() => router.push(route), 80);
+    setTimeout(() => router.navigate(route), 80);
   };
 
   return (

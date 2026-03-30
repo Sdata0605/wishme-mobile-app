@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
@@ -49,7 +48,7 @@ export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { colors, isDark, toggle } = useTheme();
   const insets = useSafeAreaInsets();
-  const tabBarHeight = useBottomTabBarHeight();
+  const tabBarHeight = insets.bottom + 49;
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { balance: liveBalance, refetch: refetchWallet } = useWallet();
   const { isCelebrity, loading: celebrityLoading } = useCelebrity();
