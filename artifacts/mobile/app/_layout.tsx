@@ -19,7 +19,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { DraggableMoreButton } from '@/components/DraggableMoreButton';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AIChatButton } from '@/components/AIChatButton';
-import { AIChatSheet } from '@/components/AIChatSheet';
 import { VoiceAssistantButton } from '@/components/VoiceAssistantButton';
 
 import { AuthProvider } from '@/context/AuthContext';
@@ -40,7 +39,6 @@ function FloatingButtons() {
     <>
       <DraggableMoreButton />
       <AIChatButton />
-      <AIChatSheet />
       <VoiceAssistantButton />
     </>
   );
@@ -78,6 +76,7 @@ function RootLayoutNav() {
       <Stack.Screen name="occasion-book/[id]" />
       <Stack.Screen name="occasion-alerts" />
       <Stack.Screen name="occasion-wishes" />
+      <Stack.Screen name="ai-assistant" options={{ presentation: 'card' }} />
       <Stack.Screen name="settings" />
       <Stack.Screen name="celebrity-signup" />
       <Stack.Screen name="celebrity-dashboard" />

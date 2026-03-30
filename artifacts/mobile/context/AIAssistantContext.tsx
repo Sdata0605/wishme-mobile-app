@@ -21,11 +21,8 @@ export interface AIMessage {
 
 interface AIAssistantContextValue {
   messages: AIMessage[];
-  isOpen: boolean;
   isLoading: boolean;
   isTyping: boolean;
-  openChat: () => void;
-  closeChat: () => void;
   sendMessage: (content: string, isVoice?: boolean) => Promise<string>;
   clearMessages: () => void;
 }
@@ -35,13 +32,10 @@ const AIAssistantContext = createContext<AIAssistantContextValue | null>(null);
 export function AIAssistantProvider({ children }: { children: React.ReactNode }) {
   const { user, session } = useAuth();
   const [messages, setMessages] = useState<AIMessage[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const messagesRef = useRef<AIMessage[]>([]);
 
-  const openChat = useCallback(() => setIsOpen(true), []);
-  const closeChat = useCallback(() => setIsOpen(false), []);
   const clearMessages = useCallback(() => {
     setMessages([]);
     messagesRef.current = [];
@@ -129,11 +123,8 @@ export function AIAssistantProvider({ children }: { children: React.ReactNode })
   return (
     <AIAssistantContext.Provider value={{
       messages,
-      isOpen,
       isLoading,
       isTyping,
-      openChat,
-      closeChat,
       sendMessage,
       clearMessages,
     }}>

@@ -1,11 +1,13 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { router, usePathname } from 'expo-router';
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { useAIAssistant } from '@/context/AIAssistantContext';
 
 export function AIChatButton() {
-  const { openChat, messages, isOpen } = useAIAssistant();
+  const { messages } = useAIAssistant();
+  const pathname = usePathname();
   const pulseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export function AIChatButton() {
     outputRange: [0.3, 0.15, 0],
   });
 
+  const isOpen = pathname === '/ai-assistant';
   const hasUnread = messages.length > 0 && !isOpen;
 
   return (
@@ -60,7 +63,7 @@ export function AIChatButton() {
 
       {/* Button */}
       <TouchableOpacity
-        onPress={openChat}
+        onPress={() => { if (!isOpen) router.push('/ai-assistant'); }}
         activeOpacity={0.85}
         style={styles.buttonWrap}
       >

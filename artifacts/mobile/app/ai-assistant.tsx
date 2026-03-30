@@ -3,10 +3,8 @@ import { router, type Href } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
-  Dimensions,
-  Modal,
+  Keyboard,
   Platform,
-  PanResponder,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,9 +16,6 @@ import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useAIAssistant, type AIMessage } from '@/context/AIAssistantContext';
-
-const { height: H } = Dimensions.get('window');
-const SHEET_HEIGHT = H * 0.88;
 
 const QUICK_STARTS = [
   { label: 'Book a Celebrity', query: 'How do I book a celebrity?' },
@@ -128,55 +123,24 @@ function MessageBubble({ msg, onSuggestion }: { msg: AIMessage; onSuggestion: (s
   );
 }
 
-export function AIChatSheet() {
-  const { isOpen, closeChat, messages, isTyping, sendMessage, clearMessages } = useAIAssistant();
+export default function AIAssistantScreen() {
+  const { messages, isTyping, sendMessage, clearMessages } = useAIAssistant();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
-
-  const dragY = useRef(new Animated.Value(0)).current;
-  const dragOffset = useRef(0);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
-      dragY.setValue(0);
-      dragOffset.current = 0;
-    }
-  }, [isOpen, dragY]);
+    const showSub = Keyboard.addListener('keyboardDidShow', () => setKeyboardVisible(true));
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   useEffect(() => {
     if (messages.length > 0) {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
     }
   }, [messages, isTyping]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dy) > 5,
-      onPanResponderGrant: () => {
-        dragOffset.current = 0;
-        dragY.setOffset(0);
-        dragY.setValue(0);
-      },
-      onPanResponderMove: (_, gs) => {
-        if (gs.dy > 0) {
-          dragY.setValue(gs.dy);
-          dragOffset.current = gs.dy;
-        }
-      },
-      onPanResponderRelease: () => {
-        dragY.flattenOffset();
-        if (dragOffset.current > 150) {
-          dragY.setValue(0);
-          closeChat();
-        } else {
-          Animated.spring(dragY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 12 }).start();
-        }
-        dragOffset.current = 0;
-      },
-    }),
-  ).current;
 
   const handleSend = useCallback(() => {
     const text = input.trim();
@@ -193,185 +157,133 @@ export function AIChatSheet() {
     sendMessage(query);
   }, [sendMessage]);
 
+  const inputBarPaddingBottom = keyboardVisible ? 16 : Math.max(16, insets.bottom);
+
   return (
-    <Modal
-      visible={isOpen}
-      animationType="slide"
-      transparent
-      onRequestClose={closeChat}
-      statusBarTranslucent
-    >
-      <View style={styles.overlay} pointerEvents="box-none">
-        {/* Backdrop */}
-        <TouchableOpacity style={styles.backdrop} onPress={closeChat} activeOpacity={1} />
-
-        {/* KAV wraps the sheet — on Android, behavior="height" shrinks KAV height
-            by keyboard height so the sheet lifts and the input stays visible. */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
-          style={{ height: SHEET_HEIGHT }}
+    <View style={[styles.container, { backgroundColor: '#0D1117' }]}>
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <LinearGradient
+          colors={['#FF6B33', '#EC4899', '#B44CFF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.avatar}
         >
-          {/* Sheet fills the KAV — flex: 1 lets it shrink with KAV */}
-          <Animated.View
-            style={[
-              styles.sheet,
-              { flex: 1, transform: [{ translateY: dragY }] },
-            ]}
-          >
-            {/* Drag handle */}
-            <View {...panResponder.panHandlers} style={styles.dragArea}>
-              <View style={styles.dragHandle} />
-            </View>
+          <Icon name="sparkles" size={24} color="#fff" />
+        </LinearGradient>
+        <View style={styles.headerText}>
+          <Text style={styles.headerTitle}>AI Assistant</Text>
+          <Text style={styles.headerStatus}>● ONLINE NOW</Text>
+        </View>
+        <TouchableOpacity onPress={clearMessages} style={styles.headerAction}>
+          <Icon name="trash-2" size={16} color="rgba(255,255,255,0.5)" />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+          <Icon name="x" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
-            {/* Header */}
-            <View style={styles.header}>
+      {/* Content with keyboard avoidance */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
+      >
+        {/* Messages */}
+        <ScrollView
+          ref={scrollRef}
+          style={styles.messages}
+          contentContainerStyle={styles.messagesContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {messages.length === 0 ? (
+            <View style={styles.emptyState}>
               <LinearGradient
                 colors={['#FF6B33', '#EC4899', '#B44CFF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
-                style={styles.avatar}
+                style={styles.emptyAvatar}
               >
-                <Icon name="sparkles" size={24} color="#fff" />
+                <Icon name="sparkles" size={32} color="#fff" />
               </LinearGradient>
-              <View style={styles.headerText}>
-                <Text style={styles.headerTitle}>AI Assistant</Text>
-                <Text style={styles.headerStatus}>● ONLINE NOW</Text>
-              </View>
-              <TouchableOpacity onPress={clearMessages} style={styles.headerAction}>
-                <Icon name="trash-2" size={16} color="rgba(255,255,255,0.5)" />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={closeChat} style={styles.closeBtn}>
-                <Icon name="x" size={20} color="#fff" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Messages */}
-            <View style={{ flex: 1 }}>
+              <Text style={styles.emptyTitle}>How can I help you?</Text>
+              <Text style={styles.emptySubtitle}>Ask me anything about WishMe</Text>
               <ScrollView
-                ref={scrollRef}
-                style={styles.messages}
-                contentContainerStyle={styles.messagesContent}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.quickStartScroll}
+                contentContainerStyle={styles.quickStartRow}
               >
-                {messages.length === 0 ? (
-                  <View style={styles.emptyState}>
-                    <LinearGradient
-                      colors={['#FF6B33', '#EC4899', '#B44CFF']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.emptyAvatar}
-                    >
-                      <Icon name="sparkles" size={32} color="#fff" />
-                    </LinearGradient>
-                    <Text style={styles.emptyTitle}>How can I help you?</Text>
-                    <Text style={styles.emptySubtitle}>Ask me anything about WishMe</Text>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.quickStartScroll}
-                      contentContainerStyle={styles.quickStartRow}
-                    >
-                      {QUICK_STARTS.map((qs) => (
-                        <TouchableOpacity
-                          key={qs.label}
-                          style={styles.quickChip}
-                          onPress={() => handleQuickStart(qs.query)}
-                          activeOpacity={0.75}
-                        >
-                          <Text style={styles.quickChipText}>{qs.label}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                ) : (
-                  <>
-                    {messages.map((msg) => (
-                      <MessageBubble key={msg.id} msg={msg} onSuggestion={handleSuggestion} />
-                    ))}
-                    {isTyping && <TypingIndicator />}
-                  </>
-                )}
+                {QUICK_STARTS.map((qs) => (
+                  <TouchableOpacity
+                    key={qs.label}
+                    style={styles.quickChip}
+                    onPress={() => handleQuickStart(qs.query)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={styles.quickChipText}>{qs.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
-
-              {/* Input bar */}
-              <View style={[styles.inputBar, { paddingBottom: Math.max(16, insets.bottom) }]}>
-                <TextInput
-                  style={styles.input}
-                  value={input}
-                  onChangeText={setInput}
-                  placeholder="Ask me anything..."
-                  placeholderTextColor="rgba(255,255,255,0.35)"
-                  returnKeyType="send"
-                  onSubmitEditing={handleSend}
-                  multiline={false}
-                />
-                <TouchableOpacity
-                  onPress={handleSend}
-                  activeOpacity={0.8}
-                  disabled={!input.trim()}
-                >
-                  {input.trim() ? (
-                    <LinearGradient
-                      colors={['#FF6B33', '#B44CFF']}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={styles.sendBtn}
-                    >
-                      <Icon name="send" size={18} color="#fff" />
-                    </LinearGradient>
-                  ) : (
-                    <View style={[styles.sendBtn, styles.sendBtnDisabled]}>
-                      <Icon name="send" size={18} color="rgba(255,255,255,0.3)" />
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
             </View>
-          </Animated.View>
-        </KeyboardAvoidingView>
-      </View>
-    </Modal>
+          ) : (
+            <>
+              {messages.map((msg) => (
+                <MessageBubble key={msg.id} msg={msg} onSuggestion={handleSuggestion} />
+              ))}
+              {isTyping && <TypingIndicator />}
+            </>
+          )}
+        </ScrollView>
+
+        {/* Input bar */}
+        <View style={[styles.inputBar, { paddingBottom: inputBarPaddingBottom }]}>
+          <TextInput
+            style={styles.input}
+            value={input}
+            onChangeText={setInput}
+            placeholder="Ask me anything..."
+            placeholderTextColor="rgba(255,255,255,0.35)"
+            returnKeyType="send"
+            onSubmitEditing={handleSend}
+            multiline={false}
+          />
+          <TouchableOpacity
+            onPress={handleSend}
+            activeOpacity={0.8}
+            disabled={!input.trim()}
+          >
+            {input.trim() ? (
+              <LinearGradient
+                colors={['#FF6B33', '#B44CFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.sendBtn}
+              >
+                <Icon name="send" size={18} color="#fff" />
+              </LinearGradient>
+            ) : (
+              <View style={[styles.sendBtn, styles.sendBtnDisabled]}>
+                <Icon name="send" size={18} color="rgba(255,255,255,0.3)" />
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
+  container: {
     flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  sheet: {
-    backgroundColor: '#0D1117',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.8,
-    shadowRadius: 30,
-    elevation: 20,
-  },
-  dragArea: {
-    alignItems: 'center',
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  dragHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    height: 72,
+    paddingBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
