@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   PanResponder,
@@ -133,6 +133,7 @@ export function AIChatSheet() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const [input, setInput] = useState('');
+  const [kbHeight, setKbHeight] = useState(0);
 
   const dragY = useRef(new Animated.Value(0)).current;
   const dragOffset = useRef(0);
@@ -143,6 +144,20 @@ export function AIChatSheet() {
       dragOffset.current = 0;
     }
   }, [isOpen, dragY]);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKbHeight(e.endCoordinates.height);
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      setKbHeight(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -240,11 +255,7 @@ export function AIChatSheet() {
           </View>
 
           {/* Messages */}
-          <KeyboardAvoidingView
-            style={{ flex: 1 }}
-            behavior="padding"
-            keyboardVerticalOffset={insets.top}
-          >
+          <View style={{ flex: 1, paddingBottom: kbHeight }}>
             <ScrollView
               ref={scrollRef}
               style={styles.messages}
@@ -293,7 +304,7 @@ export function AIChatSheet() {
             </ScrollView>
 
             {/* Input bar */}
-            <View style={[styles.inputBar, { paddingBottom: Math.max(16, insets.bottom) }]}>
+            <View style={[styles.inputBar, { paddingBottom: kbHeight > 0 ? 16 : Math.max(16, insets.bottom) }]}>
               <TextInput
                 style={styles.input}
                 value={input}
@@ -325,7 +336,7 @@ export function AIChatSheet() {
                 )}
               </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
+          </View>
         </Animated.View>
       </View>
     </Modal>
