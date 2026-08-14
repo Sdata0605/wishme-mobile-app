@@ -30,7 +30,9 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { icon: 'home', label: 'Dashboard', route: '/(tabs)' },
+  { icon: 'layers', label: 'All Services', route: '/(tabs)/all-services', highlight: true },
   { icon: 'phone', label: 'Celebrity Call', route: '/(tabs)/voice-call' },
+  { icon: 'mic', label: 'AI Voice Call', route: '/voice-call-wish' },
   { icon: 'credit-card', label: 'Wallet', route: '/wallet' },
   { icon: 'calendar', label: 'Bookings', route: '/bookings' },
   { icon: 'heart', label: 'Favorites', route: '/favorites' },
@@ -44,6 +46,8 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'briefcase', label: 'For Business', route: '/for-business' },
   { icon: 'mail', label: 'Greeting Cards', route: '/greeting-cards' },
   { icon: 'zap', label: 'Image Promotions', route: '/image-promotions' },
+  { icon: 'video', label: 'UGC Videos', route: '/ugc-videos' },
+  { icon: 'play-circle', label: 'UGC Ads', route: '/ugc-ads' },
   { icon: 'search', label: 'Browse Celebrities', route: '/(tabs)/celebrities' },
   { icon: 'share-2', label: 'Referrals', route: '/referrals' },
   { icon: 'trending-up', label: 'Commission', route: '/commission' },

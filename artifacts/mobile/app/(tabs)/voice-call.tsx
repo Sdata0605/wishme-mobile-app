@@ -15,9 +15,13 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Celebrity, useCelebrities } from '@/hooks/useCelebrities';
+import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
+import { usePlan } from '@/hooks/usePlan';
+import { useWallet } from '@/hooks/useWallet';
 
 const { width: W } = Dimensions.get('window');
 const CARD_W = (W - 52) / 2;
@@ -62,8 +66,12 @@ const LANGUAGES: Array<{ label: string; value: string }> = [
   { label: 'Punjabi', value: 'punjabi' },
 ];
 
-const MOCK_WALLET = 3250;
-const DISCOUNT_PCT = 10;
+function formatInPhone(raw: string): { ok: true; e164: string } | { ok: false } {
+  const cleaned = raw.replace(/[\s\-().]/g, '');
+  const digits = cleaned.replace(/^\+?(91)?/, '');
+  if (!/^[6-9]\d{9}$/.test(digits)) return { ok: false };
+  return { ok: true, e164: `+91${digits}` };
+}
 
 function generateDates(): Array<{ label: string; dateStr: string }> {
   const result: Array<{ label: string; dateStr: string }> = [];
@@ -147,6 +155,7 @@ function CelebSelectGrid({
   search,
   setSearch,
   onSelect,
+  favoriteIds,
   colors,
 }: {
   celebrities: Celebrity[];
@@ -156,13 +165,21 @@ function CelebSelectGrid({
   search: string;
   setSearch: (s: string) => void;
   onSelect: (c: Celebrity) => void;
+  favoriteIds: Set<string>;
   colors: ReturnType<typeof import('@/context/ThemeContext').useTheme>['colors'];
 }) {
-  const filtered = celebrities.filter(
-    (c) =>
-      c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.category.toLowerCase().includes(search.toLowerCase()),
-  );
+  const filtered = celebrities
+    .filter((c) => !!c.vapiVoiceId)
+    .filter(
+      (c) =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.category.toLowerCase().includes(search.toLowerCase()),
+    )
+    .sort((a, b) => {
+      const aS = favoriteIds.has(a.id) ? 0 : 1;
+      const bS = favoriteIds.has(b.id) ? 0 : 1;
+      return aS - bS;
+    });
 
   return (
     <>
@@ -176,6 +193,9 @@ function CelebSelectGrid({
           style={[styles.searchInput, { color: colors.foreground }]}
         />
       </View>
+      <Text style={[styles.helperNote, { color: colors.mutedForeground }]}>
+        Only subscribed celebrities with a voice setup can be called. Subscribe from their profile first.
+      </Text>
 
       {loading ? (
         <View style={styles.loadingWrap}>
@@ -192,37 +212,60 @@ function CelebSelectGrid({
             <Text style={styles.retryText}>Try Again</Text>
           </TouchableOpacity>
         </View>
+      ) : filtered.length === 0 ? (
+        <Text style={[styles.helperNote, { color: colors.mutedForeground, textAlign: 'center', marginTop: 24 }]}>
+          No celebrities with voice calling are available yet.
+        </Text>
       ) : (
         <View style={styles.grid}>
-          {filtered.map((celeb) => (
-            <TouchableOpacity
-              key={celeb.id}
-              activeOpacity={0.82}
-              onPress={() => onSelect(celeb)}
-              style={[styles.celebCard, { backgroundColor: colors.card, borderColor: colors.border, width: CARD_W }]}
-            >
-              <View style={styles.celebAvatarWrap}>
-                <Image source={{ uri: celeb.imageUrl }} style={styles.celebAvatar} />
-                {celeb.isAvailable && <View style={styles.onlineDot} />}
-              </View>
-              <View style={styles.celebInfo}>
-                <View style={styles.celebNameRow}>
-                  <Text style={[styles.celebName, { color: colors.foreground }]} numberOfLines={1}>{celeb.name}</Text>
-                  {celeb.isVerified && (
-                    <View style={styles.verifiedBadge}>
-                      <Icon name="check" size={8} color="#fff" />
+          {filtered.map((celeb) => {
+            const subscribed = favoriteIds.has(celeb.id);
+            return (
+              <TouchableOpacity
+                key={celeb.id}
+                activeOpacity={0.82}
+                onPress={() => onSelect(celeb)}
+                style={[
+                  styles.celebCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: subscribed ? colors.border : colors.border,
+                    width: CARD_W,
+                    opacity: subscribed ? 1 : 0.72,
+                  },
+                ]}
+              >
+                <View style={styles.celebAvatarWrap}>
+                  <Image source={{ uri: celeb.imageUrl }} style={styles.celebAvatar} />
+                  {celeb.isAvailable && <View style={styles.onlineDot} />}
+                  {!subscribed && (
+                    <View style={styles.lockBadge}>
+                      <Icon name="lock" size={10} color="#fff" />
                     </View>
                   )}
                 </View>
-                <Text style={[styles.celebCat, { color: colors.mutedForeground }]}>{celeb.category}</Text>
-                <View style={styles.ratingRow}>
-                  <Icon name="star" size={11} color="#F59E0B" />
-                  <Text style={[styles.ratingText, { color: colors.foreground }]}>{celeb.rating}</Text>
+                <View style={styles.celebInfo}>
+                  <View style={styles.celebNameRow}>
+                    <Text style={[styles.celebName, { color: colors.foreground }]} numberOfLines={1}>{celeb.name}</Text>
+                    {celeb.isVerified && (
+                      <View style={styles.verifiedBadge}>
+                        <Icon name="check" size={8} color="#fff" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.celebCat, { color: colors.mutedForeground }]}>{celeb.category}</Text>
+                  <View style={styles.ratingRow}>
+                    <Icon name="star" size={11} color="#F59E0B" />
+                    <Text style={[styles.ratingText, { color: colors.foreground }]}>{celeb.rating}</Text>
+                  </View>
+                  <Text style={[styles.rateText, { color: colors.primary }]}>₹{celeb.pricePerCall || 500}/call</Text>
+                  <Text style={[styles.subHint, { color: subscribed ? '#22C55E' : colors.mutedForeground }]}>
+                    {subscribed ? 'Subscribed' : 'Subscribe first'}
+                  </Text>
                 </View>
-                <Text style={[styles.rateText, { color: colors.primary }]}>₹{celeb.pricePerCall || 500}/call</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
+              </TouchableOpacity>
+            );
+          })}
         </View>
       )}
     </>
@@ -245,7 +288,9 @@ function CallDetailsForm({
   colors: ReturnType<typeof import('@/context/ThemeContext').useTheme>['colors'];
   bottomPad: number;
 }) {
-  const { user, session } = useAuth();
+  const { user, session, getValidSession } = useAuth();
+  const wallet = useWallet();
+  const { discountPercentage, getDiscountedPrice } = usePlan();
 
   const [senderName, setSenderName] = useState(
     user ? `${user.firstName} ${user.lastName}`.trim() : '',
@@ -279,17 +324,17 @@ function CallDetailsForm({
   const [success, setSuccess] = useState<SuccessResult | null>(null);
 
   const basePrice = celeb.pricePerCall || 500;
-  const discountAmt = Math.round((basePrice * DISCOUNT_PCT) / 100);
-  const finalPrice = basePrice - discountAmt;
+  const finalPrice = getDiscountedPrice(basePrice);
+  const discountAmt = Math.max(0, basePrice - finalPrice);
 
   async function handleMakeCall() {
     if (!senderName.trim() || !recipientName.trim() || !recipientPhone.trim()) {
       setCallError('Please fill in Your Name, Recipient Name, and Phone Number.');
       return;
     }
-    const phoneDigits = recipientPhone.replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
-      setCallError('Please enter a valid 10-digit phone number.');
+    const phone = formatInPhone(recipientPhone);
+    if (!phone.ok) {
+      setCallError('Please enter a valid 10-digit Indian mobile number starting with 6-9.');
       return;
     }
     if (!celeb.vapiVoiceId) {
@@ -300,51 +345,59 @@ function CallDetailsForm({
       setCallError('Please select a date and time for scheduling.');
       return;
     }
+    if (wallet.balance < finalPrice) {
+      setCallError(`Insufficient wallet balance. You need ₹${finalPrice}.`);
+      router.push('/wallet' as never);
+      return;
+    }
     setCallError(null);
     setSubmitting(true);
 
     try {
-      const body: Record<string, unknown> = {
+      const valid = await getValidSession();
+      const token = valid?.access_token ?? session?.access_token;
+      const body = {
         recipientName: recipientName.trim(),
-        recipientPhone: recipientPhone.trim(),
+        recipientPhone: phone.e164,
         occasion,
         senderName: senderName.trim(),
         celebrityId: celeb.id,
         celebrityName: celeb.name,
-        price: celeb.pricePerCall || 500,
-        language,
         voiceId: celeb.vapiVoiceId,
+        price: finalPrice,
+        celebrityPhoneId: celeb.vapiPhoneId || undefined,
+        customMessage: customMessage.trim(),
+        tone,
+        relationship,
+        language,
+        thingsToAvoid: thingsToAvoid.trim(),
+        additionalContext: additionalContext.trim(),
         scheduledAt: callTiming === 'later'
           ? buildScheduledAt(selectedDate.dateStr, selectedTime)
           : null,
       };
-      if (celeb.vapiPhoneId) body.celebrityPhoneId = celeb.vapiPhoneId;
-      if (customMessage.trim()) body.customMessage = customMessage.trim();
-      if (tone) body.tone = tone;
-      if (relationship) body.relationship = relationship;
-      if (thingsToAvoid.trim()) body.thingsToAvoid = thingsToAvoid.trim();
-      if (additionalContext.trim()) body.additionalContext = additionalContext.trim();
 
       const res = await supabaseFetch(
         '/functions/v1/vapi-celebrity-call',
         { method: 'POST', body: JSON.stringify(body) },
-        session?.access_token,
+        token,
       );
 
       const json = await res.json();
 
-      if (!res.ok || !json.success) {
+      if (!res.ok || json.error || !json.success) {
         const msg = json.error ?? json.message ?? `Request failed (${res.status})`;
         setCallError(msg);
         return;
       }
 
+      wallet.refetch();
       if (json.scheduled) {
         const scheduledAt: string = json.scheduledAt ?? buildScheduledAt(selectedDate.dateStr, selectedTime);
         const fallbackMsg = `Your call from ${celeb.name} to ${recipientName.trim()} has been scheduled!`;
         setSuccess({ scheduled: true, scheduledAt, message: json.message || fallbackMsg });
       } else {
-        const fallbackMsg = `${celeb.name} will call ${recipientName.trim()} shortly. Fingers crossed! 🤞`;
+        const fallbackMsg = `${celeb.name} will call ${recipientName.trim()} shortly.`;
         setSuccess({ scheduled: false, callId: json.callId, message: json.message || fallbackMsg });
       }
     } catch (err: unknown) {
@@ -673,7 +726,7 @@ function CallDetailsForm({
           <View style={styles.discountRow}>
             <Text style={[styles.pricingLabel, { color: colors.mutedForeground }]}>Discount</Text>
             <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{DISCOUNT_PCT}% OFF</Text>
+              <Text style={styles.discountText}>{discountPercentage}% OFF</Text>
             </View>
           </View>
           <Text style={[styles.pricingValue, { color: '#22C55E' }]}>-₹{discountAmt}</Text>
@@ -685,8 +738,8 @@ function CallDetailsForm({
         </View>
         <View style={styles.pricingRow}>
           <Text style={[styles.pricingLabel, { color: colors.mutedForeground }]}>Wallet Balance</Text>
-          <Text style={[styles.pricingValue, { color: MOCK_WALLET >= finalPrice ? '#22C55E' : '#EF4444' }]}>
-            ₹{MOCK_WALLET.toLocaleString('en-IN')}
+          <Text style={[styles.pricingValue, { color: wallet.balance >= finalPrice ? '#22C55E' : '#EF4444' }]}>
+            ₹{wallet.balance.toLocaleString('en-IN')}
           </Text>
         </View>
       </View>
@@ -726,16 +779,36 @@ function CallDetailsForm({
 export default function VoiceCallScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { celebrity: celebrityParam } = useLocalSearchParams<{ celebrity?: string | string[] }>();
+  const celebrityId = Array.isArray(celebrityParam) ? celebrityParam[0] : celebrityParam;
+  const { user, session } = useAuth();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const bottomPad = insets.bottom + 24;
 
   const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
+  const { favoriteIds, loading: favLoading } = useCelebrityFavorites({
+    profileId: user?.profileId,
+    accessToken: session?.access_token,
+  });
 
   const [step, setStep] = useState<1 | 2>(1);
   const [search, setSearch] = useState('');
   const [selectedCeleb, setSelectedCeleb] = useState<Celebrity | null>(null);
 
+  useEffect(() => {
+    if (!celebrityId || loading || favLoading || celebrities.length === 0) return;
+    const found = celebrities.find((c) => c.id === celebrityId);
+    if (!found?.vapiVoiceId) return;
+    if (!favoriteIds.has(found.id)) return;
+    setSelectedCeleb(found);
+    setStep(2);
+  }, [celebrityId, celebrities, favoriteIds, loading, favLoading]);
+
   const handleSelectCeleb = (c: Celebrity) => {
+    if (!favoriteIds.has(c.id)) {
+      router.push(`/celebrity/${c.id}` as never);
+      return;
+    }
     setSelectedCeleb(c);
     setStep(2);
   };
@@ -789,6 +862,7 @@ export default function VoiceCallScreen() {
             search={search}
             setSearch={setSearch}
             onSelect={handleSelectCeleb}
+            favoriteIds={favoriteIds}
             colors={colors}
           />
         ) : selectedCeleb ? (
@@ -845,6 +919,19 @@ const styles = StyleSheet.create({
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
   ratingText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   rateText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
+  helperNote: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
+  subHint: { fontSize: 10, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
+  lockBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },
   loadingText: { fontSize: 14, fontFamily: 'Inter_400Regular' },

@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CelebCard } from '@/components/CelebCard';
+import { HomeAllServicesSection } from '@/components/all-services/HomeAllServicesSection';
 import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useDrawer } from '@/context/DrawerContext';
@@ -68,25 +69,6 @@ const PRICE_RANGES = [
   { label: '₹1K–₹3K', min: 1000, max: 3000 },
   { label: '₹3K–₹6K', min: 3000, max: 6000 },
   { label: 'Above ₹6K', min: 6000, max: Infinity },
-];
-
-interface QuickAction {
-  icon: IconName;
-  label: string;
-  route: Href;
-  color: string;
-  badge?: number;
-}
-
-const QUICK_ACTIONS: QuickAction[] = [
-  { icon: 'video', label: 'Wish a\nFriend', route: '/(tabs)/celebrities', color: '#FF6B33' },
-  { icon: 'heart', label: 'Wish a\nCelebrity', route: '/wish-celebrity', color: '#E8527A' },
-  { icon: 'music', label: 'AI Music\nStudio', route: '/(tabs)/music', color: '#B44CFF' },
-  { icon: 'image', label: 'Photo\nWish', route: '/photo-wish', color: '#FF8C42' },
-  { icon: 'mail', label: 'Greeting\nCards', route: '/greeting-cards', color: '#7B2FFF' },
-  { icon: 'phone', label: 'Voice\nCall', route: '/(tabs)/voice-call', color: '#FF6B33' },
-  { icon: 'message-circle', label: 'Messages', route: '/messages', color: '#22C55E', badge: 3 },
-  { icon: 'zap', label: 'Upgrade\nPlan', route: '/select-plan', color: '#FFB347' },
 ];
 
 const VIDEO_CARDS = [
@@ -423,36 +405,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Quick Actions — 2 rows × 4 */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick Actions</Text>
-          <View style={styles.quickGrid}>
-            {[0, 1].map((row) => (
-              <View key={row} style={styles.quickRow}>
-                {QUICK_ACTIONS.slice(row * 4, row * 4 + 4).map((action) => (
-                  <TouchableOpacity
-                    key={action.label}
-                    style={[styles.quickItem, { width: ITEM_W, backgroundColor: colors.card }]}
-                    onPress={() => router.push(action.route)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={{ position: 'relative' }}>
-                      <View style={[styles.quickIcon, { backgroundColor: action.color + '20' }]}>
-                        <Icon name={action.icon} size={20} color={action.color} />
-                      </View>
-                      {action.badge != null && action.badge > 0 && (
-                        <View style={styles.badge}>
-                          <Text style={styles.badgeText}>{action.badge}</Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={[styles.quickLabel, { color: colors.foreground }]}>{action.label}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))}
-          </View>
-        </View>
+        {/* All Services (from Wish-Me) — replaces Quick Actions */}
+        <HomeAllServicesSection />
 
         {/* Featured Celebrities */}
         <View style={styles.section}>

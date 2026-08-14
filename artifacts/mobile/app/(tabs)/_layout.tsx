@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LayoutGrid, QrCode } from 'lucide-react-native';
 import { DrawerMenu } from '@/components/DrawerMenu';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
@@ -18,7 +19,7 @@ export default function TabLayout() {
   const isIOS = Platform.OS === 'ios';
   const isWeb = Platform.OS === 'web';
 
-  const TAB_CONTENT_H = isWeb ? 84 : 60;
+  const TAB_CONTENT_H = isWeb ? 84 : 64;
   const tabBarH = TAB_CONTENT_H + (isWeb ? 0 : insets.bottom);
 
   return (
@@ -45,10 +46,11 @@ export default function TabLayout() {
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? colors.card : '#fff' }]} />
               ),
             tabBarShowLabel: true,
-            tabBarLabelStyle: { fontSize: 11, fontFamily: 'Inter_500Medium', marginBottom: 4 },
-            tabBarIconStyle: { marginTop: 6 },
+            tabBarLabelStyle: { fontSize: 10, fontFamily: 'Inter_500Medium', marginBottom: 2 },
+            tabBarIconStyle: { marginTop: 4 },
           }}
         >
+          {/* Left */}
           <Tabs.Screen
             name="index"
             options={{
@@ -59,6 +61,13 @@ export default function TabLayout() {
                 ) : (
                   <Icon name="home" size={size} color={color} />
                 ),
+            }}
+          />
+          <Tabs.Screen
+            name="all-services"
+            options={{
+              title: 'Services',
+              tabBarIcon: ({ color, size }) => <LayoutGrid size={size} color={color} />,
             }}
           />
           <Tabs.Screen
@@ -73,6 +82,27 @@ export default function TabLayout() {
                 ),
             }}
           />
+
+          {/* Center — Scan & Pay */}
+          <Tabs.Screen
+            name="scan-pay"
+            options={{
+              title: 'Scan',
+              tabBarIcon: () => (
+                <View style={[styles.scanFab, { backgroundColor: colors.primary, shadowColor: colors.primary }]}>
+                  <QrCode size={24} color="#fff" />
+                </View>
+              ),
+              tabBarLabelStyle: {
+                fontSize: 10,
+                fontFamily: 'Inter_600SemiBold',
+                marginBottom: 2,
+                color: colors.primary,
+              },
+            }}
+          />
+
+          {/* Right */}
           <Tabs.Screen
             name="music"
             options={{
@@ -117,4 +147,16 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  scanFab: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+  },
 });

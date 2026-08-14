@@ -70,6 +70,9 @@ function RootLayoutNav() {
       <Stack.Screen name="for-business" />
       <Stack.Screen name="greeting-cards" />
       <Stack.Screen name="image-promotions" />
+      <Stack.Screen name="ugc-videos" />
+      <Stack.Screen name="ugc-ads" />
+      <Stack.Screen name="voice-call-wish" />
       <Stack.Screen name="referrals" />
       <Stack.Screen name="commission" />
       <Stack.Screen name="occasions" />
@@ -83,6 +86,7 @@ function RootLayoutNav() {
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="select-plan" />
       <Stack.Screen name="edit-profile" />
+      <Stack.Screen name="services/index" options={{ presentation: 'card', headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>
   );

@@ -606,12 +606,23 @@ export default function WishCelebrityOccasionScreen() {
       }, session?.access_token);
 
       if (!res.ok) throw new Error('Card generation failed');
-      const data = await res.json() as { card_image_url?: string; greeting_text?: string; image_url?: string };
-      const imgU = data.card_image_url ?? data.image_url ?? null;
-      const gText = data.greeting_text ?? null;
+      const data = await res.json() as {
+        success?: boolean;
+        card_url?: string;
+        cardUrl?: string;
+        card_image_url?: string;
+        image_url?: string;
+        greeting_text?: string;
+        greetingText?: string;
+        generation_attempts?: number;
+      };
+      const imgU = data.card_url ?? data.cardUrl ?? data.card_image_url ?? data.image_url ?? null;
+      const gText = data.greeting_text ?? data.greetingText ?? null;
       if (imgU) setCardImageUrl(imgU);
       if (gText) setGreetingText(gText);
-      setGenerationAttempts(prev => prev + 1);
+      setGenerationAttempts((prev) =>
+        typeof data.generation_attempts === "number" ? data.generation_attempts : prev + 1
+      );
     } catch (e: unknown) {
       setGenError(e instanceof Error ? e.message : 'Failed to generate card');
     }

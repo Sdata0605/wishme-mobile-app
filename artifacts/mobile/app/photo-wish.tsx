@@ -282,7 +282,7 @@ export default function PhotoWishScreen() {
           occasion,
           recipientName: recipient.trim(),
           wishMessage: message.trim(),
-          senderName: sender.trim(),
+          senderName: sender.trim() || null,
           textStyle,
         }),
       });

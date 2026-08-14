@@ -563,7 +563,7 @@ function BookingsTab({ celebrity, colors, session }: TabProps) {
       {bookings.map(b => {
         const fanName = b.profiles ? `${b.profiles.first_name ?? ''} ${b.profiles.last_name ?? ''}`.trim() : 'Fan';
         let requestDetails: { recipientName?: string; occasion?: string; message?: string } | null = null;
-        try { if (b.message) { const parsed = JSON.parse(b.message); requestDetails = parsed?.requestDetails ?? parsed ?? null; } } catch {}
+        try { if (b.message) { const parsed = JSON.parse(b.message); requestDetails = parsed?.requestDetails ?? parsed?.step1 ?? parsed ?? null; } } catch {}
         const isExpanded = expandedBookings.has(b.id);
         return (
           <Card key={b.id} colors={colors}>

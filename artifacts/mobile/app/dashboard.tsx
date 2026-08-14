@@ -79,6 +79,7 @@ function txTitle(type: string, description?: string): string {
     music_download: 'Music Download',
     celebrity_call: 'Celebrity Call',
     voice_call: 'Voice Call',
+    voice_call_wish: 'AI Voice Call',
     greeting_card_generation: 'Greeting Card',
     image_promotion: 'Image Promotion',
     service_payment: 'Service Payment',
@@ -96,7 +97,7 @@ const STATUS_COLORS: Record<string, string> = {
 
 const BOOKING_TYPES = new Set(['booking', 'photo_wish', 'ugc_video']);
 const MUSIC_TYPES = new Set(['music_generation', 'music_download']);
-const CALL_TYPES = new Set(['celebrity_call', 'voice_call']);
+const CALL_TYPES = new Set(['celebrity_call', 'voice_call', 'voice_call_wish']);
 const OTHER_TYPES = new Set(['greeting_card_generation', 'image_promotion', 'service_payment', 'plan_upgrade', 'debit']);
 
 interface StatCard {

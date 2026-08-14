@@ -261,6 +261,20 @@ export default function BookingWizardScreen() {
       const tok = vs?.access_token ?? null;
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 30000);
+      const prompt = `Generate a ${service} script for ${celebrity.name} based on the following details:
+      
+      Service Type: ${service}
+      Celebrity: ${celebrity.name}
+      Talking Points: ${step4.scriptText}
+      Request Details: ${JSON.stringify(step1)}
+      Creative Guidelines: ${JSON.stringify({
+        goal: step3.goal === 'Other' ? step3.customGoal : step3.goal,
+        toneAndStyle: step3.tone,
+        thingsToAvoid: step3.thingsToAvoid,
+        filmingRequirements: step3.filmingRequirements,
+      })}
+      
+      Create a natural, engaging script that incorporates these elements while maintaining ${celebrity.name}'s personality and style.`;
       const res = await fetch(`${SUPABASE_URL}/functions/v1/generate-script`, {
         method: 'POST',
         signal: controller.signal,
@@ -269,13 +283,7 @@ export default function BookingWizardScreen() {
           Authorization: `Bearer ${tok ?? SUPABASE_ANON_KEY}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          celebrityName: celebrity.name,
-          serviceType: service,
-          requestDetails: step1,
-          creativeGuidelines: { goal: step3.goal === 'Other' ? step3.customGoal : step3.goal, tone: step3.tone, thingsToAvoid: step3.thingsToAvoid, filmingRequirements: step3.filmingRequirements },
-          talkingPoints: step4.scriptText,
-        }),
+        body: JSON.stringify({ prompt }),
       });
       clearTimeout(timer);
       if (res.ok) {
@@ -300,6 +308,7 @@ export default function BookingWizardScreen() {
     const tok = vs?.access_token ?? null;
     try {
       const serviceTypeMap = { wish: 'video_wish', ad: 'image_promotion', video: 'video_promotion' };
+      const goal = step3.goal === 'Other' ? step3.customGoal : step3.goal;
       const bookingData = {
         celebrity_id: celebrity.id,
         user_id: profileId,
@@ -308,8 +317,35 @@ export default function BookingWizardScreen() {
         discount_amount: discountAmt,
         final_price: finalPrice,
         status: 'pending',
-        message: JSON.stringify({ step1, step2, step3, step4, step6: { scheduleGift: step6.scheduleGift, recipientName: step6.recipientName, recipientEmail: step6.recipientEmail, recipientPhone: step6.recipientPhone, deliveryDate: step6.deliveryDate } }),
-        instructions: step3.goal === 'Other' ? step3.customGoal : step3.goal,
+        message: JSON.stringify({
+          serviceType: service,
+          requestDetails: step1,
+          deliveryType: step2.deliveryType,
+          creativeGuidelines: {
+            goal,
+            goalOther: step3.customGoal,
+            toneAndStyle: step3.tone,
+            filmingRequirements: step3.filmingRequirements,
+            thingsToAvoid: step3.thingsToAvoid,
+            thingsToAvoidOther: '',
+            otherInfo: '',
+          },
+          scriptBuilder: {
+            scriptType: step4.scriptType,
+            talkingPoints: step4.scriptType === 'talking_points' ? step4.scriptText : '',
+            exactScript: step4.scriptType === 'exact_script' ? step4.scriptText : '',
+            generatedScript: step4.scriptText,
+            requiredLines: '',
+          },
+          ...(step6.scheduleGift
+            ? {
+                recipientName: step6.recipientName,
+                recipientEmail: step6.recipientEmail,
+                recipientPhone: step6.recipientPhone,
+              }
+            : {}),
+        }),
+        instructions: goal,
         delivery_type: step2.deliveryType,
         generated_prompt: step4.scriptText,
       };

@@ -91,9 +91,16 @@ export default function WishConfirmationScreen() {
       }, session?.access_token);
 
       if (!res.ok) throw new Error('Card generation failed');
-      const data = await res.json() as { card_url?: string; card_image_url?: string; greeting_text?: string; image_url?: string };
-      const imgUrl = data.card_url ?? data.card_image_url ?? data.image_url ?? null;
-      const gText = data.greeting_text ?? null;
+      const data = await res.json() as {
+        card_url?: string;
+        cardUrl?: string;
+        card_image_url?: string;
+        image_url?: string;
+        greeting_text?: string;
+        greetingText?: string;
+      };
+      const imgUrl = data.card_url ?? data.cardUrl ?? data.card_image_url ?? data.image_url ?? null;
+      const gText = data.greeting_text ?? data.greetingText ?? null;
       if (imgUrl) setCardImageUrl(imgUrl);
       if (gText) setGreetingText(gText);
       setRegenerationCount(prev => prev + 1);

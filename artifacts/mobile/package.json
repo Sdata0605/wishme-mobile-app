@@ -60,15 +60,17 @@
     "@react-native-community/datetimepicker": "8.4.4",
     "date-fns": "^3.6.0",
     "expo-av": "~16.0.8",
-    "expo-clipboard": "^55.0.9",
+    "expo-camera": "~17.0.10",
+    "expo-clipboard": "~8.0.8",
     "expo-document-picker": "~14.0.8",
     "expo-file-system": "~19.0.21",
     "expo-image-manipulator": "^14.0.8",
     "expo-media-library": "^18.2.1",
     "expo-screen-capture": "^8.0.9",
-    "expo-speech": "^55.0.9",
+    "expo-speech": "~14.0.8",
     "expo-speech-recognition": "^3.1.2",
     "expo-video": "~3.0.16",
+    "lucide-react-native": "^1.31.0",
     "react-native-razorpay": "^2.3.1"
   }
 }

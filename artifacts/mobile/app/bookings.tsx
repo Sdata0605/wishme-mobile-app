@@ -411,10 +411,11 @@ function parseCelebMessage(msg: string | null): { recipientName?: string; occasi
   if (!msg) return {};
   try {
     const parsed = JSON.parse(msg);
+    const rd = parsed?.requestDetails || parsed?.step1 || {};
     return {
-      recipientName: parsed?.requestDetails?.recipientName,
-      occasion: parsed?.requestDetails?.occasion,
-      message: parsed?.requestDetails?.message,
+      recipientName: rd.recipientName,
+      occasion: rd.occasion,
+      message: rd.message,
     };
   } catch {
     return { message: msg };
@@ -665,7 +666,7 @@ function CallCard({ item, colors }: { item: VoiceCall; colors: Colors }) {
         <View style={{ flex: 1 }}>
           <View style={s.cardTop}>
             <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
-              {item.celebrities?.name ?? 'Celebrity Call'}
+              {item.celebrities?.name ?? item.vapi_voice_name ?? 'AI Voice Call'}
             </Text>
             <SmallStatusBadge status={item.call_status} colors={colors} />
           </View>

@@ -1417,6 +1417,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
   const [mood, setMood] = useState(IMG_MUSIC_MOODS[0]);
   const [lyrics, setLyrics] = useState('');
   const [duration, setDuration] = useState(30);
+  const [language, setLanguage] = useState('English');
   const [uploadedAudioBase64, setUploadedAudioBase64] = useState<string | null>(null);
   const [uploadedAudioName, setUploadedAudioName] = useState<string | null>(null);
   const [gen, setGen] = useState(false);
@@ -1429,7 +1430,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
     try {
       const res = await supabaseFetch('/functions/v1/generate-lyrics', {
         method: 'POST',
-        body: JSON.stringify({ description: desc.trim() || 'a beautiful scene', genre, mood }),
+        body: JSON.stringify({ description: desc.trim() || 'a beautiful scene', genre, mood, language }),
       }, ctx.session?.access_token);
       const data = await res.json() as { lyrics?: string };
       if (data.lyrics) setLyrics(data.lyrics);
@@ -1451,14 +1452,16 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
         genre,
         mood,
         durationSeconds: duration,
+        language,
         uploadedAudioBase64: musicSource === 'upload' ? uploadedAudioBase64 : null,
       };
       const res = await supabaseFetch('/functions/v1/elevenlabs-image-music-video', {
         method: 'POST',
         body: JSON.stringify(payload),
       }, ctx.session?.access_token);
-      const data = await res.json() as { success: boolean; audioUrl: string; videoUrl?: string; imageBase64?: string; hasVocals?: boolean; error?: string };
-      if (!data.success || !data.audioUrl) throw new Error(data.error ?? 'Generation failed');
+      const data = await res.json() as { success: boolean; audioUrl?: string; b2Url?: string; videoUrl?: string; imageBase64?: string; hasVocals?: boolean; error?: string };
+      if (!data.success || !(data.audioUrl || data.b2Url)) throw new Error(data.error ?? 'Generation failed');
+      const audioUrl = data.b2Url || data.audioUrl || '';
 
       const amountCharged = data.hasVocals ? COSTS.imgVocals : COSTS.imgInstrumental;
       await supabaseFetch('/rest/v1/image_music_generations', {
@@ -1467,7 +1470,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
         body: JSON.stringify({
           user_id: ctx.profileId,
           image_url: imageBase64,
-          audio_url: data.audioUrl,
+          audio_url: audioUrl,
           video_url: data.videoUrl ?? null,
           description: desc.trim(),
           lyrics: lyrics.trim() || null,
@@ -1481,7 +1484,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
       }, ctx.session?.access_token);
 
       setResult({
-        audioUrl: data.audioUrl,
+        audioUrl,
         hasVocals: data.hasVocals ?? false,
         imgBase64: data.imageBase64 ?? imageBase64,
         videoUrl: data.videoUrl,
@@ -1518,6 +1521,7 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
           <ChipSelect options={IMG_MUSIC_GENRES} value={genre} onChange={setGenre} activeColor="#B44CFF" />
           <SL text="Mood" />
           <ChipSelect options={IMG_MUSIC_MOODS} value={mood} onChange={setMood} activeColor="#FF6B33" />
+          <LanguageDropdown value={language} onChange={setLanguage} />
           <View style={s.lyricHeader}>
             <SL text="Lyrics (optional)" />
             <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#B44CFF' }]} onPress={generateLyrics} disabled={lyricsGen}>

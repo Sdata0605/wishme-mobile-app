@@ -708,7 +708,7 @@ export default function CelebrityDetailScreen() {
       <View style={[styles.bottomBar, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity
           style={[styles.voiceCallBtn, { borderColor: colors.primary }]}
-          onPress={() => router.push('/(tabs)/voice-call')}
+          onPress={() => router.push({ pathname: '/(tabs)/voice-call', params: { celebrity: id } })}
         >
           <Icon name="phone" size={18} color={colors.primary} />
           <Text style={[styles.voiceCallText, { color: colors.primary }]}>Voice Call</Text>
