@@ -428,7 +428,7 @@ const card = StyleSheet.create({
     color: C.textLight,
   },
   amount: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.green, marginTop: 1 },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justify: 1, justifyContent: 'flex-end' },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
 });
 
 function EmptyState({ tab }: { tab: TabKey }) {

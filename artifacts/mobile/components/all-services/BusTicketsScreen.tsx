@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import {
   Image,
   Modal,
@@ -231,11 +232,17 @@ function SearchCard({
 }: {
   onSearch: (from: string, to: string, dateLabel: string) => void;
 }) {
-  const [from, setFrom] = useState('Mumbai');
-  const [to, setTo] = useState('Pune');
+  const agentPrefill = useAgentPrefill();
+  const [from, setFrom] = useState(agentPrefill.busFrom || 'Mumbai');
+  const [to, setTo] = useState(agentPrefill.busTo || 'Pune');
   const [date, setDate] = useState(() => new Date());
   const [womenBooking, setWomenBooking] = useState(false);
   const [picker, setPicker] = useState<'from' | 'to' | 'date' | null>(null);
+
+  useEffect(() => {
+    if (agentPrefill.busFrom) setFrom(agentPrefill.busFrom);
+    if (agentPrefill.busTo) setTo(agentPrefill.busTo);
+  }, [agentPrefill.busFrom, agentPrefill.busTo]);
 
   const today = new Date();
   const tomorrow = new Date(today);

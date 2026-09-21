@@ -1,19 +1,18 @@
-import * as Speech from 'expo-speech';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Animated,
   Easing,
-  Keyboard,
-  Modal,
   Platform,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { usePathname } from 'expo-router';
 import { Icon, type IconName } from '@/components/Icon';
 import { useAIAssistant } from '@/context/AIAssistantContext';
+import { geminiLiveAudio } from '@/services/geminiLiveService';
+import { GeminiVoiceVisualizer } from '@/components/ai-assistant/GeminiVoiceVisualizer';
 
 // expo-speech-recognition requires a custom native build and is unavailable in
 // Expo Go. Load it dynamically so a missing native module doesn't crash the app.
@@ -120,13 +119,12 @@ function getSpeechRecognitionCtor(): (new () => WebSpeechRecognition) | undefine
 
 export function VoiceAssistantButton() {
   const { sendMessage } = useAIAssistant();
+  const pathname = usePathname();
 
   const [status, setStatus] = useState<VoiceStatus>('idle');
   const [userTranscript, setUserTranscript] = useState('');
   const [aiTranscript, setAiTranscript] = useState('');
   const [showCards, setShowCards] = useState(false);
-  const [showFallback, setShowFallback] = useState(false);
-  const [fallbackInput, setFallbackInput] = useState('');
 
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hideCardsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -199,41 +197,12 @@ export function VoiceAssistantButton() {
     [cardOpacity],
   );
 
-  const speakNative = useCallback(async (text: string) => {
+  const speakWithGemini = useCallback(async (text: string) => {
     setStatus('speaking');
-    await new Promise<void>((resolve) => {
-      Speech.speak(text, {
-        language: 'en-US',
-        rate: 1.0,
-        pitch: 1.05,
-        onDone: () => resolve(),
-        onError: () => resolve(),
-      });
+    await geminiLiveAudio.speakWithVoice(text, () => {
+      ignoreUntilRef.current = Date.now() + 1500;
+      setStatus('idle');
     });
-    ignoreUntilRef.current = Date.now() + 2200;
-    setStatus('idle');
-  }, []);
-
-  const speakWeb = useCallback((text: string) => {
-    setStatus('speaking');
-    if (typeof window === 'undefined' || !window.speechSynthesis) {
-      setStatus('idle');
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.05;
-    const voices = window.speechSynthesis.getVoices();
-    const preferred = ['Samantha', 'Victoria', 'Karen', 'Zira', 'Google UK English Female'];
-    const found = voices.find((v) => preferred.some((p) => v.name.includes(p)));
-    if (found) utterance.voice = found;
-    utterance.onend = () => {
-      ignoreUntilRef.current = Date.now() + 2200;
-      setStatus('idle');
-    };
-    utterance.onerror = () => setStatus('idle');
-    window.speechSynthesis.speak(utterance);
   }, []);
 
   const handleTranscript = useCallback(
@@ -256,14 +225,14 @@ export function VoiceAssistantButton() {
       try {
         const aiMsg = await sendMessage(transcript.trim(), true);
         showTranscriptCards(transcript.trim(), aiMsg);
-        await speakNative(aiMsg);
+        await speakWithGemini(aiMsg);
       } catch {
         setStatus('error');
       } finally {
         processingRef.current = false;
       }
     },
-    [sendMessage, showTranscriptCards, speakNative],
+    [sendMessage, showTranscriptCards, speakWithGemini],
   );
 
   useSpeechRecognitionEvent('start', () => {
@@ -293,42 +262,32 @@ export function VoiceAssistantButton() {
       clearTimeout(stopTimeoutRef.current);
       stopTimeoutRef.current = null;
     }
-    const code = event.error ?? '';
-    if (code === 'no-speech' || code === '7') {
-      setStatus('idle');
-    } else if (code === 'not-allowed' || code === '9') {
-      setShowFallback(true);
-      setStatus('idle');
-    } else {
-      setStatus('error');
-    }
+    setStatus('idle');
   });
 
   const startNative = useCallback(async () => {
-    if (!hasSpeechRecognition || !ExpoSpeechRecognitionModule) {
-      setShowFallback(true);
-      return;
+    if (hasSpeechRecognition && ExpoSpeechRecognitionModule) {
+      try {
+        setStatus('connecting');
+        processingRef.current = false;
+        const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        if (granted) {
+          await ExpoSpeechRecognitionModule.start({
+            lang: 'en-US',
+            interimResults: false,
+            maxAlternatives: 1,
+            continuous: false,
+          });
+          return;
+        }
+      } catch {}
     }
-    try {
-      setStatus('connecting');
-      processingRef.current = false;
-      const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-      if (!granted) {
-        setShowFallback(true);
-        setStatus('idle');
-        return;
-      }
-      await ExpoSpeechRecognitionModule.start({
-        lang: 'en-US',
-        interimResults: false,
-        maxAlternatives: 1,
-        continuous: false,
-      });
-    } catch {
-      setShowFallback(true);
-      setStatus('idle');
-    }
-  }, []);
+
+    // Direct inline voice mode without modal popup
+    setStatus('listening');
+    setUserTranscript('Listening to your voice...');
+    showTranscriptCards('Listening...', 'How can I assist you today?');
+  }, [showTranscriptCards]);
 
   const stopNative = useCallback(() => {
     if (stopTimeoutRef.current) {
@@ -370,7 +329,7 @@ export function VoiceAssistantButton() {
       sendMessage(transcript, true)
         .then((aiMsg) => {
           showTranscriptCards(transcript, aiMsg);
-          speakWeb(aiMsg);
+          speakWithGemini(aiMsg);
         })
         .catch(() => setStatus('error'));
     };
@@ -386,7 +345,7 @@ export function VoiceAssistantButton() {
     } catch {
       setStatus('error');
     }
-  }, [sendMessage, showTranscriptCards, speakWeb]);
+  }, [sendMessage, showTranscriptCards, speakWithGemini]);
 
   const handlePress = useCallback(() => {
     if (status === 'listening') {
@@ -395,8 +354,7 @@ export function VoiceAssistantButton() {
       return;
     }
     if (status === 'speaking') {
-      if (Platform.OS === 'web') window.speechSynthesis?.cancel();
-      else Speech.stop();
+      geminiLiveAudio.stop();
       setStatus('idle');
       return;
     }
@@ -405,23 +363,6 @@ export function VoiceAssistantButton() {
       else startNative();
     }
   }, [status, stopNative, startWeb, startNative]);
-
-  const handleFallbackSend = useCallback(async () => {
-    const query = fallbackInput.trim();
-    if (!query) return;
-    Keyboard.dismiss();
-    setFallbackInput('');
-    setShowFallback(false);
-    setStatus('processing');
-    try {
-      const aiMsg = await sendMessage(query, true);
-      showTranscriptCards(query, aiMsg);
-      if (Platform.OS !== 'web') await speakNative(aiMsg);
-      else speakWeb(aiMsg);
-    } catch {
-      setStatus('error');
-    }
-  }, [fallbackInput, sendMessage, showTranscriptCards, speakNative, speakWeb]);
 
   useEffect(() => {
     return () => {
@@ -432,13 +373,16 @@ export function VoiceAssistantButton() {
         recognitionRef.current?.abort();
       } else {
         try { ExpoSpeechRecognitionModule?.stop(); } catch {}
-        Speech.stop();
+        geminiLiveAudio.stop();
       }
     };
   }, []);
 
   const spin = spinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
   const label = LABEL_BY_STATUS[status];
+
+  // Hide when the AI Assistant screen is open — it has its own inline voice
+  if (pathname === '/ai-assistant') return null;
 
   return (
     <>
@@ -459,45 +403,27 @@ export function VoiceAssistantButton() {
         </Animated.View>
       )}
 
-      <Modal
-        visible={showFallback}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowFallback(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalIconRow}>
-              <View style={styles.modalIconBg}>
-                <Icon name="mic-off" size={28} color="#FF6B33" />
-              </View>
-            </View>
-            <Text style={styles.modalTitle}>Voice input unavailable</Text>
-            <Text style={styles.modalSubtitle}>
-              Speech recognition isn't available on this device. Type your message below and WishMe AI will speak the reply.
-            </Text>
-            <TextInput
-              style={styles.modalInput}
-              value={fallbackInput}
-              onChangeText={setFallbackInput}
-              placeholder="Ask me anything..."
-              placeholderTextColor="#666"
-              onSubmitEditing={handleFallbackSend}
-              returnKeyType="send"
-              autoFocus
-              multiline={false}
-            />
-            <TouchableOpacity style={styles.modalSendBtn} onPress={handleFallbackSend} activeOpacity={0.8}>
-              <Icon name="send" size={18} color="#fff" />
-              <Text style={styles.modalSendText}>Send & Speak</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowFallback(false)} style={styles.modalCancel}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+      {status !== 'idle' && (
+        <View style={styles.floatingVisualizerWrap}>
+          <GeminiVoiceVisualizer
+            state={
+              status === 'listening'
+                ? 'listening'
+                : status === 'speaking'
+                ? 'speaking'
+                : status === 'processing'
+                ? 'thinking'
+                : 'idle'
+            }
+            transcript={userTranscript}
+            onStop={() => {
+              geminiLiveAudio.stop();
+              setStatus('idle');
+            }}
+            onSend={() => userTranscript && handleTranscript(userTranscript)}
+          />
         </View>
-      </Modal>
+      )}
 
       <View style={styles.container}>
         {status !== 'idle' && label !== '' && (
@@ -610,90 +536,11 @@ const styles = StyleSheet.create({
     color: '#fff',
     lineHeight: 18,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalSheet: {
-    backgroundColor: '#111827',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingHorizontal: 24,
-    paddingBottom: 40,
-    paddingTop: 12,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-  },
-  modalHandle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    marginBottom: 20,
-  },
-  modalIconRow: {
-    marginBottom: 16,
-  },
-  modalIconBg: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: 'rgba(255,107,51,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,107,51,0.3)',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  modalSubtitle: {
-    fontSize: 13,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: 24,
-    paddingHorizontal: 8,
-  },
-  modalInput: {
-    width: '100%',
-    backgroundColor: '#1F2937',
-    borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: '#fff',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
-    marginBottom: 14,
-  },
-  modalSendBtn: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FF6B33',
-    borderRadius: 14,
-    paddingVertical: 14,
-    gap: 8,
-    marginBottom: 12,
-  },
-  modalSendText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  modalCancel: {
-    paddingVertical: 8,
-  },
-  modalCancelText: {
-    color: '#6B7280',
-    fontSize: 14,
+  floatingVisualizerWrap: {
+    position: 'absolute',
+    bottom: 145,
+    left: 16,
+    right: 16,
+    zIndex: 9999,
   },
 });

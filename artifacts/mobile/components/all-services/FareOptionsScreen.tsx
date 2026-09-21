@@ -76,12 +76,14 @@ function FareCard({
   originalPrice,
   animVal,
   index,
+  onSelect,
 }: {
   tier: FareTier;
   basePrice: number;
   originalPrice: number;
   animVal: Animated.Value;
   index: number;
+  onSelect?: () => void;
 }) {
   const price = basePrice + tier.priceOffset;
   const strikePrice = originalPrice + tier.priceOffset;
@@ -205,7 +207,11 @@ function FareCard({
       <View style={fc.divider} />
 
       {/* Book Now */}
-      <TouchableOpacity style={fc.bookBtn} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={fc.bookBtn}
+        activeOpacity={0.85}
+        onPress={onSelect}
+      >
         <Text style={fc.bookText}>BOOK NOW</Text>
       </TouchableOpacity>
     </Animated.View>
@@ -323,12 +329,14 @@ export function FareOptionsScreen({
   toCode,
   dateLabel,
   onBack,
+  onSelectFare,
 }: {
   flight: FlightResult;
   fromCode: string;
   toCode: string;
   dateLabel: string;
   onBack: () => void;
+  onSelectFare?: (fareKey: string) => void;
 }) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -408,6 +416,7 @@ export function FareOptionsScreen({
             originalPrice={flight.originalPrice}
             animVal={animVal}
             index={i}
+            onSelect={() => onSelectFare?.(tier.key)}
           />
         ))}
       </ScrollView>

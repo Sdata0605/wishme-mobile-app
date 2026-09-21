@@ -24,6 +24,7 @@ import { VoiceAssistantButton } from '@/components/VoiceAssistantButton';
 import { AuthProvider } from '@/context/AuthContext';
 import { DrawerProvider } from '@/context/DrawerContext';
 import { ThemeProvider } from '@/context/ThemeContext';
+import { AgentStateProvider } from '@/context/AgentStateContext';
 import { AIAssistantProvider } from '@/context/AIAssistantContext';
 
 SplashScreen.preventAutoHideAsync();
@@ -127,14 +128,16 @@ export default function RootLayout() {
             <KeyboardProvider>
               <ThemeProvider>
                 <AuthProvider>
-                  <AIAssistantProvider>
-                    <DrawerProvider>
-                      <View style={{ flex: 1 }}>
-                        <RootLayoutNav />
-                        <FloatingButtons />
-                      </View>
-                    </DrawerProvider>
-                  </AIAssistantProvider>
+                  <AgentStateProvider>
+                    <AIAssistantProvider>
+                      <DrawerProvider>
+                        <View style={{ flex: 1 }}>
+                          <RootLayoutNav />
+                          <FloatingButtons />
+                        </View>
+                      </DrawerProvider>
+                    </AIAssistantProvider>
+                  </AgentStateProvider>
                 </AuthProvider>
               </ThemeProvider>
             </KeyboardProvider>

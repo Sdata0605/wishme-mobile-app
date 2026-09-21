@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import { supabaseFetch } from '@/constants/supabase';
 import { type VoiceItem, type VoiceList, useVoices } from '@/hooks/useVoices';
 import { useWallet } from '@/hooks/useWallet';
@@ -903,6 +904,7 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
 
 function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
   const { colors } = useTheme();
+  const agentPrefill = useAgentPrefill();
   const [songTitle, setSongTitle] = useState('');
   const [songType, setSongType] = useState<'full' | 'instrumental'>('full');
   const [voiceGender, setVoiceGender] = useState<'Any' | 'Male' | 'Female'>('Any');
@@ -918,6 +920,14 @@ function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
   const [progressMsg, setProgressMsg] = useState('');
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (agentPrefill.songTitle) setSongTitle(agentPrefill.songTitle);
+    if (agentPrefill.songDescription) setDescription(agentPrefill.songDescription);
+    if (agentPrefill.songGenre) setGenre(agentPrefill.songGenre.toLowerCase());
+    if (agentPrefill.songMood) setMood(agentPrefill.songMood.toLowerCase());
+    if (agentPrefill.songLanguage) setLanguage(agentPrefill.songLanguage);
+  }, [agentPrefill.songTitle, agentPrefill.songDescription, agentPrefill.songGenre, agentPrefill.songMood, agentPrefill.songLanguage]);
 
   useEffect(() => () => {
     if (pollingRef.current) clearInterval(pollingRef.current);
@@ -1146,11 +1156,16 @@ function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
 
 function TTSTab({ ctx }: { ctx: MusicCtx }) {
   const { colors } = useTheme();
+  const agentPrefill = useAgentPrefill();
   const [voice, setVoice] = useState<VoiceItem | null>(null);
   const [text, setText] = useState('');
   const [gen, setGen] = useState(false);
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (agentPrefill.ttsText) setText(agentPrefill.ttsText);
+  }, [agentPrefill.ttsText]);
 
   useEffect(() => {
     const all = [...ctx.voices.clonedVoices, ...ctx.voices.premadeVoices];
@@ -1200,7 +1215,7 @@ function TTSTab({ ctx }: { ctx: MusicCtx }) {
 
 function VoiceConversionTab({ ctx }: { ctx: MusicCtx }) {
   const { colors } = useTheme();
-  const [voice, setVoice] = useState<VoiceItem | null>(null);
+  const [targetVoice, setTargetVoice] = useState<VoiceItem | null>(null);
   const [audioBase64, setAudioBase64] = useState<string | null>(null);
   const [audioFileName, setAudioFileName] = useState<string | null>(null);
   const [gen, setGen] = useState(false);
@@ -1209,33 +1224,36 @@ function VoiceConversionTab({ ctx }: { ctx: MusicCtx }) {
 
   useEffect(() => {
     const all = [...ctx.voices.clonedVoices, ...ctx.voices.premadeVoices];
-    if (all.length && !voice) setVoice(all[0]);
+    if (all.length && !targetVoice) setTargetVoice(all[0]);
   }, [ctx.voices]);
 
-  const handleAudio = (base64: string, name: string) => { setAudioBase64(base64); setAudioFileName(name); };
-  const clearAudio = () => { setAudioBase64(null); setAudioFileName(null); };
+  const handleAudio = (base64: string, name: string) => {
+    setAudioBase64(base64);
+    setAudioFileName(name);
+    setAudioUri(null);
+  };
 
   const generate = async () => {
-    if (!audioBase64) { setErr('Please upload or record audio.'); return; }
-    if (!voice) { setErr('Please select a target voice.'); return; }
+    if (!audioBase64) { setErr('Please record or upload audio.'); return; }
+    if (!targetVoice) { setErr('Please select a target voice.'); return; }
     if (ctx.walletBalance < COSTS.voiceConversion) { setErr(`Insufficient balance. You need ₹${COSTS.voiceConversion}.`); return; }
     setErr(''); setGen(true); setAudioUri(null);
     try {
       const res = await supabaseFetch('/functions/v1/elevenlabs-speech-to-speech', {
         method: 'POST',
-        body: JSON.stringify({ audioBase64, voiceId: voice.voice_id }),
+        body: JSON.stringify({ audioBase64, voiceId: targetVoice.voice_id }),
       }, ctx.session?.access_token);
       const data = await res.json() as { success: boolean; audioUrl: string; error?: string };
-      if (!data.success || !data.audioUrl) throw new Error(data.error ?? 'Conversion failed');
+      if (!data.success || !data.audioUrl) throw new Error(data.error ?? 'Generation failed');
       await supabaseFetch('/rest/v1/voice_conversion_generations', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.profileId, original_file_name: audioFileName ?? 'audio.wav', target_voice_id: voice.voice_id, target_voice_name: voice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.voiceConversion }),
+        body: JSON.stringify({ user_id: ctx.profileId, voice_id: targetVoice.voice_id, voice_name: targetVoice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.voiceConversion }),
       }, ctx.session?.access_token);
       setAudioUri(data.audioUrl);
       ctx.refreshWallet();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Conversion failed');
+      setErr(e instanceof Error ? e.message : 'Generation failed');
     } finally {
       setGen(false);
     }
@@ -1243,10 +1261,10 @@ function VoiceConversionTab({ ctx }: { ctx: MusicCtx }) {
 
   return (
     <View style={s.tabContent}>
-      <SL text="Upload or Record Audio" />
-      <UploadOrRecord audioFileName={audioFileName} onAudio={handleAudio} onClear={clearAudio} />
-      <SL text="Target Voice" />
-      <VoiceSelect value={voice} onChange={setVoice} voices={ctx.voices} voicesLoading={ctx.voicesLoading} />
+      <SL text="Select Target Voice" />
+      <VoiceSelect value={targetVoice} onChange={setTargetVoice} voices={ctx.voices} voicesLoading={ctx.voicesLoading} />
+      <SL text="Your Source Audio" />
+      <UploadOrRecord audioFileName={audioFileName} onAudio={handleAudio} onClear={() => { setAudioBase64(null); setAudioFileName(null); }} />
       <ErrBox msg={err} />
       <GenBtn label={`Convert Voice (₹${COSTS.voiceConversion})`} onPress={generate} generating={gen} disabled={!audioBase64} />
       {audioUri && <AudioPlayerCard title="Voice-Converted Audio" audioUri={audioUri} />}
@@ -1256,11 +1274,16 @@ function VoiceConversionTab({ ctx }: { ctx: MusicCtx }) {
 
 function SFXTab({ ctx }: { ctx: MusicCtx }) {
   const { colors } = useTheme();
+  const agentPrefill = useAgentPrefill();
   const [desc, setDesc] = useState('');
   const [duration, setDuration] = useState(5);
   const [gen, setGen] = useState(false);
   const [audioUri, setAudioUri] = useState<string | null>(null);
   const [err, setErr] = useState('');
+
+  useEffect(() => {
+    if (agentPrefill.sfxPrompt) setDesc(agentPrefill.sfxPrompt);
+  }, [agentPrefill.sfxPrompt]);
 
   const generate = async () => {
     if (!desc.trim()) { setErr('Please describe the sound effect.'); return; }
@@ -1565,11 +1588,18 @@ export default function MusicScreen() {
   const { colors } = useTheme();
   const { user, session } = useAuth();
   const insets = useSafeAreaInsets();
+  const agentPrefill = useAgentPrefill();
   const [activeTab, setActiveTab] = useState(0);
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const { voices, loading: voicesLoading, refetch: refetchVoices } = useVoices();
   const { balance: walletBalance, profileId, refetch: refetchWallet } = useWallet();
+
+  useEffect(() => {
+    if (typeof agentPrefill.musicTab === 'number') {
+      setActiveTab(agentPrefill.musicTab);
+    }
+  }, [agentPrefill.musicTab]);
 
   useEffect(() => {
     Audio.setAudioModeAsync({ playsInSilentModeIOS: true, allowsRecordingIOS: false }).catch(() => {});

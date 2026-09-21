@@ -248,8 +248,11 @@ export default function WishCelebrityOccasionScreen() {
       const res = await supabaseFetch('/functions/v1/generate-message-suggestions', {
         method: 'POST',
         body: JSON.stringify({
+          celebrityName: celeb?.name,
           celebrity_name: celeb?.name,
+          occasionType,
           occasion: occasionType,
+          recipientName,
           recipient_name: recipientName,
         }),
       }, session?.access_token);
@@ -268,8 +271,13 @@ export default function WishCelebrityOccasionScreen() {
       const res = await supabaseFetch('/functions/v1/suggest-greeting-card-prompts', {
         method: 'POST',
         body: JSON.stringify({
+          celebrityName: celeb?.name,
           celebrity_name: celeb?.name,
+          occasionType,
           occasion: occasionType,
+          recipientName,
+          recipient_name: recipientName,
+          message,
         }),
       }, session?.access_token);
       if (res.ok) {

@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import { SUPABASE_URL, SUPABASE_ANON_KEY, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -102,6 +103,7 @@ export default function PhotoWishScreen() {
   const { user, getValidSession } = useAuth();
   const wallet = useWallet();
   const { discountPercentage, getDiscountedPrice } = usePlan();
+  const agentPrefill = useAgentPrefill();
 
   const [tab, setTab] = useState<'create' | 'history'>('create');
 
@@ -111,6 +113,13 @@ export default function PhotoWishScreen() {
   const [sender, setSender] = useState('');
   const [message, setMessage] = useState('');
   const [textStyle, setTextStyle] = useState('elegant');
+
+  // Auto-fill from agent prefill
+  useEffect(() => {
+    if (agentPrefill.occasion) setOccasion(agentPrefill.occasion);
+    if (agentPrefill.textStyle) setTextStyle(agentPrefill.textStyle.toLowerCase());
+    if (agentPrefill.message) setMessage(agentPrefill.message);
+  }, [agentPrefill.occasion, agentPrefill.textStyle, agentPrefill.message]);
 
   const [pickedImageUri, setPickedImageUri] = useState<string | null>(null);
   const [pickedImageBase64, setPickedImageBase64] = useState<string | null>(null);

@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import {
   Modal,
   Platform,
@@ -144,6 +145,7 @@ export function BillPayScreen({
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const meta = serviceMeta(kind);
+  const agentPrefill = useAgentPrefill();
 
   const [mode, setMode] = useState<'boards' | 'apartments'>('boards');
   const [gasMode, setGasMode] = useState<'piped' | 'cylinder'>('piped');
@@ -154,6 +156,11 @@ export function BillPayScreen({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [step, setStep] = useState<'form' | 'bill' | 'success'>('form');
   const [txnId] = useState(() => `WMB${Math.floor(100000 + Math.random() * 899999)}`);
+
+  // Auto-fill from agent prefill
+  useEffect(() => {
+    if (agentPrefill.billConsumerNumber) setConsumerId(agentPrefill.billConsumerNumber);
+  }, [agentPrefill.billConsumerNumber]);
 
   const isMobile = kind === 'mobile';
   const isElectricity = kind === 'electricity';

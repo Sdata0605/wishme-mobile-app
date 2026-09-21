@@ -19,6 +19,7 @@ import { Icon } from '@/components/Icon';
 import { GradientButton } from '@/components/GradientButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import { supabaseFetch } from '@/constants/supabase';
 
 const OCCASIONS = [
@@ -50,6 +51,7 @@ export default function WishBookingScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { session, user, getValidSession } = useAuth();
+  const agentPrefill = useAgentPrefill();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [celeb, setCeleb] = useState<CelebrityDetail | null>(null);
@@ -75,6 +77,13 @@ export default function WishBookingScreen() {
   const [payError, setPayError] = useState('');
 
   const [toast, setToast] = useState('');
+
+  // Auto-fill form fields from agent prefill
+  useEffect(() => {
+    if (agentPrefill.occasion) setOccasion(agentPrefill.occasion);
+    if (agentPrefill.recipientName) setRecipientName(agentPrefill.recipientName);
+    if (agentPrefill.message) setMessage(agentPrefill.message);
+  }, [agentPrefill.occasion, agentPrefill.recipientName, agentPrefill.message]);
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -145,8 +154,11 @@ export default function WishBookingScreen() {
       const res = await supabaseFetch('/functions/v1/generate-message-suggestions', {
         method: 'POST',
         body: JSON.stringify({
+          celebrityName: celeb?.name,
           celebrity_name: celeb?.name,
+          occasionType: occasion,
           occasion,
+          recipientName,
           recipient_name: recipientName,
         }),
       }, session?.access_token);
@@ -170,15 +182,23 @@ export default function WishBookingScreen() {
       const res = await supabaseFetch('/functions/v1/suggest-greeting-card-prompts', {
         method: 'POST',
         body: JSON.stringify({
+          celebrityName: celeb?.name,
           celebrity_name: celeb?.name,
+          occasionType: occasion,
           occasion,
+          recipientName,
+          recipient_name: recipientName,
         }),
       }, session?.access_token);
       if (res.ok) {
         const data = await res.json() as { prompts?: string[] };
         if (data.prompts?.length) {
           setPromptChips(data.prompts.slice(0, 4));
+        } else {
+          showToast('No card prompt suggestions returned. Try again.');
         }
+      } else {
+        showToast('Could not generate card prompt suggestions.');
       }
     } catch {}
     setSuggestingPrompt(false);

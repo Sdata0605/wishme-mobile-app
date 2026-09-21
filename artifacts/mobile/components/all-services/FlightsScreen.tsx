@@ -27,6 +27,7 @@ import {
 } from 'lucide-react-native';
 
 import { serviceColors as C } from './serviceColors';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -729,21 +730,60 @@ type PickerTarget = 'from' | 'to' | 'departure' | 'return' | 'travellers' | 'cab
 function SearchForm({
   tripType,
   onSearch,
+  initialSearch,
 }: {
   tripType: TripType;
   onSearch?: (params: FlightSearchParams) => void;
+  initialSearch?: FlightSearchParams;
 }) {
+  const agentPrefill = useAgentPrefill();
   const today = startOfDay(new Date());
-  const [fromIdx, setFromIdx] = useState(0);
-  const [toIdx, setToIdx] = useState(1);
+
+  const getInitialIdx = (name?: string, defaultIdx = -1) => {
+    if (!name) return defaultIdx;
+    const lower = name.toLowerCase();
+    const found = CITIES.findIndex((c) => lower.includes(c.city.toLowerCase()) || lower.includes(c.code.toLowerCase()));
+    return found >= 0 ? found : defaultIdx;
+  };
+
+  const [fromIdx, setFromIdx] = useState<number | null>(() => {
+    const city = initialSearch?.from || agentPrefill.fromCity;
+    const idx = getInitialIdx(city, -1);
+    return idx >= 0 ? idx : null;
+  });
+  const [toIdx, setToIdx] = useState<number | null>(() => {
+    const city = initialSearch?.to || agentPrefill.toCity;
+    const idx = getInitialIdx(city, -1);
+    return idx >= 0 ? idx : null;
+  });
   const [depDate, setDepDate] = useState<Date>(addDays(today, 2));
   const [retDate, setRetDate] = useState<Date>(addDays(today, 5));
   const [travellers, setTravellers] = useState<TravellerCounts>({ adults: 1, children: 0, infants: 0 });
   const [cabin, setCabin] = useState<CabinKey>('economy');
   const [picker, setPicker] = useState<PickerTarget>(null);
 
-  const from = CITIES[fromIdx];
-  const to = CITIES[toIdx];
+  useEffect(() => {
+    const fromCity = initialSearch?.from || agentPrefill.fromCity;
+    const toCity = initialSearch?.to || agentPrefill.toCity;
+    if (fromCity) {
+      const idx = getInitialIdx(fromCity, -1);
+      if (idx >= 0) setFromIdx(idx);
+    }
+    if (toCity) {
+      const idx = getInitialIdx(toCity, -1);
+      if (idx >= 0) setToIdx(idx);
+    }
+    if (agentPrefill.cabin) {
+      const lower = agentPrefill.cabin.toLowerCase();
+      if (lower.includes('business')) setCabin('business');
+      else if (lower.includes('first')) setCabin('first');
+      else if (lower.includes('premium')) setCabin('premiumEconomy');
+      else setCabin('economy');
+    }
+  }, [initialSearch?.from, initialSearch?.to, agentPrefill.fromCity, agentPrefill.toCity, agentPrefill.cabin]);
+
+  const from = fromIdx !== null && fromIdx >= 0 ? CITIES[fromIdx] : null;
+  const to = toIdx !== null && toIdx >= 0 ? CITIES[toIdx] : null;
 
   const swap = () => {
     setFromIdx(toIdx);
@@ -760,14 +800,15 @@ function SearchForm({
         <View style={{ flex: 1 }}>
           <Text style={sf.fieldLabel}>From</Text>
           <Text style={sf.fieldValue}>
-            {from.city} <Text style={sf.code}>({from.code})</Text>
+            {from ? `${from.city} ` : 'Select Departure City'}
+            {from && <Text style={sf.code}>({from.code})</Text>}
           </Text>
-          <Text style={sf.fieldSub}>{from.airport}</Text>
+          <Text style={sf.fieldSub}>{from ? from.airport : 'Tap to select origin airport'}</Text>
         </View>
       </TouchableOpacity>
       {picker === 'from' && (
         <CityPicker
-          exclude={toIdx}
+          exclude={toIdx ?? -1}
           onPick={(i) => {
             setFromIdx(i);
             setPicker(null);
@@ -788,14 +829,15 @@ function SearchForm({
         <View style={{ flex: 1 }}>
           <Text style={sf.fieldLabel}>To</Text>
           <Text style={sf.fieldValue}>
-            {to.city} <Text style={sf.code}>({to.code})</Text>
+            {to ? `${to.city} ` : 'Select Destination City'}
+            {to && <Text style={sf.code}>({to.code})</Text>}
           </Text>
-          <Text style={sf.fieldSub}>{to.airport}</Text>
+          <Text style={sf.fieldSub}>{to ? to.airport : 'Tap to select destination airport'}</Text>
         </View>
       </TouchableOpacity>
       {picker === 'to' && (
         <CityPicker
-          exclude={fromIdx}
+          exclude={fromIdx ?? -1}
           onPick={(i) => {
             setToIdx(i);
             setPicker(null);
@@ -929,11 +971,11 @@ function SearchForm({
         style={sf.searchBtn}
         activeOpacity={0.85}
         onPress={() => {
-          const from = CITIES[fromIdx];
-          const to = CITIES[toIdx];
+          const fromCity = fromIdx !== null && fromIdx >= 0 ? CITIES[fromIdx] : CITIES[0];
+          const toCity = toIdx !== null && toIdx >= 0 ? CITIES[toIdx] : CITIES[1];
           onSearch?.({
-            from: `${from.city} (${from.code})`,
-            to: `${to.city} (${to.code})`,
+            from: `${fromCity.city} (${fromCity.code})`,
+            to: `${toCity.city} (${toCity.code})`,
             dateLabel: formatDate(depDate),
             travellers: travellersLabel(travellers),
             cabin: cabinLabel(cabin),
@@ -1143,9 +1185,11 @@ export interface FlightSearchParams {
 export function FlightsScreen({
   onBack,
   onSearch,
+  initialSearch,
 }: {
   onBack: () => void;
   onSearch?: (params: FlightSearchParams) => void;
+  initialSearch?: FlightSearchParams;
 }) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -1176,7 +1220,7 @@ export function FlightsScreen({
       >
         <BannerCarousel />
         <TripTypeSelector value={tripType} onChange={setTripType} />
-        <SearchForm tripType={tripType} onSearch={onSearch} />
+        <SearchForm tripType={tripType} onSearch={onSearch} initialSearch={initialSearch} />
         <SpecialFares />
 
         <View style={{ height: 30 }} />

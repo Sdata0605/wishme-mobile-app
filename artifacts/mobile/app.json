@@ -2,7 +2,7 @@
   "expo": {
     "name": "WishMe",
     "slug": "mobile",
-    "owner": "prashantuser2",
+    "owner": "prashantuser3",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -74,7 +74,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "a4a952d8-74d7-4754-ac6a-22b49744f2e7"
+        "projectId": "07663ffd-5b47-43b3-a1a6-ef2797942356"
       }
     }
   }

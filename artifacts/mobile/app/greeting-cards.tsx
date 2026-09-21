@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useWallet } from '@/hooks/useWallet';
 
@@ -83,6 +84,7 @@ export default function GreetingCardsScreen() {
   const insets = useSafeAreaInsets();
   const { session, user } = useAuth();
   const wallet = useWallet();
+  const agentPrefill = useAgentPrefill();
 
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -99,6 +101,13 @@ export default function GreetingCardsScreen() {
   const [showOccasions, setShowOccasions] = useState(false);
   const [recipient, setRecipient] = useState('');
   const [sender, setSender] = useState('');
+
+  // Auto-fill from agent prefill
+  useEffect(() => {
+    if (agentPrefill.occasion) setOccasion(agentPrefill.occasion);
+    if (agentPrefill.recipientName) setRecipient(agentPrefill.recipientName);
+    if (agentPrefill.message) setPrompt(agentPrefill.message);
+  }, [agentPrefill.occasion, agentPrefill.recipientName, agentPrefill.message]);
   const [prompt, setPrompt] = useState('');
   const [refineAI, setRefineAI] = useState(false);
 
@@ -314,12 +323,17 @@ export default function GreetingCardsScreen() {
 
       const data = await res.json() as { generation?: Generation };
       if (data.generation) {
-        setCurrentGeneration(data.generation);
-        if (data.generation.status === 'completed' && data.generation.generated_image_url) {
+        const ready = Boolean(data.generation.generated_image_url)
+          && data.generation.generated_image_url !== 'base64-returned-to-client';
+        setCurrentGeneration({
+          ...data.generation,
+          status: ready ? 'completed' : (data.generation.status || 'processing'),
+        });
+        if (ready) {
           showToast('Card generated successfully!');
           wallet.refetch();
           fetchHistory();
-        } else {
+        } else if (data.generation.id) {
           startPolling(data.generation.id);
         }
       }

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import {
   Image,
   Modal,
@@ -324,17 +325,31 @@ const guest = StyleSheet.create({
 });
 
 function SearchCard({ onSearch }: { onSearch: (params: HotelSearchParams) => void }) {
+  const agentPrefill = useAgentPrefill();
   const today = new Date();
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
-  const [city, setCity] = useState('Goa');
+  const [city, setCity] = useState(agentPrefill.hotelCity || 'Goa');
   const [checkIn, setCheckIn] = useState(today);
   const [checkOut, setCheckOut] = useState(tomorrow);
-  const [rooms, setRooms] = useState(1);
-  const [adults, setAdults] = useState(2);
+  const [rooms, setRooms] = useState(agentPrefill.rooms || 1);
+  const [adults, setAdults] = useState(agentPrefill.adults || 2);
   const [children, setChildren] = useState(0);
   const [picker, setPicker] = useState<'city' | 'in' | 'out' | 'guests' | null>(null);
+
+  // Sync with agent prefill
+  useEffect(() => {
+    if (agentPrefill.hotelCity) {
+      setCity(agentPrefill.hotelCity);
+    }
+    if (agentPrefill.rooms) {
+      setRooms(agentPrefill.rooms);
+    }
+    if (agentPrefill.adults) {
+      setAdults(agentPrefill.adults);
+    }
+  }, [agentPrefill.hotelCity, agentPrefill.rooms, agentPrefill.adults]);
 
   const nights = nightsBetween(new Date(checkIn), new Date(checkOut));
 

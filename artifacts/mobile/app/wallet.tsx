@@ -17,6 +17,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import { useWallet } from '@/hooks/useWallet';
 
 const WALLET_TABS = ['Transactions', 'Referral Earnings'] as const;
@@ -477,6 +478,7 @@ export default function WalletScreen() {
   const [activeTab, setActiveTab] = useState<WalletTab>('Transactions');
 
   const { balance, refetch } = useWallet();
+  const agentPrefill = useAgentPrefill();
 
   // Deposit state
   const [depositModal, setDepositModal] = useState(false);
@@ -496,6 +498,14 @@ export default function WalletScreen() {
   const [celebId, setCelebId] = useState<string>('');
   const [bankDetails, setBankDetails] = useState<BankDetails | null>(null);
   const [bankLoading, setBankLoading] = useState(false);
+
+  // Agent: auto-open deposit modal and pre-fill amount
+  useEffect(() => {
+    if (agentPrefill.addAmount) {
+      setDepositAmt(String(agentPrefill.addAmount));
+      setDepositModal(true);
+    }
+  }, [agentPrefill.addAmount]);
 
   useEffect(() => {
     refetch();

@@ -36,9 +36,16 @@ import { serviceColors as C } from './serviceColors';
 export interface FlightResult {
   id: number;
   airline: string;
+  airlineName?: string;
+  airlineCode?: string;
+  flightNumber?: string;
   logo: string;
   depart: string;
   arrive: string;
+  departTime?: string;
+  arriveTime?: string;
+  fromCode?: string;
+  toCode?: string;
   duration: string;
   durationMins: number;
   stops: 0 | 1 | 2;

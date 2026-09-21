@@ -118,7 +118,7 @@ export default function TabLayout() {
           <Tabs.Screen
             name="voice-call"
             options={{
-              title: 'Calls',
+              title: 'Call',
               tabBarIcon: ({ color, size }) =>
                 isIOS ? (
                   <SymbolView name="phone" tintColor={color} size={size} />

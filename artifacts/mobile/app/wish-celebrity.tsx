@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import { supabaseFetch } from '@/constants/supabase';
 
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
@@ -38,6 +39,7 @@ export default function WishCelebrityScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { session, user } = useAuth();
+  const agentPrefill = useAgentPrefill();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,13 @@ export default function WishCelebrityScreen() {
   const [allCelebrities, setAllCelebrities] = useState<Celebrity[]>([]);
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+
+  // Auto-fill search from agent prefill
+  useEffect(() => {
+    if (agentPrefill.search) {
+      setSearch(agentPrefill.search);
+    }
+  }, [agentPrefill.search]);
 
   const fetchAll = useCallback(async () => {
     if (!session?.access_token || !user?.profileId) return;

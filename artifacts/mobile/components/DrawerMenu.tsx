@@ -32,7 +32,6 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'home', label: 'Dashboard', route: '/(tabs)' },
   { icon: 'layers', label: 'All Services', route: '/(tabs)/all-services', highlight: true },
   { icon: 'phone', label: 'Celebrity Call', route: '/(tabs)/voice-call' },
-  { icon: 'mic', label: 'AI Voice Call', route: '/voice-call-wish' },
   { icon: 'credit-card', label: 'Wallet', route: '/wallet' },
   { icon: 'calendar', label: 'Bookings', route: '/bookings' },
   { icon: 'heart', label: 'Favorites', route: '/favorites' },

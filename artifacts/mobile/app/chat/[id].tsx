@@ -66,6 +66,17 @@ interface ChatMessage {
   conversation_message_number?: number | null;
 }
 
+function dedupeMessages(list: ChatMessage[]): ChatMessage[] {
+  const seen = new Set<string>();
+  const out: ChatMessage[] = [];
+  for (const m of list) {
+    if (!m?.id || seen.has(m.id)) continue;
+    seen.add(m.id);
+    out.push(m);
+  }
+  return out;
+}
+
 interface ConvMeta {
   id: string;
   message_count: number;
@@ -414,10 +425,10 @@ export default function ChatScreen() {
       if (!res.ok) return;
       const newMsgs = await res.json() as ChatMessage[];
       if (newMsgs && newMsgs.length > 0) {
-        setMessages(prev => [
+        setMessages(prev => dedupeMessages([
           ...newMsgs,
           ...prev.filter(m => !m.id.startsWith('temp-')),
-        ]);
+        ]));
         if (showTypingRef.current) {
           setTyping(false);
           if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
@@ -534,7 +545,7 @@ export default function ChatScreen() {
         if (!rows || rows.length === 0) {
           setHasMoreMessages(false);
         } else {
-          setMessages(prev => [...prev, ...rows]);
+          setMessages(prev => dedupeMessages([...prev, ...rows]));
         }
       }
     } catch {}
@@ -806,7 +817,7 @@ export default function ChatScreen() {
         <FlatList
           ref={flatListRef}
           data={messages}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
           inverted
           contentContainerStyle={[s.msgList, { paddingBottom: 8 }]}
           showsVerticalScrollIndicator={false}

@@ -19,6 +19,7 @@ import {
   User,
 } from 'lucide-react-native';
 import type { Hotel, HotelRoom, HotelSearchParams } from './hotelData';
+import type { HotelGuestData } from './HotelReviewAndPayScreen';
 
 import { serviceColors as C } from './serviceColors';
 
@@ -28,12 +29,14 @@ export function HotelGuestScreen({
   search,
   onBack,
   onDone,
+  onContinue,
 }: {
   hotel: Hotel;
   room: HotelRoom;
   search: HotelSearchParams;
   onBack: () => void;
   onDone?: () => void;
+  onContinue?: (guest: HotelGuestData) => void;
 }) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -227,9 +230,15 @@ export function HotelGuestScreen({
           style={[st.bookBtn, !canBook && st.bookBtnDisabled]}
           disabled={!canBook}
           activeOpacity={0.85}
-          onPress={() => setBooked(true)}
+          onPress={() => {
+            if (onContinue) {
+              onContinue({ name, mobile, email, request, payAtHotel });
+            } else {
+              setBooked(true);
+            }
+          }}
         >
-          <Text style={st.bookText}>Confirm Booking</Text>
+          <Text style={st.bookText}>Continue to Payment</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -2,8 +2,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
   Image,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -13,18 +13,20 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { useTheme } from '@/context/ThemeContext';
-import { Celebrity, useCelebrities } from '@/hooks/useCelebrities';
+import { useAgentPrefill } from '@/context/AgentStateContext';
 import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
+import { useVoiceCallCelebrities, type VoiceCallCelebrity } from '@/hooks/useVoiceCallCelebrities';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 
-const { width: W } = Dimensions.get('window');
-const CARD_W = (W - 52) / 2;
+const PAGE_BG = '#0A0A14';
+const CARD_BG = 'rgba(255,255,255,0.04)';
+const CARD_BORDER = 'rgba(255,255,255,0.08)';
+const MUTED = 'rgba(255,255,255,0.4)';
 
 const OCCASIONS = [
   'Birthday', 'Anniversary', 'Graduation', 'New Year', 'Diwali', 'Christmas',
@@ -35,27 +37,28 @@ const OCCASIONS = [
 const TONES: Array<{ label: string; value: string }> = [
   { label: 'Warm & Loving', value: 'warm_loving' },
   { label: 'Funny & Playful', value: 'funny_playful' },
-  { label: 'Inspirational', value: 'inspirational' },
-  { label: 'Formal', value: 'formal' },
-  { label: 'Casual', value: 'casual' },
-  { label: 'Emotional', value: 'emotional' },
+  { label: 'Inspirational & Motivational', value: 'inspirational' },
+  { label: 'Formal & Professional', value: 'formal' },
+  { label: 'Casual & Friendly', value: 'casual' },
+  { label: 'Emotional & Heartfelt', value: 'emotional' },
+  { label: 'Enthusiastic & High Energy', value: 'enthusiastic' },
 ];
 
 const RELATIONSHIPS: Array<{ label: string; value: string }> = [
-  { label: 'Friend', value: 'friend' },
+  { label: 'Friend / Bestie', value: 'friend' },
   { label: 'Parent', value: 'parent' },
   { label: 'Child', value: 'child' },
-  { label: 'Spouse', value: 'spouse' },
+  { label: 'Spouse / Partner', value: 'spouse' },
   { label: 'Sibling', value: 'sibling' },
   { label: 'Colleague', value: 'colleague' },
-  { label: 'Boss', value: 'boss' },
+  { label: 'Boss / Manager', value: 'boss' },
   { label: 'Relative', value: 'relative' },
   { label: 'Other', value: 'other' },
 ];
 
 const LANGUAGES: Array<{ label: string; value: string }> = [
   { label: 'English', value: 'english' },
-  { label: 'Hindi', value: 'hindi' },
+  { label: 'Hindi (Hinglish)', value: 'hindi' },
   { label: 'Tamil', value: 'tamil' },
   { label: 'Telugu', value: 'telugu' },
   { label: 'Kannada', value: 'kannada' },
@@ -64,6 +67,14 @@ const LANGUAGES: Array<{ label: string; value: string }> = [
   { label: 'Bengali', value: 'bengali' },
   { label: 'Gujarati', value: 'gujarati' },
   { label: 'Punjabi', value: 'punjabi' },
+];
+
+const JOURNEY: Array<{ icon: IconName; label: string; desc: string }> = [
+  { icon: 'search', label: 'Select Celebrity', desc: 'Choose from our curated roster.' },
+  { icon: 'sparkles', label: 'Choose Occasion', desc: 'Birthday, anniversary, or just because.' },
+  { icon: 'edit', label: 'Enter Details', desc: 'Tell us who and what to say.' },
+  { icon: 'shield', label: 'Secure Pay', desc: 'Paid from your wallet.' },
+  { icon: 'phone-call', label: 'Call Delivered', desc: 'The magic happens on the phone.' },
 ];
 
 function formatInPhone(raw: string): { ok: true; e164: string } | { ok: false } {
@@ -78,7 +89,7 @@ function generateDates(): Array<{ label: string; dateStr: string }> {
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const now = new Date();
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 14; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() + i);
     const label =
@@ -93,19 +104,21 @@ function generateDates(): Array<{ label: string; dateStr: string }> {
   return result;
 }
 
-const DATES = generateDates();
-
 function generateTimes(): string[] {
   const times: string[] = [];
   for (let h = 0; h < 24; h++) {
-    for (let m = 0; m < 60; m += 30) {
+    for (const m of [0, 30]) {
       times.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
     }
   }
   return times;
 }
 
-const TIMES = generateTimes();
+function formatTimeLabel(t: string): string {
+  const [h, m] = t.split(':').map(Number);
+  const d = new Date(2000, 0, 1, h, m);
+  return d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+}
 
 function buildScheduledAt(dateStr: string, time: string): string {
   const [h, m] = time.split(':').map(Number);
@@ -114,62 +127,88 @@ function buildScheduledAt(dateStr: string, time: string): string {
   return d.toISOString();
 }
 
+const DATES = generateDates();
+const TIMES = generateTimes();
 
-function StepIndicator({ step }: { step: 1 | 2 }) {
-  const { colors } = useTheme();
+function Chip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
   return (
-    <View style={styles.stepRow}>
-      {([1, 2] as const).map((n) => {
-        const done = step > n;
-        const active = step === n;
-        return (
-          <React.Fragment key={n}>
-            <View style={[
-              styles.stepCircle,
-              done && { backgroundColor: colors.primary, borderColor: colors.primary },
-              active && { borderColor: colors.primary },
-              !done && !active && { borderColor: colors.border },
-            ]}>
-              {done ? (
-                <Icon name="check" size={12} color="#fff" />
-              ) : (
-                <Text style={[styles.stepNum, { color: active ? colors.primary : colors.mutedForeground }]}>{n}</Text>
-              )}
-            </View>
-            {n === 1 && (
-              <View style={[styles.stepLine, { backgroundColor: step >= 2 ? colors.primary : colors.border }]} />
-            )}
-          </React.Fragment>
-        );
-      })}
+    <TouchableOpacity
+      onPress={onPress}
+      style={[styles.chip, selected && styles.chipSelected]}
+    >
+      <Text style={[styles.chipText, selected && styles.chipTextSelected]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function FieldLabel({ children }: { children: string }) {
+  return <Text style={styles.fieldLabel}>{children}</Text>;
+}
+
+function TextField({
+  value,
+  onChangeText,
+  placeholder,
+  icon,
+  keyboardType,
+  multiline,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder: string;
+  icon?: IconName;
+  keyboardType?: 'default' | 'phone-pad';
+  multiline?: boolean;
+}) {
+  return (
+    <View style={[styles.inputWrap, multiline && styles.inputMultiline]}>
+      {icon && !multiline ? <Icon name={icon} size={15} color={MUTED} /> : null}
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="rgba(255,255,255,0.22)"
+        keyboardType={keyboardType}
+        multiline={multiline}
+        style={[styles.textInput, multiline && styles.textArea]}
+      />
     </View>
   );
 }
 
-
-function CelebSelectGrid({
+function CelebrityPickerModal({
+  visible,
+  onClose,
   celebrities,
   loading,
   error,
   onRetry,
   search,
   setSearch,
-  onSelect,
   favoriteIds,
-  colors,
+  onSelect,
 }: {
-  celebrities: Celebrity[];
+  visible: boolean;
+  onClose: () => void;
+  celebrities: VoiceCallCelebrity[];
   loading: boolean;
   error: string | null;
   onRetry: () => void;
   search: string;
   setSearch: (s: string) => void;
-  onSelect: (c: Celebrity) => void;
   favoriteIds: Set<string>;
-  colors: ReturnType<typeof import('@/context/ThemeContext').useTheme>['colors'];
+  onSelect: (c: VoiceCallCelebrity) => void;
 }) {
+  const insets = useSafeAreaInsets();
   const filtered = celebrities
-    .filter((c) => !!c.vapiVoiceId)
     .filter(
       (c) =>
         c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -182,119 +221,134 @@ function CelebSelectGrid({
     });
 
   return (
-    <>
-      <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Icon name="search" size={16} color={colors.mutedForeground} />
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search celebrities..."
-          placeholderTextColor={colors.mutedForeground}
-          style={[styles.searchInput, { color: colors.foreground }]}
-        />
-      </View>
-      <Text style={[styles.helperNote, { color: colors.mutedForeground }]}>
-        Only subscribed celebrities with a voice setup can be called. Subscribe from their profile first.
-      </Text>
-
-      {loading ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading celebrities...</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.errorWrap}>
-          <Icon name="alert-circle" size={40} color={colors.primary} />
-          <Text style={[styles.errorTitle, { color: colors.foreground }]}>Could not load celebrities</Text>
-          <Text style={[styles.errorSub, { color: colors.mutedForeground }]}>{error}</Text>
-          <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={onRetry}>
-            <Icon name="refresh-cw" size={14} color="#fff" />
-            <Text style={styles.retryText}>Try Again</Text>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <View style={[styles.modalRoot, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]}>
+        <View style={styles.modalHeader}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.modalTitle}>Select Celebrity</Text>
+            <Text style={styles.modalSub}>Choose a subscribed celebrity to send a voice call</Text>
+          </View>
+          <TouchableOpacity onPress={onClose} style={styles.modalClose}>
+            <Icon name="x" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
-      ) : filtered.length === 0 ? (
-        <Text style={[styles.helperNote, { color: colors.mutedForeground, textAlign: 'center', marginTop: 24 }]}>
-          No celebrities with voice calling are available yet.
-        </Text>
-      ) : (
-        <View style={styles.grid}>
-          {filtered.map((celeb) => {
-            const subscribed = favoriteIds.has(celeb.id);
-            return (
-              <TouchableOpacity
-                key={celeb.id}
-                activeOpacity={0.82}
-                onPress={() => onSelect(celeb)}
-                style={[
-                  styles.celebCard,
-                  {
-                    backgroundColor: colors.card,
-                    borderColor: subscribed ? colors.border : colors.border,
-                    width: CARD_W,
-                    opacity: subscribed ? 1 : 0.72,
-                  },
-                ]}
-              >
-                <View style={styles.celebAvatarWrap}>
-                  <Image source={{ uri: celeb.imageUrl }} style={styles.celebAvatar} />
-                  {celeb.isAvailable && <View style={styles.onlineDot} />}
-                  {!subscribed && (
-                    <View style={styles.lockBadge}>
-                      <Icon name="lock" size={10} color="#fff" />
+
+        <View style={styles.searchWrap}>
+          <Icon name="search" size={16} color={MUTED} />
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by name or category..."
+            placeholderTextColor="rgba(255,255,255,0.25)"
+            style={styles.searchInput}
+          />
+        </View>
+
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator color="#F472B6" />
+            <Text style={styles.helper}>Loading celebrities...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.centered}>
+            <Text style={styles.errorTitle}>Could not load celebrities</Text>
+            <Text style={styles.helper}>{error}</Text>
+            <TouchableOpacity onPress={onRetry} style={styles.retryBtn}>
+              <Text style={styles.retryText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.pickerList} keyboardShouldPersistTaps="handled">
+            {filtered.length === 0 ? (
+              <Text style={[styles.helper, { textAlign: 'center', marginTop: 32 }]}>
+                No celebrities with voice calling are available yet.
+              </Text>
+            ) : filtered.map((celeb) => {
+              const subscribed = favoriteIds.has(celeb.id);
+              return (
+                <TouchableOpacity
+                  key={celeb.id}
+                  activeOpacity={0.85}
+                  onPress={() => onSelect(celeb)}
+                  style={[styles.pickerRow, !subscribed && { opacity: 0.7 }]}
+                >
+                  <Image source={{ uri: celeb.imageUrl }} style={styles.pickerAvatar} />
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.pickerName} numberOfLines={1}>{celeb.name}</Text>
+                      {celeb.isVerified ? (
+                        <View style={styles.verified}><Icon name="check" size={8} color="#fff" /></View>
+                      ) : null}
+                    </View>
+                    <Text style={styles.pickerCat}>{celeb.category}</Text>
+                    <Text style={styles.pickerPrice}>₹{celeb.pricePerCall || 500} per call</Text>
+                  </View>
+                  {subscribed ? (
+                    <View style={styles.subBadge}><Text style={styles.subBadgeText}>Subscribed</Text></View>
+                  ) : (
+                    <View style={styles.lockWrap}>
+                      <Icon name="lock" size={12} color="#fff" />
+                      <Text style={styles.lockText}>Subscribe</Text>
                     </View>
                   )}
-                </View>
-                <View style={styles.celebInfo}>
-                  <View style={styles.celebNameRow}>
-                    <Text style={[styles.celebName, { color: colors.foreground }]} numberOfLines={1}>{celeb.name}</Text>
-                    {celeb.isVerified && (
-                      <View style={styles.verifiedBadge}>
-                        <Icon name="check" size={8} color="#fff" />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[styles.celebCat, { color: colors.mutedForeground }]}>{celeb.category}</Text>
-                  <View style={styles.ratingRow}>
-                    <Icon name="star" size={11} color="#F59E0B" />
-                    <Text style={[styles.ratingText, { color: colors.foreground }]}>{celeb.rating}</Text>
-                  </View>
-                  <Text style={[styles.rateText, { color: colors.primary }]}>₹{celeb.pricePerCall || 500}/call</Text>
-                  <Text style={[styles.subHint, { color: subscribed ? '#22C55E' : colors.mutedForeground }]}>
-                    {subscribed ? 'Subscribed' : 'Subscribe first'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      )}
-    </>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        )}
+      </View>
+    </Modal>
   );
 }
 
-
-type SuccessResult =
-  | { scheduled: false; callId?: string; message: string }
-  | { scheduled: true; scheduledAt: string; message: string };
-
-function CallDetailsForm({
-  celeb,
-  onBack,
-  colors,
-  bottomPad,
-}: {
-  celeb: Celebrity;
-  onBack: () => void;
-  colors: ReturnType<typeof import('@/context/ThemeContext').useTheme>['colors'];
-  bottomPad: number;
-}) {
+export default function VoiceCallScreen() {
+  const insets = useSafeAreaInsets();
+  const { celebrity: celebrityParam } = useLocalSearchParams<{ celebrity?: string | string[] }>();
+  const celebrityId = Array.isArray(celebrityParam) ? celebrityParam[0] : celebrityParam;
   const { user, session, getValidSession } = useAuth();
   const wallet = useWallet();
-  const { discountPercentage, getDiscountedPrice } = usePlan();
+  const { discountPercentage, getDiscountedPrice, plan } = usePlan();
+  const agentPrefill = useAgentPrefill();
+  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const bottomPad = insets.bottom + 88;
 
-  const [senderName, setSenderName] = useState(
-    user ? `${user.firstName} ${user.lastName}`.trim() : '',
-  );
+  const { celebrities, loading, error, refetch } = useVoiceCallCelebrities();
+  const { favoriteIds, loading: favLoading } = useCelebrityFavorites({
+    profileId: user?.profileId,
+    accessToken: session?.access_token,
+  });
+
+  const [showPicker, setShowPicker] = useState(false);
+  const [search, setSearch] = useState('');
+  const [selectedCeleb, setSelectedCeleb] = useState<VoiceCallCelebrity | null>(null);
+
+  const [senderName, setSenderName] = useState(user ? `${user.firstName} ${user.lastName}`.trim() : '');
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
+  const [occasion, setOccasion] = useState('');
+  const [callTiming, setCallTiming] = useState<'now' | 'scheduled'>('now');
+  const [selectedDate, setSelectedDate] = useState(DATES[0]);
+  const [selectedTime, setSelectedTime] = useState('10:00');
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [customMessage, setCustomMessage] = useState('');
+  const [tone, setTone] = useState('');
+  const [relationship, setRelationship] = useState('');
+  const [language, setLanguage] = useState('english');
+  const [thingsToAvoid, setThingsToAvoid] = useState('');
+  const [additionalContext, setAdditionalContext] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [callError, setCallError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{ scheduled: boolean; message: string; when?: string } | null>(null);
+
+  // Auto-fill from agent prefill
+  useEffect(() => {
+    if (agentPrefill.recipientName) setRecipientName(agentPrefill.recipientName);
+    if (agentPrefill.occasion) setOccasion(agentPrefill.occasion);
+    if (agentPrefill.tone) setTone(agentPrefill.tone);
+    if (agentPrefill.language) setLanguage(agentPrefill.language.toLowerCase());
+    if (agentPrefill.message) setCustomMessage(agentPrefill.message);
+  }, [agentPrefill.recipientName, agentPrefill.occasion, agentPrefill.tone, agentPrefill.language, agentPrefill.message]);
 
   useEffect(() => {
     if (user && !senderName.trim()) {
@@ -302,34 +356,73 @@ function CallDetailsForm({
     }
   }, [user]);
 
-  const [recipientName, setRecipientName] = useState('');
-  const [recipientPhone, setRecipientPhone] = useState('');
-  const [occasion, setOccasion] = useState('Birthday');
+  useEffect(() => {
+    if (!celebrityId || loading || favLoading || celebrities.length === 0) return;
+    const found = celebrities.find((c) => c.id === celebrityId);
+    if (!found?.vapiVoiceId) {
+      setShowPicker(true);
+      return;
+    }
+    if (!favoriteIds.has(found.id)) {
+      router.push(`/celebrity/${found.id}` as never);
+      return;
+    }
+    setSelectedCeleb(found);
+  }, [celebrityId, celebrities, favoriteIds, loading, favLoading]);
 
-  const [callTiming, setCallTiming] = useState<'now' | 'later'>('now');
-  const [selectedDate, setSelectedDate] = useState<{ label: string; dateStr: string }>(DATES[0]);
-  const [selectedTime, setSelectedTime] = useState('10:00');
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  useEffect(() => {
+    if (!celebrityId && !selectedCeleb && !loading && !favLoading) {
+      setShowPicker(true);
+    }
+  }, [celebrityId, selectedCeleb, loading, favLoading]);
 
-  const [customMessage, setCustomMessage] = useState('');
-  const [tone, setTone] = useState('');
-  const [relationship, setRelationship] = useState('');
-  const [language, setLanguage] = useState('english');
-  const [thingsToAvoid, setThingsToAvoid] = useState('');
-  const [additionalContext, setAdditionalContext] = useState('');
+  const basePrice = selectedCeleb?.pricePerCall || 500;
+  const finalPrice = selectedCeleb ? getDiscountedPrice(basePrice) : 0;
+  const canSubmit = Boolean(
+    selectedCeleb &&
+    senderName.trim() &&
+    recipientName.trim() &&
+    recipientPhone.trim() &&
+    occasion &&
+    (callTiming === 'now' || selectedDate),
+  );
 
-  const [submitting, setSubmitting] = useState(false);
-  const [callError, setCallError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<SuccessResult | null>(null);
+  const handleSelectCeleb = (c: VoiceCallCelebrity) => {
+    if (!favoriteIds.has(c.id)) {
+      setShowPicker(false);
+      router.push(`/celebrity/${c.id}` as never);
+      return;
+    }
+    setSelectedCeleb(c);
+    setShowPicker(false);
+    setCallError(null);
+  };
 
-  const basePrice = celeb.pricePerCall || 500;
-  const finalPrice = getDiscountedPrice(basePrice);
-  const discountAmt = Math.max(0, basePrice - finalPrice);
+  const resetForm = () => {
+    setRecipientName('');
+    setRecipientPhone('');
+    setOccasion('');
+    setCustomMessage('');
+    setTone('');
+    setRelationship('');
+    setThingsToAvoid('');
+    setAdditionalContext('');
+    setSelectedCeleb(null);
+    setCallTiming('now');
+    setSelectedDate(DATES[0]);
+    setSelectedTime('10:00');
+    setSuccess(null);
+    setShowPicker(true);
+  };
 
   async function handleMakeCall() {
-    if (!senderName.trim() || !recipientName.trim() || !recipientPhone.trim()) {
-      setCallError('Please fill in Your Name, Recipient Name, and Phone Number.');
+    if (!selectedCeleb) {
+      setCallError('Please select a celebrity first.');
+      setShowPicker(true);
+      return;
+    }
+    if (!senderName.trim() || !recipientName.trim() || !recipientPhone.trim() || !occasion) {
+      setCallError('Please fill in all required fields.');
       return;
     }
     const phone = formatInPhone(recipientPhone);
@@ -337,12 +430,12 @@ function CallDetailsForm({
       setCallError('Please enter a valid 10-digit Indian mobile number starting with 6-9.');
       return;
     }
-    if (!celeb.vapiVoiceId) {
-      setCallError('This celebrity is not yet set up for voice calls. Please choose a different celebrity.');
+    if (!selectedCeleb.vapiVoiceId) {
+      setCallError('This celebrity is not yet set up for voice calls. Please choose another.');
       return;
     }
-    if (callTiming === 'later' && (!selectedDate || !selectedTime)) {
-      setCallError('Please select a date and time for scheduling.');
+    if (callTiming === 'scheduled' && !selectedDate) {
+      setCallError('Please select a date for the scheduled call.');
       return;
     }
     if (wallet.balance < finalPrice) {
@@ -350,31 +443,32 @@ function CallDetailsForm({
       router.push('/wallet' as never);
       return;
     }
+
     setCallError(null);
     setSubmitting(true);
-
     try {
       const valid = await getValidSession();
       const token = valid?.access_token ?? session?.access_token;
+      const scheduledAt = callTiming === 'scheduled'
+        ? buildScheduledAt(selectedDate.dateStr, selectedTime)
+        : null;
       const body = {
         recipientName: recipientName.trim(),
         recipientPhone: phone.e164,
         occasion,
         senderName: senderName.trim(),
-        celebrityId: celeb.id,
-        celebrityName: celeb.name,
-        voiceId: celeb.vapiVoiceId,
+        celebrityId: selectedCeleb.id,
+        celebrityName: selectedCeleb.name,
+        voiceId: selectedCeleb.vapiVoiceId,
         price: finalPrice,
-        celebrityPhoneId: celeb.vapiPhoneId || undefined,
+        celebrityPhoneId: selectedCeleb.vapiPhoneId || undefined,
         customMessage: customMessage.trim(),
         tone,
         relationship,
         language,
         thingsToAvoid: thingsToAvoid.trim(),
         additionalContext: additionalContext.trim(),
-        scheduledAt: callTiming === 'later'
-          ? buildScheduledAt(selectedDate.dateStr, selectedTime)
-          : null,
+        scheduledAt,
       };
 
       const res = await supabaseFetch(
@@ -382,26 +476,28 @@ function CallDetailsForm({
         { method: 'POST', body: JSON.stringify(body) },
         token,
       );
-
       const json = await res.json();
-
       if (!res.ok || json.error || !json.success) {
-        const msg = json.error ?? json.message ?? `Request failed (${res.status})`;
-        setCallError(msg);
+        setCallError(json.error ?? json.message ?? `Request failed (${res.status})`);
         return;
       }
 
       wallet.refetch();
       if (json.scheduled) {
-        const scheduledAt: string = json.scheduledAt ?? buildScheduledAt(selectedDate.dateStr, selectedTime);
-        const fallbackMsg = `Your call from ${celeb.name} to ${recipientName.trim()} has been scheduled!`;
-        setSuccess({ scheduled: true, scheduledAt, message: json.message || fallbackMsg });
+        const when = json.scheduledAt ?? scheduledAt ?? '';
+        setSuccess({
+          scheduled: true,
+          when,
+          message: json.message || `Your call has been scheduled for ${new Date(when).toLocaleString('en-IN')}`,
+        });
       } else {
-        const fallbackMsg = `${celeb.name} will call ${recipientName.trim()} shortly.`;
-        setSuccess({ scheduled: false, callId: json.callId, message: json.message || fallbackMsg });
+        setSuccess({
+          scheduled: false,
+          message: json.message || `${selectedCeleb.name} is now calling ${recipientName.trim()} to wish them!`,
+        });
       }
     } catch (err: unknown) {
-      setCallError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setCallError(err instanceof Error ? err.message : 'Failed to initiate call. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -409,618 +505,538 @@ function CallDetailsForm({
 
   if (success) {
     return (
-      <View style={[styles.successCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <LinearGradient
-          colors={['#FF6B33', '#B44CFF']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={styles.successIconWrap}
-        >
-          <Icon name={success.scheduled ? 'calendar' : 'phone-call'} size={36} color="#fff" />
-        </LinearGradient>
-
-        <Text style={[styles.successTitle, { color: colors.foreground }]}>
-          {success.scheduled ? 'Call Scheduled!' : 'Call Initiated!'}
-        </Text>
-
-        <Text style={[styles.successMsg, { color: colors.mutedForeground }]}>
-          {success.message}
-        </Text>
-
-        {success.scheduled && (
-          <View style={[styles.successMetaRow, { backgroundColor: colors.backgroundSecondary ?? colors.muted }]}>
-            <Icon name="clock" size={14} color={colors.primary} />
-            <Text style={[styles.successMetaText, { color: colors.foreground }]}>
-              {new Date(success.scheduledAt).toLocaleString('en-IN', {
-                dateStyle: 'medium', timeStyle: 'short',
-              })}
-            </Text>
-          </View>
-        )}
-
-        <View style={[styles.successMetaRow, { backgroundColor: colors.backgroundSecondary ?? colors.muted, marginTop: 8 }]}>
-          <Image source={{ uri: celeb.imageUrl }} style={styles.successAvatar} />
-          <Text style={[styles.successMetaText, { color: colors.foreground }]}>{celeb.name}</Text>
-        </View>
-
-        <TouchableOpacity
-          onPress={onBack}
-          activeOpacity={0.85}
-          style={styles.bookAnotherBtnWrap}
-        >
-          <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bookAnotherBtn}>
-            <Icon name="phone" size={16} color="#fff" />
-            <Text style={styles.bookAnotherText}>Book Another Call</Text>
+      <View style={[styles.root, { paddingTop: topPad + 24, paddingBottom: bottomPad }]}>
+        <View style={styles.successCard}>
+          <LinearGradient colors={['#F97316', '#EC4899', '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.successIcon}>
+            <Icon name={success.scheduled ? 'calendar' : 'phone-call'} size={32} color="#fff" />
           </LinearGradient>
-        </TouchableOpacity>
+          <Text style={styles.successTitle}>{success.scheduled ? 'Call scheduled!' : 'Call initiated!'}</Text>
+          <Text style={styles.successMsg}>{success.message}</Text>
+          {selectedCeleb ? (
+            <View style={styles.successCeleb}>
+              <Image source={{ uri: selectedCeleb.imageUrl }} style={styles.successAvatar} />
+              <Text style={styles.successCelebName}>{selectedCeleb.name}</Text>
+            </View>
+          ) : null}
+          <TouchableOpacity onPress={resetForm} activeOpacity={0.85} style={{ width: '100%' }}>
+            <LinearGradient colors={['#F97316', '#EC4899', '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
+              <Icon name="phone" size={16} color="#fff" />
+              <Text style={styles.ctaText}>Book another call</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={[styles.formContent, { paddingBottom: bottomPad }]}>
-      <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-        <Icon name="arrow-left" size={18} color={colors.primary} />
-        <Text style={[styles.backText, { color: colors.primary }]}>Change Celebrity</Text>
-      </TouchableOpacity>
-
-      <View style={[styles.selectedCeleb, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Image source={{ uri: celeb.imageUrl }} style={styles.selectedAvatar} />
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.selectedName, { color: colors.foreground }]}>{celeb.name}</Text>
-          <Text style={[styles.selectedCat, { color: colors.mutedForeground }]}>{celeb.category}</Text>
-          <Text style={[styles.selectedRate, { color: colors.primary }]}>₹{basePrice.toLocaleString('en-IN')} / call</Text>
-        </View>
-      </View>
-
-      <View style={[styles.formSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Required Details</Text>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Your Name *</Text>
-        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
-          <Icon name="user" size={15} color={colors.mutedForeground} />
-          <TextInput
-            value={senderName}
-            onChangeText={setSenderName}
-            placeholder="Your full name"
-            placeholderTextColor={colors.mutedForeground}
-            style={[styles.textInput, { color: colors.foreground }]}
-          />
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Recipient's Name *</Text>
-        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
-          <Icon name="user" size={15} color={colors.mutedForeground} />
-          <TextInput
-            value={recipientName}
-            onChangeText={setRecipientName}
-            placeholder="Who is this call for?"
-            placeholderTextColor={colors.mutedForeground}
-            style={[styles.textInput, { color: colors.foreground }]}
-          />
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Phone Number *</Text>
-        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
-          <Icon name="phone" size={15} color={colors.mutedForeground} />
-          <TextInput
-            value={recipientPhone}
-            onChangeText={setRecipientPhone}
-            placeholder="+91 XXXXXXXXXX"
-            placeholderTextColor={colors.mutedForeground}
-            keyboardType="phone-pad"
-            style={[styles.textInput, { color: colors.foreground }]}
-          />
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Occasion *</Text>
-        <View style={styles.chipRow}>
-          {OCCASIONS.map((oc) => (
-            <TouchableOpacity
-              key={oc}
-              onPress={() => setOccasion(oc)}
-              style={[
-                styles.chip,
-                { borderColor: occasion === oc ? colors.primary : colors.border },
-                occasion === oc && { backgroundColor: colors.primary + '18' },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: occasion === oc ? colors.primary : colors.mutedForeground }]}>{oc}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={[styles.formSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>When to Make the Call</Text>
-
-        <View style={styles.timingToggle}>
-          {(['now', 'later'] as const).map((opt) => (
-            <TouchableOpacity
-              key={opt}
-              onPress={() => setCallTiming(opt)}
-              style={[
-                styles.timingBtn,
-                { borderColor: callTiming === opt ? colors.primary : colors.border },
-                callTiming === opt && { backgroundColor: colors.primary + '18' },
-              ]}
-            >
-              <Icon
-                name={opt === 'now' ? 'phone-call' : 'calendar'}
-                size={15}
-                color={callTiming === opt ? colors.primary : colors.mutedForeground}
-              />
-              <Text numberOfLines={1} style={[styles.timingBtnText, { color: callTiming === opt ? colors.primary : colors.mutedForeground }]}>
-                {opt === 'now' ? 'Call Now' : 'Schedule for Later'}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {callTiming === 'later' && (
-          <>
-            <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Select Date</Text>
-            <TouchableOpacity
-              onPress={() => { setShowDatePicker(!showDatePicker); setShowTimePicker(false); }}
-              style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}
-            >
-              <Icon name="calendar" size={15} color={colors.mutedForeground} />
-              <Text style={[styles.dateText, { color: selectedDate ? colors.foreground : colors.mutedForeground }]}>
-                {selectedDate.label}
-              </Text>
-              <Icon name={showDatePicker ? 'chevron-up' : 'chevron-down'} size={14} color={colors.mutedForeground} />
-            </TouchableOpacity>
-            {showDatePicker && (
-              <View style={[styles.pickerDropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                {DATES.map((d) => (
-                  <TouchableOpacity
-                    key={d.dateStr}
-                    onPress={() => { setSelectedDate(d); setShowDatePicker(false); }}
-                    style={[
-                      styles.pickerOption,
-                      { borderBottomColor: colors.border },
-                      selectedDate.dateStr === d.dateStr && { backgroundColor: colors.primary + '10' },
-                    ]}
-                  >
-                    <Icon name="calendar" size={14} color={colors.primary} />
-                    <Text style={[styles.pickerOptionText, { color: selectedDate.dateStr === d.dateStr ? colors.primary : colors.foreground }]}>
-                      {d.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-
-            <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Select Time</Text>
-            <TouchableOpacity
-              onPress={() => { setShowTimePicker(!showTimePicker); setShowDatePicker(false); }}
-              style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}
-            >
-              <Icon name="clock" size={15} color={colors.mutedForeground} />
-              <Text style={[styles.dateText, { color: colors.foreground }]}>{selectedTime}</Text>
-              <Icon name={showTimePicker ? 'chevron-up' : 'chevron-down'} size={14} color={colors.mutedForeground} />
-            </TouchableOpacity>
-            {showTimePicker && (
-              <View style={[styles.pickerDropdown, styles.timeDropdown, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={{ maxHeight: 200 }}>
-                  {TIMES.map((t) => (
-                    <TouchableOpacity
-                      key={t}
-                      onPress={() => { setSelectedTime(t); setShowTimePicker(false); }}
-                      style={[
-                        styles.pickerOption,
-                        { borderBottomColor: colors.border },
-                        selectedTime === t && { backgroundColor: colors.primary + '10' },
-                      ]}
-                    >
-                      <Icon name="clock" size={14} color={colors.primary} />
-                      <Text style={[styles.pickerOptionText, { color: selectedTime === t ? colors.primary : colors.foreground }]}>
-                        {t}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-            )}
-          </>
-        )}
-      </View>
-
-      <View style={[styles.formSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Personalization <Text style={[styles.optionalTag, { color: colors.mutedForeground }]}>(Optional)</Text></Text>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground }]}>Custom Message</Text>
-        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background, height: 90, alignItems: 'flex-start', paddingTop: 10 }]}>
-          <TextInput
-            value={customMessage}
-            onChangeText={setCustomMessage}
-            placeholder="Specific wishes, memories, or things to mention..."
-            placeholderTextColor={colors.mutedForeground}
-            multiline
-            style={[styles.textInput, { color: colors.foreground, textAlignVertical: 'top', flex: 1, width: '100%' }]}
-          />
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Tone & Style</Text>
-        <View style={styles.chipRow}>
-          {TONES.map((t) => (
-            <TouchableOpacity
-              key={t.value}
-              onPress={() => setTone(tone === t.value ? '' : t.value)}
-              style={[
-                styles.chip,
-                { borderColor: tone === t.value ? colors.primary : colors.border },
-                tone === t.value && { backgroundColor: colors.primary + '18' },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: tone === t.value ? colors.primary : colors.mutedForeground }]}>{t.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Relationship to Recipient</Text>
-        <View style={styles.chipRow}>
-          {RELATIONSHIPS.map((r) => (
-            <TouchableOpacity
-              key={r.value}
-              onPress={() => setRelationship(relationship === r.value ? '' : r.value)}
-              style={[
-                styles.chip,
-                { borderColor: relationship === r.value ? colors.primary : colors.border },
-                relationship === r.value && { backgroundColor: colors.primary + '18' },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: relationship === r.value ? colors.primary : colors.mutedForeground }]}>{r.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Language</Text>
-        <View style={styles.chipRow}>
-          {LANGUAGES.map((l) => (
-            <TouchableOpacity
-              key={l.value}
-              onPress={() => setLanguage(l.value)}
-              style={[
-                styles.chip,
-                { borderColor: language === l.value ? colors.primary : colors.border },
-                language === l.value && { backgroundColor: colors.primary + '18' },
-              ]}
-            >
-              <Text style={[styles.chipText, { color: language === l.value ? colors.primary : colors.mutedForeground }]}>{l.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Things to Avoid</Text>
-        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background }]}>
-          <TextInput
-            value={thingsToAvoid}
-            onChangeText={setThingsToAvoid}
-            placeholder="Topics or phrases to exclude..."
-            placeholderTextColor={colors.mutedForeground}
-            style={[styles.textInput, { color: colors.foreground }]}
-          />
-        </View>
-
-        <Text style={[styles.fieldLabel, { color: colors.foreground, marginTop: 14 }]}>Additional Context</Text>
-        <View style={[styles.inputWrap, { borderColor: colors.border, backgroundColor: colors.background, height: 80, alignItems: 'flex-start', paddingTop: 10 }]}>
-          <TextInput
-            value={additionalContext}
-            onChangeText={setAdditionalContext}
-            placeholder="Any extra info about the recipient..."
-            placeholderTextColor={colors.mutedForeground}
-            multiline
-            style={[styles.textInput, { color: colors.foreground, textAlignVertical: 'top', flex: 1, width: '100%' }]}
-          />
-        </View>
-      </View>
-
-      <View style={[styles.pricingCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.pricingTitle, { color: colors.foreground }]}>Pricing Summary</Text>
-        <View style={styles.pricingRow}>
-          <Text style={[styles.pricingLabel, { color: colors.mutedForeground }]}>Voice call price</Text>
-          <Text style={[styles.pricingValue, { color: colors.foreground }]}>₹{basePrice.toLocaleString('en-IN')}</Text>
-        </View>
-        <View style={styles.pricingRow}>
-          <View style={styles.discountRow}>
-            <Text style={[styles.pricingLabel, { color: colors.mutedForeground }]}>Discount</Text>
-            <View style={styles.discountBadge}>
-              <Text style={styles.discountText}>{discountPercentage}% OFF</Text>
-            </View>
-          </View>
-          <Text style={[styles.pricingValue, { color: '#22C55E' }]}>-₹{discountAmt}</Text>
-        </View>
-        <View style={[styles.divider, { backgroundColor: colors.border }]} />
-        <View style={styles.pricingRow}>
-          <Text style={[styles.totalLabel, { color: colors.foreground }]}>Total</Text>
-          <Text style={[styles.totalValue, { color: colors.primary }]}>₹{finalPrice.toLocaleString('en-IN')}</Text>
-        </View>
-        <View style={styles.pricingRow}>
-          <Text style={[styles.pricingLabel, { color: colors.mutedForeground }]}>Wallet Balance</Text>
-          <Text style={[styles.pricingValue, { color: wallet.balance >= finalPrice ? '#22C55E' : '#EF4444' }]}>
-            ₹{wallet.balance.toLocaleString('en-IN')}
-          </Text>
-        </View>
-      </View>
-
-      {callError && (
-        <View style={[styles.callErrorBanner, { backgroundColor: '#EF444420', borderColor: '#EF4444' }]}>
-          <Icon name="alert-circle" size={16} color="#EF4444" />
-          <Text style={[styles.callErrorText, { color: '#EF4444' }]}>{callError}</Text>
-        </View>
-      )}
-
-      <TouchableOpacity
-        onPress={handleMakeCall}
-        disabled={submitting}
-        activeOpacity={0.85}
-        style={[styles.callBtnWrap, submitting && { opacity: 0.7 }]}
-      >
-        <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.callCTA}>
-          {submitting ? (
-            <>
-              <ActivityIndicator size="small" color="#fff" />
-              <Text style={styles.callCTAText}>Initiating...</Text>
-            </>
-          ) : (
-            <>
-              <Icon name="phone" size={18} color="#fff" />
-              <Text style={styles.callCTAText}>Make Call</Text>
-            </>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-
-export default function VoiceCallScreen() {
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-  const { celebrity: celebrityParam } = useLocalSearchParams<{ celebrity?: string | string[] }>();
-  const celebrityId = Array.isArray(celebrityParam) ? celebrityParam[0] : celebrityParam;
-  const { user, session } = useAuth();
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const bottomPad = insets.bottom + 24;
-
-  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
-  const { favoriteIds, loading: favLoading } = useCelebrityFavorites({
-    profileId: user?.profileId,
-    accessToken: session?.access_token,
-  });
-
-  const [step, setStep] = useState<1 | 2>(1);
-  const [search, setSearch] = useState('');
-  const [selectedCeleb, setSelectedCeleb] = useState<Celebrity | null>(null);
-
-  useEffect(() => {
-    if (!celebrityId || loading || favLoading || celebrities.length === 0) return;
-    const found = celebrities.find((c) => c.id === celebrityId);
-    if (!found?.vapiVoiceId) return;
-    if (!favoriteIds.has(found.id)) return;
-    setSelectedCeleb(found);
-    setStep(2);
-  }, [celebrityId, celebrities, favoriteIds, loading, favLoading]);
-
-  const handleSelectCeleb = (c: Celebrity) => {
-    if (!favoriteIds.has(c.id)) {
-      router.push(`/celebrity/${c.id}` as never);
-      return;
-    }
-    setSelectedCeleb(c);
-    setStep(2);
-  };
-
-  const handleBack = () => {
-    setStep(1);
-    setSelectedCeleb(null);
-  };
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <LinearGradient
-        colors={['#FF6B33', '#B44CFF']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={[styles.header, { paddingTop: topPad + 16 }]}
-      >
-        <Text style={styles.headerTitle}>Celebrity Voice Calls</Text>
-        <Text style={styles.headerSub}>Book a live 1-on-1 call with your favourite star</Text>
-      </LinearGradient>
-
-      <View style={[styles.stepBarWrap, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <View style={styles.stepLabels}>
-          <Text style={[styles.stepLabelText, {
-            color: step === 1 ? colors.primary : colors.mutedForeground,
-            fontFamily: step === 1 ? 'Inter_700Bold' : 'Inter_400Regular',
-          }]}>
-            Select Celebrity
-          </Text>
-          <Text style={[styles.stepLabelText, {
-            color: step === 2 ? colors.primary : colors.mutedForeground,
-            fontFamily: step === 2 ? 'Inter_700Bold' : 'Inter_400Regular',
-          }]}>
-            Call Details
-          </Text>
-        </View>
-        <StepIndicator step={step} />
-      </View>
-
+    <View style={styles.root}>
       <ScrollView
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: bottomPad }]}
+        contentContainerStyle={{ paddingTop: topPad + 8, paddingBottom: bottomPad, paddingHorizontal: 16 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {step === 1 ? (
-          <CelebSelectGrid
-            celebrities={celebrities}
-            loading={loading}
-            error={error}
-            onRetry={refetch}
-            search={search}
-            setSearch={setSearch}
-            onSelect={handleSelectCeleb}
-            favoriteIds={favoriteIds}
-            colors={colors}
+        <View style={styles.hero}>
+          <Text style={styles.heroItalic}>Experience Stardom:</Text>
+          <Text style={styles.heroGradient}>Celebrity Voice Calls</Text>
+          <Text style={styles.heroSub}>
+            Transform any occasion into a legendary memory with a personalized voice call from your favorite icon.
+          </Text>
+        </View>
+
+        <Text style={styles.journeyTitle}>
+          The Journey to a <Text style={styles.pinkItalic}>Moment</Text>
+        </Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.journeyRow}>
+          {JOURNEY.map((step) => (
+            <View key={step.label} style={styles.journeyCard}>
+              <View style={styles.journeyIcon}>
+                <Icon name={step.icon} size={18} color="#F472B6" />
+              </View>
+              <Text style={styles.journeyLabel}>{step.label}</Text>
+              <Text style={styles.journeyDesc}>{step.desc}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHead}>
+            <Icon name="star" size={14} color="#F472B6" />
+            <Text style={styles.sectionTitle}>Select a Celebrity</Text>
+          </View>
+          {selectedCeleb ? (
+            <>
+              <View style={styles.selectedRow}>
+                <Image source={{ uri: selectedCeleb.imageUrl }} style={styles.selectedAvatar} />
+                <View style={{ flex: 1 }}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.selectedName}>{selectedCeleb.name}</Text>
+                    {selectedCeleb.isVerified ? (
+                      <View style={styles.verified}><Icon name="check" size={8} color="#fff" /></View>
+                    ) : null}
+                  </View>
+                  <Text style={styles.pickerPrice}>₹{basePrice} per call</Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setShowPicker(true)}>
+                <Text style={styles.changeLink}>View all artists →</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <TouchableOpacity style={styles.dashedPick} onPress={() => setShowPicker(true)}>
+              <Icon name="phone" size={22} color={MUTED} />
+              <Text style={styles.helper}>Tap to select a celebrity</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={styles.premiumCard}>
+          <Text style={styles.premiumTitle}>Premium Quality</Text>
+          <Text style={styles.helper}>
+            Every call uses the celebrity’s cloned voice and is delivered to the recipient’s phone.
+          </Text>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHead}>
+            <View style={[styles.numBadge, { backgroundColor: '#F97316' }]}><Text style={styles.numText}>1</Text></View>
+            <Text style={styles.sectionTitle}>Call Details</Text>
+          </View>
+          <FieldLabel>YOUR NAME *</FieldLabel>
+          <TextField value={senderName} onChangeText={setSenderName} placeholder="e.g. Rahul Sharma" icon="user" />
+          <FieldLabel>RECIPIENT'S NAME *</FieldLabel>
+          <TextField value={recipientName} onChangeText={setRecipientName} placeholder="Who are they calling?" icon="user" />
+          <FieldLabel>PHONE NUMBER *</FieldLabel>
+          <TextField value={recipientPhone} onChangeText={setRecipientPhone} placeholder="+91 00000 00000" icon="phone" keyboardType="phone-pad" />
+          <FieldLabel>OCCASION *</FieldLabel>
+          <View style={styles.chipRow}>
+            {OCCASIONS.map((oc) => (
+              <Chip key={oc} label={oc} selected={occasion === oc} onPress={() => setOccasion(oc)} />
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHead}>
+            <View style={[styles.numBadge, { backgroundColor: '#EC4899' }]}><Text style={styles.numText}>2</Text></View>
+            <Text style={styles.sectionTitle}>Scheduling</Text>
+          </View>
+          <View style={styles.timingRow}>
+            <TouchableOpacity
+              style={[styles.timingCard, callTiming === 'now' && styles.timingCardActive]}
+              onPress={() => setCallTiming('now')}
+            >
+              <Icon name="zap" size={18} color={callTiming === 'now' ? '#FB923C' : MUTED} />
+              <View>
+                <Text style={styles.timingTitle}>Call Now</Text>
+                <Text style={styles.journeyDesc}>Estimated wait: 4–5 mins</Text>
+              </View>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.timingCard, callTiming === 'scheduled' && styles.timingCardPurple]}
+              onPress={() => setCallTiming('scheduled')}
+            >
+              <Icon name="calendar" size={18} color={callTiming === 'scheduled' ? '#C084FC' : MUTED} />
+              <View>
+                <Text style={styles.timingTitle}>Schedule Later</Text>
+                <Text style={styles.journeyDesc}>Pick a future date & time</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+
+          {callTiming === 'scheduled' ? (
+            <>
+              <FieldLabel>SELECT DATE</FieldLabel>
+              <TouchableOpacity
+                style={styles.inputWrap}
+                onPress={() => { setShowDatePicker(!showDatePicker); setShowTimePicker(false); }}
+              >
+                <Icon name="calendar" size={15} color={MUTED} />
+                <Text style={styles.dateText}>{selectedDate.label}</Text>
+                <Icon name={showDatePicker ? 'chevron-up' : 'chevron-down'} size={14} color={MUTED} />
+              </TouchableOpacity>
+              {showDatePicker ? (
+                <View style={styles.dropdown}>
+                  {DATES.map((d) => (
+                    <TouchableOpacity
+                      key={d.dateStr}
+                      style={styles.dropdownRow}
+                      onPress={() => { setSelectedDate(d); setShowDatePicker(false); }}
+                    >
+                      <Text style={[styles.dropdownText, selectedDate.dateStr === d.dateStr && { color: '#F472B6' }]}>{d.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : null}
+
+              <FieldLabel>PREFERRED TIME</FieldLabel>
+              <TouchableOpacity
+                style={styles.inputWrap}
+                onPress={() => { setShowTimePicker(!showTimePicker); setShowDatePicker(false); }}
+              >
+                <Icon name="clock" size={15} color={MUTED} />
+                <Text style={styles.dateText}>{formatTimeLabel(selectedTime)}</Text>
+                <Icon name={showTimePicker ? 'chevron-up' : 'chevron-down'} size={14} color={MUTED} />
+              </TouchableOpacity>
+              {showTimePicker ? (
+                <View style={[styles.dropdown, { maxHeight: 200 }]}>
+                  <ScrollView nestedScrollEnabled>
+                    {TIMES.map((t) => (
+                      <TouchableOpacity
+                        key={t}
+                        style={styles.dropdownRow}
+                        onPress={() => { setSelectedTime(t); setShowTimePicker(false); }}
+                      >
+                        <Text style={[styles.dropdownText, selectedTime === t && { color: '#F472B6' }]}>{formatTimeLabel(t)}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : null}
+            </>
+          ) : null}
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.sectionHead}>
+            <View style={[styles.numBadge, { backgroundColor: '#8B5CF6' }]}><Text style={styles.numText}>3</Text></View>
+            <Text style={styles.sectionTitle}>Personalization</Text>
+          </View>
+          <FieldLabel>TONE & STYLE</FieldLabel>
+          <View style={styles.chipRow}>
+            {TONES.map((t) => (
+              <Chip key={t.value} label={t.label} selected={tone === t.value} onPress={() => setTone(tone === t.value ? '' : t.value)} />
+            ))}
+          </View>
+          <FieldLabel>RELATIONSHIP</FieldLabel>
+          <View style={styles.chipRow}>
+            {RELATIONSHIPS.map((r) => (
+              <Chip key={r.value} label={r.label} selected={relationship === r.value} onPress={() => setRelationship(relationship === r.value ? '' : r.value)} />
+            ))}
+          </View>
+          <FieldLabel>LANGUAGE</FieldLabel>
+          <View style={styles.chipRow}>
+            {LANGUAGES.map((l) => (
+              <Chip key={l.value} label={l.label} selected={language === l.value} onPress={() => setLanguage(l.value)} />
+            ))}
+          </View>
+          <FieldLabel>CUSTOM MESSAGE / THINGS TO SAY</FieldLabel>
+          <TextField
+            value={customMessage}
+            onChangeText={(v) => setCustomMessage(v.slice(0, 500))}
+            placeholder={selectedCeleb ? `Mention memories you want ${selectedCeleb.name} to talk about...` : 'Mention special memories, nicknames, or things to say...'}
+            multiline
           />
-        ) : selectedCeleb ? (
-          <CallDetailsForm
-            celeb={selectedCeleb}
-            onBack={handleBack}
-            colors={colors}
-            bottomPad={bottomPad}
-          />
-        ) : null}
+          <Text style={styles.charCount}>{customMessage.length} / 500 characters</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.estLabel}>ESTIMATED TOTAL</Text>
+          <View style={styles.priceRow}>
+            <Text style={styles.priceNow}>{selectedCeleb ? `₹${finalPrice.toLocaleString('en-IN')}` : '—'}</Text>
+            {selectedCeleb && discountPercentage > 0 ? (
+              <Text style={styles.priceOld}>₹{basePrice.toLocaleString('en-IN')}</Text>
+            ) : null}
+          </View>
+          {selectedCeleb && discountPercentage > 0 ? (
+            <Text style={styles.discountNote}>{discountPercentage}% {plan || ''} discount applied</Text>
+          ) : null}
+          <Text style={styles.walletLine}>Wallet: ₹{wallet.balance.toLocaleString('en-IN')}</Text>
+
+          {callError ? (
+            <View style={styles.errorBanner}>
+              <Icon name="alert-circle" size={16} color="#F87171" />
+              <Text style={styles.errorBannerText}>{callError}</Text>
+            </View>
+          ) : null}
+
+          <TouchableOpacity
+            onPress={handleMakeCall}
+            disabled={submitting || !canSubmit}
+            activeOpacity={0.85}
+            style={[(!canSubmit || submitting) && { opacity: 0.4 }]}
+          >
+            <LinearGradient colors={['#F97316', '#EC4899', '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
+              {submitting ? (
+                <>
+                  <ActivityIndicator color="#fff" />
+                  <Text style={styles.ctaText}>{callTiming === 'scheduled' ? 'Scheduling...' : 'Initiating...'}</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.ctaText}>BOOK YOUR CALL</Text>
+                  <Icon name="arrow-right" size={16} color="#fff" />
+                </>
+              )}
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
+
+      <CelebrityPickerModal
+        visible={showPicker}
+        onClose={() => setShowPicker(false)}
+        celebrities={celebrities}
+        loading={loading}
+        error={error}
+        onRetry={refetch}
+        search={search}
+        setSearch={setSearch}
+        favoriteIds={favoriteIds}
+        onSelect={handleSelectCeleb}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingBottom: 20 },
-  headerTitle: { fontSize: 24, fontFamily: 'PlayfairDisplay_700Bold', color: '#fff', marginBottom: 4 },
-  headerSub: { fontSize: 13, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.85)' },
-
-  stepBarWrap: { paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, gap: 10 },
-  stepLabels: { flexDirection: 'row', justifyContent: 'space-between' },
-  stepLabelText: { fontSize: 13 },
-  stepRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 0 },
-  stepCircle: {
-    width: 28, height: 28, borderRadius: 14, borderWidth: 2,
-    alignItems: 'center', justifyContent: 'center',
+  root: { flex: 1, backgroundColor: PAGE_BG },
+  hero: { paddingVertical: 18, alignItems: 'center' },
+  heroItalic: {
+    fontFamily: 'PlayfairDisplay_700Bold',
+    fontSize: 26,
+    color: '#fff',
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
-  stepNum: { fontSize: 13, fontFamily: 'Inter_700Bold' },
-  stepLine: { flex: 1, height: 2, marginHorizontal: 8 },
-
-  scrollContent: { padding: 16, gap: 14 },
-
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 46,
+  heroGradient: {
+    fontFamily: 'PlayfairDisplay_700Bold',
+    fontSize: 26,
+    color: '#F472B6',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: 4,
   },
-  searchInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
-
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  celebCard: { borderRadius: 14, borderWidth: 1, overflow: 'hidden', paddingBottom: 10 },
-  celebAvatarWrap: { position: 'relative' },
-  celebAvatar: { width: 48, height: 48, alignSelf: 'center', marginTop: 12, borderRadius: 24 },
-  onlineDot: {
-    position: 'absolute', bottom: 2, right: (CARD_W - 48) / 2 - 2,
-    width: 10, height: 10, borderRadius: 5, backgroundColor: '#22C55E', borderWidth: 1.5, borderColor: '#fff',
+  heroSub: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 20,
+    color: MUTED,
+    textAlign: 'center',
+    fontFamily: 'Inter_400Regular',
+    maxWidth: 340,
   },
-  celebInfo: { paddingHorizontal: 10, paddingTop: 8, gap: 2 },
-  celebNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  celebName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', flex: 1 },
-  verifiedBadge: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
-  celebCat: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  ratingText: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
-  rateText: { fontSize: 12, fontFamily: 'Inter_700Bold' },
-  helperNote: { fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
-  subHint: { fontSize: 10, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
-  lockBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+  journeyTitle: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter_600SemiBold',
+    textAlign: 'center',
+    marginBottom: 14,
+  },
+  pinkItalic: { color: '#F472B6', fontStyle: 'italic' },
+  journeyRow: { gap: 10, paddingBottom: 8 },
+  journeyCard: {
+    width: 128,
+    backgroundColor: CARD_BG,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 16,
+    padding: 12,
+    alignItems: 'center',
+  },
+  journeyIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
     alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 8,
   },
-
-  loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12 },
-  loadingText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  errorWrap: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 12, paddingHorizontal: 20 },
-  errorTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
-  errorSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
-  retryBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
-  retryText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-
-  backBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  backText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-
-  selectedCeleb: { flexDirection: 'row', alignItems: 'center', gap: 14, borderRadius: 14, padding: 14, borderWidth: 1 },
-  selectedAvatar: { width: 56, height: 56, borderRadius: 28 },
-  selectedName: { fontSize: 15, fontFamily: 'Inter_600SemiBold', marginBottom: 2 },
-  selectedCat: { fontSize: 12, fontFamily: 'Inter_400Regular', marginBottom: 4 },
-  selectedRate: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-
-  formContent: { gap: 14 },
-  formSection: { borderRadius: 16, padding: 18, borderWidth: 1, gap: 4 },
-  sectionTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 12 },
-  optionalTag: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  fieldLabel: { fontSize: 13, fontFamily: 'Inter_600SemiBold', marginBottom: 8 },
-
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 9999, borderWidth: 1.5 },
-  chipText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
-
+  journeyLabel: { color: '#fff', fontSize: 11, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
+  journeyDesc: { color: MUTED, fontSize: 10, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 4, lineHeight: 14 },
+  card: {
+    backgroundColor: CARD_BG,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 18,
+    padding: 16,
+    marginTop: 14,
+  },
+  premiumCard: {
+    marginTop: 14,
+    borderRadius: 18,
+    padding: 16,
+    backgroundColor: 'rgba(236,72,153,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(236,72,153,0.15)',
+  },
+  premiumTitle: {
+    fontSize: 15,
+    fontFamily: 'Inter_700Bold',
+    color: '#F472B6',
+    marginBottom: 6,
+  },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
+  sectionTitle: { color: '#fff', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  numBadge: { width: 26, height: 26, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  numText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_700Bold' },
+  fieldLabel: {
+    color: MUTED,
+    fontSize: 10,
+    fontFamily: 'Inter_600SemiBold',
+    letterSpacing: 0.6,
+    marginBottom: 8,
+    marginTop: 12,
+  },
   inputWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, height: 46,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    minHeight: 44,
   },
-  textInput: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
-  dateText: { flex: 1, fontSize: 14, fontFamily: 'Inter_400Regular' },
-
-  timingToggle: { flexDirection: 'row', gap: 10 },
-  timingBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 12, borderRadius: 10, borderWidth: 1.5, overflow: 'hidden',
+  inputMultiline: { alignItems: 'flex-start', paddingVertical: 10, minHeight: 90 },
+  textInput: { flex: 1, color: '#fff', fontSize: 14, fontFamily: 'Inter_400Regular' },
+  textArea: { textAlignVertical: 'top', minHeight: 70 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
   },
-  timingBtnText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', flexShrink: 1 },
-
-  pickerDropdown: { borderRadius: 12, borderWidth: 1, marginTop: 6, overflow: 'hidden' },
-  timeDropdown: {},
-  pickerOption: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1,
+  chipSelected: { borderColor: 'rgba(236,72,153,0.5)', backgroundColor: 'rgba(236,72,153,0.12)' },
+  chipText: { color: MUTED, fontSize: 12, fontFamily: 'Inter_500Medium' },
+  chipTextSelected: { color: '#F472B6' },
+  selectedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 10,
+    borderRadius: 14,
+    backgroundColor: 'rgba(236,72,153,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(236,72,153,0.2)',
   },
-  pickerOptionText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
-
-  pricingCard: { borderRadius: 16, padding: 18, borderWidth: 1, gap: 10 },
-  pricingTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 4 },
-  pricingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  pricingLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
-  pricingValue: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  discountRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
-  discountBadge: { backgroundColor: '#22C55E20', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 9999 },
-  discountText: { color: '#22C55E', fontSize: 11, fontFamily: 'Inter_700Bold' },
-  divider: { height: 1, marginVertical: 4 },
-  totalLabel: { fontSize: 15, fontFamily: 'Inter_700Bold', flex: 1 },
-  totalValue: { fontSize: 17, fontFamily: 'Inter_700Bold' },
-
-  callErrorBanner: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
-    borderWidth: 1, borderRadius: 10, padding: 12,
+  selectedAvatar: { width: 44, height: 44, borderRadius: 22 },
+  selectedName: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  changeLink: { color: MUTED, fontSize: 12, textAlign: 'center', marginTop: 12, fontFamily: 'Inter_500Medium' },
+  dashedPick: {
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: CARD_BORDER,
+    borderRadius: 14,
+    paddingVertical: 28,
+    alignItems: 'center',
+    gap: 8,
   },
-  callErrorText: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular' },
-
-  callBtnWrap: { borderRadius: 14, overflow: 'hidden' },
-  callCTA: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, paddingVertical: 16 },
-  callCTAText: { color: '#fff', fontSize: 17, fontFamily: 'Inter_700Bold' },
-
+  helper: { color: MUTED, fontSize: 12, fontFamily: 'Inter_400Regular', lineHeight: 18 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  verified: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
+  timingRow: { gap: 10 },
+  timingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  timingCardActive: { borderColor: 'rgba(249,115,22,0.4)', backgroundColor: 'rgba(249,115,22,0.08)' },
+  timingCardPurple: { borderColor: 'rgba(168,85,247,0.4)', backgroundColor: 'rgba(168,85,247,0.08)' },
+  timingTitle: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
+  dateText: { flex: 1, color: '#fff', fontSize: 14, fontFamily: 'Inter_400Regular' },
+  dropdown: {
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 12,
+    backgroundColor: '#151528',
+    overflow: 'hidden',
+  },
+  dropdownRow: { paddingHorizontal: 14, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: CARD_BORDER },
+  dropdownText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_500Medium' },
+  charCount: { color: 'rgba(255,255,255,0.25)', fontSize: 10, textAlign: 'right', marginTop: 6 },
+  estLabel: { color: 'rgba(255,255,255,0.3)', fontSize: 10, letterSpacing: 0.8, fontFamily: 'Inter_600SemiBold' },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 6 },
+  priceNow: { color: '#fff', fontSize: 32, fontFamily: 'Inter_700Bold' },
+  priceOld: { color: MUTED, fontSize: 14, textDecorationLine: 'line-through' },
+  discountNote: { color: '#34D399', fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 4 },
+  walletLine: { color: MUTED, fontSize: 12, marginTop: 8, marginBottom: 14, fontFamily: 'Inter_400Regular' },
+  errorBanner: {
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: 'rgba(239,68,68,0.12)',
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+  },
+  errorBannerText: { flex: 1, color: '#F87171', fontSize: 13, fontFamily: 'Inter_400Regular' },
+  cta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+  },
+  ctaText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold' },
   successCard: {
-    borderRadius: 20, borderWidth: 1, padding: 28,
-    alignItems: 'center', gap: 14,
+    margin: 20,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    backgroundColor: CARD_BG,
+    padding: 28,
+    alignItems: 'center',
+    gap: 12,
   },
-  successIconWrap: {
-    width: 80, height: 80, borderRadius: 40,
-    alignItems: 'center', justifyContent: 'center',
+  successIcon: { width: 76, height: 76, borderRadius: 38, alignItems: 'center', justifyContent: 'center' },
+  successTitle: { color: '#fff', fontSize: 22, fontFamily: 'PlayfairDisplay_700Bold', textAlign: 'center' },
+  successMsg: { color: MUTED, fontSize: 14, textAlign: 'center', lineHeight: 22, fontFamily: 'Inter_400Regular' },
+  successCeleb: { flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: 'stretch', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 10 },
+  successAvatar: { width: 32, height: 32, borderRadius: 16 },
+  successCelebName: { color: '#fff', fontFamily: 'Inter_500Medium' },
+  modalRoot: { flex: 1, backgroundColor: PAGE_BG, paddingHorizontal: 16 },
+  modalHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 14 },
+  modalTitle: { color: '#fff', fontSize: 20, fontFamily: 'Inter_700Bold' },
+  modalSub: { color: MUTED, fontSize: 12, marginTop: 4, fontFamily: 'Inter_400Regular' },
+  modalClose: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  searchWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 12,
   },
-  successTitle: { fontSize: 22, fontFamily: 'PlayfairDisplay_700Bold', textAlign: 'center' },
-  successMsg: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 22 },
-  successMetaRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10, alignSelf: 'stretch',
+  searchInput: { flex: 1, color: '#fff', fontSize: 14, fontFamily: 'Inter_400Regular' },
+  pickerList: { paddingBottom: 24, gap: 10 },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 12,
+    borderRadius: 14,
+    backgroundColor: CARD_BG,
+    borderWidth: 1,
+    borderColor: CARD_BORDER,
   },
-  successMetaText: { fontSize: 14, fontFamily: 'Inter_500Medium', flex: 1 },
-  successAvatar: { width: 28, height: 28, borderRadius: 14 },
-  bookAnotherBtnWrap: { borderRadius: 12, overflow: 'hidden', alignSelf: 'stretch', marginTop: 6 },
-  bookAnotherBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
-  bookAnotherText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  pickerAvatar: { width: 48, height: 48, borderRadius: 24 },
+  pickerName: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold', flexShrink: 1 },
+  pickerCat: { color: MUTED, fontSize: 12, marginTop: 2 },
+  pickerPrice: { color: '#F472B6', fontSize: 12, fontFamily: 'Inter_600SemiBold', marginTop: 2 },
+  subBadge: { backgroundColor: 'rgba(34,197,94,0.15)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
+  subBadgeText: { color: '#4ADE80', fontSize: 10, fontFamily: 'Inter_700Bold' },
+  lockWrap: { alignItems: 'center', gap: 4 },
+  lockText: { color: MUTED, fontSize: 10, fontFamily: 'Inter_500Medium' },
+  centered: { alignItems: 'center', justifyContent: 'center', paddingVertical: 48, gap: 10 },
+  errorTitle: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  retryBtn: { backgroundColor: '#EC4899', paddingHorizontal: 18, paddingVertical: 10, borderRadius: 10 },
+  retryText: { color: '#fff', fontFamily: 'Inter_600SemiBold' },
 });
