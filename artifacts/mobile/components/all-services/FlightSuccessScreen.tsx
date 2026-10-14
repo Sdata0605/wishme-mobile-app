@@ -28,6 +28,8 @@ import type { FlightContactInfo, FlightPassenger } from './FlightPassengerScreen
 import type { SelectedFlightAddons } from './FlightAddonsScreen';
 import type { TBOBookingConfirmation } from '../../services/tboService';
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles, glass, dockBar } from './themed';
+import { BrandFill } from './BrandFill';
 
 interface FlightSuccessScreenProps {
   flight: FlightResult;
@@ -52,6 +54,7 @@ export function FlightSuccessScreen({
   confirmation,
   onDone,
 }: FlightSuccessScreenProps) {
+  const s = use_s();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -98,11 +101,11 @@ export function FlightSuccessScreen({
       {/* Top Banner */}
       <View style={[s.topBanner, { paddingTop: topPad + 12 }]}>
         <View style={s.successBadge}>
-          <CheckCircle2 size={36} color="#10B981" />
+          <CheckCircle2 size={36} color={T('#10B981', 'fg')} />
         </View>
         <Text style={s.successHeading}>Flight Confirmed!</Text>
         <Text style={s.successSub}>
-          E-ticket has been sent to <Text style={{ color: C.blue, fontFamily: 'Inter_600SemiBold' }}>{contact.email}</Text>
+          E-ticket has been sent to <Text style={{ color: T(C.blue, 'fg'), fontFamily: 'Inter_600SemiBold' }}>{contact.email}</Text>
         </Text>
       </View>
 
@@ -141,7 +144,7 @@ export function FlightSuccessScreen({
               <View style={s.flightLine}>
                 <View style={s.lineDot} />
                 <View style={s.dashLine} />
-                <Plane size={14} color={C.blue} style={{ transform: [{ rotate: '90deg' }] }} />
+                <Plane size={14} color={T(C.blue, 'fg')} style={{ transform: [{ rotate: '90deg' }] }} />
                 <View style={s.dashLine} />
                 <View style={s.lineDot} />
               </View>
@@ -170,7 +173,7 @@ export function FlightSuccessScreen({
               return (
                 <View key={p.id} style={s.passItem}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                    <User size={14} color={C.blue} />
+                    <User size={14} color={T(C.blue, 'fg')} />
                     <Text style={s.passName}>
                       {p.title} {p.firstName} {p.lastName}
                     </Text>
@@ -190,19 +193,19 @@ export function FlightSuccessScreen({
             <View style={s.addonsIncluded}>
               {addons.meals.length > 0 && (
                 <View style={s.addonChip}>
-                  <Utensils size={12} color="#D97706" />
+                  <Utensils size={12} color={T('#D97706', 'fg')} />
                   <Text style={s.addonChipText}>{addons.meals.length} Meal(s)</Text>
                 </View>
               )}
               {addons.extraBaggageKg > 0 && (
                 <View style={s.addonChip}>
-                  <Luggage size={12} color="#059669" />
+                  <Luggage size={12} color={T('#059669', 'fg')} />
                   <Text style={s.addonChipText}>+{addons.extraBaggageKg}kg Extra Baggage</Text>
                 </View>
               )}
               {addons.insurance && (
                 <View style={s.addonChip}>
-                  <ShieldCheck size={12} color="#2563EB" />
+                  <ShieldCheck size={12} color={T('#2563EB', 'fg')} />
                   <Text style={s.addonChipText}>Trip Insurance Active</Text>
                 </View>
               )}
@@ -212,7 +215,7 @@ export function FlightSuccessScreen({
           {/* Barcode / QR Section */}
           <View style={s.qrSection}>
             <View style={s.qrBox}>
-              <QrCode size={54} color={C.dark} />
+              <QrCode size={54} color={T(C.dark, 'fg')} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.eTicketNum}>E-TICKET NO</Text>
@@ -225,15 +228,15 @@ export function FlightSuccessScreen({
         {/* Quick Actions */}
         <View style={s.actionRow}>
           <TouchableOpacity style={s.actionBtn} activeOpacity={0.7} onPress={handleDownload}>
-            <Download size={16} color={C.blue} />
+            <Download size={16} color={T(C.blue, 'fg')} />
             <Text style={s.actionBtnText}>Download PDF</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.actionBtn} activeOpacity={0.7} onPress={handleShare}>
-            <Share2 size={16} color={C.blue} />
+            <Share2 size={16} color={T(C.blue, 'fg')} />
             <Text style={s.actionBtnText}>Share Ticket</Text>
           </TouchableOpacity>
           <TouchableOpacity style={s.actionBtn} activeOpacity={0.7} onPress={handleAddToCalendar}>
-            <Calendar size={16} color={C.blue} />
+            <Calendar size={16} color={T(C.blue, 'fg')} />
             <Text style={s.actionBtnText}>Add Calendar</Text>
           </TouchableOpacity>
         </View>
@@ -242,13 +245,13 @@ export function FlightSuccessScreen({
         <View style={s.infoCard}>
           <Text style={s.infoTitle}>Important Guidelines</Text>
           <View style={s.infoItem}>
-            <MapPin size={14} color={C.textLight} style={{ marginTop: 2 }} />
+            <MapPin size={14} color={T(C.textLight, 'fg')} style={{ marginTop: 2 }} />
             <Text style={s.infoText}>
               Reach airport at least 2 hours before domestic flight departure.
             </Text>
           </View>
           <View style={s.infoItem}>
-            <Luggage size={14} color={C.textLight} style={{ marginTop: 2 }} />
+            <Luggage size={14} color={T(C.textLight, 'fg')} style={{ marginTop: 2 }} />
             <Text style={s.infoText}>
               Standard cabin baggage: 7kg per passenger. Valid Govt photo ID required at gate.
             </Text>
@@ -258,7 +261,7 @@ export function FlightSuccessScreen({
 
       {/* Footer */}
       <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, 14) }]}>
-        <TouchableOpacity style={s.doneBtn} activeOpacity={0.85} onPress={onDone}>
+        <TouchableOpacity style={s.doneBtn} activeOpacity={0.85} onPress={onDone}><BrandFill />
           <Text style={s.doneBtnText}>Back to Services</Text>
         </TouchableOpacity>
       </View>
@@ -266,38 +269,38 @@ export function FlightSuccessScreen({
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_s = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   topBanner: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
   successBadge: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 8,
   },
-  successHeading: { fontSize: 20, fontFamily: 'Inter_700Bold', color: C.text },
+  successHeading: { fontSize: 20, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   successSub: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 4,
     textAlign: 'center',
   },
   ticketCard: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 16,
     marginTop: 8,
     shadowColor: '#000',
@@ -305,41 +308,41 @@ const s = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 3,
-  },
+   ...glass(22), },
   ticketHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
-  airlineName: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
-  flightNum: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  airlineName: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  flightNum: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   pnrBadge: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: T('#EFF6FF', 'bg'),
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
     alignItems: 'center',
   },
-  pnrLabel: { fontSize: 9, fontFamily: 'Inter_700Bold', color: C.blue, letterSpacing: 0.5 },
-  pnrCode: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.dark },
+  pnrLabel: { fontSize: 9, fontFamily: 'Inter_700Bold', color: T(C.blue, 'fg'), letterSpacing: 0.5 },
+  pnrCode: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.dark, 'fg') },
   routeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
   },
-  airportCode: { fontSize: 24, fontFamily: 'Inter_700Bold', color: C.text },
-  timeText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: C.dark, marginTop: 2 },
-  terminalText: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  airportCode: { fontSize: 24, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  timeText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: T(C.dark, 'fg'), marginTop: 2 },
+  terminalText: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   durationCol: { alignItems: 'center', paddingHorizontal: 10 },
-  durationText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.textLight, marginBottom: 4 },
+  durationText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg'), marginBottom: 4 },
   flightLine: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  lineDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: C.blue },
-  dashLine: { width: 22, height: 1, backgroundColor: C.blue },
-  stopsText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: '#059669', marginTop: 4 },
+  lineDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: T(C.blue, 'bg') },
+  dashLine: { width: 22, height: 1, backgroundColor: T(C.blue, 'bg') },
+  stopsText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: T('#059669', 'fg'), marginTop: 4 },
   ticketDivider: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -352,16 +355,16 @@ const s = StyleSheet.create({
     height: 28,
     borderTopRightRadius: 14,
     borderBottomRightRadius: 14,
-    backgroundColor: C.pageBg,
+    backgroundColor: T(C.pageBg, 'bg'),
     borderWidth: 1,
     borderLeftWidth: 0,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
   },
   dashedSep: {
     flex: 1,
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     height: 0,
     marginHorizontal: 4,
   },
@@ -370,66 +373,66 @@ const s = StyleSheet.create({
     height: 28,
     borderTopLeftRadius: 14,
     borderBottomLeftRadius: 14,
-    backgroundColor: C.pageBg,
+    backgroundColor: T(C.pageBg, 'bg'),
     borderWidth: 1,
     borderRightWidth: 0,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
   },
   passengersBlock: { paddingVertical: 10 },
-  sectionMini: { fontSize: 10, fontFamily: 'Inter_700Bold', color: C.gray, letterSpacing: 0.8, marginBottom: 8 },
+  sectionMini: { fontSize: 10, fontFamily: 'Inter_700Bold', color: T(C.gray, 'fg'), letterSpacing: 0.8, marginBottom: 8 },
   passItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 4,
   },
-  passName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
+  passName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
   seatBadge: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: T('#F3F4F6', 'bg'),
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
-  seatBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: C.text },
+  seatBadgeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   addonsIncluded: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
   },
   addonChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: T('#F8FAFC', 'bg'),
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
   },
-  addonChipText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.text },
+  addonChipText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
   qrSection: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: T('#F8FAFC', 'bg'),
     borderRadius: 12,
     padding: 12,
     marginTop: 8,
   },
   qrBox: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     padding: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
   },
-  eTicketNum: { fontSize: 10, fontFamily: 'Inter_700Bold', color: C.textLight, letterSpacing: 0.5 },
-  eTicketVal: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.text, marginTop: 1 },
-  barcodeHint: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.gray, marginTop: 2 },
+  eTicketNum: { fontSize: 10, fontFamily: 'Inter_700Bold', color: T(C.textLight, 'fg'), letterSpacing: 0.5 },
+  eTicketVal: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 1 },
+  barcodeHint: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.gray, 'fg'), marginTop: 2 },
   actionRow: {
     flexDirection: 'row',
     gap: 8,
@@ -441,40 +444,41 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     paddingVertical: 10,
   },
-  actionBtnText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.blue },
+  actionBtnText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.blue, 'fg') },
   infoCard: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 14,
     marginTop: 12,
-  },
-  infoTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.text, marginBottom: 8 },
+   ...glass(18), },
+  infoTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginBottom: 8 },
   infoItem: { flexDirection: 'row', gap: 8, marginBottom: 6 },
-  infoText: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, lineHeight: 16 },
+  infoText: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), lineHeight: 16 },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 16,
     paddingTop: 12,
-  },
+   ...dockBar(), },
   doneBtn: {
-    backgroundColor: C.blue,
+    backgroundColor: T(C.blue, 'bg'),
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
-  },
-  doneBtnText: { color: C.white, fontSize: 15, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  doneBtnText: { color: T(C.white, 'fg'), fontSize: 15, fontFamily: 'Inter_700Bold' },
 });
+const use_s = () => useThemedStyles(make_s);

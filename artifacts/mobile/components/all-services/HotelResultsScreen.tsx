@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { clearOptionSet, setOptionSet } from '@/services/assistant/bridge';
 import {
   Image,
   Modal,
@@ -27,6 +28,8 @@ import {
 import { HOTELS, type Hotel, type HotelSearchParams } from './hotelData';
 
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles, glass } from './themed';
+import { BrandFill } from './BrandFill';
 
 type FilterCat = 'popular' | 'price' | 'rating' | 'stars' | 'type' | 'amenities';
 
@@ -93,10 +96,11 @@ function Checkbox({
   right?: string;
   onToggle: () => void;
 }) {
+  const ch = use_ch();
   return (
     <TouchableOpacity style={ch.row} onPress={onToggle} activeOpacity={0.75}>
       <View style={[ch.box, checked && ch.boxOn]}>
-        {checked && <Check size={11} color={C.white} />}
+        {checked && <Check size={11} color={T(C.white, 'fg')} />}
       </View>
       <Text style={ch.label}>{label}</Text>
       {!!right && <Text style={ch.right}>{right}</Text>}
@@ -104,22 +108,23 @@ function Checkbox({
   );
 }
 
-const ch = StyleSheet.create({
+const make_ch = () => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   box: {
     width: 20,
     height: 20,
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
-  boxOn: { backgroundColor: C.green, borderColor: C.green },
-  label: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: C.text },
-  right: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.textLight },
+  boxOn: { backgroundColor: T(C.green, 'bg'), borderColor: T(C.green, 'border') },
+  label: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
+  right: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
 });
+const use_ch = () => useThemedStyles(make_ch);
 
 function FiltersModal({
   visible,
@@ -132,6 +137,7 @@ function FiltersModal({
   onClose: () => void;
   onApply: (f: HotelFilters) => void;
 }) {
+  const fm = use_fm();
   const insets = useSafeAreaInsets();
   const [filters, setFilters] = useState(value);
   const [tab, setTab] = useState<FilterCat>('popular');
@@ -173,11 +179,11 @@ function FiltersModal({
             </View>
             <View style={fm.headerActions}>
               <TouchableOpacity style={fm.clear} onPress={() => setFilters(DEFAULT_FILTERS)}>
-                <RotateCcw size={13} color={C.orange} />
+                <RotateCcw size={13} color={T(C.orange, 'fg')} />
                 <Text style={fm.clearText}>Clear</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={onClose}>
-                <X size={20} color={C.text} />
+                <X size={20} color={T(C.text, 'fg')} />
               </TouchableOpacity>
             </View>
           </View>
@@ -335,10 +341,10 @@ function FiltersModal({
   );
 }
 
-const fm = StyleSheet.create({
+const make_fm = () => StyleSheet.create({
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     height: '88%',
@@ -351,29 +357,29 @@ const fm = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
-  title: { fontSize: 17, fontFamily: 'Inter_700Bold', color: C.text },
-  sub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+  title: { fontSize: 17, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  sub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   clear: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: T('#F5F0FF', 'bg'),
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  clearText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.orange },
+  clearText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.orange, 'fg') },
   body: { flex: 1, flexDirection: 'row', minHeight: 0 },
   side: {
     width: 78,
     flexGrow: 0,
     flexShrink: 0,
-    backgroundColor: C.pageBg,
+    backgroundColor: T(C.pageBg, 'bg'),
     borderRightWidth: 1,
-    borderRightColor: C.border,
+    borderRightColor: T(C.border, 'border'),
   },
   sideItem: {
     paddingVertical: 13,
@@ -381,46 +387,48 @@ const fm = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: 'transparent',
   },
-  sideItemOn: { backgroundColor: C.white, borderLeftColor: C.green },
-  sideText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.textLight },
-  sideTextOn: { color: C.green, fontFamily: 'Inter_700Bold' },
+  sideItemOn: { backgroundColor: T(C.white, 'bg'), borderLeftColor: T(C.green, 'border') },
+  sideText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  sideTextOn: { color: T(C.green, 'fg'), fontFamily: 'Inter_700Bold' },
   content: { flex: 1, minWidth: 0 },
-  hint: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.textLight, marginBottom: 10 },
+  hint: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg'), marginBottom: 10 },
   group: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     paddingHorizontal: 12,
-  },
-  sep: { height: 1, backgroundColor: C.lightGray },
+   ...glass(18), },
+  sep: { height: 1, backgroundColor: T(C.lightGray, 'bg') },
   priceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   priceChip: {
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 18,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
-  priceChipOn: { borderColor: C.green, backgroundColor: '#ECFDF5' },
-  priceText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.textLight },
-  priceTextOn: { color: C.green },
-  footer: { borderTopWidth: 1, borderTopColor: C.border, paddingHorizontal: 14, paddingTop: 10 },
+  priceChipOn: { borderColor: T(C.green, 'border'), backgroundColor: T('#ECFDF5', 'bg') },
+  priceText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
+  priceTextOn: { color: T(C.green, 'fg') },
+  footer: { borderTopWidth: 1, borderTopColor: T(C.border, 'border'), paddingHorizontal: 14, paddingTop: 10 },
   apply: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
   },
-  applyText: { color: C.white, fontSize: 15, fontFamily: 'Inter_700Bold' },
+  applyText: { color: T(C.white, 'fg'), fontSize: 15, fontFamily: 'Inter_700Bold' },
 });
+const use_fm = () => useThemedStyles(make_fm);
 
 function HotelCard({ hotel, nights, onPress }: { hotel: Hotel; nights: number; onPress: () => void }) {
+  const card = use_card();
   const discount = Math.round(((hotel.originalPrice - hotel.price) / hotel.originalPrice) * 100);
   return (
     <TouchableOpacity style={card.wrap} activeOpacity={0.88} onPress={onPress}>
-      <View style={[card.image, { backgroundColor: hotel.tint }]}>
+      <View style={[card.image, { backgroundColor: T(hotel.tint, 'bg') }]}>
         <Image
           source={require('../../assets/images/travel-hotels.jpg')}
           style={card.img}
@@ -429,7 +437,7 @@ function HotelCard({ hotel, nights, onPress }: { hotel: Hotel; nights: number; o
         <View style={[card.imgTint, { backgroundColor: `${hotel.tint}99` }]} />
         <View style={card.starRow}>
           {Array.from({ length: hotel.stars }).map((_, i) => (
-            <Star key={i} size={10} color="#FCD34D" fill="#FCD34D" />
+            <Star key={i} size={10} color={T('#FCD34D', 'fg')} fill={T('#FCD34D', 'fg')} />
           ))}
         </View>
         {hotel.freeCancel && (
@@ -444,7 +452,7 @@ function HotelCard({ hotel, nights, onPress }: { hotel: Hotel; nights: number; o
           {hotel.name}
         </Text>
         <View style={card.locRow}>
-          <MapPin size={12} color={C.textLight} />
+          <MapPin size={12} color={T(C.textLight, 'fg')} />
           <Text style={card.loc} numberOfLines={1}>
             {hotel.area} · {hotel.distance}
           </Text>
@@ -462,9 +470,9 @@ function HotelCard({ hotel, nights, onPress }: { hotel: Hotel; nights: number; o
           {hotel.amenities.slice(0, 3).map((a) => (
             <View key={a} style={card.amenityChip}>
               {a === 'Wi-Fi' ? (
-                <Wifi size={10} color={C.purpleLight} />
+                <Wifi size={10} color={T(C.purpleLight, 'fg')} />
               ) : a === 'Breakfast' ? (
-                <Coffee size={10} color={C.orange} />
+                <Coffee size={10} color={T(C.orange, 'fg')} />
               ) : null}
               <Text style={card.amenityText}>{a}</Text>
             </View>
@@ -481,7 +489,7 @@ function HotelCard({ hotel, nights, onPress }: { hotel: Hotel; nights: number; o
             {discount > 0 && (
               <Text style={card.off}>{discount}% off</Text>
             )}
-            <View style={card.cta}>
+            <View style={card.cta}><BrandFill />
               <Text style={card.ctaText}>View</Text>
             </View>
           </View>
@@ -491,16 +499,16 @@ function HotelCard({ hotel, nights, onPress }: { hotel: Hotel; nights: number; o
   );
 }
 
-const card = StyleSheet.create({
+const make_card = () => StyleSheet.create({
   wrap: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 16,
     marginHorizontal: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     overflow: 'hidden',
-  },
+   ...glass(22), },
   image: { height: 140, position: 'relative' },
   img: { width: '100%', height: '100%' },
   imgTint: { ...StyleSheet.absoluteFillObject },
@@ -509,64 +517,65 @@ const card = StyleSheet.create({
     position: 'absolute',
     right: 10,
     top: 10,
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  badgeText: { color: C.white, fontSize: 10, fontFamily: 'Inter_700Bold' },
+  badgeText: { color: T(C.white, 'fg'), fontSize: 10, fontFamily: 'Inter_700Bold' },
   body: { padding: 12 },
-  name: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text },
+  name: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  loc: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
+  loc: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   ratingPill: {
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  ratingText: { color: C.white, fontSize: 11, fontFamily: 'Inter_700Bold' },
-  reviews: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.textLight },
-  type: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.purpleLight },
+  ratingText: { color: T(C.white, 'fg'), fontSize: 11, fontFamily: 'Inter_700Bold' },
+  reviews: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  type: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.purpleLight, 'fg') },
   amenityRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 8 },
   amenityChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  amenityText: { fontSize: 10, fontFamily: 'Inter_500Medium', color: C.text },
+  amenityText: { fontSize: 10, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
   priceRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-end',
     marginTop: 10,
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingTop: 10,
   },
   strike: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: C.gray,
+    color: T(C.gray, 'fg'),
     textDecorationLine: 'line-through',
   },
-  price: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
-  per: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  price: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  per: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   rightCol: { alignItems: 'flex-end', gap: 6 },
-  off: { fontSize: 11, fontFamily: 'Inter_700Bold', color: C.green },
+  off: { fontSize: 11, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
   cta: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 8,
-  },
-  ctaText: { color: C.white, fontSize: 12, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  ctaText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_700Bold' },
 });
+const use_card = () => useThemedStyles(make_card);
 
 export function HotelResultsScreen({
   search,
@@ -577,6 +586,7 @@ export function HotelResultsScreen({
   onBack: () => void;
   onSelectHotel: (hotel: Hotel) => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const [filtersVisible, setFiltersVisible] = useState(false);
@@ -599,11 +609,31 @@ export function HotelResultsScreen({
 
   const active = countFilters(filters);
 
+  // Let the voice assistant read out and pick from what is on screen.
+  useEffect(() => {
+    setOptionSet({
+      kind: 'hotels',
+      loading: false,
+      items: hotels.map((h) => ({
+        title: h.name,
+        detail: `${h.area}, ${h.stars} star, rated ${h.rating}, ₹${h.price} per night${
+          h.freeCancel ? ', free cancellation' : ''
+        }${h.breakfast ? ', breakfast included' : ''}`,
+      })),
+      select: (i) => {
+        const h = hotels[i];
+        if (h) onSelectHotel(h);
+      },
+    });
+    return () => clearOptionSet('hotels');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hotels]);
+
   return (
     <View style={st.root}>
       <View style={[st.header, { paddingTop: topPad + 6 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={22} color={C.text} />
+          <ArrowLeft size={22} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={st.title}>{search.city}</Text>
@@ -612,7 +642,7 @@ export function HotelResultsScreen({
           </Text>
         </View>
         <TouchableOpacity style={st.filterBtn} onPress={() => setFiltersVisible(true)}>
-          <SlidersHorizontal size={14} color={C.green} />
+          <SlidersHorizontal size={14} color={T(C.green, 'fg')} />
           <Text style={st.filterText}>Filters</Text>
           {active > 0 && (
             <View style={st.badge}>
@@ -623,10 +653,10 @@ export function HotelResultsScreen({
       </View>
 
       <TouchableOpacity style={st.sortBar} onPress={() => setSortOpen(!sortOpen)}>
-        <Filter size={13} color={C.textLight} />
+        <Filter size={13} color={T(C.textLight, 'fg')} />
         <Text style={st.sortLabel}>Sort: </Text>
         <Text style={st.sortValue}>{sort}</Text>
-        {sortOpen ? <ChevronUp size={14} color={C.textLight} /> : <ChevronDown size={14} color={C.textLight} />}
+        {sortOpen ? <ChevronUp size={14} color={T(C.textLight, 'fg')} /> : <ChevronDown size={14} color={T(C.textLight, 'fg')} />}
       </TouchableOpacity>
       {sortOpen && (
         <View style={st.sortDrop}>
@@ -640,7 +670,7 @@ export function HotelResultsScreen({
               }}
             >
               <Text style={[st.sortOptText, sort === s && st.sortOptOn]}>{s}</Text>
-              {sort === s && <Check size={14} color={C.green} />}
+              {sort === s && <Check size={14} color={T(C.green, 'fg')} />}
             </TouchableOpacity>
           ))}
         </View>
@@ -660,7 +690,7 @@ export function HotelResultsScreen({
           <View style={st.empty}>
             <Text style={st.emptyTitle}>No hotels match</Text>
             <Text style={st.emptySub}>Try clearing some filters</Text>
-            <TouchableOpacity style={st.emptyBtn} onPress={() => setFilters(DEFAULT_FILTERS)}>
+            <TouchableOpacity style={st.emptyBtn} onPress={() => setFilters(DEFAULT_FILTERS)}><BrandFill />
               <Text style={st.emptyBtnText}>Reset Filters</Text>
             </TouchableOpacity>
           </View>
@@ -677,58 +707,58 @@ export function HotelResultsScreen({
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
-  meta: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  meta: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     borderWidth: 1.5,
-    borderColor: C.green,
+    borderColor: T(C.green, 'border'),
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
   },
-  filterText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.green },
+  filterText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
   badge: {
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
-  badgeText: { color: C.white, fontSize: 9, fontFamily: 'Inter_700Bold' },
+  badgeText: { color: T(C.white, 'fg'), fontSize: 9, fontFamily: 'Inter_700Bold' },
   sortBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
-  sortLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.textLight },
-  sortValue: { flex: 1, fontSize: 11, fontFamily: 'Inter_700Bold', color: C.text },
+  sortLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  sortValue: { flex: 1, fontSize: 11, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   sortDrop: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
     paddingHorizontal: 14,
   },
   sortOpt: {
@@ -737,33 +767,34 @@ const st = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: C.lightGray,
+    borderBottomColor: T(C.lightGray, 'border'),
   },
-  sortOptText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: C.text },
-  sortOptOn: { color: C.green, fontFamily: 'Inter_700Bold' },
+  sortOptText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
+  sortOptOn: { color: T(C.green, 'fg'), fontFamily: 'Inter_700Bold' },
   count: {
     fontSize: 11,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     paddingHorizontal: 14,
     marginBottom: 10,
   },
   empty: {
     marginHorizontal: 14,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 24,
     alignItems: 'center',
-  },
-  emptyTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text },
-  emptySub: { fontSize: 12, color: C.textLight, marginTop: 6, marginBottom: 14 },
+   ...glass(18), },
+  emptyTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  emptySub: { fontSize: 12, color: T(C.textLight, 'fg'), marginTop: 6, marginBottom: 14 },
   emptyBtn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 9,
-  },
-  emptyBtnText: { color: C.white, fontSize: 12, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  emptyBtnText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_700Bold' },
 });
+const use_st = () => useThemedStyles(make_st);

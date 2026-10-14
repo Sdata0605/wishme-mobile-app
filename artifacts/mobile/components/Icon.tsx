@@ -574,6 +574,83 @@ const ICONS = {
       <Line x1={3} y1={18} x2={3.01} y2={18} {...p(c)} />
     </Svg>
   ),
+  cloud: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" {...p(c)} />
+    </Svg>
+  ),
+  'cloud-rain': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Line x1={16} y1={13} x2={16} y2={21} {...p(c)} />
+      <Line x1={8} y1={13} x2={8} y2={21} {...p(c)} />
+      <Line x1={12} y1={15} x2={12} y2={23} {...p(c)} />
+      <Path d="M20 16.58A5 5 0 0 0 18 7h-1.26A8 8 0 1 0 4 15.25" {...p(c)} />
+    </Svg>
+  ),
+  'cloud-snow': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25" {...p(c)} />
+      <Line x1={8} y1={16} x2={8.01} y2={16} {...p(c)} />
+      <Line x1={8} y1={20} x2={8.01} y2={20} {...p(c)} />
+      <Line x1={12} y1={18} x2={12.01} y2={18} {...p(c)} />
+      <Line x1={12} y1={22} x2={12.01} y2={22} {...p(c)} />
+      <Line x1={16} y1={16} x2={16.01} y2={16} {...p(c)} />
+      <Line x1={16} y1={20} x2={16.01} y2={20} {...p(c)} />
+    </Svg>
+  ),
+  'cloud-lightning': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M19 16.9A5 5 0 0 0 18 7h-1.26a8 8 0 1 0-11.62 9" {...p(c)} />
+      <Polyline points="13 11 9 17 15 17 11 23" {...p(c)} />
+    </Svg>
+  ),
+  droplet: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" {...p(c)} />
+    </Svg>
+  ),
+  wind: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M9.59 4.59A2 2 0 1 1 11 8H2m10.59 11.41A2 2 0 1 0 14 16H2m15.73-8.27A2.5 2.5 0 1 1 19.5 12H2" {...p(c)} />
+    </Svg>
+  ),
+  thermometer: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z" {...p(c)} />
+    </Svg>
+  ),
+  newspaper: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" {...p(c)} />
+      <Path d="M18 14h-8M15 18h-5" {...p(c)} />
+      <Path d="M10 6h8v4h-8V6Z" {...p(c)} />
+    </Svg>
+  ),
+  'audio-lines': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Line x1={2} y1={10} x2={2} y2={13} {...p(c)} />
+      <Line x1={6} y1={6} x2={6} y2={17} {...p(c)} />
+      <Line x1={10} y1={3} x2={10} y2={21} {...p(c)} />
+      <Line x1={14} y1={8} x2={14} y2={15} {...p(c)} />
+      <Line x1={18} y1={5} x2={18} y2={18} {...p(c)} />
+      <Line x1={22} y1={10} x2={22} y2={13} {...p(c)} />
+    </Svg>
+  ),
+  grid: (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Rect x={3} y={3} width={7} height={7} rx={1.5} {...p(c)} />
+      <Rect x={14} y={3} width={7} height={7} rx={1.5} {...p(c)} />
+      <Rect x={14} y={14} width={7} height={7} rx={1.5} {...p(c)} />
+      <Rect x={3} y={14} width={7} height={7} rx={1.5} {...p(c)} />
+    </Svg>
+  ),
+  'shopping-cart': (c, sz) => (
+    <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
+      <Circle cx={9} cy={21} r={1} {...p(c)} />
+      <Circle cx={20} cy={21} r={1} {...p(c)} />
+      <Path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" {...p(c)} />
+    </Svg>
+  ),
 } satisfies Record<string, RenderFn>;
 
 const ALIASES = {

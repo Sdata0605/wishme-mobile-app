@@ -28,6 +28,8 @@ import {
 import { serviceColors as C } from './serviceColors';
 import { useAuth } from '@/context/AuthContext';
 import type { FlightResult } from './FlightResultsScreen';
+import { T, useThemedStyles, glass, dockBar } from './themed';
+import { BrandFill } from './BrandFill';
 
 export interface FlightPassenger {
   id: string;
@@ -65,6 +67,7 @@ export function FlightPassengerScreen({
   onBack: () => void;
   onContinue: (passengers: FlightPassenger[], contact: FlightContactInfo) => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { user } = useAuth();
@@ -163,13 +166,13 @@ export function FlightPassengerScreen({
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: C.pageBg }}
+      style={{ flex: 1, backgroundColor: T(C.pageBg, 'page') }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       {/* Header */}
       <View style={[st.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={22} color={C.text} />
+          <ArrowLeft size={22} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={st.headerTitle}>Traveller Details</Text>
@@ -211,7 +214,7 @@ export function FlightPassengerScreen({
           <View key={pax.id} style={st.paxCard}>
             <View style={st.paxCardHead}>
               <View style={st.paxBadge}>
-                <User size={14} color={C.purple} />
+                <User size={14} color={T(C.purple, 'fg')} />
                 <Text style={st.paxBadgeText}>
                   Passenger {idx + 1} ({pax.type.toUpperCase()})
                 </Text>
@@ -259,7 +262,7 @@ export function FlightPassengerScreen({
                 <TextInput
                   style={st.input}
                   placeholder="e.g. Rahul"
-                  placeholderTextColor={C.gray}
+                  placeholderTextColor={T(C.gray, 'fg')}
                   value={pax.firstName}
                   onChangeText={(v) => updatePax(pax.id, 'firstName', v)}
                 />
@@ -272,7 +275,7 @@ export function FlightPassengerScreen({
                 <TextInput
                   style={st.input}
                   placeholder="e.g. Sharma"
-                  placeholderTextColor={C.gray}
+                  placeholderTextColor={T(C.gray, 'fg')}
                   value={pax.lastName}
                   onChangeText={(v) => updatePax(pax.id, 'lastName', v)}
                 />
@@ -285,7 +288,7 @@ export function FlightPassengerScreen({
               <TextInput
                 style={st.input}
                 placeholder="1995-05-15"
-                placeholderTextColor={C.gray}
+                placeholderTextColor={T(C.gray, 'fg')}
                 value={pax.dob}
                 onChangeText={(v) => updatePax(pax.id, 'dob', v)}
               />
@@ -301,11 +304,11 @@ export function FlightPassengerScreen({
           <View style={{ marginTop: 12 }}>
             <Text style={st.inputLabel}>Email Address*</Text>
             <View style={st.iconInputWrap}>
-              <Mail size={16} color={C.gray} />
+              <Mail size={16} color={T(C.gray, 'fg')} />
               <TextInput
                 style={st.iconInput}
                 placeholder="your.email@example.com"
-                placeholderTextColor={C.gray}
+                placeholderTextColor={T(C.gray, 'fg')}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 value={email}
@@ -317,11 +320,11 @@ export function FlightPassengerScreen({
           <View style={{ marginTop: 12 }}>
             <Text style={st.inputLabel}>Mobile Number*</Text>
             <View style={st.iconInputWrap}>
-              <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text }}>+91</Text>
+              <Text style={{ fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') }}>+91</Text>
               <TextInput
                 style={st.iconInput}
                 placeholder="9876543210"
-                placeholderTextColor={C.gray}
+                placeholderTextColor={T(C.gray, 'fg')}
                 keyboardType="phone-pad"
                 value={phone}
                 onChangeText={setPhone}
@@ -337,14 +340,14 @@ export function FlightPassengerScreen({
             onPress={() => setGstEnabled(!gstEnabled)}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-              <Briefcase size={18} color={C.purple} />
+              <Briefcase size={18} color={T(C.purple, 'fg')} />
               <View>
                 <Text style={st.gstTitle}>Add GST Number (Optional)</Text>
                 <Text style={st.gstSub}>Claim input tax credit on business travel</Text>
               </View>
             </View>
             <View style={[st.checkCircle, gstEnabled && st.checkCircleActive]}>
-              {gstEnabled && <CheckCircle2 size={18} color={C.white} />}
+              {gstEnabled && <CheckCircle2 size={18} color={T(C.white, 'fg')} />}
             </View>
           </TouchableOpacity>
 
@@ -353,7 +356,7 @@ export function FlightPassengerScreen({
               <TextInput
                 style={st.input}
                 placeholder="GSTIN (e.g. 07AAAAA0000A1Z5)"
-                placeholderTextColor={C.gray}
+                placeholderTextColor={T(C.gray, 'fg')}
                 value={gstNumber}
                 onChangeText={setGstNumber}
                 autoCapitalize="characters"
@@ -361,7 +364,7 @@ export function FlightPassengerScreen({
               <TextInput
                 style={st.input}
                 placeholder="Company Name"
-                placeholderTextColor={C.gray}
+                placeholderTextColor={T(C.gray, 'fg')}
                 value={companyName}
                 onChangeText={setCompanyName}
               />
@@ -378,120 +381,121 @@ export function FlightPassengerScreen({
             ₹{(flight.price * passengers.length).toLocaleString('en-IN')}
           </Text>
         </View>
-        <TouchableOpacity style={st.continueBtn} activeOpacity={0.85} onPress={handleProceed}>
+        <TouchableOpacity style={st.continueBtn} activeOpacity={0.85} onPress={handleProceed}><BrandFill />
           <Text style={st.continueBtnText}>Select Seats & Add-ons</Text>
-          <ChevronRight size={18} color={C.white} />
+          <ChevronRight size={18} color={T(C.white, 'fg')} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const st = StyleSheet.create({
+const make_st = () => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: C.text },
-  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
-  stepBadge: { backgroundColor: '#F3E8FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
-  stepText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.purple },
+  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
+  stepBadge: { backgroundColor: T('#F3E8FF', 'bg'), paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+  stepText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.purple, 'fg') },
   flightBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: C.darkBg,
+    backgroundColor: T(C.darkBg, 'bg'),
     borderRadius: 14,
     padding: 14,
     marginBottom: 12,
   },
   fbLeft: { gap: 2 },
   fbAir: { fontSize: 12, fontFamily: 'Inter_500Medium', color: 'rgba(255,255,255,0.7)' },
-  fbRoute: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.white },
+  fbRoute: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.white, 'fg') },
   fbRight: { alignItems: 'flex-end', gap: 2 },
-  fbFare: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#FCD34D' },
-  fbPrice: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.white },
-  errorBox: { backgroundColor: '#FEE2E2', borderRadius: 10, padding: 12, marginBottom: 12 },
-  errorText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.red },
+  fbFare: { fontSize: 10, fontFamily: 'Inter_700Bold', color: T('#FCD34D', 'fg') },
+  fbPrice: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.white, 'fg') },
+  errorBox: { backgroundColor: T('#FEE2E2', 'bg'), borderRadius: 10, padding: 12, marginBottom: 12 },
+  errorText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.red, 'fg') },
   paxCard: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: C.border,
-  },
+    borderColor: T(C.border, 'border'),
+   ...glass(22), },
   paxCardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   paxBadge: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  paxBadgeText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.text },
-  leadText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.purple },
+  paxBadgeText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  leadText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.purple, 'fg') },
   titleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
-  genderWrap: { flexDirection: 'row', borderRadius: 8, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
-  titleBtn: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: C.white },
-  titleBtnActive: { backgroundColor: C.purple },
-  titleBtnText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.text },
-  titleBtnTextActive: { color: C.white, fontFamily: 'Inter_700Bold' },
+  genderWrap: { flexDirection: 'row', borderRadius: 8, borderWidth: 1, borderColor: T(C.border, 'border'), overflow: 'hidden' },
+  titleBtn: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: T(C.white, 'bg') },
+  titleBtnActive: { backgroundColor: T(C.purple, 'bg') },
+  titleBtnText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
+  titleBtnTextActive: { color: T(C.white, 'fg'), fontFamily: 'Inter_700Bold' },
   nameRow: { flexDirection: 'row', alignItems: 'center' },
-  inputLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.textLight, marginBottom: 5 },
+  inputLabel: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg'), marginBottom: 5 },
   input: {
     height: 44,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     paddingHorizontal: 12,
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
-    color: C.text,
-    backgroundColor: '#FAFAFA',
+    color: T(C.text, 'fg'),
+    backgroundColor: T('#FAFAFA', 'bg'),
   },
   iconInputWrap: {
     height: 44,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: T('#FAFAFA', 'bg'),
   },
-  iconInput: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: C.text },
-  cardTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
-  cardSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
-  gstTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
-  gstSub: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: C.textLight },
-  checkCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  checkCircleActive: { backgroundColor: C.purple, borderColor: C.purple },
+  iconInput: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
+  cardTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  cardSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
+  gstTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  gstSub: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  checkCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: T(C.border, 'border'), alignItems: 'center', justifyContent: 'center' },
+  checkCircleActive: { backgroundColor: T(C.purple, 'bg'), borderColor: T(C.purple, 'border') },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 16,
     paddingTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  footerLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
-  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+   ...dockBar(), },
+  footerLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   continueBtn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 18,
     paddingVertical: 12,
     borderRadius: 12,
-  },
-  continueBtnText: { color: C.white, fontSize: 14, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  continueBtnText: { color: T(C.white, 'fg'), fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
+const use_st = () => useThemedStyles(make_st);

@@ -29,10 +29,12 @@ import {
 import { serviceColors as C } from './serviceColors';
 import { useWallet } from '@/hooks/useWallet';
 import { useAuth } from '@/context/AuthContext';
-import { tboBookAndTicket, type TBOBookingConfirmation } from '@/services/tboService';
+import { tboBookAndTicket, tboFareQuote, type TBOBookingConfirmation } from '@/services/tboService';
 import type { FlightResult } from './FlightResultsScreen';
 import type { FlightPassenger, FlightContactInfo } from './FlightPassengerScreen';
 import type { SelectedFlightAddons } from './FlightAddonsScreen';
+import { T, useThemedStyles, glass, dockBar } from './themed';
+import { BrandFill } from './BrandFill';
 
 export function FlightReviewAndPayScreen({
   flight,
@@ -51,6 +53,7 @@ export function FlightReviewAndPayScreen({
   onBack: () => void;
   onBookingSuccess: (confirmation: TBOBookingConfirmation) => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { user } = useAuth();
@@ -112,29 +115,24 @@ export function FlightReviewAndPayScreen({
         } : undefined,
       }));
 
-      const airlineName = flight.airlineName || flight.airline || 'IndiGo';
-      const airlineCode = flight.airlineCode || flight.airline?.slice(0, 2)?.toUpperCase() || '6E';
-      const flightNumber = flight.flightNumber || '2041';
-      const fromCode = flight.fromCode || flight.depAirport || 'DEL';
-      const toCode = flight.toCode || flight.arrAirport || 'BOM';
-      const departTime = flight.departTime || flight.depart || '06:00';
-      const arriveTime = flight.arriveTime || flight.arrive || '08:15';
+      if (!flight.traceId || !flight.resultIndex) {
+        throw new Error('This fare is no longer held. Please search again and reselect your flight.');
+      }
+
+      // Re-price immediately before ticketing — TBO fares can move between search and book.
+      const quote = await tboFareQuote(flight.traceId, flight.resultIndex);
+      if (quote.isPriceChanged) {
+        throw new Error(
+          `The airline changed this fare to ₹${quote.flight.price.toLocaleString('en-IN')}. ` +
+          'Please go back and reselect to continue at the new price.',
+        );
+      }
 
       const confirmation = await tboBookAndTicket({
-        flight: {
-          airline: airlineName,
-          airlineCode: airlineCode,
-          code: flightNumber,
-          from: fromCode,
-          to: toCode,
-          depart: departTime,
-          arrive: arriveTime,
-          price: flight.price,
-        },
-        fareTier: fareKey,
+        traceId: flight.traceId,
+        resultIndex: flight.resultIndex,
+        isLCC: !!flight.isLCC,
         passengers: formattedPax,
-        contact: { email: contact.email, phone: contact.phone },
-        insurance: addons.insurance,
         totalAmount: finalTotal,
       });
 
@@ -157,11 +155,11 @@ export function FlightReviewAndPayScreen({
   const arriveTime = flight.arriveTime || flight.arrive || '08:15';
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.pageBg }}>
+    <View style={{ flex: 1, backgroundColor: T(C.pageBg, 'page') }}>
       {/* Header */}
       <View style={[st.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={22} color={C.text} />
+          <ArrowLeft size={22} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={st.headerTitle}>Review & Payment</Text>
@@ -181,7 +179,7 @@ export function FlightReviewAndPayScreen({
         <View style={st.card}>
           <View style={st.airRow}>
             <View style={st.airLogoBox}>
-              <Plane size={18} color={C.purple} />
+              <Plane size={18} color={T(C.purple, 'fg')} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={st.airName}>{airlineName} · {airlineCode}-{flightNumber}</Text>
@@ -222,7 +220,7 @@ export function FlightReviewAndPayScreen({
                     {p.type.toUpperCase()} · Seat: {seat ? seat.seatNo : 'Auto'} {meal ? `· Meal: ${meal.label.slice(0, 15)}...` : ''}
                   </Text>
                 </View>
-                <CheckCircle2 size={16} color={C.green} />
+                <CheckCircle2 size={16} color={T(C.green, 'fg')} />
               </View>
             );
           })}
@@ -231,14 +229,14 @@ export function FlightReviewAndPayScreen({
         {/* Coupon Card */}
         <View style={st.card}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <Tag size={16} color={C.purple} />
+            <Tag size={16} color={T(C.purple, 'fg')} />
             <Text style={st.cardHeading}>Offers & Promo Code</Text>
           </View>
           <View style={st.couponInputWrap}>
             <TextInput
               style={st.couponInput}
               placeholder="Enter coupon code"
-              placeholderTextColor={C.gray}
+              placeholderTextColor={T(C.gray, 'fg')}
               value={coupon}
               onChangeText={setCoupon}
               autoCapitalize="characters"
@@ -249,7 +247,7 @@ export function FlightReviewAndPayScreen({
           </View>
           {appliedCoupon && (
             <View style={st.appliedBox}>
-              <Percent size={14} color={C.green} />
+              <Percent size={14} color={T(C.green, 'fg')} />
               <Text style={st.appliedText}>
                 Code <Text style={{ fontFamily: 'Inter_700Bold' }}>{appliedCoupon}</Text> applied! You saved ₹{couponDiscount}
               </Text>
@@ -267,12 +265,12 @@ export function FlightReviewAndPayScreen({
             onPress={() => setPaymentMethod('wallet')}
           >
             <View style={st.payIconBox}>
-              <Wallet size={20} color={paymentMethod === 'wallet' ? C.white : C.purple} />
+              <Wallet size={20} color={paymentMethod === 'wallet' ? T(C.white, 'fg') : T(C.purple, 'fg')} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={st.payTitle}>WishMe Wallet</Text>
               <Text style={st.paySub}>
-                Available Balance: <Text style={{ fontFamily: 'Inter_700Bold', color: C.green }}>₹{walletBalance.toLocaleString('en-IN')}</Text>
+                Available Balance: <Text style={{ fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') }}>₹{walletBalance.toLocaleString('en-IN')}</Text>
               </Text>
             </View>
             <View style={[st.radioOuter, paymentMethod === 'wallet' && st.radioOuterActive]}>
@@ -286,7 +284,7 @@ export function FlightReviewAndPayScreen({
             onPress={() => setPaymentMethod('upi')}
           >
             <View style={st.payIconBox}>
-              <Zap size={20} color={paymentMethod === 'upi' ? C.white : C.orange} />
+              <Zap size={20} color={paymentMethod === 'upi' ? T(C.white, 'fg') : T(C.orange, 'fg')} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={st.payTitle}>UPI / Google Pay / PhonePe</Text>
@@ -303,7 +301,7 @@ export function FlightReviewAndPayScreen({
             onPress={() => setPaymentMethod('card')}
           >
             <View style={st.payIconBox}>
-              <CreditCard size={20} color={paymentMethod === 'card' ? C.white : '#3B82F6'} />
+              <CreditCard size={20} color={paymentMethod === 'card' ? T(C.white, 'fg') : T('#3B82F6', 'fg')} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={st.payTitle}>Credit / Debit Card</Text>
@@ -324,7 +322,7 @@ export function FlightReviewAndPayScreen({
           {mealsTotal > 0 && <View style={st.fareRow}><Text style={st.fareLabel}>In-flight Meals</Text><Text style={st.fareVal}>+₹{mealsTotal.toLocaleString('en-IN')}</Text></View>}
           {baggageTotal > 0 && <View style={st.fareRow}><Text style={st.fareLabel}>Extra Baggage</Text><Text style={st.fareVal}>+₹{baggageTotal.toLocaleString('en-IN')}</Text></View>}
           {insuranceTotal > 0 && <View style={st.fareRow}><Text style={st.fareLabel}>Travel Insurance</Text><Text style={st.fareVal}>+₹{insuranceTotal.toLocaleString('en-IN')}</Text></View>}
-          {couponDiscount > 0 && <View style={st.fareRow}><Text style={[st.fareLabel, { color: C.green }]}>Promo Discount</Text><Text style={[st.fareVal, { color: C.green }]}>-₹{couponDiscount.toLocaleString('en-IN')}</Text></View>}
+          {couponDiscount > 0 && <View style={st.fareRow}><Text style={[st.fareLabel, { color: T(C.green, 'fg') }]}>Promo Discount</Text><Text style={[st.fareVal, { color: T(C.green, 'fg') }]}>-₹{couponDiscount.toLocaleString('en-IN')}</Text></View>}
           <View style={st.divider} />
           <View style={st.fareRow}><Text style={st.totalLabel}>Total Payable</Text><Text style={st.totalVal}>₹{finalTotal.toLocaleString('en-IN')}</Text></View>
         </View>
@@ -341,13 +339,13 @@ export function FlightReviewAndPayScreen({
           activeOpacity={0.85}
           onPress={handlePayAndBook}
           disabled={processing}
-        >
+        ><BrandFill />
           {processing ? (
-            <ActivityIndicator size="small" color={C.white} />
+            <ActivityIndicator size="small" color={T(C.white, 'fg')} />
           ) : (
             <>
               <Text style={st.payBtnText}>Pay & Book Now</Text>
-              <ChevronRight size={18} color={C.white} />
+              <ChevronRight size={18} color={T(C.white, 'fg')} />
             </>
           )}
         </TouchableOpacity>
@@ -356,115 +354,116 @@ export function FlightReviewAndPayScreen({
   );
 }
 
-const st = StyleSheet.create({
+const make_st = () => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: C.text },
-  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
-  stepBadge: { backgroundColor: '#F3E8FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
-  stepText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.purple },
+  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
+  stepBadge: { backgroundColor: T('#F3E8FF', 'bg'), paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+  stepText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.purple, 'fg') },
   card: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: C.border,
-  },
-  cardHeading: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text, marginBottom: 12 },
+    borderColor: T(C.border, 'border'),
+   ...glass(22), },
+  cardHeading: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginBottom: 12 },
   airRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 },
-  airLogoBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center' },
-  airName: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.text },
-  fareType: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: C.purple, marginTop: 2 },
-  nonStopPill: { backgroundColor: '#ECFDF5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  nonStopText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: C.green },
+  airLogoBox: { width: 36, height: 36, borderRadius: 10, backgroundColor: T('#F3E8FF', 'bg'), alignItems: 'center', justifyContent: 'center' },
+  airName: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  fareType: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: T(C.purple, 'fg'), marginTop: 2 },
+  nonStopPill: { backgroundColor: T('#ECFDF5', 'bg'), paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+  nonStopText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
   routeGrid: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  timeText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
-  codeText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.textLight, marginTop: 2 },
+  timeText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  codeText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg'), marginTop: 2 },
   midDuration: { alignItems: 'center', flex: 1, paddingHorizontal: 16 },
-  durText: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: C.textLight, marginBottom: 4 },
-  durLine: { height: 2, width: '100%', backgroundColor: C.border },
+  durText: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg'), marginBottom: 4 },
+  durLine: { height: 2, width: '100%', backgroundColor: T(C.border, 'bg') },
   paxRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: T('#F3F4F6', 'border'),
   },
-  paxName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
-  paxSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+  paxName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  paxSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
   couponInputWrap: { flexDirection: 'row', gap: 8 },
   couponInput: {
     flex: 1,
     height: 44,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     paddingHorizontal: 12,
     fontSize: 13,
     fontFamily: 'Inter_700Bold',
-    color: C.text,
-    backgroundColor: '#FAFAFA',
+    color: T(C.text, 'fg'),
+    backgroundColor: T('#FAFAFA', 'bg'),
   },
-  applyBtn: { backgroundColor: C.purple, borderRadius: 10, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  applyBtnText: { color: C.white, fontSize: 12, fontFamily: 'Inter_700Bold' },
-  appliedBox: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, backgroundColor: '#ECFDF5', padding: 8, borderRadius: 8 },
-  appliedText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.green },
+  applyBtn: { backgroundColor: T(C.purple, 'bg'), borderRadius: 10, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
+  applyBtnText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_700Bold' },
+  appliedBox: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, backgroundColor: T('#ECFDF5', 'bg'), padding: 8, borderRadius: 8 },
+  appliedText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.green, 'fg') },
   payOpt: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     marginBottom: 8,
     gap: 12,
   },
-  payOptActive: { borderColor: C.purple, backgroundColor: '#FAF5FF' },
-  payIconBox: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  payTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.text },
-  paySub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
-  radioOuter: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: C.gray, alignItems: 'center', justifyContent: 'center' },
-  radioOuterActive: { borderColor: C.purple },
-  radioInner: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: C.purple },
+  payOptActive: { borderColor: T(C.purple, 'border'), backgroundColor: T('#FAF5FF', 'bg') },
+  payIconBox: { width: 38, height: 38, borderRadius: 10, backgroundColor: T('#F3F4F6', 'bg'), alignItems: 'center', justifyContent: 'center' },
+  payTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  paySub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
+  radioOuter: { width: 18, height: 18, borderRadius: 9, borderWidth: 1.5, borderColor: T(C.gray, 'border'), alignItems: 'center', justifyContent: 'center' },
+  radioOuterActive: { borderColor: T(C.purple, 'border') },
+  radioInner: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: T(C.purple, 'bg') },
   fareRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  fareLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: C.textLight },
-  fareVal: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.text },
-  divider: { height: 1, backgroundColor: C.border, marginVertical: 8 },
-  totalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
-  totalVal: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.green },
+  fareLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  fareVal: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  divider: { height: 1, backgroundColor: T(C.border, 'bg'), marginVertical: 8 },
+  totalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  totalVal: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 16,
     paddingTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  footerLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
-  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+   ...dockBar(), },
+  footerLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   payBtn: {
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 22,
     paddingVertical: 13,
     borderRadius: 12,
-  },
-  payBtnText: { color: C.white, fontSize: 14, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  payBtnText: { color: T(C.white, 'fg'), fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
+const use_st = () => useThemedStyles(make_st);

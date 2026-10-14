@@ -25,6 +25,8 @@ import type { Seat } from './SeatSelectionScreen';
 import type { StopPoint } from './BoardingPointsScreen';
 
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles, glass, dockBar } from './themed';
+import { BrandFill } from './BrandFill';
 
 const GENDERS = ['Female', 'Male', 'Other'] as const;
 
@@ -41,6 +43,7 @@ export function PassengerDetailsScreen({
   dropping: StopPoint;
   onBack: () => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -68,7 +71,7 @@ export function PassengerDetailsScreen({
     return (
       <View style={[st.root, st.successWrap]}>
         <View style={st.successCircle}>
-          <CheckCircle2 size={54} color={C.green} />
+          <CheckCircle2 size={54} color={T(C.green, 'fg')} />
         </View>
         <Text style={st.successTitle}>Seat is booked</Text>
         <Text style={st.successSub}>
@@ -77,7 +80,7 @@ export function PassengerDetailsScreen({
           {boarding.name} ({boarding.time}) → {dropping.name} ({dropping.time})
         </Text>
         <Text style={st.successFare}>₹{total} · {name.trim()}</Text>
-        <TouchableOpacity style={st.doneBtn} activeOpacity={0.85} onPress={onBack}>
+        <TouchableOpacity style={st.doneBtn} activeOpacity={0.85} onPress={onBack}><BrandFill />
           <Text style={st.doneText}>Done</Text>
         </TouchableOpacity>
       </View>
@@ -89,7 +92,7 @@ export function PassengerDetailsScreen({
       {/* Header */}
       <View style={[st.headerBar, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={24} color={C.text} />
+          <ArrowLeft size={24} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View>
           <Text style={st.headerTitle}>Passenger details</Text>
@@ -115,13 +118,13 @@ export function PassengerDetailsScreen({
             </Text>
 
             <View style={st.pointRow}>
-              <Navigation size={14} color={C.orange} />
+              <Navigation size={14} color={T(C.orange, 'fg')} />
               <Text style={st.pointText} numberOfLines={1}>
                 {boarding.name} · {boarding.time}
               </Text>
             </View>
             <View style={st.pointRow}>
-              <MapPin size={14} color={C.green} />
+              <MapPin size={14} color={T(C.green, 'fg')} />
               <Text style={st.pointText} numberOfLines={1}>
                 {dropping.name} · {dropping.time}
               </Text>
@@ -150,8 +153,8 @@ export function PassengerDetailsScreen({
 
           {/* Contact details */}
           <View style={st.sectionHead}>
-            <View style={[st.sectionIcon, { backgroundColor: '#FFF7ED' }]}>
-              <Phone size={15} color={C.orange} />
+            <View style={[st.sectionIcon, { backgroundColor: T('#F5F0FF', 'bg') }]}>
+              <Phone size={15} color={T(C.orange, 'fg')} />
             </View>
             <Text style={st.sectionTitle}>Contact details</Text>
           </View>
@@ -162,7 +165,7 @@ export function PassengerDetailsScreen({
               value={mobile}
               onChangeText={setMobile}
               placeholder="10-digit mobile number"
-              placeholderTextColor={C.gray}
+              placeholderTextColor={T(C.gray, 'fg')}
               keyboardType="phone-pad"
               maxLength={10}
             />
@@ -172,7 +175,7 @@ export function PassengerDetailsScreen({
               value={email}
               onChangeText={setEmail}
               placeholder="you@example.com"
-              placeholderTextColor={C.gray}
+              placeholderTextColor={T(C.gray, 'fg')}
               keyboardType="email-address"
               autoCapitalize="none"
             />
@@ -182,7 +185,7 @@ export function PassengerDetailsScreen({
               value={stateRes}
               onChangeText={setStateRes}
               placeholder="e.g. Maharashtra"
-              placeholderTextColor={C.gray}
+              placeholderTextColor={T(C.gray, 'fg')}
             />
             <View style={st.toggleRow}>
               <Text style={st.toggleText}>
@@ -191,16 +194,16 @@ export function PassengerDetailsScreen({
               <Switch
                 value={notify}
                 onValueChange={setNotify}
-                trackColor={{ false: '#D1D5DB', true: '#FDBA8C' }}
-                thumbColor={notify ? C.orange : C.white}
+                trackColor={{ false: T('#D1D5DB', 'bg'), true: T('#E9D5FF', 'bg') }}
+                thumbColor={notify ? T(C.orange, 'fg') : T(C.white, 'fg')}
               />
             </View>
           </View>
 
           {/* Passenger information */}
           <View style={st.sectionHead}>
-            <View style={[st.sectionIcon, { backgroundColor: '#F5F3FF' }]}>
-              <User size={15} color={C.purple} />
+            <View style={[st.sectionIcon, { backgroundColor: T('#F5F3FF', 'bg') }]}>
+              <User size={15} color={T(C.purple, 'fg')} />
             </View>
             <Text style={st.sectionTitle}>Passenger information</Text>
           </View>
@@ -211,7 +214,7 @@ export function PassengerDetailsScreen({
               value={name}
               onChangeText={setName}
               placeholder="Name as per ID"
-              placeholderTextColor={C.gray}
+              placeholderTextColor={T(C.gray, 'fg')}
             />
             <Text style={st.inputLabel}>Age</Text>
             <TextInput
@@ -219,7 +222,7 @@ export function PassengerDetailsScreen({
               value={age}
               onChangeText={(t) => setAge(t.replace(/[^0-9]/g, ''))}
               placeholder="Age in years"
-              placeholderTextColor={C.gray}
+              placeholderTextColor={T(C.gray, 'fg')}
               keyboardType="number-pad"
               maxLength={3}
             />
@@ -250,8 +253,8 @@ export function PassengerDetailsScreen({
             activeOpacity={0.85}
             disabled={!canBook}
             onPress={() => setBooked(true)}
-          >
-            <BadgeCheck size={16} color={C.white} />
+          ><BrandFill />
+            <BadgeCheck size={16} color={T(C.white, 'fg')} />
             <Text style={st.bookText}>Book seat</Text>
           </TouchableOpacity>
         </View>
@@ -260,47 +263,47 @@ export function PassengerDetailsScreen({
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
-  headerSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  headerSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   card: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     marginHorizontal: 14,
     marginTop: 12,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 14,
-  },
-  busName: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text },
+   ...glass(22), },
+  busName: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   timesLine: {
     fontSize: 11.5,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 2,
     marginBottom: 10,
   },
   pointRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 6 },
-  pointText: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.text },
-  divider: { height: 1, backgroundColor: C.border, marginVertical: 12 },
+  pointText: { flex: 1, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  divider: { height: 1, backgroundColor: T(C.border, 'bg'), marginVertical: 12 },
   seatRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  seatId: { width: 46, fontSize: 12.5, fontFamily: 'Inter_700Bold', color: C.text },
-  seatMeta: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
-  seatPrice: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold', color: C.text },
+  seatId: { width: 46, fontSize: 12.5, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  seatMeta: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  seatPrice: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
   totalRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  totalLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.textLight },
-  totalValue: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.green },
+  totalLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  totalValue: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -315,24 +318,24 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionTitle: { fontSize: 14.5, fontFamily: 'Inter_700Bold', color: C.text },
+  sectionTitle: { fontSize: 14.5, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   inputLabel: {
     fontSize: 11,
     fontFamily: 'Inter_600SemiBold',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginBottom: 5,
     marginTop: 4,
   },
   input: {
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === 'web' ? 10 : 9,
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
-    color: C.text,
-    backgroundColor: C.white,
+    color: T(C.text, 'fg'),
+    backgroundColor: T(C.white, 'bg'),
     marginBottom: 10,
   },
   toggleRow: {
@@ -345,71 +348,72 @@ const st = StyleSheet.create({
     flex: 1,
     fontSize: 11.5,
     fontFamily: 'Inter_500Medium',
-    color: C.text,
+    color: T(C.text, 'fg'),
     lineHeight: 16,
   },
   genderRow: { flexDirection: 'row', gap: 8 },
   genderChip: {
     flex: 1,
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 20,
     paddingVertical: 9,
     alignItems: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
-  genderChipActive: { borderColor: C.purple, backgroundColor: '#F5F3FF' },
-  genderText: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold', color: C.textLight },
-  genderTextActive: { color: C.purple },
+  genderChipActive: { borderColor: T(C.purple, 'border'), backgroundColor: T('#F5F3FF', 'bg') },
+  genderText: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
+  genderTextActive: { color: T(C.purple, 'fg') },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 16,
     paddingTop: 12,
-  },
-  footerLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
-  footerTotal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text, marginTop: 1 },
+   ...dockBar(), },
+  footerLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  footerTotal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 1 },
   bookBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 22,
     paddingHorizontal: 24,
     paddingVertical: 12,
-  },
-  bookDisabled: { backgroundColor: '#FDBA8C' },
-  bookText: { color: C.white, fontSize: 13.5, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  bookDisabled: { backgroundColor: T('#E9D5FF', 'bg') },
+  bookText: { color: T(C.white, 'fg'), fontSize: 13.5, fontFamily: 'Inter_700Bold' },
   successWrap: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   successCircle: {
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 18,
   },
-  successTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: C.text },
+  successTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   successSub: {
     fontSize: 12.5,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     textAlign: 'center',
     marginTop: 8,
     lineHeight: 19,
   },
-  successFare: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.green, marginTop: 10 },
+  successFare: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg'), marginTop: 10 },
   doneBtn: {
     marginTop: 24,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 22,
     paddingHorizontal: 32,
     paddingVertical: 12,
-  },
-  doneText: { color: C.white, fontSize: 13.5, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  doneText: { color: T(C.white, 'fg'), fontSize: 13.5, fontFamily: 'Inter_700Bold' },
 });
+const use_st = () => useThemedStyles(make_st);

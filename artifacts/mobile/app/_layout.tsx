@@ -1,31 +1,36 @@
 import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_600SemiBold,
-  Inter_700Bold,
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
   useFonts,
-} from '@expo-google-fonts/inter';
-import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
+} from '@expo-google-fonts/manrope';
+import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { Stack, useSegments } from 'expo-router';
+import { router, Stack, useSegments } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
 import * as SplashScreen from 'expo-splash-screen';
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
+import * as Notifications from 'expo-notifications';
 import { AppState, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { DraggableMoreButton } from '@/components/DraggableMoreButton';
+import { adoptRootFromInstance } from '@/assistant-hook';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
-import { AIChatButton } from '@/components/AIChatButton';
-import { VoiceAssistantButton } from '@/components/VoiceAssistantButton';
+import { AssistantOverlay } from '@/components/assistant/AssistantOverlay';
 
-import { AuthProvider } from '@/context/AuthContext';
+import { AssistantPersonaProvider, useAssistantPersona } from '@/context/AssistantPersonaContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DrawerProvider } from '@/context/DrawerContext';
+import { OrderConfirmProvider } from '@/context/OrderConfirmContext';
+import { OccasionInApp } from '@/components/OccasionInApp';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { AgentStateProvider } from '@/context/AgentStateContext';
-import { AIAssistantProvider } from '@/context/AIAssistantContext';
+import { VoiceAssistantProvider } from '@/context/VoiceAssistantContext';
+import { reminderIdFrom, syncScheduledReminders } from '@/services/hub/notifications';
+import { acknowledgeReminder } from '@/services/hub/reminders';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,12 +42,84 @@ function FloatingButtons() {
   const segments = useSegments();
   if (HIDDEN_SEGMENTS.has(segments[0] as string)) return null;
   return (
-    <>
-      <DraggableMoreButton />
-      <AIChatButton />
-      <VoiceAssistantButton />
-    </>
+    <AssistantOverlay />
   );
+}
+
+/**
+ * Asks each user to set up their assistant once: when the database has no saved settings for
+ * them (new accounts, and existing users the first time after this feature shipped).
+ * It waits until they reach the main app so it never interrupts sign-up or plan selection.
+ */
+function AssistantSetupGate() {
+  const { user } = useAuth();
+  const { status } = useAssistantPersona();
+  const segments = useSegments();
+  const asked = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!user?.id || status !== 'needs-setup') return;
+    if (segments[0] !== '(tabs)') return;
+    if (asked.current === user.id) return;
+    asked.current = user.id;
+    router.push('/assistant-setup' as never);
+  }, [user?.id, status, segments]);
+
+  return null;
+}
+
+/**
+ * Keeps the phone's own scheduled reminders in step with the server's.
+ *
+ * Android forgets scheduled notifications on reboot and when the app is force-stopped, so they are
+ * rebuilt whenever the app starts or returns to the foreground. Tapping a reminder opens it.
+ */
+function ReminderNotifications() {
+  const { session, getValidSession } = useAuth();
+  const loggedIn = !!session?.access_token;
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    let cancelled = false;
+
+    const sync = async () => {
+      const token = (await getValidSession())?.access_token;
+      if (!token || cancelled) return;
+      // Never asks here: notification permission is requested on the Permissions screen.
+      await syncScheduledReminders(token);
+    };
+
+    void sync();
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') void sync();
+    });
+    return () => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, [loggedIn, getValidSession]);
+
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const id = reminderIdFrom(response);
+      if (!id) return;
+
+      // Swiping a reminder away is the user dealing with it, exactly as the editor promises
+      // ("if you have not dismissed the reminder in time..."). Without this it counted as ignored
+      // and the escalation rang them anyway.
+      const dismissed = response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER ? false : true;
+      if (!dismissed) router.push(`/reminder-edit?id=${id}` as never);
+
+      // Either way they have seen it, so nothing should ring about it later.
+      void (async () => {
+        const token = (await getValidSession())?.access_token;
+        if (token) await acknowledgeReminder(token, id);
+      })();
+    });
+    return () => sub.remove();
+  }, []);
+
+  return null;
 }
 
 function RootLayoutNav() {
@@ -57,7 +134,6 @@ function RootLayoutNav() {
       <Stack.Screen name="chat/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="bookings" />
       <Stack.Screen name="favorites" />
-      <Stack.Screen name="wallet" />
       <Stack.Screen name="wish-orders" />
       <Stack.Screen name="messages" />
       <Stack.Screen name="loved-ones" />
@@ -70,6 +146,7 @@ function RootLayoutNav() {
       <Stack.Screen name="wish-friend" />
       <Stack.Screen name="for-business" />
       <Stack.Screen name="greeting-cards" />
+      <Stack.Screen name="library" />
       <Stack.Screen name="image-promotions" />
       <Stack.Screen name="ugc-videos" />
       <Stack.Screen name="ugc-ads" />
@@ -80,8 +157,20 @@ function RootLayoutNav() {
       <Stack.Screen name="occasion-book/[id]" />
       <Stack.Screen name="occasion-alerts" />
       <Stack.Screen name="occasion-wishes" />
-      <Stack.Screen name="ai-assistant" options={{ presentation: 'card' }} />
       <Stack.Screen name="settings" />
+      <Stack.Screen name="ai-calls" />
+      <Stack.Screen name="calendar" />
+      <Stack.Screen name="reminders" />
+      <Stack.Screen name="reminder-edit" options={{ presentation: 'card' }} />
+      <Stack.Screen name="event-edit" options={{ presentation: 'card' }} />
+      <Stack.Screen name="call-logs" />
+      <Stack.Screen name="call-log/[id]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="documents" />
+      <Stack.Screen name="finance" />
+      <Stack.Screen name="features" />
+      <Stack.Screen name="news" />
+      <Stack.Screen name="document/[id]" options={{ presentation: 'card' }} />
+      <Stack.Screen name="assistant-setup" options={{ presentation: 'card' }} />
       <Stack.Screen name="celebrity-signup" />
       <Stack.Screen name="celebrity-dashboard" />
       <Stack.Screen name="dashboard" />
@@ -95,11 +184,18 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_600SemiBold,
-    Inter_700Bold,
-    PlayfairDisplay_700Bold,
+    // MyAssistant's type: Manrope for text, Space Grotesk for headlines. They are registered under the family
+    // names the app already uses (Inter_* and PlayfairDisplay_*), so every screen switches without edits.
+    Inter_400Regular: Manrope_400Regular,
+    Inter_500Medium: Manrope_500Medium,
+    Inter_600SemiBold: Manrope_600SemiBold,
+    Inter_700Bold: Manrope_700Bold,
+    PlayfairDisplay_700Bold: SpaceGrotesk_700Bold,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    SpaceGrotesk_700Bold,
   });
 
   useEffect(() => {
@@ -129,14 +225,21 @@ export default function RootLayout() {
               <ThemeProvider>
                 <AuthProvider>
                   <AgentStateProvider>
-                    <AIAssistantProvider>
+                    <AssistantPersonaProvider>
+                    <VoiceAssistantProvider>
                       <DrawerProvider>
-                        <View style={{ flex: 1 }}>
+                      <OrderConfirmProvider>
+                        <View style={{ flex: 1 }} ref={adoptRootFromInstance}>
                           <RootLayoutNav />
                           <FloatingButtons />
+                          <AssistantSetupGate />
+                          <ReminderNotifications />
+                          <OccasionInApp />
                         </View>
+                      </OrderConfirmProvider>
                       </DrawerProvider>
-                    </AIAssistantProvider>
+                    </VoiceAssistantProvider>
+                    </AssistantPersonaProvider>
                   </AgentStateProvider>
                 </AuthProvider>
               </ThemeProvider>

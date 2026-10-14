@@ -18,6 +18,7 @@ import { Icon, IconName } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const B2_PREFIX = 'https://f005.backblazeb2.com/file/wishmetoday/';
 
@@ -162,7 +163,7 @@ function WishCard({ wish, colors }: WishCardProps) {
         <View style={s.replyBlock}>
           <View style={s.replyHeader}>
             <Text style={s.replyHeaderIcon}>✨</Text>
-            <Text style={[s.replyHeaderName, { color: '#B44CFF' }]}>
+            <Text style={[s.replyHeaderName, { color: '#1F7BFF' }]}>
               {celeb?.name ?? 'Celebrity'}
             </Text>
             {wish.reply_sent_at && (
@@ -353,7 +354,7 @@ export default function OccasionWishesScreen() {
 
   if (!user) {
     return (
-      <View style={[s.screen, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.screen, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -374,13 +375,13 @@ export default function OccasionWishesScreen() {
             <Text style={s.gateBtnText}>Sign In</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   if (loading) {
     return (
-      <View style={[s.screen, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.screen, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -391,13 +392,13 @@ export default function OccasionWishesScreen() {
         <View style={s.gateWrap}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   if (celebrities.length === 0) {
     return (
-      <View style={[s.screen, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.screen, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -418,12 +419,12 @@ export default function OccasionWishesScreen() {
             <Text style={s.gateBtnText}>Browse Celebrities</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   return (
-    <View style={[s.screen, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.screen, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -456,7 +457,7 @@ export default function OccasionWishesScreen() {
           contentContainerStyle={[s.scrollContent, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FF6B33" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
           }
         >
           <Text style={[s.sectionLabel, { color: colors.foreground }]}>Select Celebrity</Text>
@@ -598,7 +599,7 @@ export default function OccasionWishesScreen() {
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={['#FF6B33', '#B44CFF']}
+                  colors={['#7B5CFA', '#1F7BFF']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.sendBtnGrad}
@@ -618,7 +619,7 @@ export default function OccasionWishesScreen() {
           contentContainerStyle={[s.scrollContent, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FF6B33" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
           }
         >
           {wishes.length === 0 ? (
@@ -642,7 +643,7 @@ export default function OccasionWishesScreen() {
           <Text style={s.toastText}>{toast}</Text>
         </View>
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -786,10 +787,10 @@ const s = StyleSheet.create({
   expandHint: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 2 },
 
   replyBlock: {
-    backgroundColor: '#B44CFF12',
+    backgroundColor: '#1F7BFF12',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#B44CFF30',
+    borderColor: '#1F7BFF30',
     padding: 12,
     gap: 6,
   },

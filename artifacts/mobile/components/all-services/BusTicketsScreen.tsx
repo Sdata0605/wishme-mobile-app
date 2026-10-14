@@ -35,6 +35,8 @@ import {
   X,
   Zap,
 } from 'lucide-react-native';
+import { T, useThemedStyles, glass, dk, N } from './themed';
+import { BrandFill, BannerScrim } from './BrandFill';
 
 
 
@@ -100,6 +102,7 @@ function CityPicker({
   onSelect: (city: string) => void;
   onClose: () => void;
 }) {
+  const md = use_md();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={md.backdrop}>
@@ -107,7 +110,7 @@ function CityPicker({
           <View style={md.head}>
             <Text style={md.title}>{title}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <X size={22} color={C.text} />
+              <X size={22} color={T(C.text, 'fg')} />
             </TouchableOpacity>
           </View>
           <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
@@ -121,10 +124,10 @@ function CityPicker({
                 }}
               >
                 <View style={md.cityIcon}>
-                  <MapPin size={16} color={C.orange} />
+                  <MapPin size={16} color={T(C.orange, 'fg')} />
                 </View>
                 <Text style={md.cityText}>{city}</Text>
-                {selected === city && <Check size={18} color={C.green} />}
+                {selected === city && <Check size={18} color={T(C.green, 'fg')} />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -146,6 +149,7 @@ function DatePicker({
   onSelect: (d: Date) => void;
   onClose: () => void;
 }) {
+  const md = use_md();
   const days = nextDays(14);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -154,7 +158,7 @@ function DatePicker({
           <View style={md.head}>
             <Text style={md.title}>Journey date</Text>
             <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <X size={22} color={C.text} />
+              <X size={22} color={T(C.text, 'fg')} />
             </TouchableOpacity>
           </View>
           <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
@@ -168,13 +172,13 @@ function DatePicker({
                 }}
               >
                 <View style={md.cityIcon}>
-                  <Calendar size={16} color={C.purpleLight} />
+                  <Calendar size={16} color={T(C.purpleLight, 'fg')} />
                 </View>
                 <Text style={md.cityText}>
                   {formatDate(d)}
                   {i === 0 ? '  ·  Today' : i === 1 ? '  ·  Tomorrow' : ''}
                 </Text>
-                {sameDay(selected, d) && <Check size={18} color={C.green} />}
+                {sameDay(selected, d) && <Check size={18} color={T(C.green, 'fg')} />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -184,14 +188,14 @@ function DatePicker({
   );
 }
 
-const md = StyleSheet.create({
+const make_md = () => StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.45)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 24,
@@ -203,9 +207,9 @@ const md = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
-  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -213,18 +217,19 @@ const md = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 13,
     borderBottomWidth: 1,
-    borderBottomColor: C.lightGray,
+    borderBottomColor: T(C.lightGray, 'border'),
   },
   cityIcon: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: T('#F5F0FF', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cityText: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium', color: C.text },
+  cityText: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
 });
+const use_md = () => useThemedStyles(make_md);
 
 // ─── Search card ─────────────────────────────────────────────────────────────
 function SearchCard({
@@ -232,6 +237,7 @@ function SearchCard({
 }: {
   onSearch: (from: string, to: string, dateLabel: string) => void;
 }) {
+  const sc = use_sc();
   const agentPrefill = useAgentPrefill();
   const [from, setFrom] = useState(agentPrefill.busFrom || 'Mumbai');
   const [to, setTo] = useState(agentPrefill.busTo || 'Pune');
@@ -274,13 +280,13 @@ function SearchCard({
         </TouchableOpacity>
         {/* Swap button */}
         <TouchableOpacity style={sc.swapBtn} onPress={swap} activeOpacity={0.8}>
-          <ArrowUpDown size={16} color={C.white} />
+          <ArrowUpDown size={16} color={T(C.white, 'fg')} />
         </TouchableOpacity>
       </View>
 
       {/* Date */}
       <TouchableOpacity style={sc.dateRow} onPress={() => setPicker('date')} activeOpacity={0.7}>
-        <Calendar size={18} color={C.purpleLight} />
+        <Calendar size={18} color={T(C.purpleLight, 'fg')} />
         <View style={{ flex: 1 }}>
           <Text style={sc.fieldLabel}>Date of journey</Text>
           <Text style={sc.cityValue}>{formatDate(date)}</Text>
@@ -310,7 +316,7 @@ function SearchCard({
       {/* Women booking toggle */}
       <View style={sc.womenRow}>
         <View style={sc.womenIcon}>
-          <Users size={16} color="#DB2777" />
+          <Users size={16} color={T('#DB2777', 'fg')} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={sc.womenTitle}>Booking for women</Text>
@@ -319,8 +325,8 @@ function SearchCard({
         <Switch
           value={womenBooking}
           onValueChange={setWomenBooking}
-          trackColor={{ false: '#D1D5DB', true: '#F9A8D4' }}
-          thumbColor={womenBooking ? '#DB2777' : '#F9FAFB'}
+          trackColor={{ false: T('#D1D5DB', 'bg'), true: T('#F9A8D4', 'bg') }}
+          thumbColor={womenBooking ? T('#DB2777', 'fg') : T('#F9FAFB', 'fg')}
         />
       </View>
 
@@ -329,8 +335,8 @@ function SearchCard({
         style={sc.searchBtn}
         activeOpacity={0.85}
         onPress={() => onSearch(from, to, formatDate(date))}
-      >
-        <Search size={18} color={C.white} />
+      ><BrandFill />
+        <Search size={18} color={T(C.white, 'fg')} />
         <Text style={sc.searchBtnText}>Search Buses</Text>
       </TouchableOpacity>
 
@@ -360,24 +366,24 @@ function SearchCard({
   );
 }
 
-const sc = StyleSheet.create({
+const make_sc = () => StyleSheet.create({
   card: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     marginHorizontal: 14,
-    marginTop: -34,
+    marginTop: dk(14, -34),
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 12,
     elevation: 4,
-  },
+   ...glass(22), },
   routeBox: {
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 14,
     position: 'relative',
   },
@@ -392,17 +398,17 @@ const sc = StyleSheet.create({
     width: 9,
     height: 9,
     borderRadius: 5,
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
   },
   dotTo: {
     width: 9,
     height: 9,
     borderRadius: 5,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
   },
-  divider: { height: 1, backgroundColor: C.border, marginLeft: 33 },
-  fieldLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
-  cityValue: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text, marginTop: 1 },
+  divider: { height: 1, backgroundColor: T(C.border, 'bg'), marginLeft: 33 },
+  fieldLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  cityValue: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 1 },
   swapBtn: {
     position: 'absolute',
     right: 14,
@@ -411,7 +417,7 @@ const sc = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -425,7 +431,7 @@ const sc = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 11,
@@ -434,43 +440,43 @@ const sc = StyleSheet.create({
   chipRow: { flexDirection: 'row', gap: 6 },
   chip: {
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
-  chipActive: { backgroundColor: '#FFF7ED', borderColor: C.orange },
-  chipText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: C.textLight },
-  chipTextActive: { color: C.orange },
+  chipActive: { backgroundColor: T('#F5F0FF', 'bg'), borderColor: T(C.orange, 'border') },
+  chipText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
+  chipTextActive: { color: T(C.orange, 'fg') },
   womenRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     marginTop: 12,
-    backgroundColor: '#FDF2F8',
+    backgroundColor: T('#FDF2F8', 'bg'),
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderWidth: 1,
-    borderColor: '#FBCFE8',
+    borderColor: T('#FBCFE8', 'border'),
   },
   womenIcon: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#FCE7F3',
+    backgroundColor: T('#FCE7F3', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  womenTitle: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold', color: C.text },
-  womenSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  womenTitle: { fontSize: 12.5, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  womenSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   searchBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 24,
     paddingVertical: 14,
     marginTop: 14,
@@ -479,27 +485,29 @@ const sc = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
-  },
-  searchBtnText: { color: C.white, fontSize: 15, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  searchBtnText: { color: T(C.white, 'fg'), fontSize: 15, fontFamily: 'Inter_700Bold' },
 });
+const use_sc = () => useThemedStyles(make_sc);
 
 // ─── Bus type chips ──────────────────────────────────────────────────────────
 const BUS_TYPES = [
   { label: 'AC', Icon: Snowflake, color: '#2563EB', bg: '#EFF6FF' },
-  { label: 'Sleeper', Icon: Moon, color: C.purpleLight, bg: '#F5F3FF' },
+  { label: 'Sleeper', Icon: Moon, color: T(C.purpleLight, 'fg'), bg: '#F5F3FF' },
   { label: 'Luxury', Icon: Sparkles, color: '#D97706', bg: '#FFFBEB' },
-  { label: 'Seater', Icon: Bus, color: C.green, bg: '#ECFDF5' },
+  { label: 'Seater', Icon: Bus, color: T(C.green, 'fg'), bg: '#ECFDF5' },
 ];
 
 function BusTypes() {
+  const bt = use_bt();
   return (
     <View style={bt.section}>
       <Text style={bt.heading}>Browse by bus type</Text>
       <View style={bt.row}>
         {BUS_TYPES.map((t) => (
           <TouchableOpacity key={t.label} style={bt.chipCard} activeOpacity={0.8}>
-            <View style={[bt.iconBg, { backgroundColor: t.bg }]}>
-              <t.Icon size={20} color={t.color} />
+            <View style={[bt.iconBg, { backgroundColor: T(t.bg, 'bg') }]}>
+              <t.Icon size={20} color={T(t.color, 'fg')} />
             </View>
             <Text style={bt.label}>{t.label}</Text>
           </TouchableOpacity>
@@ -509,19 +517,19 @@ function BusTypes() {
   );
 }
 
-const bt = StyleSheet.create({
+const make_bt = () => StyleSheet.create({
   section: { marginTop: 20, paddingHorizontal: 14 },
-  heading: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text, marginBottom: 10 },
+  heading: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginBottom: 10 },
   row: { flexDirection: 'row', gap: 10 },
   chipCard: {
     flex: 1,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
   },
   iconBg: {
     width: 40,
@@ -530,8 +538,9 @@ const bt = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  label: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.text },
+  label: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
 });
+const use_bt = () => useThemedStyles(make_bt);
 
 // ─── Popular routes ──────────────────────────────────────────────────────────
 const ROUTES = [
@@ -542,24 +551,25 @@ const ROUTES = [
 ];
 
 function PopularRoutes() {
+  const pr = use_pr();
   return (
     <View style={pr.section}>
       <View style={pr.head}>
         <Text style={pr.heading}>Popular bus routes</Text>
         <TouchableOpacity style={pr.viewAll}>
           <Text style={pr.viewAllText}>View All</Text>
-          <ChevronRight size={14} color={C.orange} />
+          <ChevronRight size={14} color={T(C.orange, 'fg')} />
         </TouchableOpacity>
       </View>
       {ROUTES.map((r) => (
         <TouchableOpacity key={`${r.from}-${r.to}`} style={pr.card} activeOpacity={0.8}>
           <View style={pr.iconBox}>
-            <Bus size={20} color={C.orange} />
+            <Bus size={20} color={T(C.orange, 'fg')} />
           </View>
           <View style={{ flex: 1 }}>
             <View style={pr.routeRow}>
               <Text style={pr.city}>{r.from}</Text>
-              <ArrowRight size={13} color={C.gray} />
+              <ArrowRight size={13} color={T(C.gray, 'fg')} />
               <Text style={pr.city}>{r.to}</Text>
             </View>
             <Text style={pr.time}>~ {r.time} · daily departures</Text>
@@ -574,7 +584,7 @@ function PopularRoutes() {
   );
 }
 
-const pr = StyleSheet.create({
+const make_pr = () => StyleSheet.create({
   section: { marginTop: 20, paddingHorizontal: 14 },
   head: {
     flexDirection: 'row',
@@ -582,60 +592,62 @@ const pr = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  heading: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  heading: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   viewAll: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  viewAllText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.orange },
+  viewAllText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.orange, 'fg') },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     padding: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: C.border,
-  },
+    borderColor: T(C.border, 'border'),
+   ...glass(18), },
   iconBox: {
     width: 42,
     height: 42,
     borderRadius: 12,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: T('#F5F0FF', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
   routeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  city: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
-  time: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+  city: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  time: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
   priceBox: { alignItems: 'flex-end' },
-  priceLabel: { fontSize: 9, fontFamily: 'Inter_400Regular', color: C.textLight },
-  price: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.green },
+  priceLabel: { fontSize: 9, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  price: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
 });
+const use_pr = () => useThemedStyles(make_pr);
 
 // ─── Offers strip ────────────────────────────────────────────────────────────
 function BusOffer() {
+  const ofr = use_ofr();
   return (
-    <View style={ofr.container}>
+    <View style={ofr.container}><BrandFill />
       <View style={ofr.iconBox}>
-        <Percent size={26} color="#FCD34D" />
+        <Percent size={26} color={T('#FCD34D', 'fg')} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={ofr.headline}>Flat 10% off on bus tickets</Text>
         <View style={ofr.codePill}>
-          <Tag size={10} color={C.white} />
+          <Tag size={10} color={T(C.white, 'fg')} />
           <Text style={ofr.codeText}> Use Code: BUS10</Text>
         </View>
       </View>
-      <TouchableOpacity style={ofr.btn}>
+      <TouchableOpacity style={ofr.btn}><BrandFill />
         <Text style={ofr.btnText}>Claim</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const ofr = StyleSheet.create({
+const make_ofr = () => StyleSheet.create({
   container: {
-    backgroundColor: C.purple,
+    backgroundColor: T(C.purple, 'bg'),
     marginHorizontal: 14,
     marginTop: 20,
     borderRadius: 16,
@@ -643,7 +655,7 @@ const ofr = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
+   overflow: 'hidden', },
   iconBox: {
     width: 44,
     height: 44,
@@ -652,7 +664,7 @@ const ofr = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headline: { color: C.white, fontSize: 13, fontFamily: 'Inter_700Bold' },
+  headline: { color: T(C.white, 'fg'), fontSize: 13, fontFamily: 'Inter_700Bold' },
   codePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -666,30 +678,32 @@ const ofr = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.25)',
     borderStyle: 'dashed',
   },
-  codeText: { color: C.white, fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  codeText: { color: T(C.white, 'fg'), fontSize: 10, fontFamily: 'Inter_600SemiBold' },
   btn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
-  },
-  btnText: { color: C.white, fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+   overflow: 'hidden', },
+  btnText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 });
+const use_ofr = () => useThemedStyles(make_ofr);
 
 // ─── Trust strip ─────────────────────────────────────────────────────────────
 const TRUST = [
-  { Icon: ShieldCheck, color: C.green, title: 'Safe Travel', sub: 'Verified operators' },
+  { Icon: ShieldCheck, color: T(C.green, 'fg'), title: 'Safe Travel', sub: 'Verified operators' },
   { Icon: Ticket, color: '#FBBF24', title: 'Instant Ticket', sub: 'M-ticket on phone' },
   { Icon: Zap, color: '#60A5FA', title: 'Free Cancel', sub: 'On select buses' },
-  { Icon: Headphones, color: C.green, title: '24x7 Help', sub: 'Trip support' },
+  { Icon: Headphones, color: T(C.green, 'fg'), title: '24x7 Help', sub: 'Trip support' },
 ];
 
 function TrustStrip() {
+  const ts = use_ts();
   return (
     <View style={ts.container}>
       {TRUST.map((b, i) => (
         <View key={b.title} style={[ts.item, i < TRUST.length - 1 && ts.itemBorder]}>
-          <b.Icon size={20} color={b.color} />
+          <b.Icon size={20} color={T(b.color, 'fg')} />
           <Text style={ts.title}>{b.title}</Text>
           <Text style={ts.sub}>{b.sub}</Text>
         </View>
@@ -698,9 +712,9 @@ function TrustStrip() {
   );
 }
 
-const ts = StyleSheet.create({
+const make_ts = () => StyleSheet.create({
   container: {
-    backgroundColor: C.darkBg,
+    backgroundColor: T(C.darkBg, 'bg'),
     marginTop: 20,
     marginHorizontal: 14,
     borderRadius: 16,
@@ -711,7 +725,7 @@ const ts = StyleSheet.create({
   item: { flex: 1, alignItems: 'center', gap: 5, paddingHorizontal: 4 },
   itemBorder: { borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.08)' },
   title: {
-    color: C.white,
+    color: T(C.white, 'fg'),
     fontSize: 10.5,
     fontFamily: 'Inter_600SemiBold',
     textAlign: 'center',
@@ -724,6 +738,7 @@ const ts = StyleSheet.create({
     lineHeight: 11,
   },
 });
+const use_ts = () => useThemedStyles(make_ts);
 
 // ─── Bus Tickets Screen ──────────────────────────────────────────────────────
 export function BusTicketsScreen({
@@ -735,6 +750,7 @@ export function BusTicketsScreen({
   onSearch: (from: string, to: string, dateLabel: string) => void;
   onOpenMyTickets?: () => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -743,7 +759,7 @@ export function BusTicketsScreen({
       {/* Header */}
       <View style={[st.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={24} color={C.text} />
+          <ArrowLeft size={24} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View>
           <Text style={st.headerTitle}>Bus Tickets</Text>
@@ -758,7 +774,7 @@ export function BusTicketsScreen({
         >
           <Text style={st.myTicketsText}>My Tickets</Text>
           <View style={st.headerIcon}>
-            <Bus size={18} color={C.orange} />
+            <Bus size={18} color={T(C.orange, 'fg')} />
           </View>
         </TouchableOpacity>
       </View>
@@ -777,6 +793,7 @@ export function BusTicketsScreen({
             resizeMode="cover"
           />
           <View style={st.bannerOverlay} />
+          <BannerScrim />
           <View style={st.bannerCaption}>
             <Text style={st.bannerTitle}>Book Bus Tickets</Text>
             <Text style={st.bannerSub}>AC, Sleeper & Luxury coaches</Text>
@@ -794,23 +811,23 @@ export function BusTicketsScreen({
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   headerSub: {
     fontSize: 10,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 1,
   },
   myTicketsBtn: {
@@ -821,21 +838,22 @@ const st = StyleSheet.create({
   myTicketsText: {
     fontSize: 12,
     fontFamily: 'Inter_600SemiBold',
-    color: C.orange,
+    color: T(C.orange, 'fg'),
   },
   headerIcon: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: T('#F5F0FF', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
   content: { paddingBottom: 40 },
   bannerWrap: {
     height: 170,
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     position: 'relative',
+    ...{ marginHorizontal: dk(14, 0), marginTop: dk(10, 0), borderRadius: dk(22, 0), borderWidth: dk(1.5, 0), borderColor: N().cardBorder, overflow: 'hidden' },
   },
   bannerImage: { width: '100%', height: '100%' },
   bannerOverlay: {
@@ -844,7 +862,7 @@ const st = StyleSheet.create({
   },
   bannerCaption: { position: 'absolute', left: 16, top: 22 },
   bannerTitle: {
-    color: C.white,
+    color: T(C.white, 'fg'),
     fontSize: 22,
     fontFamily: 'Inter_700Bold',
     textShadowColor: 'rgba(0,0,0,0.5)',
@@ -861,3 +879,4 @@ const st = StyleSheet.create({
     textShadowRadius: 4,
   },
 });
+const use_st = () => useThemedStyles(make_st);

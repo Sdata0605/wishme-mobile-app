@@ -16,6 +16,7 @@ import { GradientButton } from '@/components/GradientButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFetch } from '@/constants/supabase';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 interface OrderSummary {
   id: string;
@@ -88,10 +89,10 @@ export default function WishCongratulationsScreen() {
   const convId = order?.conversation_id ?? conversationId;
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <LinearGradient
-          colors={['#FF6B33', '#B44CFF']}
+          colors={['#7B5CFA', '#1F7BFF']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[s.hero, { paddingTop: topPad + 32 }]}
@@ -110,9 +111,9 @@ export default function WishCongratulationsScreen() {
             </View>
           ) : order ? (
             <>
-              <View style={[s.celebBanner, { backgroundColor: '#FF6B3310', borderColor: '#FF6B3330' }]}>
-                <Icon name="star" size={18} color="#FF6B33" />
-                <Text style={[s.celebBannerText, { color: '#FF6B33' }]}>
+              <View style={[s.celebBanner, { backgroundColor: '#7B5CFA10', borderColor: '#7B5CFA30' }]}>
+                <Icon name="star" size={18} color="#7B5CFA" />
+                <Text style={[s.celebBannerText, { color: '#7B5CFA' }]}>
                   Wish delivered to {order.celebrities?.name}
                 </Text>
               </View>
@@ -154,9 +155,9 @@ export default function WishCongratulationsScreen() {
               </View>
             </>
           ) : (
-            <View style={[s.celebBanner, { backgroundColor: '#FF6B3310', borderColor: '#FF6B3330' }]}>
-              <Icon name="star" size={18} color="#FF6B33" />
-              <Text style={[s.celebBannerText, { color: '#FF6B33' }]}>Your wish has been sent!</Text>
+            <View style={[s.celebBanner, { backgroundColor: '#7B5CFA10', borderColor: '#7B5CFA30' }]}>
+              <Icon name="star" size={18} color="#7B5CFA" />
+              <Text style={[s.celebBannerText, { color: '#7B5CFA' }]}>Your wish has been sent!</Text>
             </View>
           )}
 
@@ -166,14 +167,14 @@ export default function WishCongratulationsScreen() {
 
           {convId && (
             <TouchableOpacity
-              style={[s.viewConvBtn, { borderColor: '#4B83FF', backgroundColor: '#4B83FF18' }]}
+              style={[s.viewConvBtn, { borderColor: '#3B5BDB', backgroundColor: '#3B5BDB18' }]}
               onPress={() => {
                 if (intervalRef.current) clearInterval(intervalRef.current);
                 router.push(('/chat/' + convId) as never);
               }}
             >
-              <Icon name="message-circle" size={16} color="#4B83FF" />
-              <Text style={[s.viewConvText, { color: '#4B83FF' }]}>View Conversation</Text>
+              <Icon name="message-circle" size={16} color="#3B5BDB" />
+              <Text style={[s.viewConvText, { color: '#3B5BDB' }]}>View Conversation</Text>
             </TouchableOpacity>
           )}
 
@@ -199,7 +200,7 @@ export default function WishCongratulationsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </View></AmbientBackground>
   );
 }
 

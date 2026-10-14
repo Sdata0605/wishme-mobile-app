@@ -27,6 +27,8 @@ import {
 } from './billData';
 
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles, glass, dockBar } from './themed';
+import { BrandFill } from './BrandFill';
 
 function ProviderPicker({
   visible,
@@ -43,6 +45,7 @@ function ProviderPicker({
   onSelect: (p: BillProvider) => void;
   onClose: () => void;
 }) {
+  const md = use_md();
   const [q, setQ] = useState('');
   const filtered = providers.filter((p) =>
     `${p.name} ${p.state ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()),
@@ -55,15 +58,15 @@ function ProviderPicker({
           <View style={md.head}>
             <Text style={md.title}>{title}</Text>
             <TouchableOpacity onPress={onClose}>
-              <X size={22} color={C.text} />
+              <X size={22} color={T(C.text, 'fg')} />
             </TouchableOpacity>
           </View>
           <View style={md.search}>
-            <Search size={14} color={C.gray} />
+            <Search size={14} color={T(C.gray, 'fg')} />
             <TextInput
               style={md.searchInput}
               placeholder="Search provider..."
-              placeholderTextColor={C.gray}
+              placeholderTextColor={T(C.gray, 'fg')}
               value={q}
               onChangeText={setQ}
             />
@@ -82,7 +85,7 @@ function ProviderPicker({
                   <Text style={md.name}>{p.name}</Text>
                   {!!p.state && <Text style={md.state}>{p.state}</Text>}
                 </View>
-                {selected?.id === p.id && <Check size={18} color={C.green} />}
+                {selected?.id === p.id && <Check size={18} color={T(C.green, 'fg')} />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -92,10 +95,10 @@ function ProviderPicker({
   );
 }
 
-const md = StyleSheet.create({
+const make_md = () => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 20,
@@ -107,33 +110,34 @@ const md = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
-  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   search: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     margin: 14,
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
   },
-  searchInput: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: C.text, padding: 0 },
+  searchInput: { flex: 1, fontSize: 13, fontFamily: 'Inter_400Regular', color: T(C.text, 'fg'), padding: 0 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 13,
     borderBottomWidth: 1,
-    borderBottomColor: C.lightGray,
+    borderBottomColor: T(C.lightGray, 'border'),
   },
-  name: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: C.text },
-  state: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+  name: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  state: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
 });
+const use_md = () => useThemedStyles(make_md);
 
 export function BillPayScreen({
   kind,
@@ -142,6 +146,7 @@ export function BillPayScreen({
   kind: BillKind;
   onBack: () => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const meta = serviceMeta(kind);
@@ -207,7 +212,7 @@ export function BillPayScreen({
     return (
       <View style={[st.root, st.successWrap, { paddingTop: topPad + 40 }]}>
         <View style={st.successIcon}>
-          <CheckCircle2 size={42} color={C.green} />
+          <CheckCircle2 size={42} color={T(C.green, 'fg')} />
         </View>
         <Text style={st.successTitle}>Payment Successful</Text>
         <Text style={st.successSub}>
@@ -221,7 +226,7 @@ export function BillPayScreen({
           <Text style={st.successMeta}>{consumerId}</Text>
           <Text style={st.successAmount}>₹{fetchedAmount.toLocaleString('en-IN')}</Text>
         </View>
-        <TouchableOpacity style={st.doneBtn} onPress={onBack}>
+        <TouchableOpacity style={st.doneBtn} onPress={onBack}><BrandFill />
           <Text style={st.doneText}>Done</Text>
         </TouchableOpacity>
       </View>
@@ -233,7 +238,7 @@ export function BillPayScreen({
       <View style={st.root}>
         <View style={[st.header, { paddingTop: topPad + 8 }]}>
           <TouchableOpacity onPress={() => setStep('form')}>
-            <ArrowLeft size={24} color={C.text} />
+            <ArrowLeft size={24} color={T(C.text, 'fg')} />
           </TouchableOpacity>
           <View>
             <Text style={st.headerTitle}>Confirm Payment</Text>
@@ -243,8 +248,8 @@ export function BillPayScreen({
 
         <ScrollView contentContainerStyle={{ padding: 14 }}>
           <View style={st.billCard}>
-            <View style={[st.billIcon, { backgroundColor: meta.bg }]}>
-              <meta.Icon size={26} color={meta.color} />
+            <View style={[st.billIcon, { backgroundColor: T(meta.bg, 'bg') }]}>
+              <meta.Icon size={26} color={T(meta.color, 'fg')} />
             </View>
             <Text style={st.billProvider}>{provider?.name}</Text>
             <Text style={st.billId}>{consumerId}</Text>
@@ -265,7 +270,7 @@ export function BillPayScreen({
             <Text style={st.footerLabel}>Paying</Text>
             <Text style={st.footerPrice}>₹{fetchedAmount.toLocaleString('en-IN')}</Text>
           </View>
-          <TouchableOpacity style={st.payBtn} onPress={() => setStep('success')}>
+          <TouchableOpacity style={st.payBtn} onPress={() => setStep('success')}><BrandFill />
             <Text style={st.payText}>Pay Now</Text>
           </TouchableOpacity>
         </View>
@@ -277,14 +282,14 @@ export function BillPayScreen({
     <View style={st.root}>
       <View style={[st.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={24} color={C.text} />
+          <ArrowLeft size={24} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={st.headerTitle}>{meta.title}</Text>
           <Text style={st.headerSub}>{meta.desc}</Text>
         </View>
-        <View style={[st.headerIcon, { backgroundColor: meta.bg }]}>
-          <meta.Icon size={18} color={meta.color} />
+        <View style={[st.headerIcon, { backgroundColor: T(meta.bg, 'bg') }]}>
+          <meta.Icon size={18} color={T(meta.color, 'fg')} />
         </View>
       </View>
 
@@ -372,17 +377,17 @@ export function BillPayScreen({
                 : 'Operator / Provider'}
           </Text>
           <TouchableOpacity style={st.select} onPress={() => setPickerOpen(true)}>
-            <Text style={[st.selectText, !provider && { color: C.gray }]}>
+            <Text style={[st.selectText, !provider && { color: T(C.gray, 'fg') }]}>
               {provider?.name ?? 'Select provider'}
             </Text>
-            <ChevronRight size={16} color={C.gray} />
+            <ChevronRight size={16} color={T(C.gray, 'fg')} />
           </TouchableOpacity>
 
           <Text style={st.fieldLabel}>{provider?.hint ?? 'Consumer / Account ID'}</Text>
           <TextInput
             style={st.input}
             placeholder={provider?.hint ?? 'Enter details'}
-            placeholderTextColor={C.gray}
+            placeholderTextColor={T(C.gray, 'fg')}
             value={consumerId}
             onChangeText={setConsumerId}
             keyboardType={isMobile || kind === 'landline' ? 'phone-pad' : 'default'}
@@ -395,7 +400,7 @@ export function BillPayScreen({
               <TextInput
                 style={st.input}
                 placeholder="Enter amount"
-                placeholderTextColor={C.gray}
+                placeholderTextColor={T(C.gray, 'fg')}
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="numeric"
@@ -476,20 +481,20 @@ export function BillPayScreen({
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
-  headerSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  headerSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   headerIcon: {
     width: 36,
     height: 36,
@@ -499,29 +504,29 @@ const st = StyleSheet.create({
   },
   toggleRow: {
     flexDirection: 'row',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 4,
     marginBottom: 12,
-  },
+   ...glass(18), },
   toggle: { flex: 1, borderRadius: 10, paddingVertical: 10, alignItems: 'center' },
-  toggleOn: { backgroundColor: '#FFF7ED' },
-  toggleText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.textLight },
-  toggleTextOn: { color: C.orange },
+  toggleOn: { backgroundColor: T('#F5F0FF', 'bg') },
+  toggleText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
+  toggleTextOn: { color: T(C.orange, 'fg') },
   formCard: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 16,
-  },
-  formTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text, marginBottom: 14 },
+   ...glass(22), },
+  formTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginBottom: 14 },
   fieldLabel: {
     fontSize: 11,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginBottom: 6,
     marginTop: 8,
   },
@@ -529,49 +534,49 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
-  selectText: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium', color: C.text },
+  selectText: { flex: 1, fontSize: 14, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
   input: {
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
     fontFamily: 'Inter_500Medium',
-    color: C.text,
-    backgroundColor: C.white,
+    color: T(C.text, 'fg'),
+    backgroundColor: T(C.white, 'bg'),
   },
   quickAmounts: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
   amountChip: {
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
   },
-  amountChipOn: { backgroundColor: '#FFF7ED', borderColor: C.orange },
-  amountText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.textLight },
-  amountTextOn: { color: C.orange },
+  amountChipOn: { backgroundColor: T('#F5F0FF', 'bg'), borderColor: T(C.orange, 'border') },
+  amountText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
+  amountTextOn: { color: T(C.orange, 'fg') },
   proceed: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 24,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 18,
   },
   proceedDisabled: { opacity: 0.45 },
-  proceedText: { color: C.white, fontSize: 15, fontFamily: 'Inter_700Bold' },
+  proceedText: { color: T(C.white, 'fg'), fontSize: 15, fontFamily: 'Inter_700Bold' },
   popularTitle: {
     fontSize: 14,
     fontFamily: 'Inter_700Bold',
-    color: C.text,
+    color: T(C.text, 'fg'),
     marginTop: 18,
     marginBottom: 10,
   },
@@ -579,25 +584,25 @@ const st = StyleSheet.create({
   popularChip: {
     width: '48%',
     flexGrow: 1,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     padding: 12,
     minHeight: 56,
     justifyContent: 'center',
   },
-  popularChipOn: { borderColor: C.orange, backgroundColor: '#FFF7ED' },
-  popularText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.text },
-  popularTextOn: { color: C.orange },
+  popularChipOn: { borderColor: T(C.orange, 'border'), backgroundColor: T('#F5F0FF', 'bg') },
+  popularText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  popularTextOn: { color: T(C.orange, 'fg') },
   billCard: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 18,
     alignItems: 'center',
-  },
+   ...glass(22), },
   billIcon: {
     width: 54,
     height: 54,
@@ -606,63 +611,63 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 10,
   },
-  billProvider: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
-  billId: { fontSize: 12, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 4 },
-  sep: { height: 1, backgroundColor: C.border, alignSelf: 'stretch', marginVertical: 14 },
-  billLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
-  billAmount: { fontSize: 28, fontFamily: 'Inter_700Bold', color: C.text, marginTop: 4 },
+  billProvider: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  billId: { fontSize: 12, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 4 },
+  sep: { height: 1, backgroundColor: T(C.border, 'bg'), alignSelf: 'stretch', marginVertical: 14 },
+  billLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  billAmount: { fontSize: 28, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 4 },
   billDue: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: C.green,
+    color: T(C.green, 'fg'),
     marginTop: 8,
     textAlign: 'center',
   },
   offerCard: {
     marginTop: 12,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: T('#F5F3FF', 'bg'),
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#DDD6FE',
+    borderColor: T('#DDD6FE', 'border'),
   },
-  offerTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.purple },
-  offerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+  offerTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.purple, 'fg') },
+  offerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 14,
     paddingTop: 12,
     gap: 12,
-  },
-  footerLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
-  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+   ...dockBar(), },
+  footerLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   payBtn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 22,
     paddingHorizontal: 22,
     paddingVertical: 12,
-  },
-  payText: { color: C.white, fontSize: 14, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  payText: { color: T(C.white, 'fg'), fontSize: 14, fontFamily: 'Inter_700Bold' },
   successWrap: { alignItems: 'center', paddingHorizontal: 24 },
   successIcon: {
     width: 76,
     height: 76,
     borderRadius: 38,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
   },
-  successTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', color: C.text },
+  successTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   successSub: {
     fontSize: 13,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     textAlign: 'center',
     marginTop: 8,
     marginBottom: 20,
@@ -670,22 +675,23 @@ const st = StyleSheet.create({
   },
   successCard: {
     width: '100%',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 16,
     marginBottom: 20,
-  },
-  successLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
-  successPnr: { fontSize: 20, fontFamily: 'Inter_700Bold', color: C.purple, marginTop: 2 },
-  successMeta: { fontSize: 12, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 4 },
-  successAmount: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.green, marginTop: 10 },
+   ...glass(22), },
+  successLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  successPnr: { fontSize: 20, fontFamily: 'Inter_700Bold', color: T(C.purple, 'fg'), marginTop: 2 },
+  successMeta: { fontSize: 12, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 4 },
+  successAmount: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg'), marginTop: 10 },
   doneBtn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 22,
     paddingHorizontal: 24,
     paddingVertical: 12,
-  },
-  doneText: { color: C.white, fontSize: 14, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  doneText: { color: T(C.white, 'fg'), fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
+const use_st = () => useThemedStyles(make_st);

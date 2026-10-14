@@ -25,6 +25,7 @@ import { Icon } from '@/components/Icon';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
 
@@ -248,6 +249,10 @@ const vn = StyleSheet.create({
   label: { fontSize: 11, fontFamily: 'Inter_400Regular' },
 });
 
+// Bubble caps at 80% of screen width (mb.bubble) with 14px padding each side —
+// the card image must fit inside that, not a raw fraction of the full screen.
+const cardWidth = Dimensions.get('window').width * 0.8 - 28;
+
 function MessageBubble({
   msg,
   isMe,
@@ -291,10 +296,10 @@ function MessageBubble({
               </Text>
             )}
             {parsed.url && (
-              <View style={mb.cardWrap}>
+              <View style={[mb.cardWrap, { width: cardWidth }]}>
                 <Image
                   source={{ uri: parsed.url }}
-                  style={[mb.cardImg, { width: Math.min(Dimensions.get('window').width * 0.75, 320) }]}
+                  style={mb.cardImg}
                   contentFit="cover"
                 />
                 <TouchableOpacity
@@ -325,11 +330,11 @@ function MessageBubble({
 
 const mb = StyleSheet.create({
   wrap: { gap: 3, marginVertical: 2 },
-  bubble: { maxWidth: '80%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16 },
+  bubble: { maxWidth: '80%', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 16, overflow: 'hidden' },
   text: { fontSize: 14, fontFamily: 'Inter_400Regular', lineHeight: 20 },
   time: { fontSize: 11, fontFamily: 'Inter_400Regular', marginHorizontal: 4 },
   cardWrap: { gap: 8 },
-  cardImg: { height: 180, borderRadius: 10 },
+  cardImg: { width: '100%', height: 180, borderRadius: 10, overflow: 'hidden' },
   cardLink: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   cardLinkText: { fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   aiBadge: {
@@ -338,9 +343,9 @@ const mb = StyleSheet.create({
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
-    backgroundColor: 'rgba(180,76,255,0.2)',
+    backgroundColor: 'rgba(31,123,255,0.2)',
   },
-  aiBadgeText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#B44CFF' },
+  aiBadgeText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#1F7BFF' },
 });
 
 export default function ChatScreen() {
@@ -777,7 +782,7 @@ export default function ChatScreen() {
       behavior="padding"
       keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
     >
-      <View style={[s.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
         {/* Header */}
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border, backgroundColor: colors.background }]}>
           <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -957,7 +962,7 @@ export default function ChatScreen() {
             </View>
           )}
         </View>
-      </View>
+      </View></AmbientBackground>
     </KeyboardAvoidingView>
   );
 }

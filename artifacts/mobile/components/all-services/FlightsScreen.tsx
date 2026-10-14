@@ -28,6 +28,8 @@ import {
 
 import { serviceColors as C } from './serviceColors';
 import { useAgentPrefill } from '@/context/AgentStateContext';
+import { T, useThemedStyles, glass, dk, N } from './themed';
+import { BrandFill, BannerScrim } from './BrandFill';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -106,6 +108,7 @@ const BANNERS: Banner[] = [
 ];
 
 function BannerCarousel() {
+  const bn = use_bn();
   const [page, setPage] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const pageRef = useRef(0);
@@ -151,7 +154,8 @@ function BannerCarousel() {
         {BANNERS.map((b) => (
           <View key={b.title} style={bn.card}>
             <Image source={b.image} style={bn.image} resizeMode="cover" />
-            <View style={[bn.overlay, { backgroundColor: b.tint }]} />
+            <View style={[bn.overlay, { backgroundColor: T(b.tint, 'bg') }]} />
+            <BannerScrim />
             <View style={bn.caption}>
               <Text style={bn.title}>{b.title}</Text>
               <Text style={bn.sub}>{b.sub}</Text>
@@ -168,21 +172,23 @@ function BannerCarousel() {
   );
 }
 
-const bn = StyleSheet.create({
+const make_bn = () => StyleSheet.create({
   wrap: { marginTop: 12 },
   row: { paddingHorizontal: 14, gap: 10 },
   card: {
     width: BANNER_W,
     height: 160,
-    borderRadius: 18,
+    borderRadius: dk(22, 18),
+    borderWidth: dk(1.5, 0),
+    borderColor: N().cardBorder,
     overflow: 'hidden',
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
   },
   image: { width: '100%', height: '100%' },
   overlay: { ...StyleSheet.absoluteFillObject },
   caption: { position: 'absolute', left: 14, bottom: 12 },
   title: {
-    color: C.white,
+    color: T(C.white, 'fg'),
     fontSize: 19,
     fontFamily: 'Inter_700Bold',
     textShadowColor: 'rgba(0,0,0,0.5)',
@@ -205,9 +211,10 @@ const bn = StyleSheet.create({
     marginTop: 8,
   },
   dot: { height: 5, borderRadius: 3 },
-  dotActive: { width: 16, backgroundColor: C.orange },
-  dotInactive: { width: 5, backgroundColor: '#D1D5DB' },
+  dotActive: { width: 16, backgroundColor: T(C.orange, 'bg') },
+  dotInactive: { width: 5, backgroundColor: T('#D1D5DB', 'bg') },
 });
+const use_bn = () => useThemedStyles(make_bn);
 
 // ─── Trip type selector ──────────────────────────────────────────────────────
 type TripType = 'oneWay' | 'roundTrip' | 'multiCity';
@@ -225,6 +232,7 @@ function TripTypeSelector({
   value: TripType;
   onChange: (t: TripType) => void;
 }) {
+  const tt = use_tt();
   return (
     <View style={tt.row}>
       {TRIP_TYPES.map((t) => {
@@ -247,7 +255,7 @@ function TripTypeSelector({
   );
 }
 
-const tt = StyleSheet.create({
+const make_tt = () => StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -261,20 +269,21 @@ const tt = StyleSheet.create({
     height: 18,
     borderRadius: 9,
     borderWidth: 2,
-    borderColor: C.gray,
+    borderColor: T(C.gray, 'border'),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioOuterActive: { borderColor: C.blue },
+  radioOuterActive: { borderColor: T(C.blue, 'border') },
   radioInner: {
     width: 9,
     height: 9,
     borderRadius: 4.5,
-    backgroundColor: C.blue,
+    backgroundColor: T(C.blue, 'bg'),
   },
-  label: { fontSize: 13, fontFamily: 'Inter_500Medium', color: C.textLight },
-  labelActive: { color: C.text, fontFamily: 'Inter_600SemiBold' },
+  label: { fontSize: 13, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  labelActive: { color: T(C.text, 'fg'), fontFamily: 'Inter_600SemiBold' },
 });
+const use_tt = () => useThemedStyles(make_tt);
 
 // ─── Search form ─────────────────────────────────────────────────────────────
 const CITIES = [
@@ -312,6 +321,17 @@ function sameDay(a: Date | null, b: Date | null) {
 function formatDate(d: Date) {
   return `${d.getDate()} ${MONTH_NAMES[d.getMonth()].slice(0, 3)} ${d.getFullYear()}`;
 }
+function toIsoDate(d: Date) {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+const TBO_CABIN_CLASS: Record<CabinKey, number> = {
+  economy: 2,
+  premiumEconomy: 3,
+  business: 4,
+  first: 6,
+};
 function formatDay(d: Date) {
   return DAY_FULL[d.getDay()];
 }
@@ -330,6 +350,7 @@ function MonthCalendar({
   minDate: Date;
   onPick: (d: Date) => void;
 }) {
+  const cal = use_cal();
   const initial = selected && selected >= minDate ? selected : minDate;
   const [year, setYear] = useState(initial.getFullYear());
   const [month, setMonth] = useState(initial.getMonth());
@@ -368,13 +389,13 @@ function MonthCalendar({
           disabled={!canGoPrev}
           activeOpacity={0.7}
         >
-          <ChevronLeft size={18} color={canGoPrev ? C.text : C.gray} />
+          <ChevronLeft size={18} color={canGoPrev ? T(C.text, 'fg') : T(C.gray, 'fg')} />
         </TouchableOpacity>
         <Text style={cal.monthLabel}>
           {MONTH_NAMES[month]} {year}
         </Text>
         <TouchableOpacity style={cal.navBtn} onPress={goNext} activeOpacity={0.7}>
-          <ChevronRight size={18} color={C.text} />
+          <ChevronRight size={18} color={T(C.text, 'fg')} />
         </TouchableOpacity>
       </View>
       <View style={cal.weekRow}>
@@ -414,15 +435,15 @@ function MonthCalendar({
   );
 }
 
-const cal = StyleSheet.create({
+const make_cal = () => StyleSheet.create({
   wrap: {
     marginTop: 12,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 14,
     padding: 10,
-    backgroundColor: C.white,
-  },
+    backgroundColor: T(C.white, 'bg'),
+   ...glass(18), },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -434,20 +455,20 @@ const cal = StyleSheet.create({
     height: 32,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
   navBtnDisabled: { opacity: 0.4 },
-  monthLabel: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
+  monthLabel: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   weekRow: { flexDirection: 'row', marginBottom: 4 },
   weekDay: {
     flex: 1,
     textAlign: 'center',
     fontSize: 10,
     fontFamily: 'Inter_600SemiBold',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     textTransform: 'uppercase',
   },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
@@ -458,11 +479,12 @@ const cal = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 10,
   },
-  cellActive: { backgroundColor: C.blue },
-  cellText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: C.text },
-  cellTextDisabled: { color: '#D1D5DB' },
-  cellTextActive: { color: C.white, fontFamily: 'Inter_700Bold' },
+  cellActive: { backgroundColor: T(C.blue, 'bg') },
+  cellText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
+  cellTextDisabled: { color: T('#D1D5DB', 'fg') },
+  cellTextActive: { color: T(C.white, 'fg'), fontFamily: 'Inter_700Bold' },
 });
+const use_cal = () => useThemedStyles(make_cal);
 
 // ─── Travellers picker ───────────────────────────────────────────────────────
 interface TravellerCounts {
@@ -492,6 +514,7 @@ function NumSelector({
   max: number;
   overflow: string; // e.g. ">9"
 }) {
+  const tp = use_tp();
   const items = Array.from({ length: max - min + 1 }, (_, i) => min + i);
   return (
     <ScrollView
@@ -526,6 +549,7 @@ function TravellersPicker({
   initial: TravellerCounts;
   onApply: (t: TravellerCounts) => void;
 }) {
+  const tp = use_tp();
   const [adults, setAdults] = useState(initial.adults);
   const [children, setChildren] = useState(initial.children);
   const [infants, setInfants] = useState(initial.infants);
@@ -556,32 +580,32 @@ function TravellersPicker({
         style={tp.applyBtn}
         activeOpacity={0.85}
         onPress={() => onApply({ adults, children, infants })}
-      >
+      ><BrandFill />
         <Text style={tp.applyText}>APPLY</Text>
       </TouchableOpacity>
     </View>
   );
 }
 
-const tp = StyleSheet.create({
+const make_tp = () => StyleSheet.create({
   wrap: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 14,
     padding: 14,
-    backgroundColor: C.white,
-  },
+    backgroundColor: T(C.white, 'bg'),
+   ...glass(18), },
   label: {
     fontSize: 12,
     fontFamily: 'Inter_700Bold',
-    color: C.text,
+    color: T(C.text, 'fg'),
     marginTop: 8,
   },
   hint: {
     fontSize: 10,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginBottom: 6,
   },
   numRow: { flexDirection: 'row', gap: 6, paddingBottom: 2 },
@@ -590,26 +614,27 @@ const tp = StyleSheet.create({
     height: 36,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
-  numBtnActive: { backgroundColor: C.blue, borderColor: C.blue },
-  numText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
-  numTextActive: { color: C.white },
+  numBtnActive: { backgroundColor: T(C.blue, 'bg'), borderColor: T(C.blue, 'border') },
+  numText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  numTextActive: { color: T(C.white, 'fg') },
   twoCol: { flexDirection: 'row', marginTop: 8, gap: 10 },
-  colDivider: { width: 1, backgroundColor: C.border, marginTop: 4 },
+  colDivider: { width: 1, backgroundColor: T(C.border, 'bg'), marginTop: 4 },
   applyBtn: {
     marginTop: 14,
     alignSelf: 'flex-end',
-    backgroundColor: C.blue,
+    backgroundColor: T(C.blue, 'bg'),
     borderRadius: 20,
     paddingHorizontal: 28,
     paddingVertical: 10,
-  },
-  applyText: { color: C.white, fontSize: 13, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
+   overflow: 'hidden', },
+  applyText: { color: T(C.white, 'fg'), fontSize: 13, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
 });
+const use_tp = () => useThemedStyles(make_tp);
 
 // ─── Cabin class picker ──────────────────────────────────────────────────────
 type CabinKey = 'economy' | 'premiumEconomy' | 'business' | 'first';
@@ -654,6 +679,7 @@ function CabinClassPicker({
   value: CabinKey;
   onChange: (k: CabinKey) => void;
 }) {
+  const cb = use_cb();
   return (
     <View style={cb.wrap}>
       {CABIN_OPTIONS.map((opt) => {
@@ -688,15 +714,15 @@ function CabinClassPicker({
   );
 }
 
-const cb = StyleSheet.create({
+const make_cb = () => StyleSheet.create({
   wrap: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 14,
     overflow: 'hidden',
-    backgroundColor: C.white,
-  },
+    backgroundColor: T(C.white, 'bg'),
+   ...glass(18), },
   card: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -704,26 +730,27 @@ const cb = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
-  cardActive: { backgroundColor: C.blueLight, borderBottomColor: C.blue },
+  cardActive: { backgroundColor: T(C.blueLight, 'bg'), borderBottomColor: T(C.blue, 'border') },
   cardLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
   radioOuter: {
     width: 18,
     height: 18,
     borderRadius: 9,
     borderWidth: 2,
-    borderColor: C.gray,
+    borderColor: T(C.gray, 'border'),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioInner: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: C.blue },
-  cardTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
-  cardTitleActive: { color: C.blue },
+  radioInner: { width: 9, height: 9, borderRadius: 4.5, backgroundColor: T(C.blue, 'bg') },
+  cardTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  cardTitleActive: { color: T(C.blue, 'fg') },
   perksRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  perk: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
+  perk: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   emoji: { fontSize: 28, marginLeft: 8 },
 });
+const use_cb = () => useThemedStyles(make_cb);
 
 type PickerTarget = 'from' | 'to' | 'departure' | 'return' | 'travellers' | 'cabin' | null;
 
@@ -736,6 +763,7 @@ function SearchForm({
   onSearch?: (params: FlightSearchParams) => void;
   initialSearch?: FlightSearchParams;
 }) {
+  const sf = use_sf();
   const agentPrefill = useAgentPrefill();
   const today = startOfDay(new Date());
 
@@ -796,7 +824,7 @@ function SearchForm({
     <View style={sf.card}>
       {/* From */}
       <TouchableOpacity style={sf.fieldRow} activeOpacity={0.7} onPress={() => togglePicker('from')}>
-        <PlaneTakeoff size={18} color={C.blue} />
+        <PlaneTakeoff size={18} color={T(C.blue, 'fg')} />
         <View style={{ flex: 1 }}>
           <Text style={sf.fieldLabel}>From</Text>
           <Text style={sf.fieldValue}>
@@ -819,13 +847,13 @@ function SearchForm({
       <View style={sf.dividerRow}>
         <View style={sf.divider} />
         <TouchableOpacity style={sf.swapBtn} onPress={swap} activeOpacity={0.8}>
-          <ArrowRightLeft size={15} color={C.blue} />
+          <ArrowRightLeft size={15} color={T(C.blue, 'fg')} />
         </TouchableOpacity>
       </View>
 
       {/* To */}
       <TouchableOpacity style={sf.fieldRow} activeOpacity={0.7} onPress={() => togglePicker('to')}>
-        <PlaneLanding size={18} color={C.orange} />
+        <PlaneLanding size={18} color={T(C.orange, 'fg')} />
         <View style={{ flex: 1 }}>
           <Text style={sf.fieldLabel}>To</Text>
           <Text style={sf.fieldValue}>
@@ -854,7 +882,7 @@ function SearchForm({
           activeOpacity={0.7}
           onPress={() => togglePicker('departure')}
         >
-          <Calendar size={18} color={C.purpleLight} />
+          <Calendar size={18} color={T(C.purpleLight, 'fg')} />
           <View>
             <Text style={sf.fieldLabel}>Departure</Text>
             <Text style={sf.fieldValue}>{formatDate(depDate)}</Text>
@@ -869,7 +897,7 @@ function SearchForm({
               activeOpacity={0.7}
               onPress={() => togglePicker('return')}
             >
-              <Calendar size={18} color={C.green} />
+              <Calendar size={18} color={T(C.green, 'fg')} />
               <View>
                 <Text style={sf.fieldLabel}>Return</Text>
                 <Text style={sf.fieldValue}>{formatDate(retDate)}</Text>
@@ -910,14 +938,14 @@ function SearchForm({
           activeOpacity={0.7}
           onPress={() => togglePicker('travellers')}
         >
-          <Users size={17} color={C.blue} />
+          <Users size={17} color={T(C.blue, 'fg')} />
           <View style={{ flex: 1 }}>
             <Text style={sf.fieldLabel}>Travellers</Text>
             <Text style={sf.fieldValueSm} numberOfLines={1}>
               {travellersLabel(travellers)}
             </Text>
           </View>
-          <ChevronDown size={14} color={C.gray} />
+          <ChevronDown size={14} color={T(C.gray, 'fg')} />
         </TouchableOpacity>
 
         <View style={sf.dateDivider} />
@@ -934,7 +962,7 @@ function SearchForm({
               {cabinLabel(cabin)}
             </Text>
           </View>
-          <ChevronDown size={14} color={C.gray} />
+          <ChevronDown size={14} color={T(C.gray, 'fg')} />
         </TouchableOpacity>
       </View>
 
@@ -959,7 +987,7 @@ function SearchForm({
 
       {tripType === 'multiCity' && (
         <View style={sf.multiNote}>
-          <Plane size={13} color={C.textLight} />
+          <Plane size={13} color={T(C.textLight, 'fg')} />
           <Text style={sf.multiNoteText}>
             Add up to 5 flights in one booking — coming soon
           </Text>
@@ -979,10 +1007,18 @@ function SearchForm({
             dateLabel: formatDate(depDate),
             travellers: travellersLabel(travellers),
             cabin: cabinLabel(cabin),
+            fromCode: fromCity.code,
+            toCode: toCity.code,
+            departDate: toIsoDate(depDate),
+            returnDate: tripType === 'roundTrip' ? toIsoDate(retDate) : undefined,
+            adults: travellers.adults,
+            children: travellers.children,
+            infants: travellers.infants,
+            cabinClass: TBO_CABIN_CLASS[cabin],
           });
         }}
-      >
-        <Search size={18} color={C.white} />
+      ><BrandFill />
+        <Search size={18} color={T(C.white, 'fg')} />
         <Text style={sf.searchBtnText}>Search Flights</Text>
       </TouchableOpacity>
     </View>
@@ -990,6 +1026,7 @@ function SearchForm({
 }
 
 function CityPicker({ exclude, onPick }: { exclude: number; onPick: (i: number) => void }) {
+  const sf = use_sf();
   return (
     <View style={sf.cityList}>
       {CITIES.map((c, i) =>
@@ -1009,47 +1046,47 @@ function CityPicker({ exclude, onPick }: { exclude: number; onPick: (i: number) 
   );
 }
 
-const sf = StyleSheet.create({
+const make_sf = () => StyleSheet.create({
   card: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     marginHorizontal: 14,
     marginTop: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 14,
-  },
+   ...glass(22), },
   fieldRow: { flexDirection: 'row', gap: 10, alignItems: 'center' },
   fieldLabel: {
     fontSize: 10,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  fieldValue: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text, marginTop: 2 },
-  code: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.textLight },
-  fieldSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.gray, marginTop: 1 },
+  fieldValue: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 2 },
+  code: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
+  fieldSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.gray, 'fg'), marginTop: 1 },
   dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 10 },
-  divider: { flex: 1, height: 1, backgroundColor: C.border },
-  dividerPlain: { height: 1, backgroundColor: C.border, marginVertical: 12 },
+  divider: { flex: 1, height: 1, backgroundColor: T(C.border, 'bg') },
+  dividerPlain: { height: 1, backgroundColor: T(C.border, 'bg'), marginVertical: 12 },
   swapBtn: {
     width: 32,
     height: 32,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: C.white,
+    borderColor: T(C.border, 'border'),
+    backgroundColor: T(C.white, 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
   },
   dateRow: { flexDirection: 'row', alignItems: 'center' },
-  dateDivider: { width: 1, height: 36, backgroundColor: C.border, marginHorizontal: 10 },
+  dateDivider: { width: 1, height: 36, backgroundColor: T(C.border, 'bg'), marginHorizontal: 10 },
   cityList: {
     marginTop: 10,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -1060,49 +1097,50 @@ const sf = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderBottomWidth: 1,
-    borderBottomColor: C.lightGray,
+    borderBottomColor: T(C.lightGray, 'border'),
   },
   cityCode: {
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
     minWidth: 44,
     alignItems: 'center',
   },
-  cityCodeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: C.text },
-  cityName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
-  cityAirport: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
+  cityCodeText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  cityName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  cityAirport: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   travelCabinRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 2,
   },
-  fieldValueSm: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text, marginTop: 2 },
+  fieldValueSm: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg'), marginTop: 2 },
   cabinEmoji: { fontSize: 16 },
   multiNote: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     marginTop: 12,
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
-  multiNoteText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.textLight },
+  multiNoteText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
   searchBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     marginTop: 16,
     borderRadius: 14,
     paddingVertical: 14,
-  },
-  searchBtnText: { color: C.white, fontSize: 15, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  searchBtnText: { color: T(C.white, 'fg'), fontSize: 15, fontFamily: 'Inter_700Bold' },
 });
+const use_sf = () => useThemedStyles(make_sf);
 
 // ─── Special fares ───────────────────────────────────────────────────────────
 interface Fare {
@@ -1120,6 +1158,7 @@ const FARES: Fare[] = [
 ];
 
 function SpecialFares() {
+  const fr = use_fr();
   const [selected, setSelected] = useState('regular');
   return (
     <View style={fr.section}>
@@ -1148,30 +1187,31 @@ function SpecialFares() {
   );
 }
 
-const fr = StyleSheet.create({
+const make_fr = () => StyleSheet.create({
   section: { marginTop: 18 },
   heading: {
     fontSize: 15,
     fontFamily: 'Inter_700Bold',
-    color: C.text,
+    color: T(C.text, 'fg'),
     paddingHorizontal: 14,
     marginBottom: 10,
   },
   row: { paddingHorizontal: 14, gap: 10 },
   card: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     minWidth: 130,
-  },
-  cardActive: { borderColor: C.blue, backgroundColor: C.blueLight },
-  title: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
-  titleActive: { color: C.blue },
-  sub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 3 },
+   ...glass(18), },
+  cardActive: { borderColor: T(C.blue, 'border'), backgroundColor: T(C.blueLight, 'bg') },
+  title: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  titleActive: { color: T(C.blue, 'fg') },
+  sub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 3 },
 });
+const use_fr = () => useThemedStyles(make_fr);
 
 // ─── Flights Screen ──────────────────────────────────────────────────────────
 export interface FlightSearchParams {
@@ -1180,6 +1220,15 @@ export interface FlightSearchParams {
   dateLabel: string;
   travellers: string;
   cabin: string;
+  /** Machine-readable fields the TBO search API needs. */
+  fromCode: string;
+  toCode: string;
+  departDate: string;
+  returnDate?: string;
+  adults: number;
+  children: number;
+  infants: number;
+  cabinClass: number;
 }
 
 export function FlightsScreen({
@@ -1191,6 +1240,7 @@ export function FlightsScreen({
   onSearch?: (params: FlightSearchParams) => void;
   initialSearch?: FlightSearchParams;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const [tripType, setTripType] = useState<TripType>('oneWay');
@@ -1200,7 +1250,7 @@ export function FlightsScreen({
       {/* Header */}
       <View style={[st.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={24} color={C.text} />
+          <ArrowLeft size={24} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View>
           <Text style={st.headerTitle}>Flights</Text>
@@ -1208,7 +1258,7 @@ export function FlightsScreen({
         </View>
         <View style={{ flex: 1 }} />
         <View style={st.headerIcon}>
-          <Plane size={18} color={C.blue} />
+          <Plane size={18} color={T(C.blue, 'fg')} />
         </View>
       </View>
 
@@ -1229,30 +1279,30 @@ export function FlightsScreen({
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   headerSub: {
     fontSize: 10,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 1,
   },
   headerIcon: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#E0F2FE',
+    backgroundColor: T('#E0F2FE', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1262,11 +1312,12 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     marginHorizontal: 14,
     marginTop: 20,
     borderRadius: 14,
     paddingVertical: 14,
-  },
-  searchBtnText: { color: C.white, fontSize: 15, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  searchBtnText: { color: T(C.white, 'fg'), fontSize: 15, fontFamily: 'Inter_700Bold' },
 });
+const use_st = () => useThemedStyles(make_st);

@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAgentPrefill } from '@/context/AgentStateContext';
+import { useAuth } from '@/context/AuthContext';
 import { TravelScreen } from './TravelScreen';
 import { FlightsScreen, type FlightSearchParams } from './FlightsScreen';
 import { FlightResultsScreen, type FlightResult } from './FlightResultsScreen';
@@ -29,6 +30,9 @@ import { BillPayScreen } from './BillPayScreen';
 import type { BillKind } from './billData';
 import { serviceColors } from './serviceColors';
 import { voiceService } from '@/services/voiceService';
+import { setServicesController } from '@/services/assistant/bridge';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
+import { T, useThemedStyles } from './themed';
 
 export type ServiceView =
   | 'travel'
@@ -83,6 +87,29 @@ const DEFAULT_BACK: Partial<Record<ServiceView, ServiceView | 'hub'>> = {
   billPay: 'bills',
 };
 
+const CABIN_CLASS = { economy: 2, premium_economy: 3, business: 4, first: 6 } as const;
+const CABIN_LABEL = {
+  economy: 'Economy / Premium Economy',
+  premium_economy: 'Premium Economy',
+  business: 'Business',
+  first: 'First',
+} as const;
+
+/** "2026-10-05" → "5 Oct 2026" (the flight screens' label format). */
+function isoToFlightLabel(iso: string) {
+  const d = new Date(`${iso}T00:00:00`);
+  return `${d.getDate()} ${d.toLocaleString('en-IN', { month: 'short' })} ${d.getFullYear()}`;
+}
+
+/** "2026-10-05" → "Mon, 5 Oct" (the hotel and bus screens' label format). */
+function isoToShortLabel(iso: string) {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-IN', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+}
+
 export function ServicesFlow({
   initialView,
   initialBillKind,
@@ -90,8 +117,10 @@ export function ServicesFlow({
   initialView: ServiceView;
   initialBillKind?: BillKind;
 }) {
+  const styles = use_styles();
   const router = useRouter();
   const agentPrefill = useAgentPrefill();
+  const { session } = useAuth();
   const [view, setView] = useState<ServiceView>(initialView);
   const [hubReturn, setHubReturn] = useState<Partial<Record<ServiceView, ServiceView | 'hub'>>>({});
   const [billKind, setBillKind] = useState<BillKind>(initialBillKind ?? 'electricity');
@@ -102,7 +131,32 @@ export function ServicesFlow({
     dateLabel: '',
     travellers: '1 Adult',
     cabin: 'Economy / Premium Economy',
+    fromCode: '',
+    toCode: '',
+    departDate: '',
+    adults: 1,
+    children: 0,
+    infants: 0,
+    cabinClass: 2,
   });
+
+  // Only a completed search carries the codes/date the TBO API needs.
+  const flightSearchQuery = useMemo(
+    () =>
+      flightSearch.fromCode && flightSearch.toCode && flightSearch.departDate
+        ? {
+            origin: flightSearch.fromCode,
+            destination: flightSearch.toCode,
+            departDate: flightSearch.departDate,
+            returnDate: flightSearch.returnDate,
+            adults: flightSearch.adults,
+            children: flightSearch.children,
+            infants: flightSearch.infants,
+            cabinClass: flightSearch.cabinClass,
+          }
+        : undefined,
+    [flightSearch],
+  );
   const [selectedFlight, setSelectedFlight] = useState<FlightResult | null>(null);
   const [selectedFareKey, setSelectedFareKey] = useState<string>('wishspecial');
   const [flightPassengers, setFlightPassengers] = useState<FlightPassenger[]>([]);
@@ -214,6 +268,76 @@ export function ServicesFlow({
     setView('billPay');
   };
 
+  // Voice assistant control: search and pick fares without touching the screen.
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  useEffect(() => {
+    setServicesController({
+      searchFlights: (r) => {
+        const travellers = [
+          `${r.adults} Adult${r.adults !== 1 ? 's' : ''}`,
+          r.children > 0 ? `${r.children} Child${r.children !== 1 ? 'ren' : ''}` : '',
+          r.infants > 0 ? `${r.infants} Infant${r.infants !== 1 ? 's' : ''}` : '',
+        ]
+          .filter(Boolean)
+          .join(', ');
+        setFlightSearch({
+          from: `${r.fromCity} (${r.fromCode})`,
+          to: `${r.toCity} (${r.toCode})`,
+          dateLabel: isoToFlightLabel(r.date),
+          travellers,
+          cabin: CABIN_LABEL[r.cabin],
+          fromCode: r.fromCode,
+          toCode: r.toCode,
+          departDate: r.date,
+          adults: r.adults,
+          children: r.children,
+          infants: r.infants,
+          cabinClass: CABIN_CLASS[r.cabin],
+        });
+        setHubReturn((prev) => ({ ...prev, flights: prev.flights ?? 'hub' }));
+        setView('flightResults');
+      },
+      searchHotels: (r) => {
+        const nights = Math.max(
+          1,
+          Math.round(
+            (new Date(`${r.checkOut}T00:00:00`).getTime() - new Date(`${r.checkIn}T00:00:00`).getTime()) /
+              86_400_000,
+          ),
+        );
+        setHotelSearch({
+          city: r.city,
+          checkIn: isoToShortLabel(r.checkIn),
+          checkOut: isoToShortLabel(r.checkOut),
+          nights,
+          rooms: r.rooms,
+          adults: r.adults,
+          children: r.children,
+        });
+        setHubReturn((prev) => ({ ...prev, hotels: prev.hotels ?? 'hub' }));
+        setView('hotelResults');
+      },
+      searchBuses: (r) => {
+        setBusSearch({ from: r.from, to: r.to, dateLabel: isoToShortLabel(r.date) });
+        setHubReturn((prev) => ({ ...prev, busTickets: prev.busTickets ?? 'hub' }));
+        setView('busResults');
+      },
+      openBill: (kind) => {
+        setBillKind(kind as BillKind);
+        setHubReturn((prev) => ({ ...prev, billPay: prev.billPay ?? 'hub' }));
+        setView('billPay');
+      },
+      selectFare: (fareKey) => {
+        if (viewRef.current !== 'flightFares') return false;
+        setSelectedFareKey(fareKey ?? 'wishspecial');
+        setView('flightPassenger');
+        return true;
+      },
+    });
+    return () => setServicesController(null);
+  }, []);
+
   const rootStyle = styles.root;
 
   const renderContent = () => {
@@ -233,7 +357,7 @@ export function ServicesFlow({
             }}
           />
           {(view === 'busPoints' || view === 'busPassenger') && (
-            <View style={StyleSheet.absoluteFill}>
+            <AmbientBackground>
               <BoardingPointsScreen
                 bus={selectedBus}
                 from={busSearch.from}
@@ -244,10 +368,10 @@ export function ServicesFlow({
                   setView('busPassenger');
                 }}
               />
-            </View>
+            </AmbientBackground>
           )}
           {view === 'busPassenger' && busPoints && (
-            <View style={StyleSheet.absoluteFill}>
+            <AmbientBackground>
               <PassengerDetailsScreen
                 bus={selectedBus}
                 seats={selectedSeats}
@@ -255,7 +379,7 @@ export function ServicesFlow({
                 dropping={busPoints.dropping}
                 onBack={() => setView('busPoints')}
               />
-            </View>
+            </AmbientBackground>
           )}
         </View>
       );
@@ -400,6 +524,8 @@ export function ServicesFlow({
             dateLabel={flightSearch.dateLabel}
             travellers={flightSearch.travellers}
             cabin={flightSearch.cabin}
+            search={flightSearchQuery}
+            accessToken={session?.access_token}
             onBack={() => setView('flights')}
             onViewPrices={(flight) => {
               setSelectedFlight(flight);
@@ -552,12 +678,15 @@ export function ServicesFlow({
   };
 
   return (
-    <View style={rootStyle}>
-      {renderContent()}
-    </View>
+    <AmbientBackground>
+      <View style={rootStyle}>
+        {renderContent()}
+      </View>
+    </AmbientBackground>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: serviceColors.pageBg },
+const make_styles = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(serviceColors.pageBg, 'page') },
 });
+const use_styles = () => useThemedStyles(make_styles);

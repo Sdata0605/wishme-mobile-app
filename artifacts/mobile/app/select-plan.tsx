@@ -15,6 +15,7 @@ import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 declare global {
   interface Window {
@@ -39,7 +40,8 @@ interface Plan {
   price: number;
   original_price: number | null;
   service_discount_percentage: number;
-  referral_commission_percentage: number;
+  referral_commission_l1: number | null;
+  referral_commission_l2: number | null;
   is_active: boolean;
   features: string[] | Record<string, unknown>;
   is_popular?: boolean;
@@ -53,8 +55,8 @@ const PLAN_ICONS: Record<string, string> = {
 };
 const PLAN_COLORS: Record<string, string> = {
   basic: '#22C55E',
-  premium: '#FF6B33',
-  elite: '#B44CFF',
+  premium: '#7B5CFA',
+  elite: '#1F7BFF',
 };
 
 function getPlanTierIndex(planName: string): number {
@@ -276,7 +278,7 @@ export default function SelectPlanScreen() {
             email: user?.email ?? '',
             contact: user?.phone ?? '',
           },
-          theme: { color: '#FF6B33' },
+          theme: { color: '#7B5CFA' },
           handler: async (response: {
             razorpay_payment_id: string;
             razorpay_order_id: string;
@@ -330,7 +332,7 @@ export default function SelectPlanScreen() {
             email: user?.email ?? '',
             contact: user?.phone ?? '',
           },
-          theme: { color: '#FF6B33' },
+          theme: { color: '#7B5CFA' },
         });
 
         if (data?.razorpay_payment_id) {
@@ -357,7 +359,7 @@ export default function SelectPlanScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           {!isPostSignup && (
             <TouchableOpacity onPress={() => router.back()}>
@@ -368,15 +370,15 @@ export default function SelectPlanScreen() {
           <View style={{ width: 22 }} />
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#FF6B33" />
+          <ActivityIndicator size="large" color="#7B5CFA" />
           <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading plans...</Text>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         {!isPostSignup ? (
           <TouchableOpacity onPress={() => router.back()}>
@@ -407,8 +409,8 @@ export default function SelectPlanScreen() {
         )}
 
         {isEliteUser ? (
-          <View style={[styles.eliteBox, { backgroundColor: colors.card, borderColor: '#B44CFF' }]}>
-            <Icon name="award" size={48} color="#B44CFF" />
+          <View style={[styles.eliteBox, { backgroundColor: colors.card, borderColor: '#1F7BFF' }]}>
+            <Icon name="award" size={48} color="#1F7BFF" />
             <Text style={[styles.eliteTitle, { color: colors.foreground }]}>
               You're on the Elite Plan!
             </Text>
@@ -419,7 +421,7 @@ export default function SelectPlanScreen() {
         ) : (
           visiblePlans.map((plan) => {
             const planKey = plan.name.toLowerCase();
-            const color = PLAN_COLORS[planKey] ?? '#FF6B33';
+            const color = PLAN_COLORS[planKey] ?? '#7B5CFA';
             const iconName = PLAN_ICONS[planKey] ?? 'star';
             const features = parseFeatures(plan.features);
             const isCurrent = isCurrentPlan(plan);
@@ -481,7 +483,7 @@ export default function SelectPlanScreen() {
                   <View style={[styles.statChip, { backgroundColor: `${color}12` }]}>
                     <Icon name="share-2" size={12} color={color} />
                     <Text style={[styles.statText, { color }]}>
-                      {plan.referral_commission_percentage}% Referral Commission
+                      {plan.referral_commission_l1 ?? 0}% Referral Commission{(plan.referral_commission_l2 ?? 0) > 0 ? ` · ${plan.referral_commission_l2}% level 2` : ''}
                     </Text>
                   </View>
                 </View>
@@ -533,7 +535,7 @@ export default function SelectPlanScreen() {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 

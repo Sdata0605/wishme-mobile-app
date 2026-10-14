@@ -18,6 +18,7 @@ import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
 
@@ -213,7 +214,7 @@ export default function MessagesScreen() {
   };
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -241,7 +242,7 @@ export default function MessagesScreen() {
 
       {loading ? (
         <View style={s.loadingWrap}>
-          <ActivityIndicator size="large" color="#FF6B33" />
+          <ActivityIndicator size="large" color="#7B5CFA" />
           <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Loading conversations...</Text>
         </View>
       ) : (
@@ -251,7 +252,7 @@ export default function MessagesScreen() {
           contentContainerStyle={{ paddingBottom: insets.bottom + 20, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FF6B33" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
           }
           ListEmptyComponent={
             <View style={s.emptyWrap}>
@@ -266,12 +267,12 @@ export default function MessagesScreen() {
               </Text>
               {!search && (
                 <TouchableOpacity
-                  style={[s.emptyBtn, { backgroundColor: '#FF6B3315', borderColor: '#FF6B3340' }]}
+                  style={[s.emptyBtn, { backgroundColor: '#7B5CFA15', borderColor: '#7B5CFA40' }]}
                   onPress={() => router.push('/favorites')}
                   activeOpacity={0.8}
                 >
-                  <Icon name="heart" size={15} color="#FF6B33" />
-                  <Text style={[s.emptyBtnText, { color: '#FF6B33' }]}>Explore Celebrities</Text>
+                  <Icon name="heart" size={15} color="#7B5CFA" />
+                  <Text style={[s.emptyBtnText, { color: '#7B5CFA' }]}>Explore Celebrities</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -279,7 +280,7 @@ export default function MessagesScreen() {
           renderItem={renderItem}
         />
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 

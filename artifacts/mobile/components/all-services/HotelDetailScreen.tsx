@@ -23,6 +23,8 @@ import {
 import type { Hotel, HotelRoom, HotelSearchParams } from './hotelData';
 
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles, glass, dockBar } from './themed';
+import { BrandFill } from './BrandFill';
 
 function RoomCard({
   room,
@@ -33,6 +35,7 @@ function RoomCard({
   selected: boolean;
   onSelect: () => void;
 }) {
+  const rm = use_rm();
   return (
     <TouchableOpacity
       style={[rm.card, selected && rm.cardOn]}
@@ -47,7 +50,7 @@ function RoomCard({
           </Text>
         </View>
         <View style={[rm.check, selected && rm.checkOn]}>
-          {selected && <Check size={12} color={C.white} />}
+          {selected && <Check size={12} color={T(C.white, 'fg')} />}
         </View>
       </View>
 
@@ -80,69 +83,70 @@ function RoomCard({
   );
 }
 
-const rm = StyleSheet.create({
+const make_rm = () => StyleSheet.create({
   card: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 14,
     marginBottom: 10,
-  },
-  cardOn: { borderColor: C.green, backgroundColor: '#F0FDF4' },
+   ...glass(18), },
+  cardOn: { borderColor: T(C.green, 'border'), backgroundColor: T('#F0FDF4', 'bg') },
   top: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  name: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
-  bed: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 3 },
+  name: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  bed: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 3 },
   check: {
     width: 22,
     height: 22,
     borderRadius: 11,
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
-  checkOn: { backgroundColor: C.green, borderColor: C.green },
+  checkOn: { backgroundColor: T(C.green, 'bg'), borderColor: T(C.green, 'border') },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10 },
   chip: {
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  chipText: { fontSize: 10, fontFamily: 'Inter_500Medium', color: C.text },
+  chipText: { fontSize: 10, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
   flags: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  flagGreen: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.green },
-  flagOrange: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.orange },
+  flagGreen: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.green, 'fg') },
+  flagOrange: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.orange, 'fg') },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     justifyContent: 'space-between',
     marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingTop: 10,
   },
   strike: {
     fontSize: 11,
-    color: C.gray,
+    color: T(C.gray, 'fg'),
     textDecorationLine: 'line-through',
     fontFamily: 'Inter_400Regular',
   },
-  price: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
-  per: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
+  price: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  per: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   selectBtn: {
     borderWidth: 1.5,
-    borderColor: C.orange,
+    borderColor: T(C.orange, 'border'),
     borderRadius: 18,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  selectBtnOn: { backgroundColor: C.orange, borderColor: C.orange },
-  selectText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.orange },
-  selectTextOn: { color: C.white },
+  selectBtnOn: { backgroundColor: T(C.orange, 'bg'), borderColor: T(C.orange, 'border') },
+  selectText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.orange, 'fg') },
+  selectTextOn: { color: T(C.white, 'fg') },
 });
+const use_rm = () => useThemedStyles(make_rm);
 
 export function HotelDetailScreen({
   hotel,
@@ -155,6 +159,7 @@ export function HotelDetailScreen({
   onBack: () => void;
   onContinue: (room: HotelRoom) => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const [selectedRoomId, setSelectedRoomId] = useState(hotel.rooms[0]?.id ?? '');
@@ -164,7 +169,7 @@ export function HotelDetailScreen({
   return (
     <View style={st.root}>
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        <View style={[st.hero, { backgroundColor: hotel.tint }]}>
+        <View style={[st.hero, { backgroundColor: T(hotel.tint, 'bg') }]}>
           <Image
             source={require('../../assets/images/travel-hotels.jpg')}
             style={st.heroImg}
@@ -176,11 +181,11 @@ export function HotelDetailScreen({
             onPress={onBack}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <ArrowLeft size={20} color={C.white} />
+            <ArrowLeft size={20} color={T(C.white, 'fg')} />
           </TouchableOpacity>
           <View style={st.heroStars}>
             {Array.from({ length: hotel.stars }).map((_, i) => (
-              <Star key={i} size={12} color="#FCD34D" fill="#FCD34D" />
+              <Star key={i} size={12} color={T('#FCD34D', 'fg')} fill={T('#FCD34D', 'fg')} />
             ))}
           </View>
         </View>
@@ -188,7 +193,7 @@ export function HotelDetailScreen({
         <View style={st.panel}>
           <Text style={st.name}>{hotel.name}</Text>
           <View style={st.locRow}>
-            <MapPin size={13} color={C.textLight} />
+            <MapPin size={13} color={T(C.textLight, 'fg')} />
             <Text style={st.loc}>
               {hotel.area}, {hotel.city} · {hotel.distance}
             </Text>
@@ -209,13 +214,13 @@ export function HotelDetailScreen({
             {hotel.amenities.map((a) => (
               <View key={a} style={st.amenityItem}>
                 {a === 'Wi-Fi' ? (
-                  <Wifi size={16} color={C.purpleLight} />
+                  <Wifi size={16} color={T(C.purpleLight, 'fg')} />
                 ) : a === 'Breakfast' ? (
-                  <Coffee size={16} color={C.orange} />
+                  <Coffee size={16} color={T(C.orange, 'fg')} />
                 ) : a === 'Pool' || a === 'Spa' ? (
-                  <Bath size={16} color={C.green} />
+                  <Bath size={16} color={T(C.green, 'fg')} />
                 ) : (
-                  <BedDouble size={16} color={C.textLight} />
+                  <BedDouble size={16} color={T(C.textLight, 'fg')} />
                 )}
                 <Text style={st.amenityLabel}>{a}</Text>
               </View>
@@ -231,7 +236,7 @@ export function HotelDetailScreen({
               <View style={st.reviewTop}>
                 <Text style={st.reviewName}>{r.name}</Text>
                 <View style={st.reviewRating}>
-                  <Star size={10} color="#FCD34D" fill="#FCD34D" />
+                  <Star size={10} color={T('#FCD34D', 'fg')} fill={T('#FCD34D', 'fg')} />
                   <Text style={st.reviewRatingText}>{r.rating}.0</Text>
                 </View>
               </View>
@@ -267,8 +272,8 @@ export function HotelDetailScreen({
           style={st.bookBtn}
           activeOpacity={0.85}
           onPress={() => selectedRoom && onContinue(selectedRoom)}
-        >
-          <Users size={16} color={C.white} />
+        ><BrandFill />
+          <Users size={16} color={T(C.white, 'fg')} />
           <Text style={st.bookText}>Continue</Text>
         </TouchableOpacity>
       </View>
@@ -276,8 +281,8 @@ export function HotelDetailScreen({
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   hero: { height: 220, position: 'relative' },
   heroImg: { width: '100%', height: '100%' },
   heroTint: { ...StyleSheet.absoluteFillObject },
@@ -300,35 +305,35 @@ const st = StyleSheet.create({
   },
   panel: {
     marginTop: -16,
-    backgroundColor: C.pageBg,
+    backgroundColor: T(C.pageBg, 'bg'),
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     paddingHorizontal: 14,
     paddingTop: 16,
   },
-  name: { fontSize: 20, fontFamily: 'Inter_700Bold', color: C.text },
+  name: { fontSize: 20, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   locRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
-  loc: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: C.textLight },
+  loc: { flex: 1, fontSize: 12, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 },
   ratingPill: {
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
     borderRadius: 6,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  ratingText: { color: C.white, fontSize: 12, fontFamily: 'Inter_700Bold' },
-  reviews: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.textLight, flex: 1 },
+  ratingText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_700Bold' },
+  reviews: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg'), flex: 1 },
   typePill: {
-    backgroundColor: '#F5F3FF',
+    backgroundColor: T('#F5F3FF', 'bg'),
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  typeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.purple },
+  typeText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.purple, 'fg') },
   section: {
     fontSize: 15,
     fontFamily: 'Inter_700Bold',
-    color: C.text,
+    color: T(C.text, 'fg'),
     marginTop: 18,
     marginBottom: 8,
   },
@@ -336,67 +341,68 @@ const st = StyleSheet.create({
   amenityItem: {
     width: '30%',
     flexGrow: 1,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     paddingVertical: 10,
     alignItems: 'center',
     gap: 5,
-  },
-  amenityLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.text },
+   ...glass(18), },
+  amenityLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
   about: {
     fontSize: 13,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     lineHeight: 19,
   },
   reviewCard: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 12,
     marginBottom: 8,
-  },
+   ...glass(18), },
   reviewTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 6,
   },
-  reviewName: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.text },
+  reviewName: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   reviewRating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  reviewRatingText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.text },
-  reviewText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: C.textLight, lineHeight: 17 },
-  reviewWhen: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.gray, marginTop: 6 },
+  reviewRatingText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  reviewText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), lineHeight: 17 },
+  reviewWhen: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.gray, 'fg'), marginTop: 6 },
   roomHint: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginBottom: 10,
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 14,
     paddingTop: 12,
     gap: 12,
-  },
-  footerLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
-  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+   ...dockBar(), },
+  footerLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   bookBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 22,
     paddingHorizontal: 20,
     paddingVertical: 12,
-  },
-  bookText: { color: C.white, fontSize: 14, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  bookText: { color: T(C.white, 'fg'), fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
+const use_st = () => useThemedStyles(make_st);

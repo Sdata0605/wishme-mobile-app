@@ -1,10 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Animated,
   Dimensions,
   Image,
   Pressable,
@@ -12,11 +10,15 @@ import {
   Text,
   View,
 } from 'react-native';
+import Reanimated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Reveal } from '@/components/neon/Motion';
+import { withAlpha } from '@/constants/neon';
+import { useTheme } from '@/context/ThemeContext';
 
 const STORAGE_ONBOARDING = '@wishme/onboarding_seen';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { height: H } = Dimensions.get('window');
 
 const INTRO_VIDEO = require('@/assets/videos/intro.mp4');
 
@@ -26,28 +28,24 @@ const SLIDES = [
     title: 'Wish a Friend',
     desc: 'Send personalized video wishes to your loved ones from their favorite stars',
     image: require('@/assets/images/splash1.jpeg'),
-    gradient: ['transparent', 'rgba(255,107,51,0.9)'] as const,
   },
   {
     key: '2',
     title: 'Wish a Celebrity',
     desc: 'Get personalized video messages from your favorite celebrities',
     image: require('@/assets/images/splash2.jpeg'),
-    gradient: ['transparent', 'rgba(180,76,255,0.9)'] as const,
   },
   {
     key: '3',
     title: 'Make Promotion Ads',
     desc: 'Create professional promotion videos with celebrity endorsements',
     image: require('@/assets/images/splash3.jpeg'),
-    gradient: ['transparent', 'rgba(232,82,122,0.9)'] as const,
   },
   {
     key: '4',
     title: 'UGC Videos',
     desc: 'User-generated content videos with celebrity collaborations',
     image: require('@/assets/images/splash4.jpeg'),
-    gradient: ['transparent', 'rgba(75,0,130,0.95)'] as const,
   },
 ];
 
@@ -93,139 +91,85 @@ function VideoIntroScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
+/** A page dot: 7px, stretching to 22px for the live one (MyAssistant's guide). */
+function Dot({ active }: { active: boolean }) {
+  const { neon } = useTheme();
+  const w = useSharedValue(active ? 22 : 7);
+  useEffect(() => {
+    w.value = withTiming(active ? 22 : 7, { duration: 220 });
+  }, [active, w]);
+  const style = useAnimatedStyle(() => ({ width: w.value }));
+  return <Reanimated.View style={[styles.dot, { backgroundColor: active ? neon.violet : withAlpha(neon.violet, 0.18) }, style]} />;
+}
+
 function SlideScreen({
   slide,
   index,
   total,
-  active,
   onNext,
   onSkip,
 }: {
   slide: (typeof SLIDES)[0];
   index: number;
   total: number;
-  active: boolean;
   onNext: () => void;
   onSkip: () => void;
 }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const imageScale = useRef(new Animated.Value(0.95)).current;
-  const contentY = useRef(new Animated.Value(32)).current;
-  const contentOpacity = useRef(new Animated.Value(0)).current;
-  const btnOpacity = useRef(new Animated.Value(0)).current;
+  const { neon } = useTheme();
   const insets = useSafeAreaInsets();
-
-  useEffect(() => {
-    if (active) {
-      Animated.parallel([
-        Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        Animated.timing(imageScale, { toValue: 1, duration: 1000, useNativeDriver: true }),
-        Animated.sequence([
-          Animated.delay(300),
-          Animated.parallel([
-            Animated.timing(contentOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-            Animated.timing(contentY, { toValue: 0, duration: 700, useNativeDriver: true }),
-          ]),
-        ]),
-        Animated.sequence([
-          Animated.delay(700),
-          Animated.timing(btnOpacity, { toValue: 1, duration: 700, useNativeDriver: true }),
-        ]),
-      ]).start();
-    } else {
-      opacity.setValue(0);
-      imageScale.setValue(0.95);
-      contentY.setValue(32);
-      contentOpacity.setValue(0);
-      btnOpacity.setValue(0);
-    }
-  }, [active]);
+  const last = index === total - 1;
 
   return (
-    <Animated.View
-      pointerEvents={active ? 'auto' : 'none'}
-      style={[styles.slide, { opacity }]}
-    >
-      <Animated.View
-        style={[
-          { position: 'absolute', top: 0, left: 0, right: 0, height: H, backgroundColor: '#000' },
-          { transform: [{ scale: imageScale }] },
-        ]}
-      >
-        <Image
-          source={slide.image}
-          style={{ position: 'absolute', top: 0, left: 0, width: W, height: H }}
-          resizeMode="cover"
-        />
-      </Animated.View>
-      <LinearGradient
-        colors={slide.gradient as unknown as [string, string]}
-        locations={[0.3, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-
-      {/* Top bar */}
+    <View style={[StyleSheet.absoluteFill, { backgroundColor: neon.bg }]}>
       <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
-        <View style={styles.logoPill}>
-          <Text style={styles.logoText}>WishMe</Text>
-        </View>
-        <View style={styles.topRight}>
-          <View style={styles.progressPill}>
-            <Text style={styles.progressText}>{index + 1}/{total}</Text>
-          </View>
-          <Pressable onPress={onSkip} style={({ pressed }) => [styles.skipPill, { opacity: pressed ? 0.7 : 1 }]}>
-            <Text style={styles.skipText}>Skip</Text>
-          </Pressable>
-        </View>
+        <Pressable onPress={onSkip} hitSlop={10} accessibilityRole="button" accessibilityLabel="Skip the introduction">
+          <Text style={[styles.skipLink, { color: neon.textLo }]}>Skip</Text>
+        </Pressable>
       </View>
 
-      {/* Content */}
-      <Animated.View
-        style={[
-          styles.slideContent,
-          { paddingBottom: insets.bottom + 32, opacity: contentOpacity, transform: [{ translateY: contentY }] },
-        ]}
-      >
-        <Text style={styles.slideTitle}>{slide.title}</Text>
-        <Text style={styles.slideDesc}>{slide.desc}</Text>
-        <Animated.View style={{ opacity: btnOpacity, marginTop: 32 }}>
-          <Pressable onPress={onNext} style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}>
-            <LinearGradient
-              colors={['#FF6B33', '#B44CFF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.continueBtn}
-            >
-              <Text style={styles.continueBtnText}>
-                {index === total - 1 ? 'Get Started' : 'Continue'}
-              </Text>
-            </LinearGradient>
-          </Pressable>
-        </Animated.View>
+      <View style={styles.pageBody}>
+        <Reveal key={slide.key}>
+          <View style={[styles.photoCard, { borderColor: neon.line }]}>
+            <Image source={slide.image} style={styles.photo} resizeMode="cover" />
+          </View>
+        </Reveal>
+        <Reveal key={`t${slide.key}`} delayMs={60}>
+          <Text style={[styles.slideTitle, { color: neon.textHi }]} maxFontSizeMultiplier={1.3}>{slide.title}</Text>
+        </Reveal>
+        <Reveal key={`d${slide.key}`} delayMs={120}>
+          <Text style={[styles.slideDesc, { color: neon.textLo }]}>{slide.desc}</Text>
+        </Reveal>
+      </View>
 
-        {/* Dots */}
-        <View style={styles.dots}>
-          {Array.from({ length: total }).map((_, i) => (
-            <View
-              key={i}
-              style={[styles.dot, i === index && styles.dotActive]}
-            />
-          ))}
+      <View style={[styles.bottomRow, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={styles.dots} accessibilityRole="progressbar" accessibilityValue={{ min: 1, max: total, now: index + 1 }}>
+          {Array.from({ length: total }).map((_, i) => <Dot key={i} active={i === index} />)}
         </View>
-      </Animated.View>
-    </Animated.View>
+        <Pressable
+          onPress={onNext}
+          accessibilityRole="button"
+          accessibilityLabel={last ? 'Get started' : 'Next slide'}
+          style={({ pressed }) => [styles.nextBtn, { backgroundColor: neon.violet, opacity: pressed ? 0.85 : 1 }]}
+        >
+          <Text style={styles.nextText}>{last ? 'Get started' : 'Next'}</Text>
+        </Pressable>
+      </View>
+    </View>
   );
 }
 
 export default function OnboardingScreen() {
+  const { neon } = useTheme();
   const [phase, setPhase] = useState<'video' | 'slides'>('video');
   const [current, setCurrent] = useState(0);
 
+  // The permissions screen explains itself and hands over to sign-in, so it sits between the
+  // slides and (auth) rather than interrupting the user once they are already signing in.
   const finish = async () => {
     try {
       await AsyncStorage.setItem(STORAGE_ONBOARDING, '1');
     } catch {}
-    router.replace('/(auth)');
+    router.replace({ pathname: '/permissions' as never, params: { next: 'auth' } });
   };
 
   const next = () => {
@@ -237,21 +181,17 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: '#000' }]}>
+    <View style={[styles.container, { backgroundColor: phase === 'video' ? '#000' : neon.bg }]}>
       {phase === 'video' ? (
         <VideoIntroScreen onDone={() => setPhase('slides')} />
       ) : (
-        SLIDES.map((slide, index) => (
-          <SlideScreen
-            key={slide.key}
-            slide={slide}
-            index={index}
-            total={SLIDES.length}
-            active={index === current}
-            onNext={next}
-            onSkip={finish}
-          />
-        ))
+        <SlideScreen
+          slide={SLIDES[current]}
+          index={current}
+          total={SLIDES.length}
+          onNext={next}
+          onSkip={finish}
+        />
       )}
     </View>
   );
@@ -259,47 +199,18 @@ export default function OnboardingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  slide: {
-    ...StyleSheet.absoluteFillObject,
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  topBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    zIndex: 10,
-  },
-  logoPill: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 9999,
-  },
-  logoText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-  },
-  topRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  progressPill: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 9999,
-  },
-  progressText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_500Medium' },
-  skipPill: {
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 9999,
-  },
+  topBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 24 },
+  skipLink: { fontSize: 14, fontFamily: 'Inter_600SemiBold', paddingVertical: 6 },
+  pageBody: { flex: 1, paddingHorizontal: 32, justifyContent: 'center' },
+  photoCard: { height: H * 0.34, borderRadius: 24, borderWidth: 1, overflow: 'hidden', marginBottom: 26 },
+  photo: { width: '100%', height: '100%' },
+  slideTitle: { fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', letterSpacing: -0.5, lineHeight: 30 },
+  slideDesc: { fontSize: 15.5, fontFamily: 'Inter_400Regular', lineHeight: 24, marginTop: 12 },
+  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 8 },
+  dots: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { height: 7, borderRadius: 4 },
+  nextBtn: { borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14 },
+  nextText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   videoSkip: {
     position: 'absolute',
     right: 20,
@@ -309,47 +220,4 @@ const styles = StyleSheet.create({
     borderRadius: 9999,
   },
   skipText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_500Medium' },
-  slideContent: {
-    paddingHorizontal: 28,
-  },
-  slideTitle: {
-    color: '#fff',
-    fontSize: 36,
-    fontFamily: 'PlayfairDisplay_700Bold',
-    marginBottom: 12,
-    lineHeight: 44,
-  },
-  slideDesc: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 17,
-    fontFamily: 'Inter_500Medium',
-    lineHeight: 26,
-  },
-  continueBtn: {
-    height: 52,
-    borderRadius: 9999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  continueBtnText: {
-    color: '#fff',
-    fontSize: 17,
-    fontFamily: 'Inter_600SemiBold',
-  },
-  dots: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 20,
-    alignSelf: 'center',
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.4)',
-  },
-  dotActive: {
-    backgroundColor: '#FF6B33',
-    width: 18,
-  },
 });

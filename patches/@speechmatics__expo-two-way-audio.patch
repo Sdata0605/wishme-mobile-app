@@ -1,0 +1,124 @@
+diff --git a/android/src/main/java/expo/modules/twowayaudio/AudioEngine.kt b/android/src/main/java/expo/modules/twowayaudio/AudioEngine.kt
+index 0103151ab5ebfa36909c352d0d228f67feda6069..1f2cd94b44e2b5f5e23903b5ade9e4adebd203ae 100644
+--- a/android/src/main/java/expo/modules/twowayaudio/AudioEngine.kt
++++ b/android/src/main/java/expo/modules/twowayaudio/AudioEngine.kt
+@@ -22,6 +22,8 @@ import kotlin.math.pow
+ 
+ class AudioEngine (context: Context) {
+     private val SAMPLE_RATE = 16000
++    // Gemini Live speaks at 24 kHz; play it natively instead of downsampling to 16 kHz.
++    private val PLAYBACK_SAMPLE_RATE = 24000
+     private val AUDIO_FORMAT = AudioFormat.ENCODING_PCM_16BIT
+     private val CHANNEL_CONFIG = AudioFormat.CHANNEL_IN_MONO
+ 
+@@ -54,7 +56,9 @@ class AudioEngine (context: Context) {
+     private fun initializeAudio(context:Context) {
+         audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+         audioManager.mode = AudioManager.MODE_IN_COMMUNICATION
+-        requestAudioFocus()
++        if (!requestAudioFocus()) {
++            throw RuntimeException("Audio focus request failed")
++        }
+ 
+         // Route audio to external device if connected, otherwise route to speaker
+         updateAudioRouting()
+@@ -74,7 +78,7 @@ class AudioEngine (context: Context) {
+         }, null)
+ 
+         val bufferSize = AudioTrack.getMinBufferSize(
+-            SAMPLE_RATE,
++            PLAYBACK_SAMPLE_RATE,
+             AudioFormat.CHANNEL_OUT_MONO,
+             AUDIO_FORMAT
+         )
+@@ -86,7 +90,7 @@ class AudioEngine (context: Context) {
+                 .build(),
+             AudioFormat.Builder()
+                 .setEncoding(AUDIO_FORMAT)
+-                .setSampleRate(SAMPLE_RATE)
++                .setSampleRate(PLAYBACK_SAMPLE_RATE)
+                 .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                 .build(),
+             bufferSize,
+@@ -139,7 +143,7 @@ class AudioEngine (context: Context) {
+     }
+ 
+     @SuppressLint("NewApi")
+-    private fun requestAudioFocus() {
++    private fun requestAudioFocus(): Boolean {
+         val focusRequest =
+             AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                 .setAudioAttributes(
+@@ -162,9 +166,7 @@ class AudioEngine (context: Context) {
+         audioFocusRequest = focusRequest
+         val result = audioManager.requestAudioFocus(focusRequest)
+ 
+-        if (result != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+-            throw RuntimeException("Audio focus request failed")
+-        }
++        return result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+     }
+ 
+     @RequiresApi(Build.VERSION_CODES.Q)
+@@ -286,6 +288,18 @@ class AudioEngine (context: Context) {
+         audioTrack.write(data, 0, data.size)
+     }
+ 
++    /** Drops queued and buffered audio immediately (used when the user interrupts the assistant). */
++    fun flushPlayback() {
++        audioSampleQueue.clear()
++        try {
++            audioTrack.pause()
++            audioTrack.flush()
++            audioTrack.play()
++        } catch (e: Exception) {
++            Log.e("AudioEngine", "Error flushing playback", e)
++        }
++    }
++
+     fun bypassVoiceProcessing(bypass: Boolean) {
+         if (bypass) {
+             echoCanceler?.enabled = false
+@@ -305,9 +319,24 @@ class AudioEngine (context: Context) {
+ 
+     @RequiresApi(Build.VERSION_CODES.Q)
+     fun resumeRecordingAndPlayer() {
+-        requestAudioFocus()
+-        isRecording = toggleRecording(isRecordingBeforePause)
+-        audioTrack.play()
++        // Coming back from a phone call or another app: audio focus may still be held
++        // elsewhere. That must never crash the app, so every step is best-effort.
++        try {
++            if (!requestAudioFocus()) Log.w("AudioEngine", "Audio focus not granted on resume")
++        } catch (e: Exception) {
++            Log.w("AudioEngine", "Audio focus request failed on resume", e)
++        }
++        try {
++            isRecording = toggleRecording(isRecordingBeforePause)
++        } catch (e: Exception) {
++            isRecording = false
++            Log.w("AudioEngine", "Could not resume recording", e)
++        }
++        try {
++            audioTrack.play()
++        } catch (e: Exception) {
++            Log.w("AudioEngine", "Could not resume playback", e)
++        }
+     }
+ 
+     @SuppressLint("NewApi")
+diff --git a/android/src/main/java/expo/modules/twowayaudio/ExpoTwoWayAudioModule.kt b/android/src/main/java/expo/modules/twowayaudio/ExpoTwoWayAudioModule.kt
+index 303873ecf088246f5e4f5cfd6f102594d24e49bd..68d1c1da29264299dcd8208e82fd70f699983c37 100644
+--- a/android/src/main/java/expo/modules/twowayaudio/ExpoTwoWayAudioModule.kt
++++ b/android/src/main/java/expo/modules/twowayaudio/ExpoTwoWayAudioModule.kt
+@@ -62,6 +62,10 @@ class ExpoTwoWayAudioModule : Module() {
+              audioEngine?.playPCMData(data)
+          }
+ 
++         Function("flushPlayback") {
++             audioEngine?.flushPlayback()
++         }
++
+          Function("bypassVoiceProcessing") { bypass: Boolean ->
+              audioEngine?.bypassVoiceProcessing(bypass)
+          }

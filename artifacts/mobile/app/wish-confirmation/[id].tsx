@@ -17,6 +17,7 @@ import { GradientButton } from '@/components/GradientButton';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFetch } from '@/constants/supabase';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 interface WishOrder {
   id: string;
@@ -147,7 +148,7 @@ export default function WishConfirmationScreen() {
   const maxRegenReached = regenerationCount >= 3;
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -294,7 +295,7 @@ export default function WishConfirmationScreen() {
           ) : null}
         </ScrollView>
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -307,7 +308,7 @@ const s = StyleSheet.create({
   errorTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   retryBtn: { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   retryText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  paymentBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#86EFAC', backgroundColor: '#F0FDF4', padding: 14, marginBottom: 16 },
+  paymentBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#86EFAC', backgroundColor: 'rgba(34,197,94,0.12)', padding: 14, marginBottom: 16 },
   paymentBannerTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#16A34A' },
   paymentBannerSubtitle: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#15803D', marginTop: 2 },
   celebRow: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 16 },
@@ -330,7 +331,7 @@ const s = StyleSheet.create({
   genErrorText: { color: '#EF4444', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 16 },
   maxRegenBanner: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8, padding: 10, marginBottom: 12 },
   maxRegenText: { fontSize: 13, fontFamily: 'Inter_400Regular' },
-  sentBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#86EFAC', backgroundColor: '#F0FDF4', padding: 14, marginBottom: 12 },
+  sentBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, borderWidth: 1, borderColor: '#86EFAC', backgroundColor: 'rgba(34,197,94,0.12)', padding: 14, marginBottom: 12 },
   sentBannerText: { fontSize: 15, fontFamily: 'Inter_600SemiBold', color: '#16A34A', flex: 1 },
   actions: { flexDirection: 'row', gap: 12, marginBottom: 12, alignItems: 'center' },
   regenBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1.5, borderRadius: 9999, paddingVertical: 12, paddingHorizontal: 16 },

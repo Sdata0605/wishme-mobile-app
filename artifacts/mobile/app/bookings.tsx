@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Audio } from 'expo-av';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { format } from 'date-fns';
@@ -17,10 +17,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon } from '@/components/Icon';
+import { Icon, type IconName } from '@/components/Icon';
+import { SaveToLibraryButton } from '@/components/SaveToLibraryButton';
+import { SlideSidebar } from '@/components/SlideSidebar';
 import { useAuth } from '@/context/AuthContext';
 import { supabaseFetch, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 function useRealtimeBookings(
   profileId: string | null,
@@ -62,6 +65,7 @@ function useRealtimeBookings(
       ws.onopen = () => {
         join('bookings');
         join('music_generations');
+        join('wish_friend_orders');
         heartbeat = setInterval(() => {
           send({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) });
         }, 30000);
@@ -74,7 +78,9 @@ function useRealtimeBookings(
             (msg.payload?.data?.type === 'UPDATE' || msg.payload?.eventType === 'UPDATE');
           if (isUpdate) {
             const topic: string = msg.topic ?? '';
-            if (topic.includes('music_generations')) {
+            if (topic.includes('wish_friend_orders')) {
+              onUpdateRef.current('wish_friend_orders');
+            } else if (topic.includes('music_generations')) {
               onUpdateRef.current('music_generations');
             } else if (topic.includes('bookings')) {
               onUpdateRef.current('bookings');
@@ -117,6 +123,7 @@ type Colors = ReturnType<typeof import('@/context/ThemeContext').useTheme>['colo
 
 const BOOKING_TABS = [
   'Celebrity',
+  'Wish a Friend',
   'Wishes',
   'Cards',
   'Photo',
@@ -127,7 +134,6 @@ const BOOKING_TABS = [
   'SFX',
   'Convert',
   'Isolate',
-  'Occasions',
 ] as const;
 type BookingTab = (typeof BOOKING_TABS)[number];
 
@@ -138,6 +144,12 @@ interface CelebBooking {
   message: string | null; final_price: number; created_at: string;
   generation_error: string | null;
   celebrities: { name: string; image_url: string; category: string } | null;
+}
+interface WishFriendOrder {
+  id: string; order_type: 'video_wish' | 'ugc_video'; status: 'pending' | 'processing' | 'completed' | 'rejected';
+  recipient_name: string; occasion: string; prompt: string; price_paid: number;
+  video_url: string | null; video_file_key: string | null; admin_notes: string | null; created_at: string;
+  celebrities: { name: string; image_url: string } | null;
 }
 interface WishOrder {
   id: string; celebrity_id: string; occasion_type: string; recipient_name: string;
@@ -186,15 +198,10 @@ interface AudioIsolation {
   id: string; original_file_name: string; audio_url: string | null;
   credits_used: number; status: string; created_at: string;
 }
-interface OccasionBooking {
-  id: string; recipient_name: string; message: string; price: number;
-  status: string; created_at: string;
-  celebrities: { name: string; image_url: string } | null;
-  occasions: { name: string } | null;
-}
 
 interface TabData {
   celeb: CelebBooking[];
+  wishFriend: WishFriendOrder[];
   wishes: WishOrder[];
   cards: GreetingCard[];
   photo: PhotoWish[];
@@ -205,7 +212,6 @@ interface TabData {
   sfx: SfxGen[];
   convert: VoiceConversion[];
   isolate: AudioIsolation[];
-  occasions: OccasionBooking[];
 }
 
 type TabDataKey = keyof TabData;
@@ -317,7 +323,7 @@ function BookingAudioPlayer({ audioUrl, colors }: { audioUrl: string | null; col
   const progress = duration > 0 ? position / duration : 0;
   return (
     <View style={[s.audioPlayer, { backgroundColor: colors.background, borderColor: colors.border }]}>
-      <TouchableOpacity onPress={toggle} style={[s.playBtn, { backgroundColor: '#FF6B33' }]} disabled={!audioUrl}>
+      <TouchableOpacity onPress={toggle} style={[s.playBtn, { backgroundColor: '#7B5CFA' }]} disabled={!audioUrl}>
         {loading ? (
           <ActivityIndicator size="small" color="#fff" />
         ) : (
@@ -325,7 +331,7 @@ function BookingAudioPlayer({ audioUrl, colors }: { audioUrl: string | null; col
         )}
       </TouchableOpacity>
       <View style={s.audioBar}>
-        <View style={[s.audioProgress, { backgroundColor: '#FF6B33', width: `${progress * 100}%` }]} />
+        <View style={[s.audioProgress, { backgroundColor: '#7B5CFA', width: `${progress * 100}%` }]} />
       </View>
       <Text style={[s.audioDuration, { color: colors.mutedForeground }]}>
         {duration > 0 ? `${fmtMs(position)} / ${fmtMs(duration)}` : audioUrl ? '--:--' : 'N/A'}
@@ -505,14 +511,14 @@ function CelebCard({ item, colors, accessToken }: { item: CelebBooking; colors: 
           ) : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
           {item.final_price > 0 && (
-            <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.final_price.toLocaleString('en-IN')}</Text>
+            <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.final_price.toLocaleString('en-IN')}</Text>
           )}
           <Text style={[s.orderId, { color: colors.mutedForeground }]}>Order #{item.id.slice(0, 8).toUpperCase()}</Text>
         </View>
       </View>
 
       {isUnderReview && (
-        <View style={[s.infoBox, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B' }]}>
+        <View style={[s.infoBox, { backgroundColor: 'rgba(245,158,11,0.14)', borderColor: '#F59E0B' }]}>
           <Icon name="clock" size={14} color="#92400E" />
           <Text style={[s.infoBoxText, { color: '#92400E' }]}>Video Under Review — our team will send it to you shortly.</Text>
         </View>
@@ -527,7 +533,7 @@ function CelebCard({ item, colors, accessToken }: { item: CelebBooking; colors: 
 
       {isVideoReady && loadingVideo && (
         <View style={s.videoLoadingRow}>
-          <ActivityIndicator size="small" color="#FF6B33" />
+          <ActivityIndicator size="small" color="#7B5CFA" />
           <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>Loading video...</Text>
         </View>
       )}
@@ -540,16 +546,121 @@ function CelebCard({ item, colors, accessToken }: { item: CelebBooking; colors: 
           <video src={signedUrl} controls style={{ width: '100%', borderRadius: 10 }} />
         </View>
       )}
+      {isVideoReady && (
+        <SaveToLibraryButton
+          video={{
+            sourceType: 'booking',
+            sourceId: item.id,
+            title: `${SERVICE_TYPE_LABELS[item.service_type] ?? 'Video'}${item.celebrities?.name ? ` · ${item.celebrities.name}` : ''}`,
+            subtitle: parsed.recipientName ? `For ${parsed.recipientName}` : null,
+            mediaUrl: item.video_url,
+            fileKey: item.video_file_key,
+            thumbnailUrl: item.celebrities?.image_url ?? null,
+          }}
+        />
+      )}
 
       {item.status !== 'pending' && (
         <TouchableOpacity onPress={() => setShowTimeline(t => !t)} style={s.timelineToggle}>
-          <Text style={{ color: '#FF6B33', fontSize: 12, fontFamily: 'Inter_500Medium' }}>
+          <Text style={{ color: '#7B5CFA', fontSize: 12, fontFamily: 'Inter_500Medium' }}>
             {showTimeline ? 'Hide Timeline' : 'Order Timeline'}
           </Text>
-          <Icon name={showTimeline ? 'chevron-up' : 'chevron-down'} size={14} color="#FF6B33" />
+          <Icon name={showTimeline ? 'chevron-up' : 'chevron-down'} size={14} color="#7B5CFA" />
         </TouchableOpacity>
       )}
       {showTimeline && item.status !== 'pending' && <OrderTimeline row={item} colors={colors} />}
+    </View>
+  );
+}
+
+const WISH_FRIEND_STATUS: Record<WishFriendOrder['status'], { label: string; color: string }> = {
+  pending: { label: 'Request received', color: '#F59E0B' },
+  processing: { label: 'Being made', color: '#3B82F6' },
+  completed: { label: 'Delivered', color: '#22C55E' },
+  rejected: { label: 'Rejected', color: '#EF4444' },
+};
+
+function WishFriendCard({ item, colors, accessToken }: { item: WishFriendOrder; colors: Colors; accessToken: string | null }) {
+  const status = WISH_FRIEND_STATUS[item.status] ?? WISH_FRIEND_STATUS.pending;
+  const delivered = item.status === 'completed' && (item.video_file_key || item.video_url);
+  const [videoUri, setVideoUri] = useState<string | null>(null);
+
+  // Prefer a signed URL (works whether or not the bucket is public); fall back to the stored URL.
+  useEffect(() => {
+    if (!delivered) { setVideoUri(null); return; }
+    let cancelled = false;
+    const fallback = item.video_url;
+    if (!item.video_file_key || !accessToken) { setVideoUri(fallback); return; }
+    supabaseFetch(
+      '/functions/v1/b2-get-signed-url',
+      { method: 'POST', body: JSON.stringify({ fileKey: item.video_file_key }) },
+      accessToken,
+    )
+      .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      .then(d => { if (!cancelled) setVideoUri(d?.signedUrl ?? d?.url ?? fallback); })
+      .catch(() => { if (!cancelled) setVideoUri(fallback); });
+    return () => { cancelled = true; };
+  }, [delivered, item.video_file_key, item.video_url, accessToken]);
+
+  return (
+    <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+      <View style={s.cardRow}>
+        {item.celebrities?.image_url ? (
+          <Image source={{ uri: item.celebrities.image_url }} style={s.thumb} />
+        ) : (
+          <View style={[s.thumb, s.thumbPlaceholder, { backgroundColor: colors.border }]}>
+            <Icon name="video" size={28} color={colors.mutedForeground} />
+          </View>
+        )}
+        <View style={{ flex: 1 }}>
+          <View style={s.cardTop}>
+            <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
+              {item.order_type === 'ugc_video' ? 'UGC Video' : 'Video Wish'} · {item.celebrities?.name ?? 'Celebrity'}
+            </Text>
+            <View style={[s.statusBadge, { backgroundColor: status.color + '22' }]}>
+              <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>
+            </View>
+          </View>
+          <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For {item.recipient_name} · {item.occasion}</Text>
+          <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.prompt}</Text>
+          <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
+          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
+          <Text style={[s.orderId, { color: colors.mutedForeground }]}>Order #{item.id.slice(0, 8).toUpperCase()}</Text>
+        </View>
+      </View>
+
+      {(item.status === 'pending' || item.status === 'processing') && (
+        <View style={[s.infoBox, { backgroundColor: colors.border + '44', borderColor: colors.border }]}>
+          <ActivityIndicator size="small" color="#F59E0B" />
+          <Text style={[s.infoBoxText, { color: colors.mutedForeground }]}>Our team is making your video. It will appear here when it is ready.</Text>
+        </View>
+      )}
+      {item.status === 'rejected' && (
+        <View style={[s.infoBox, { backgroundColor: 'rgba(239,68,68,0.12)', borderColor: '#EF4444' }]}>
+          <Icon name="x" size={14} color="#991B1B" />
+          <Text style={[s.infoBoxText, { color: '#991B1B' }]}>{item.admin_notes || 'We could not make this video. Please contact support for a refund.'}</Text>
+        </View>
+      )}
+      {delivered && videoUri && Platform.OS !== 'web' && <InlineCelebVideoPlayer videoUri={videoUri} colors={colors} />}
+      {delivered && videoUri && Platform.OS === 'web' && (
+        <View style={[s.videoWrapper, { borderColor: colors.border }]}>
+          <video src={videoUri} controls style={{ width: '100%', borderRadius: 10 }} />
+        </View>
+      )}
+      {delivered && item.video_url ? <DownloadLink url={item.video_url} colors={colors} /> : null}
+      {delivered && (
+        <SaveToLibraryButton
+          video={{
+            sourceType: 'wish_friend',
+            sourceId: item.id,
+            title: `${item.order_type === 'ugc_video' ? 'UGC Video' : 'Video Wish'}${item.celebrities?.name ? ` · ${item.celebrities.name}` : ''}`,
+            subtitle: `For ${item.recipient_name}`,
+            mediaUrl: item.video_url,
+            fileKey: item.video_file_key,
+            thumbnailUrl: item.celebrities?.image_url ?? null,
+          }}
+        />
+      )}
     </View>
   );
 }
@@ -577,7 +688,7 @@ function WishCard({ item, colors }: { item: WishOrder; colors: Colors }) {
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.occasion_type} for {item.recipient_name}</Text>
           {item.message ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.message}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.amount_paid > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.amount_paid.toLocaleString('en-IN')}</Text>}
+          {item.amount_paid > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.amount_paid.toLocaleString('en-IN')}</Text>}
           {imgUrl ? (
             <TouchableOpacity onPress={() => setPreview(imgUrl)}>
               <Image source={{ uri: imgUrl }} style={s.cardImg} resizeMode="cover" />
@@ -606,7 +717,7 @@ function CardCard({ item, colors }: { item: GreetingCard; colors: Colors }) {
           </View>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For {item.recipient_name}</Text>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
+          {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
           {item.generated_image_url ? (
             <TouchableOpacity onPress={() => setPreview(item.generated_image_url!)}>
               <Image source={{ uri: item.generated_image_url }} style={s.cardImg} resizeMode="cover" />
@@ -639,7 +750,7 @@ function PhotoCard({ item, colors }: { item: PhotoWish; colors: Colors }) {
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For {item.recipient_name}</Text>
           {item.message ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.message}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
           {item.output_url ? (
             <TouchableOpacity onPress={() => setPreview(item.output_url!)}>
               <Image source={{ uri: item.output_url }} style={s.cardImg} resizeMode="cover" />
@@ -673,11 +784,11 @@ function CallCard({ item, colors }: { item: VoiceCall; colors: Colors }) {
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.occasion} for {item.recipient_name}</Text>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>From: {item.sender_name} → {item.recipient_phone}</Text>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
+          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
         </View>
       </View>
       {item.scheduled_at && (
-        <View style={[s.infoBox, { backgroundColor: '#EFF6FF', borderColor: '#3B82F6' }]}>
+        <View style={[s.infoBox, { backgroundColor: 'rgba(59,130,246,0.12)', borderColor: '#3B82F6' }]}>
           <Icon name="calendar" size={14} color="#1D4ED8" />
           <Text style={[s.infoBoxText, { color: '#1D4ED8' }]}>
             Scheduled: {fmtDateLong(item.scheduled_at)} at {fmtTime(item.scheduled_at)}
@@ -712,7 +823,7 @@ function MusicCard({ item, colors }: { item: MusicGen; colors: Colors }) {
           )}
           {item.lyrics ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.lyrics}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
           {item.error_message ? <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'Inter_400Regular' }}>{item.error_message}</Text> : null}
           {item.status === 'completed' && audioUrl ? (
             <>
@@ -721,7 +832,7 @@ function MusicCard({ item, colors }: { item: MusicGen; colors: Colors }) {
             </>
           ) : item.status === 'processing' ? (
             <View style={s.processingRow}>
-              <ActivityIndicator size="small" color="#FF6B33" />
+              <ActivityIndicator size="small" color="#7B5CFA" />
               <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>Processing...</Text>
             </View>
           ) : null}
@@ -759,7 +870,7 @@ function ImgMusicCard({ item, colors }: { item: ImgMusicGen; colors: Colors }) {
             )}
             {item.description ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.description}</Text> : null}
             <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-            {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
+            {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
             {item.status === 'completed' && item.audio_url ? (
               <>
                 <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
@@ -788,7 +899,7 @@ function TtsCard({ item, colors }: { item: TtsGen; colors: Colors }) {
           </View>
           {item.text ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={3}>{item.text}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -814,7 +925,7 @@ function SfxCard({ item, colors }: { item: SfxGen; colors: Colors }) {
             <Text style={[s.cardSub, { color: colors.mutedForeground }]}>Duration: {item.duration_seconds}s</Text>
           )}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -838,7 +949,7 @@ function ConvertCard({ item, colors }: { item: VoiceConversion; colors: Colors }
           </View>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>File: {item.original_file_name}</Text>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -861,7 +972,7 @@ function IsolateCard({ item, colors }: { item: AudioIsolation; colors: Colors })
             <SmallStatusBadge status={item.status} colors={colors} />
           </View>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -871,50 +982,20 @@ function IsolateCard({ item, colors }: { item: AudioIsolation; colors: Colors })
   );
 }
 
-function OccasionCard({ item, colors }: { item: OccasionBooking; colors: Colors }) {
-  return (
-    <View style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={s.cardRow}>
-        {item.celebrities?.image_url ? (
-          <Image source={{ uri: item.celebrities.image_url }} style={s.thumb} />
-        ) : (
-          <View style={[s.thumb, s.thumbPlaceholder, { backgroundColor: colors.border }]}>
-            <Icon name="gift" size={28} color={colors.mutedForeground} />
-          </View>
-        )}
-        <View style={{ flex: 1 }}>
-          <View style={s.cardTop}>
-            <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
-              {item.occasions?.name ?? 'Occasion'}
-            </Text>
-            <SmallStatusBadge status={item.status} colors={colors} />
-          </View>
-          {item.celebrities?.name && (
-            <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.celebrities.name}</Text>
-          )}
-          <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For: {item.recipient_name}</Text>
-          {item.message ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.message}</Text> : null}
-          <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.price > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.price.toLocaleString('en-IN')}</Text>}
-        </View>
-      </View>
-    </View>
-  );
-}
 
 const EMPTY_CONFIG: Record<BookingTab, { icon: string; label: string; route: string; btnLabel: string }> = {
-  Celebrity: { icon: 'star', label: 'No celebrity bookings yet', route: '/(tabs)/home', btnLabel: 'Book a Celebrity' },
-  Wishes: { icon: 'heart', label: 'No wishes yet', route: '/(tabs)/home', btnLabel: 'Send a Wish' },
-  Cards: { icon: 'gift', label: 'No greeting cards yet', route: '/create-card', btnLabel: 'Create a Card' },
+  Celebrity: { icon: 'star', label: 'No celebrity bookings yet', route: '/(tabs)', btnLabel: 'Book a Celebrity' },
+  'Wish a Friend': { icon: 'video', label: 'No Wish a Friend orders yet', route: '/wish-friend', btnLabel: 'Wish a Friend' },
+  Wishes: { icon: 'heart', label: 'No wishes yet', route: '/(tabs)', btnLabel: 'Send a Wish' },
+  Cards: { icon: 'gift', label: 'No greeting cards yet', route: '/greeting-cards', btnLabel: 'Create a Card' },
   Photo: { icon: 'image', label: 'No photo wishes yet', route: '/photo-wish', btnLabel: 'Create Photo Wish' },
-  Calls: { icon: 'phone', label: 'No celebrity calls yet', route: '/(tabs)/home', btnLabel: 'Book a Call' },
+  Calls: { icon: 'phone', label: 'No celebrity calls yet', route: '/(tabs)', btnLabel: 'Book a Call' },
   Music: { icon: 'music', label: 'No music generated yet', route: '/(tabs)/music', btnLabel: 'Generate Music' },
   'Img+Music': { icon: 'image', label: 'No image+music yet', route: '/(tabs)/music', btnLabel: 'Create Img+Music' },
   TTS: { icon: 'volume-2', label: 'No text-to-speech yet', route: '/(tabs)/music', btnLabel: 'Create TTS' },
   SFX: { icon: 'zap', label: 'No sound effects yet', route: '/(tabs)/music', btnLabel: 'Generate SFX' },
   Convert: { icon: 'mic', label: 'No voice conversions yet', route: '/(tabs)/music', btnLabel: 'Convert Voice' },
   Isolate: { icon: 'volume-x', label: 'No audio isolations yet', route: '/(tabs)/music', btnLabel: 'Isolate Audio' },
-  Occasions: { icon: 'gift', label: 'No occasion bookings yet', route: '/occasions', btnLabel: 'Book an Occasion' },
 };
 
 function EmptyState({ tab, colors }: { tab: BookingTab; colors: Colors }) {
@@ -930,8 +1011,58 @@ function EmptyState({ tab, colors }: { tab: BookingTab; colors: Colors }) {
   );
 }
 
+const TAB_META: Record<BookingTab, { icon: IconName; label: string; title: string; description: string }> = {
+  Celebrity: { icon: 'star', label: 'Celebrity', title: 'Celebrity bookings', description: 'Video messages from celebrities' },
+  'Wish a Friend': { icon: 'heart', label: 'Wish a Friend', title: 'Wish a Friend orders', description: 'Video wishes and UGC videos' },
+  Wishes: { icon: 'gift', label: 'Wishes', title: 'Celebrity wishes', description: 'Wish cards from celebrities' },
+  Cards: { icon: 'mail', label: 'Greeting Cards', title: 'Greeting cards', description: 'Cards you created' },
+  Photo: { icon: 'image', label: 'Photo Wishes', title: 'Photo wishes', description: 'Personalised photo wishes' },
+  Calls: { icon: 'phone', label: 'Calls', title: 'Celebrity calls', description: 'Celebrity and AI voice calls' },
+  Music: { icon: 'music', label: 'AI Music', title: 'AI music', description: 'Songs you generated' },
+  'Img+Music': { icon: 'layers', label: 'Image + Music', title: 'Image + music', description: 'Image and music creations' },
+  TTS: { icon: 'volume-2', label: 'Text to Speech', title: 'Text to speech', description: 'Voice from your text' },
+  SFX: { icon: 'zap', label: 'Sound Effects', title: 'Sound effects', description: 'Generated sound effects' },
+  Convert: { icon: 'mic', label: 'Voice Convert', title: 'Voice conversions', description: 'Voice changed to another' },
+  Isolate: { icon: 'volume-x', label: 'Audio Isolate', title: 'Audio isolation', description: 'Clean voice from audio' },
+};
+
+const SIDEBAR_GROUPS: { title: string; tabs: BookingTab[] }[] = [
+  { title: 'Wishes & celebrities', tabs: ['Celebrity', 'Wish a Friend', 'Wishes', 'Calls'] },
+  { title: 'Cards & photos', tabs: ['Cards', 'Photo'] },
+  { title: 'AI music & audio', tabs: ['Music', 'Img+Music', 'TTS', 'SFX', 'Convert', 'Isolate'] },
+];
+
+function SkeletonCards({ colors }: { colors: Colors }) {
+  const anim = useRef(new Animated.Value(0.35)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(anim, { toValue: 0.9, duration: 700, useNativeDriver: true }),
+      Animated.timing(anim, { toValue: 0.35, duration: 700, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [anim]);
+  return (
+    <>
+      {[0, 1, 2].map(i => (
+        <Animated.View key={i} style={[s.card, { backgroundColor: colors.card, borderColor: colors.border, opacity: anim }]}>
+          <View style={s.cardRow}>
+            <View style={[s.thumb, { backgroundColor: colors.border }]} />
+            <View style={{ flex: 1, gap: 8 }}>
+              <View style={{ height: 12, width: '70%', borderRadius: 6, backgroundColor: colors.border }} />
+              <View style={{ height: 10, width: '50%', borderRadius: 5, backgroundColor: colors.border }} />
+              <View style={{ height: 10, width: '35%', borderRadius: 5, backgroundColor: colors.border }} />
+            </View>
+          </View>
+        </Animated.View>
+      ))}
+    </>
+  );
+}
+
 const TAB_TO_TABLES: Record<BookingTab, { table: string; select: string; dataKey: TabDataKey }[]> = {
   Celebrity: [{ table: 'bookings', select: 'id,user_id,celebrity_id,service_type,status,generation_status,video_status,video_file_key,video_url,message,final_price,created_at,generation_error,celebrities:celebrity_id(name,image_url,category)', dataKey: 'celeb' }],
+  'Wish a Friend': [{ table: 'wish_friend_orders', select: 'id,order_type,status,recipient_name,occasion,prompt,price_paid,video_url,video_file_key,admin_notes,created_at,celebrities:celebrity_id(name,image_url)', dataKey: 'wishFriend' }],
   Wishes: [{ table: 'wish_celebrity_orders', select: 'id,celebrity_id,occasion_type,recipient_name,message,amount_paid,status,generated_card_image_url,card_url,created_at,celebrities:celebrity_id(name,image_url)', dataKey: 'wishes' }],
   Cards: [{ table: 'greeting_card_generations', select: 'id,occasion_name,recipient_name,original_prompt,generated_image_url,amount_charged,status,created_at', dataKey: 'cards' }],
   Photo: [{ table: 'photo_wishes', select: 'id,occasion_type,recipient_name,message,output_url,credits_used,status,created_at', dataKey: 'photo' }],
@@ -942,11 +1073,11 @@ const TAB_TO_TABLES: Record<BookingTab, { table: string; select: string; dataKey
   SFX: [{ table: 'sound_effect_generations', select: 'id,description,duration_seconds,audio_url,credits_used,status,created_at', dataKey: 'sfx' }],
   Convert: [{ table: 'voice_conversion_generations', select: 'id,target_voice_name,original_file_name,audio_url,credits_used,status,created_at', dataKey: 'convert' }],
   Isolate: [{ table: 'audio_isolation_generations', select: 'id,original_file_name,audio_url,credits_used,status,created_at', dataKey: 'isolate' }],
-  Occasions: [{ table: 'occasion_bookings', select: 'id,recipient_name,message,price,status,created_at,celebrities:celebrity_id(name,image_url),occasions:occasion_id(name)', dataKey: 'occasions' }],
 };
 
 const TABLE_TO_TAB: Record<string, BookingTab> = {
   bookings: 'Celebrity',
+  wish_friend_orders: 'Wish a Friend',
   music_generations: 'Music',
 };
 
@@ -955,14 +1086,18 @@ export default function BookingsScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { user, getValidSession } = useAuth();
-  const [activeTab, setActiveTab] = useState<BookingTab>('Celebrity');
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  const [activeTab, setActiveTab] = useState<BookingTab>(
+    (BOOKING_TABS as readonly string[]).includes(tabParam ?? '') ? (tabParam as BookingTab) : 'Celebrity',
+  );
   const [tabLoading, setTabLoading] = useState<Partial<Record<BookingTab, boolean>>>({});
   const [fetchError, setFetchError] = useState(false);
-  const [badgeCounts, setBadgeCounts] = useState<Partial<Record<BookingTab, number>>>({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loadedTabs, setLoadedTabs] = useState<Partial<Record<BookingTab, boolean>>>({});
   const [data, setData] = useState<TabData>({
-    celeb: [], wishes: [], cards: [], photo: [],
+    celeb: [], wishFriend: [], wishes: [], cards: [], photo: [],
     calls: [], music: [], imgMusic: [], tts: [],
-    sfx: [], convert: [], isolate: [], occasions: [],
+    sfx: [], convert: [], isolate: [],
   });
   const loadedTabsRef = useRef<Set<BookingTab>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
@@ -971,41 +1106,6 @@ export default function BookingsScreen() {
   useEffect(() => {
     getValidSession().then(s => setRealtimeToken(s?.access_token ?? null));
   }, [getValidSession]);
-
-  const fetchBadgeCounts = useCallback(async () => {
-    if (!user?.profileId) return;
-    const validSession = await getValidSession();
-    if (!validSession?.access_token) return;
-    const pid = user.profileId;
-    const tok = validSession.access_token;
-
-    const countFetches = BOOKING_TABS.map(async (tab) => {
-      const configs = TAB_TO_TABLES[tab];
-      let total = 0;
-      for (const cfg of configs) {
-        try {
-          const res = await supabaseFetch(
-            `/rest/v1/${cfg.table}?select=id&user_id=eq.${pid}&limit=1`,
-            { method: 'HEAD', headers: { Prefer: 'count=exact' } },
-            tok,
-          );
-          const rangeHeader = res.headers.get('content-range');
-          if (rangeHeader) {
-            const match = rangeHeader.match(/\/(\d+)$/);
-            if (match) total += parseInt(match[1], 10);
-          }
-        } catch {}
-      }
-      return { tab, count: total };
-    });
-
-    const results = await Promise.all(countFetches);
-    const counts: Partial<Record<BookingTab, number>> = {};
-    for (const { tab, count } of results) {
-      counts[tab] = count;
-    }
-    setBadgeCounts(counts);
-  }, [user?.profileId, getValidSession]);
 
   const fetchTab = useCallback(async (tab: BookingTab, force = false) => {
     if (!user?.profileId) return;
@@ -1031,6 +1131,7 @@ export default function BookingsScreen() {
         setData(prev => ({ ...prev, [cfg.dataKey]: rows }));
       }
       loadedTabsRef.current.add(tab);
+      setLoadedTabs(prev => ({ ...prev, [tab]: true }));
       setFetchError(false);
     } catch {
       setFetchError(true);
@@ -1042,13 +1143,9 @@ export default function BookingsScreen() {
   const handleRefreshButton = useCallback(async () => {
     setRefreshing(true);
     loadedTabsRef.current.delete(activeTab);
-    await Promise.all([fetchBadgeCounts(), fetchTab(activeTab, true)]);
+    await fetchTab(activeTab, true);
     setRefreshing(false);
-  }, [activeTab, fetchBadgeCounts, fetchTab]);
-
-  useEffect(() => {
-    fetchBadgeCounts();
-  }, [fetchBadgeCounts]);
+  }, [activeTab, fetchTab]);
 
   useEffect(() => {
     fetchTab(activeTab);
@@ -1061,9 +1158,8 @@ export default function BookingsScreen() {
       if (tab === activeTab) {
         fetchTab(tab, true);
       }
-      fetchBadgeCounts();
     }
-  }, [activeTab, fetchTab, fetchBadgeCounts]);
+  }, [activeTab, fetchTab]);
 
   useRealtimeBookings(
     user?.profileId ?? null,
@@ -1072,19 +1168,17 @@ export default function BookingsScreen() {
   );
 
   function renderTabItems(tab: BookingTab) {
-    const isLoading = tabLoading[tab];
-    if (isLoading) {
-      return (
-        <View style={s.loadingContainer}>
-          <ActivityIndicator size="large" color="#FF6B33" />
-        </View>
-      );
+    if (!loadedTabs[tab] && !fetchError) {
+      return <SkeletonCards colors={colors} />;
     }
     const showEmpty = !fetchError;
     switch (tab) {
       case 'Celebrity':
         return data.celeb.length === 0 ? (showEmpty ? <EmptyState tab="Celebrity" colors={colors} /> : null) :
           data.celeb.map(item => <CelebCard key={item.id} item={item} colors={colors} accessToken={realtimeToken} />);
+      case 'Wish a Friend':
+        return data.wishFriend.length === 0 ? (showEmpty ? <EmptyState tab="Wish a Friend" colors={colors} /> : null) :
+          data.wishFriend.map(item => <WishFriendCard key={item.id} item={item} colors={colors} accessToken={realtimeToken} />);
       case 'Wishes':
         return data.wishes.length === 0 ? (showEmpty ? <EmptyState tab="Wishes" colors={colors} /> : null) :
           data.wishes.map(item => <WishCard key={item.id} item={item} colors={colors} />);
@@ -1115,53 +1209,51 @@ export default function BookingsScreen() {
       case 'Isolate':
         return data.isolate.length === 0 ? (showEmpty ? <EmptyState tab="Isolate" colors={colors} /> : null) :
           data.isolate.map(item => <IsolateCard key={item.id} item={item} colors={colors} />);
-      case 'Occasions':
-        return data.occasions.length === 0 ? (showEmpty ? <EmptyState tab="Occasions" colors={colors} /> : null) :
-          data.occasions.map(item => <OccasionCard key={item.id} item={item} colors={colors} />);
     }
   }
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Icon name="arrow-left" size={22} color={colors.foreground} />
-        </TouchableOpacity>
+        <View style={s.headerLeft}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={10}>
+            <Icon name="arrow-left" size={22} color={colors.foreground} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setSidebarOpen(true)}
+            hitSlop={8}
+            accessibilityLabel="Open menu"
+            style={[s.menuBtn, { backgroundColor: colors.card, borderColor: colors.border }]}
+          >
+            <Icon name="menu" size={20} color={colors.foreground} />
+          </TouchableOpacity>
+        </View>
         <Text style={[s.headerTitle, { color: colors.foreground }]}>My Bookings</Text>
         <TouchableOpacity onPress={handleRefreshButton} disabled={refreshing}>
           {refreshing ? (
-            <ActivityIndicator size="small" color="#FF6B33" />
+            <ActivityIndicator size="small" color="#7B5CFA" />
           ) : (
             <Icon name="refresh-cw" size={18} color={colors.foreground} />
           )}
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={[s.tabBar, { borderBottomColor: colors.border }]}
-        contentContainerStyle={s.tabBarContent}
+      <View style={s.body}>
+      <View style={{ flex: 1 }}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={() => setSidebarOpen(true)}
+        style={[s.sectionBar, { backgroundColor: colors.card, borderColor: colors.border }]}
       >
-        {BOOKING_TABS.map(tab => {
-          const active = tab === activeTab;
-          const count = badgeCounts[tab];
-          const label = count != null ? `${tab} (${count})` : tab;
-          return (
-            <TouchableOpacity
-              key={tab}
-              onPress={() => setActiveTab(tab)}
-              style={[s.tabPill, active && { backgroundColor: '#FF6B33' }]}
-            >
-              <Text style={[s.tabPillText, { color: active ? '#fff' : colors.mutedForeground },
-                active && s.tabPillTextActive]}
-              >
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+        <View style={s.sectionBarIcon}>
+          <Icon name={TAB_META[activeTab].icon} size={18} color="#fff" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[s.sectionBarTitle, { color: colors.foreground }]} numberOfLines={1}>{TAB_META[activeTab].title}</Text>
+          <Text style={[s.sectionBarHint, { color: colors.mutedForeground }]}>Tap to switch section</Text>
+        </View>
+        <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
+      </TouchableOpacity>
 
       {fetchError && (
         <TouchableOpacity
@@ -1183,7 +1275,32 @@ export default function BookingsScreen() {
       >
         {renderTabItems(activeTab)}
       </ScrollView>
-    </View>
+      </View>
+      </View>
+
+      <SlideSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        title="My Bookings"
+        subtitle="Choose what to view"
+        activeKey={activeTab}
+        onSelect={key => { setActiveTab(key as BookingTab); setSidebarOpen(false); }}
+        groups={SIDEBAR_GROUPS.map(g => ({
+          title: g.title,
+          items: g.tabs.map(tab => ({
+            key: tab,
+            label: TAB_META[tab].label,
+            description: TAB_META[tab].description,
+            icon: TAB_META[tab].icon,
+            count: loadedTabs[tab] ? data[TAB_TO_TABLES[tab][0].dataKey].length : null,
+          })),
+        }))}
+        footer={[
+          { label: 'Library', icon: 'layers', onPress: () => { setSidebarOpen(false); router.push('/library' as never); } },
+          { label: 'Wish a Friend', icon: 'heart', onPress: () => { setSidebarOpen(false); router.push('/wish-friend' as never); } },
+        ]}
+      />
+    </View></AmbientBackground>
   );
 }
 
@@ -1194,12 +1311,17 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1,
   },
   headerTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
-  tabBar: { borderBottomWidth: 1, height: 54, flexShrink: 0 },
-  tabBarContent: { paddingHorizontal: 14, alignItems: 'center', gap: 8, paddingVertical: 9 },
-  tabPill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999 },
-  tabPillText: { fontSize: 12, fontFamily: 'Inter_500Medium' },
-  tabPillTextActive: { fontFamily: 'Inter_700Bold' },
-  listContent: { padding: 14, gap: 14 },
+  body: { flex: 1 },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  menuBtn: { width: 38, height: 38, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  sectionBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 12, marginTop: 12,
+    padding: 12, borderRadius: 16, borderWidth: 1,
+  },
+  sectionBarIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#7B5CFA', alignItems: 'center', justifyContent: 'center' },
+  sectionBarTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
+  sectionBarHint: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 1 },
+  listContent: { padding: 12, gap: 12 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   card: {
     borderRadius: 16, padding: 14, borderWidth: 1, overflow: 'hidden',
@@ -1242,7 +1364,7 @@ const s = StyleSheet.create({
   processingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyTitle: { fontSize: 16, fontFamily: 'Inter_500Medium', textAlign: 'center' },
-  emptyBtn: { backgroundColor: '#FF6B33', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 9999, marginTop: 4 },
+  emptyBtn: { backgroundColor: '#7B5CFA', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 9999, marginTop: 4 },
   emptyBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   errorBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

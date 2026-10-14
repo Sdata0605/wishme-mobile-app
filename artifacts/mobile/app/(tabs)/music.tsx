@@ -23,7 +23,7 @@ import { Icon } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useAgentPrefill } from '@/context/AgentStateContext';
-import { supabaseFetch } from '@/constants/supabase';
+import { parseApiError, supabaseFetch } from '@/constants/supabase';
 import { type VoiceItem, type VoiceList, useVoices } from '@/hooks/useVoices';
 import { useWallet } from '@/hooks/useWallet';
 
@@ -164,7 +164,7 @@ function fmtMs(ms: number): string {
   return `${Math.floor(total / 60)}:${(total % 60).toString().padStart(2, '0')}`;
 }
 
-function WaveformBar({ delay, color = '#FF6B33', active = true }: { delay: number; color?: string; active?: boolean }) {
+function WaveformBar({ delay, color = '#7B5CFA', active = true }: { delay: number; color?: string; active?: boolean }) {
   const anim = useRef(new Animated.Value(0.3)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -258,7 +258,7 @@ function AudioPlayerCard({ title, audioUri, badge }: { title: string; audioUri: 
 
   return (
     <View style={[s.playerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.playerGradient}>
+      <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.playerGradient}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <Text style={s.playerTitle}>{title}</Text>
           {badge ? <View style={s.badgePill}><Text style={s.badgeText}>{badge}</Text></View> : null}
@@ -365,7 +365,7 @@ function AudioRecorder({ onAudio, label = 'Record Audio' }: { onAudio: (base64: 
     return (
       <View style={[s.recorderPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={s.waveRow}>
-          {Array.from({ length: 12 }).map((_, i) => <WaveformBar key={i} delay={i * 80} color="#B44CFF" active={false} />)}
+          {Array.from({ length: 12 }).map((_, i) => <WaveformBar key={i} delay={i * 80} color="#1F7BFF" active={false} />)}
         </View>
         <Text style={[s.recDuration, { color: colors.mutedForeground }]}>{fmtTime(secs)}</Text>
         <TouchableOpacity style={[s.reRecordBtn, { borderColor: colors.border }]} onPress={() => { setState('idle'); setSecs(0); }}>
@@ -379,19 +379,19 @@ function AudioRecorder({ onAudio, label = 'Record Audio' }: { onAudio: (base64: 
   return (
     <View>
       <TouchableOpacity
-        style={[s.recorderBtn, { backgroundColor: state === 'recording' ? '#FF6B3315' : colors.card, borderColor: state === 'recording' ? '#FF6B33' : colors.border }]}
+        style={[s.recorderBtn, { backgroundColor: state === 'recording' ? '#7B5CFA15' : colors.card, borderColor: state === 'recording' ? '#7B5CFA' : colors.border }]}
         onPress={state === 'idle' ? startRecord : stopRecord}
         activeOpacity={0.8}
       >
         {state === 'recording' ? (
           <View style={s.recRow}>
             <Animated.View style={[s.recDot, { transform: [{ scale: pulseAnim }] }]} />
-            <Text style={[s.recLabel, { color: '#FF6B33' }]}>Recording... {fmtTime(secs)}</Text>
+            <Text style={[s.recLabel, { color: '#7B5CFA' }]}>Recording... {fmtTime(secs)}</Text>
             <Text style={[s.recHint, { color: colors.mutedForeground }]}>Tap to stop</Text>
           </View>
         ) : (
           <View style={s.recRow}>
-            <Icon name="mic" size={20} color="#B44CFF" />
+            <Icon name="mic" size={20} color="#1F7BFF" />
             <Text style={[s.recLabel, { color: colors.foreground }]}>{label}</Text>
           </View>
         )}
@@ -423,7 +423,7 @@ function UploadOrRecord({ audioFileName, onAudio, onClear, showRecorder = true }
   if (audioFileName) {
     return (
       <View style={[s.recorderPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Icon name="music" size={18} color="#B44CFF" />
+        <Icon name="music" size={18} color="#1F7BFF" />
         <Text style={[s.uploadText, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{audioFileName}</Text>
         <TouchableOpacity onPress={onClear}>
           <Icon name="x" size={16} color={colors.mutedForeground} />
@@ -435,7 +435,7 @@ function UploadOrRecord({ audioFileName, onAudio, onClear, showRecorder = true }
   return (
     <View style={s.uploadOrRec}>
       <TouchableOpacity style={[s.uploadBtn, { borderColor: colors.border, backgroundColor: colors.card }]} activeOpacity={0.8} onPress={pickFile}>
-        <Icon name="upload" size={18} color="#B44CFF" />
+        <Icon name="upload" size={18} color="#1F7BFF" />
         <Text style={[s.uploadText, { color: colors.foreground }]}>Upload Audio File</Text>
       </TouchableOpacity>
       {showRecorder && (
@@ -472,7 +472,7 @@ function ImageUploadArea({ imageUri, onImage, onClear }: { imageUri: string | nu
 
   if (imageUri) {
     return (
-      <View style={[s.imagePreview, { borderColor: '#B44CFF' }]}>
+      <View style={[s.imagePreview, { borderColor: '#1F7BFF' }]}>
         <Image source={{ uri: imageUri }} style={{ width: '100%', height: 160, borderRadius: 12 }} resizeMode="cover" />
         <TouchableOpacity style={s.changeImageBtn} onPress={onClear}>
           <Text style={s.changeImageText}>Change Image</Text>
@@ -483,7 +483,7 @@ function ImageUploadArea({ imageUri, onImage, onClear }: { imageUri: string | nu
 
   return (
     <TouchableOpacity style={[s.imageUploadArea, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={pick} activeOpacity={0.8}>
-      <Icon name="upload" size={28} color="#B44CFF" />
+      <Icon name="upload" size={28} color="#1F7BFF" />
       <Text style={[s.imageUploadText, { color: colors.foreground }]}>Tap to Upload Image</Text>
       <Text style={[{ fontSize: 12, fontFamily: 'Inter_400Regular' }, { color: colors.mutedForeground }]}>JPG, PNG up to 10MB</Text>
     </TouchableOpacity>
@@ -528,17 +528,17 @@ function VoiceSelect({ value, onChange, voices, voicesLoading }: {
   const renderVoiceItem = (v: VoiceItem) => (
     <TouchableOpacity
       key={v.voice_id}
-      style={[s.dropdownItem, value?.voice_id === v.voice_id && { backgroundColor: '#B44CFF20' }]}
+      style={[s.dropdownItem, value?.voice_id === v.voice_id && { backgroundColor: '#1F7BFF20' }]}
       onPress={() => { onChange(v); setOpen(false); }}
     >
-      <Text style={[s.dropdownItemText, { color: value?.voice_id === v.voice_id ? '#B44CFF' : colors.foreground, flex: 1 }]} numberOfLines={1}>{v.name}</Text>
+      <Text style={[s.dropdownItemText, { color: value?.voice_id === v.voice_id ? '#1F7BFF' : colors.foreground, flex: 1 }]} numberOfLines={1}>{v.name}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {v.preview_url ? (
           <TouchableOpacity onPress={() => playPreview(v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name={playingId === v.voice_id ? 'pause' : 'play'} size={14} color="#B44CFF" />
+            <Icon name={playingId === v.voice_id ? 'pause' : 'play'} size={14} color="#1F7BFF" />
           </TouchableOpacity>
         ) : null}
-        {value?.voice_id === v.voice_id && <Icon name="check" size={14} color="#B44CFF" />}
+        {value?.voice_id === v.voice_id && <Icon name="check" size={14} color="#1F7BFF" />}
       </View>
     </TouchableOpacity>
   );
@@ -554,7 +554,7 @@ function VoiceSelect({ value, onChange, voices, voicesLoading }: {
           {voices.clonedVoices.length > 0 && (
             <>
               <View style={[s.voiceGroupHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[s.voiceGroupLabel, { color: '#B44CFF' }]}>Your Cloned Voices</Text>
+                <Text style={[s.voiceGroupLabel, { color: '#1F7BFF' }]}>Your Cloned Voices</Text>
               </View>
               {voices.clonedVoices.map(renderVoiceItem)}
               <View style={[s.voiceGroupDivider, { backgroundColor: colors.border }]} />
@@ -579,7 +579,7 @@ function VoiceSelect({ value, onChange, voices, voicesLoading }: {
   );
 }
 
-function ChipSelect({ options, value, onChange, activeColor = '#B44CFF' }: { options: string[]; value: string; onChange: (v: string) => void; activeColor?: string }) {
+function ChipSelect({ options, value, onChange, activeColor = '#1F7BFF' }: { options: string[]; value: string; onChange: (v: string) => void; activeColor?: string }) {
   const { colors } = useTheme();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
@@ -607,11 +607,11 @@ function LanguageDropdown({ value, onChange }: { value: string; onChange: (v: st
           {SONG_LANGUAGES.map(lang => (
             <TouchableOpacity
               key={lang}
-              style={[s.dropdownItem, value === lang && { backgroundColor: '#FF6B3320' }]}
+              style={[s.dropdownItem, value === lang && { backgroundColor: '#7B5CFA20' }]}
               onPress={() => { onChange(lang); setOpen(false); }}
             >
-              <Text style={[s.dropdownItemText, { color: value === lang ? '#FF6B33' : colors.foreground, flex: 1 }]}>{lang}</Text>
-              {value === lang && <Icon name="check" size={14} color="#FF6B33" />}
+              <Text style={[s.dropdownItemText, { color: value === lang ? '#7B5CFA' : colors.foreground, flex: 1 }]}>{lang}</Text>
+              {value === lang && <Icon name="check" size={14} color="#7B5CFA" />}
             </TouchableOpacity>
           ))}
         </View>
@@ -644,7 +644,7 @@ function DurationSlider({ value, onChange, min = 1, max = 30, step = 1 }: { valu
 function GenBtn({ label, onPress, generating, disabled }: { label: string; onPress: () => void; generating: boolean; disabled?: boolean }) {
   return (
     <TouchableOpacity onPress={onPress} disabled={generating || disabled} style={{ marginTop: 16, opacity: (generating || disabled) ? 0.6 : 1 }} activeOpacity={0.85}>
-      <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.genBtn}>
+      <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.genBtn}>
         <Icon name="zap" size={18} color="#fff" />
         <Text style={s.genBtnText}>{generating ? 'Generating...' : label}</Text>
       </LinearGradient>
@@ -667,7 +667,7 @@ function ErrBox({ msg }: { msg: string }) {
   );
 }
 
-function InfoBox({ msg, color = '#B44CFF' }: { msg: string; color?: string }) {
+function InfoBox({ msg, color = '#1F7BFF' }: { msg: string; color?: string }) {
   return (
     <View style={[s.infoBox, { backgroundColor: color + '15', borderColor: color + '40' }]}>
       <Icon name="info" size={14} color={color} />
@@ -691,7 +691,7 @@ function WalletCard({ balance }: { balance: number }) {
   return (
     <View style={[s.walletCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={s.walletRow}>
-        <Icon name="wallet" size={20} color="#B44CFF" />
+        <Icon name="wallet" size={20} color="#1F7BFF" />
         <Text style={[s.walletLabel, { color: colors.mutedForeground }]}>Wallet Balance</Text>
         <Text style={s.walletBalance}>₹{balance.toLocaleString('en-IN')}</Text>
       </View>
@@ -889,11 +889,11 @@ function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
         )}
       </View>
       <View style={s.imgMusicActions}>
-        <TouchableOpacity style={[s.actionBtn, { flex: 1, borderColor: '#B44CFF', borderWidth: 1.5 }]} onPress={saveAudio}>
-          <Icon name={audioSaved ? 'check' : 'download'} size={15} color="#B44CFF" />
-          <Text style={[s.actionBtnText, { color: '#B44CFF' }]}>{audioSaved ? 'Audio Saved!' : 'Save Audio'}</Text>
+        <TouchableOpacity style={[s.actionBtn, { flex: 1, borderColor: '#1F7BFF', borderWidth: 1.5 }]} onPress={saveAudio}>
+          <Icon name={audioSaved ? 'check' : 'download'} size={15} color="#1F7BFF" />
+          <Text style={[s.actionBtnText, { color: '#1F7BFF' }]}>{audioSaved ? 'Audio Saved!' : 'Save Audio'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.actionBtn, { flex: 1, backgroundColor: '#B44CFF' }]} onPress={downloadMp4}>
+        <TouchableOpacity style={[s.actionBtn, { flex: 1, backgroundColor: '#1F7BFF' }]} onPress={downloadMp4}>
           <Icon name={videoSaved ? 'check' : 'download'} size={15} color="#fff" />
           <Text style={[s.actionBtnText, { color: '#fff' }]}>{videoSaved ? 'Saved!' : 'Download MP4'}</Text>
         </TouchableOpacity>
@@ -944,9 +944,13 @@ function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
         method: 'POST',
         body: JSON.stringify({ description: description.trim() || songTitle.trim(), genre, mood, language }),
       }, ctx.session?.access_token);
+      if (!res.ok) { setErr(await parseApiError(res)); return; }
       const data = await res.json() as { lyrics?: string };
       if (data.lyrics) setLyrics(data.lyrics);
-    } catch {}
+      else setErr('No lyrics were returned. Please try again.');
+    } catch {
+      setErr('Could not reach the lyrics service. Check your connection and try again.');
+    }
     setLyricsGen(false);
   };
 
@@ -1074,16 +1078,16 @@ function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
         </>
       )}
       <SL text="Genre" />
-      <ChipSelect options={GENERATE_SONG_GENRES} value={genre} onChange={setGenre} activeColor="#FF6B33" />
+      <ChipSelect options={GENERATE_SONG_GENRES} value={genre} onChange={setGenre} activeColor="#7B5CFA" />
       <SL text="Mood" />
-      <ChipSelect options={GENERATE_SONG_MOODS} value={mood} onChange={setMood} activeColor="#B44CFF" />
+      <ChipSelect options={GENERATE_SONG_MOODS} value={mood} onChange={setMood} activeColor="#1F7BFF" />
       {songType === 'full' ? (
         <>
           <View style={s.lyricHeader}>
             <SL text="Lyrics" />
-            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#FF6B33' }]} onPress={generateLyrics} disabled={lyricsGen}>
-              <Icon name="sparkles" size={13} color="#FF6B33" />
-              <Text style={[s.aiLyricsBtnText, { color: '#FF6B33' }]}>{lyricsGen ? 'Generating...' : 'Generate Lyrics'}</Text>
+            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#7B5CFA' }]} onPress={generateLyrics} disabled={lyricsGen}>
+              <Icon name="sparkles" size={13} color="#7B5CFA" />
+              <Text style={[s.aiLyricsBtnText, { color: '#7B5CFA' }]}>{lyricsGen ? 'Generating...' : 'Generate Lyrics'}</Text>
             </TouchableOpacity>
           </View>
           <TextInput
@@ -1114,15 +1118,15 @@ function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
       <GenBtn label={`Generate Song (₹${cost})`} onPress={generate} generating={gen} />
 
       {gen ? (
-        <View style={[s.resultPanel, s.resultPanelLoading, { backgroundColor: colors.card, borderColor: '#FF6B33' }]}>
+        <View style={[s.resultPanel, s.resultPanelLoading, { backgroundColor: colors.card, borderColor: '#7B5CFA' }]}>
           <View style={s.waveRow}>
             {Array.from({ length: 16 }).map((_, i) => (
-              <WaveformBar key={i} delay={i * 60} color="#FF6B33" active={true} />
+              <WaveformBar key={i} delay={i * 60} color="#7B5CFA" active={true} />
             ))}
           </View>
           <Text style={[s.generatingText, { color: colors.foreground }]}>{progressMsg || 'Starting generation...'}</Text>
           <Text style={[s.generatingHint, { color: colors.mutedForeground }]}>This may take up to 5 minutes</Text>
-          <View style={[s.genSpinner, { borderColor: '#FF6B33' + '30', borderTopColor: '#FF6B33' }]} />
+          <View style={[s.genSpinner, { borderColor: '#7B5CFA' + '30', borderTopColor: '#7B5CFA' }]} />
         </View>
       ) : audioUrl ? (
         <View style={[s.resultPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -1130,13 +1134,13 @@ function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
         </View>
       ) : (
         <View style={[s.resultPanel, s.resultPanelEmpty, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <LinearGradient colors={['#7B2FFF20', '#FF6B3320']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.resultEmptyGradient}>
-            <Icon name="music" size={32} color="#FF6B33" />
+          <LinearGradient colors={['#7C3AED20', '#7B5CFA20']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.resultEmptyGradient}>
+            <Icon name="music" size={32} color="#7B5CFA" />
             <Text style={[s.resultEmptyTitle, { color: colors.foreground }]}>Your song will appear here</Text>
             <Text style={[s.resultEmptyHint, { color: colors.mutedForeground }]}>Fill in the details above and tap Generate Song</Text>
             <View style={s.decorativeWaveRow}>
               {Array.from({ length: 20 }).map((_, i) => (
-                <WaveformBar key={i} delay={i * 50} color={'#FF6B33'} active={false} />
+                <WaveformBar key={i} delay={i * 50} color={'#7B5CFA'} active={false} />
               ))}
             </View>
             <View style={s.resultControls}>
@@ -1361,7 +1365,7 @@ function CloneTab({ ctx }: { ctx: MusicCtx }) {
 
   return (
     <View style={s.tabContent}>
-      <InfoBox msg="For best results, record 1–5 minutes of clear, natural speech." color="#FF6B33" />
+      <InfoBox msg="For best results, record 1–5 minutes of clear, natural speech." color="#7B5CFA" />
       <SL text="Upload or Record Voice Sample" />
       <UploadOrRecord audioFileName={audioFileName} onAudio={handleAudio} onClear={() => { setAudioBase64(null); setAudioFileName(null); }} />
       <SL text="Voice Name" />
@@ -1449,15 +1453,19 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
   const [err, setErr] = useState('');
 
   const generateLyrics = async () => {
-    setLyricsGen(true);
+    setErr(''); setLyricsGen(true);
     try {
       const res = await supabaseFetch('/functions/v1/generate-lyrics', {
         method: 'POST',
         body: JSON.stringify({ description: desc.trim() || 'a beautiful scene', genre, mood, language }),
       }, ctx.session?.access_token);
+      if (!res.ok) { setErr(await parseApiError(res)); return; }
       const data = await res.json() as { lyrics?: string };
       if (data.lyrics) setLyrics(data.lyrics);
-    } catch {}
+      else setErr('No lyrics were returned. Please try again.');
+    } catch {
+      setErr('Could not reach the lyrics service. Check your connection and try again.');
+    }
     setLyricsGen(false);
   };
 
@@ -1541,14 +1549,14 @@ function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
             placeholder="Calming piano melody for a sunset beach..." placeholderTextColor={colors.mutedForeground}
             value={desc} onChangeText={setDesc} multiline numberOfLines={3} />
           <SL text="Genre" />
-          <ChipSelect options={IMG_MUSIC_GENRES} value={genre} onChange={setGenre} activeColor="#B44CFF" />
+          <ChipSelect options={IMG_MUSIC_GENRES} value={genre} onChange={setGenre} activeColor="#1F7BFF" />
           <SL text="Mood" />
-          <ChipSelect options={IMG_MUSIC_MOODS} value={mood} onChange={setMood} activeColor="#FF6B33" />
+          <ChipSelect options={IMG_MUSIC_MOODS} value={mood} onChange={setMood} activeColor="#7B5CFA" />
           <LanguageDropdown value={language} onChange={setLanguage} />
           <View style={s.lyricHeader}>
             <SL text="Lyrics (optional)" />
-            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#B44CFF' }]} onPress={generateLyrics} disabled={lyricsGen}>
-              <Icon name="zap" size={13} color="#B44CFF" />
+            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#1F7BFF' }]} onPress={generateLyrics} disabled={lyricsGen}>
+              <Icon name="zap" size={13} color="#1F7BFF" />
               <Text style={s.aiLyricsBtnText}>{lyricsGen ? 'Generating...' : 'AI Generate'}</Text>
             </TouchableOpacity>
           </View>
@@ -1630,7 +1638,7 @@ export default function MusicScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={[{ flex: 1 }, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
-        <LinearGradient colors={['#7B2FFF', '#B44CFF', '#E8527A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.header, { paddingTop: topPad + 12 }]}>
+        <LinearGradient colors={['#7C3AED', '#1F7BFF', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.header, { paddingTop: topPad + 12 }]}>
           <Text style={s.headerTagline}><Text style={s.headerTaglineItalic}>Your Symphony,{'\n'}Powered by AI.</Text></Text>
         </LinearGradient>
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
@@ -1662,7 +1670,7 @@ const s = StyleSheet.create({
   walletCard: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 4, gap: 10 },
   walletRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   walletLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
-  walletBalance: { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#B44CFF' },
+  walletBalance: { fontSize: 20, fontFamily: 'Inter_700Bold', color: '#1F7BFF' },
   priceRow: { gap: 8, paddingVertical: 2 },
   priceChip: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6, alignItems: 'center', gap: 2 },
   priceChipName: { fontSize: 10, fontFamily: 'Inter_500Medium' },
@@ -1679,8 +1687,8 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   tabPillActive: {
-    backgroundColor: '#FF6B33',
-    shadowColor: '#FF6B33',
+    backgroundColor: '#7B5CFA',
+    shadowColor: '#7B5CFA',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.55,
     shadowRadius: 6,
@@ -1733,19 +1741,19 @@ const s = StyleSheet.create({
   sliderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   sliderBtn: { width: 36, height: 36, borderRadius: 9999, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   sliderTrack: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
-  sliderFill: { height: 6, backgroundColor: '#B44CFF', borderRadius: 3 },
+  sliderFill: { height: 6, backgroundColor: '#1F7BFF', borderRadius: 3 },
   sliderLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center', marginTop: 4 },
   infoBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 10, borderWidth: 1, padding: 12, marginTop: 8 },
-  infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#B44CFF', flex: 1 },
+  infoText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#1F7BFF', flex: 1 },
   errBox: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 8 },
   errorText: { fontSize: 12, fontFamily: 'Inter_400Regular', color: '#ef4444', flex: 1 },
   lyricHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 8 },
   aiLyricsBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1.5, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 },
-  aiLyricsBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#B44CFF' },
+  aiLyricsBtnText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#1F7BFF' },
   radioGroup: { gap: 10 },
   radioRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#B44CFF' },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#1F7BFF' },
   radioText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
   successCard: { borderRadius: 16, borderWidth: 1, padding: 24, alignItems: 'center', gap: 12, marginTop: 16 },
   successIcon: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#22c55e20', alignItems: 'center', justifyContent: 'center' },
@@ -1754,17 +1762,17 @@ const s = StyleSheet.create({
   imageUploadArea: { height: 140, borderRadius: 16, borderWidth: 2, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 8 },
   imageUploadText: { fontSize: 14, fontFamily: 'Inter_500Medium' },
   imagePreview: { borderRadius: 16, borderWidth: 2, overflow: 'hidden' },
-  changeImageBtn: { padding: 12, alignItems: 'center', backgroundColor: 'rgba(180,76,255,0.12)' },
-  changeImageText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#B44CFF' },
+  changeImageBtn: { padding: 12, alignItems: 'center', backgroundColor: 'rgba(31,123,255,0.12)' },
+  changeImageText: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: '#1F7BFF' },
   toggleRow: { flexDirection: 'row', borderRadius: 10, overflow: 'hidden', borderWidth: 1 },
   toggleOpt: { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  toggleOptActive: { backgroundColor: '#B44CFF' },
+  toggleOptActive: { backgroundColor: '#1F7BFF' },
   toggleOptText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   imgMusicResult: { marginTop: 16, borderRadius: 16, overflow: 'hidden' },
   imgOverlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.42)', alignItems: 'center', justifyContent: 'center' },
-  overlayPlayBtn: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(180,76,255,0.85)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  overlayPlayBtn: { width: 68, height: 68, borderRadius: 34, backgroundColor: 'rgba(31,123,255,0.85)', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
   imgWaveRow: { position: 'absolute', bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 3 },
-  imgBadgeTop: { position: 'absolute', top: 10, right: 10, backgroundColor: '#B44CFF', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+  imgBadgeTop: { position: 'absolute', top: 10, right: 10, backgroundColor: '#1F7BFF', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
   imgBadgeText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   imgMusicActions: { flexDirection: 'row', gap: 10, padding: 14, backgroundColor: '#1a1a2e' },
   actionBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12 },

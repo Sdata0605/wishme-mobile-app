@@ -23,9 +23,11 @@ import {
   X,
 } from 'lucide-react-native';
 import { serviceColors as C } from './serviceColors';
-import { tboGetSSR, type TBOSeatItem, type TBOMealltem } from '@/services/tboService';
+import { tboSeatMap, type TBOSeatItem, type TBOMealltem } from '@/services/tboService';
 import type { FlightResult } from './FlightResultsScreen';
 import type { FlightPassenger } from './FlightPassengerScreen';
+import { T, useThemedStyles, glass, dockBar } from './themed';
+import { BrandFill } from './BrandFill';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -47,6 +49,7 @@ export function FlightAddonsScreen({
   onBack: () => void;
   onContinue: (addons: SelectedFlightAddons) => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -63,12 +66,21 @@ export function FlightAddonsScreen({
   const [insurance, setInsurance] = useState(true);
 
   useEffect(() => {
-    tboGetSSR(String(flight.id)).then((res) => {
+    if (!flight.traceId || !flight.resultIndex) {
+      setSeats([]);
+      setMeals([]);
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    tboSeatMap(flight.traceId, flight.resultIndex).then((res) => {
+      if (cancelled) return;
       setSeats(res.seats);
       setMeals(res.meals);
       setLoading(false);
     });
-  }, [flight.id]);
+    return () => { cancelled = true; };
+  }, [flight.traceId, flight.resultIndex]);
 
   const handleSeatClick = (seat: TBOSeatItem) => {
     if (!seat.IsAvailable) return;
@@ -128,11 +140,11 @@ export function FlightAddonsScreen({
   const rowNumbers = Array.from(new Set(seats.map((s) => s.RowNo)));
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.pageBg }}>
+    <View style={{ flex: 1, backgroundColor: T(C.pageBg, 'page') }}>
       {/* Header */}
       <View style={[st.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={22} color={C.text} />
+          <ArrowLeft size={22} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={st.headerTitle}>Add-ons & Seats</Text>
@@ -197,8 +209,8 @@ export function FlightAddonsScreen({
 
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color={C.purple} />
-          <Text style={{ marginTop: 12, fontSize: 13, color: C.textLight }}>Loading seat map...</Text>
+          <ActivityIndicator size="large" color={T(C.purple, 'fg')} />
+          <Text style={{ marginTop: 12, fontSize: 13, color: T(C.textLight, 'fg') }}>Loading seat map...</Text>
         </View>
       ) : (
         <ScrollView
@@ -211,10 +223,10 @@ export function FlightAddonsScreen({
             <View>
               {/* Legend */}
               <View style={st.legendCard}>
-                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: '#F3F4F6' }]} /><Text style={st.legendText}>Occupied</Text></View>
-                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: '#E0E7FF', borderColor: '#6366F1', borderWidth: 1 }]} /><Text style={st.legendText}>Free / ₹150</Text></View>
-                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: '#FEF3C7', borderColor: '#F59E0B', borderWidth: 1 }]} /><Text style={st.legendText}>₹350</Text></View>
-                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: '#FCE7F3', borderColor: '#EC4899', borderWidth: 1 }]} /><Text style={st.legendText}>₹600+</Text></View>
+                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: T('#F3F4F6', 'bg') }]} /><Text style={st.legendText}>Occupied</Text></View>
+                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: T('#E0E7FF', 'bg'), borderColor: T('#6366F1', 'border'), borderWidth: 1 }]} /><Text style={st.legendText}>Free / ₹150</Text></View>
+                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: T('#FEF3C7', 'bg'), borderColor: T('#F59E0B', 'border'), borderWidth: 1 }]} /><Text style={st.legendText}>₹350</Text></View>
+                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: T('#FCE7F3', 'bg'), borderColor: T('#EC4899', 'border'), borderWidth: 1 }]} /><Text style={st.legendText}>₹600+</Text></View>
               </View>
 
               {/* Airplane Cabin */}
@@ -235,6 +247,15 @@ export function FlightAddonsScreen({
                 </View>
 
                 {/* Rows */}
+                {seats.length === 0 && (
+                  <View style={st.seatMapUnavailable}>
+                    <Text style={st.seatMapUnavailableTitle}>Seat selection unavailable</Text>
+                    <Text style={st.seatMapUnavailableSub}>
+                      {flight.airline} hasn't released a seat map for this flight. You can still
+                      continue — a seat will be auto-assigned at check-in.
+                    </Text>
+                  </View>
+                )}
                 {rowNumbers.map((rowNo) => {
                   const rowSeats = seats.filter((s) => s.RowNo === rowNo);
                   const isExit = rowNo === '12' || rowNo === '14';
@@ -271,7 +292,7 @@ export function FlightAddonsScreen({
                                 style={[
                                   st.seatBoxText,
                                   isAssignedToCurrent && st.seatBoxTextSelected,
-                                  !seat?.IsAvailable && { color: '#9CA3AF' },
+                                  !seat?.IsAvailable && { color: T('#9CA3AF', 'fg') },
                                 ]}
                               >
                                 {isAssignedToCurrent ? '✓' : seat?.SeatNo}
@@ -309,7 +330,7 @@ export function FlightAddonsScreen({
                                 style={[
                                   st.seatBoxText,
                                   isAssignedToCurrent && st.seatBoxTextSelected,
-                                  !seat?.IsAvailable && { color: '#9CA3AF' },
+                                  !seat?.IsAvailable && { color: T('#9CA3AF', 'fg') },
                                 ]}
                               >
                                 {isAssignedToCurrent ? '✓' : seat?.SeatNo}
@@ -338,14 +359,14 @@ export function FlightAddonsScreen({
                     onPress={() => handleMealClick(m)}
                   >
                     <View style={st.mealIconBox}>
-                      <Utensils size={20} color={isSelected ? C.white : C.purple} />
+                      <Utensils size={20} color={isSelected ? T(C.white, 'fg') : T(C.purple, 'fg')} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={st.mealTitle}>{m.Description}</Text>
                       <Text style={st.mealPrice}>₹{m.Price}</Text>
                     </View>
                     <View style={[st.checkCircle, isSelected && st.checkCircleActive]}>
-                      {isSelected && <Check size={14} color={C.white} />}
+                      {isSelected && <Check size={14} color={T(C.white, 'fg')} />}
                     </View>
                   </TouchableOpacity>
                 );
@@ -370,13 +391,13 @@ export function FlightAddonsScreen({
                   style={[st.bagCard, extraBaggageKg === b.kg && st.bagCardActive]}
                   onPress={() => setExtraBaggageKg(b.kg)}
                 >
-                  <Luggage size={22} color={extraBaggageKg === b.kg ? C.purple : C.textLight} />
+                  <Luggage size={22} color={extraBaggageKg === b.kg ? T(C.purple, 'fg') : T(C.textLight, 'fg')} />
                   <View style={{ flex: 1 }}>
                     <Text style={st.bagTitle}>{b.label}</Text>
                     <Text style={st.bagPrice}>{b.price === 0 ? 'Free' : `₹${b.price}`}</Text>
                   </View>
                   <View style={[st.checkCircle, extraBaggageKg === b.kg && st.checkCircleActive]}>
-                    {extraBaggageKg === b.kg && <Check size={14} color={C.white} />}
+                    {extraBaggageKg === b.kg && <Check size={14} color={T(C.white, 'fg')} />}
                   </View>
                 </TouchableOpacity>
               ))}
@@ -387,7 +408,7 @@ export function FlightAddonsScreen({
           {activeTab === 'insurance' && (
             <View style={st.insurCard}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <ShieldCheck size={28} color={C.green} />
+                <ShieldCheck size={28} color={T(C.green, 'fg')} />
                 <View style={{ flex: 1 }}>
                   <Text style={st.insurHead}>Comprehensive Travel Cover</Text>
                   <Text style={st.insurSub}>₹249 per traveller</Text>
@@ -395,17 +416,17 @@ export function FlightAddonsScreen({
               </View>
 
               <View style={st.insurPerks}>
-                <View style={st.perkRow}><CheckCircle2 size={15} color={C.green} /><Text style={st.perkText}>Medical Emergency cover up to ₹5,00,000</Text></View>
-                <View style={st.perkRow}><CheckCircle2 size={15} color={C.green} /><Text style={st.perkText}>Flight Delay & Cancellation compensation</Text></View>
-                <View style={st.perkRow}><CheckCircle2 size={15} color={C.green} /><Text style={st.perkText}>Baggage Loss & Theft protection up to ₹25,000</Text></View>
-                <View style={st.perkRow}><CheckCircle2 size={15} color={C.green} /><Text style={st.perkText}>24x7 Global Emergency Assistance</Text></View>
+                <View style={st.perkRow}><CheckCircle2 size={15} color={T(C.green, 'fg')} /><Text style={st.perkText}>Medical Emergency cover up to ₹5,00,000</Text></View>
+                <View style={st.perkRow}><CheckCircle2 size={15} color={T(C.green, 'fg')} /><Text style={st.perkText}>Flight Delay & Cancellation compensation</Text></View>
+                <View style={st.perkRow}><CheckCircle2 size={15} color={T(C.green, 'fg')} /><Text style={st.perkText}>Baggage Loss & Theft protection up to ₹25,000</Text></View>
+                <View style={st.perkRow}><CheckCircle2 size={15} color={T(C.green, 'fg')} /><Text style={st.perkText}>24x7 Global Emergency Assistance</Text></View>
               </View>
 
               <TouchableOpacity
                 style={[st.insurToggle, insurance && st.insurToggleActive]}
                 onPress={() => setInsurance(!insurance)}
               >
-                <Text style={[st.insurToggleText, insurance && { color: C.white }]}>
+                <Text style={[st.insurToggleText, insurance && { color: T(C.white, 'fg') }]}>
                   {insurance ? '✓ Insurance Added' : '+ Add Travel Insurance (₹249)'}
                 </Text>
               </TouchableOpacity>
@@ -422,36 +443,36 @@ export function FlightAddonsScreen({
             {grandAddonsTotal > 0 ? `+₹${grandAddonsTotal.toLocaleString('en-IN')}` : 'Included'}
           </Text>
         </View>
-        <TouchableOpacity style={st.continueBtn} activeOpacity={0.85} onPress={handleProceed}>
+        <TouchableOpacity style={st.continueBtn} activeOpacity={0.85} onPress={handleProceed}><BrandFill />
           <Text style={st.continueBtnText}>Review & Pay</Text>
-          <ChevronRight size={18} color={C.white} />
+          <ChevronRight size={18} color={T(C.white, 'fg')} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const st = StyleSheet.create({
+const make_st = () => StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: C.text },
-  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
-  stepBadge: { backgroundColor: '#F3E8FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
-  stepText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.purple },
-  tabBar: { flexDirection: 'row', backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.border },
+  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
+  stepBadge: { backgroundColor: T('#F3E8FF', 'bg'), paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
+  stepText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.purple, 'fg') },
+  tabBar: { flexDirection: 'row', backgroundColor: T(C.white, 'bg'), borderBottomWidth: 1, borderBottomColor: T(C.border, 'border') },
   tabBtn: { flex: 1, paddingVertical: 12, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  tabBtnActive: { borderBottomColor: C.purple },
-  tabBtnText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.textLight },
-  tabBtnTextActive: { color: C.purple, fontFamily: 'Inter_700Bold' },
-  paxBar: { paddingHorizontal: 14, paddingVertical: 10, gap: 8, backgroundColor: '#FAF5FF' },
+  tabBtnActive: { borderBottomColor: T(C.purple, 'border') },
+  tabBtnText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  tabBtnTextActive: { color: T(C.purple, 'fg'), fontFamily: 'Inter_700Bold' },
+  paxBar: { paddingHorizontal: 14, paddingVertical: 10, gap: 8, backgroundColor: T('#FAF5FF', 'bg') },
   paxPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -459,49 +480,52 @@ const st = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 20,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
   },
-  paxPillActive: { backgroundColor: C.purple, borderColor: C.purple },
-  paxPillText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.text },
-  paxPillTextActive: { color: C.white },
-  miniTag: { backgroundColor: '#FCD34D', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
-  miniTagText: { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#78350F' },
+  paxPillActive: { backgroundColor: T(C.purple, 'bg'), borderColor: T(C.purple, 'border') },
+  paxPillText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  paxPillTextActive: { color: T(C.white, 'fg') },
+  miniTag: { backgroundColor: T('#FCD34D', 'bg'), paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 },
+  miniTagText: { fontSize: 9, fontFamily: 'Inter_700Bold', color: T('#78350F', 'fg') },
   legendCard: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 12,
     padding: 10,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: C.border,
-  },
+    borderColor: T(C.border, 'border'),
+   ...glass(18), },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendBox: { width: 14, height: 14, borderRadius: 4 },
-  legendText: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: C.textLight },
+  legendText: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
   fuselage: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 20,
     padding: 16,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     alignItems: 'center',
-  },
+   ...glass(22), },
   cockpit: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: T('#F3F4F6', 'bg'),
     borderRadius: 20,
     paddingHorizontal: 20,
     paddingVertical: 8,
     marginBottom: 16,
   },
-  cockpitText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: C.textLight },
+  cockpitText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: T(C.textLight, 'fg') },
   seatColHead: { flexDirection: 'row', width: '100%', justifyContent: 'space-between', paddingHorizontal: 6, marginBottom: 8 },
-  colLetter: { width: 34, textAlign: 'center', fontSize: 13, fontFamily: 'Inter_700Bold', color: C.textLight },
+  seatMapUnavailable: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 20 },
+  seatMapUnavailableTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg'), marginBottom: 6 },
+  seatMapUnavailableSub: { fontSize: 12.5, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), textAlign: 'center', lineHeight: 18 },
+  colLetter: { width: 34, textAlign: 'center', fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.textLight, 'fg') },
   seatRow: { flexDirection: 'row', width: '100%', justifyContent: 'space-between', alignItems: 'center', marginVertical: 4 },
   aisle: { width: 28, alignItems: 'center' },
-  aisleText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#9CA3AF' },
+  aisleText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T('#9CA3AF', 'fg') },
   seatBox: {
     width: 34,
     height: 34,
@@ -510,94 +534,95 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  seatFree: { backgroundColor: '#EEF2FF', borderColor: '#C7D2FE' },
-  seatStandard: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
-  seatPremium: { backgroundColor: '#FCE7F3', borderColor: '#FBCFE8' },
-  seatOccupied: { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB' },
-  seatSelectedCurrent: { backgroundColor: C.purple, borderColor: C.purple },
-  seatSelectedOther: { backgroundColor: '#9333EA', borderColor: '#9333EA' },
-  seatBoxText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: C.text },
-  seatBoxTextSelected: { color: C.white },
+  seatFree: { backgroundColor: T('#EEF2FF', 'bg'), borderColor: T('#C7D2FE', 'border') },
+  seatStandard: { backgroundColor: T('#FEF3C7', 'bg'), borderColor: T('#FDE68A', 'border') },
+  seatPremium: { backgroundColor: T('#FCE7F3', 'bg'), borderColor: T('#FBCFE8', 'border') },
+  seatOccupied: { backgroundColor: T('#F3F4F6', 'bg'), borderColor: T('#E5E7EB', 'border') },
+  seatSelectedCurrent: { backgroundColor: T(C.purple, 'bg'), borderColor: T(C.purple, 'border') },
+  seatSelectedOther: { backgroundColor: T('#9333EA', 'bg'), borderColor: T('#9333EA', 'border') },
+  seatBoxText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  seatBoxTextSelected: { color: T(C.white, 'fg') },
   exitRowIndicator: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: T('#FEF2F2', 'bg'),
     paddingVertical: 4,
     borderRadius: 6,
     marginVertical: 6,
     alignItems: 'center',
   },
-  exitText: { fontSize: 9.5, fontFamily: 'Inter_700Bold', color: C.red },
-  sectionTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
-  sectionSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2, marginBottom: 8 },
+  exitText: { fontSize: 9.5, fontFamily: 'Inter_700Bold', color: T(C.red, 'fg') },
+  sectionTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  sectionSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2, marginBottom: 8 },
   mealCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     gap: 12,
-  },
-  mealCardActive: { borderColor: C.purple, backgroundColor: '#FAF5FF' },
-  mealIconBox: { width: 38, height: 38, borderRadius: 10, backgroundColor: '#F3E8FF', alignItems: 'center', justifyContent: 'center' },
-  mealTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
-  mealPrice: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.green, marginTop: 2 },
+   ...glass(18), },
+  mealCardActive: { borderColor: T(C.purple, 'border'), backgroundColor: T('#FAF5FF', 'bg') },
+  mealIconBox: { width: 38, height: 38, borderRadius: 10, backgroundColor: T('#F3E8FF', 'bg'), alignItems: 'center', justifyContent: 'center' },
+  mealTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  mealPrice: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg'), marginTop: 2 },
   bagCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     gap: 12,
-  },
-  bagCardActive: { borderColor: C.purple, backgroundColor: '#FAF5FF' },
-  bagTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
-  bagPrice: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.green, marginTop: 2 },
-  checkCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: C.border, alignItems: 'center', justifyContent: 'center' },
-  checkCircleActive: { backgroundColor: C.purple, borderColor: C.purple },
-  insurCard: { backgroundColor: C.white, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: C.border },
-  insurHead: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text },
-  insurSub: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.green, marginTop: 2 },
+   ...glass(18), },
+  bagCardActive: { borderColor: T(C.purple, 'border'), backgroundColor: T('#FAF5FF', 'bg') },
+  bagTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  bagPrice: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg'), marginTop: 2 },
+  checkCircle: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: T(C.border, 'border'), alignItems: 'center', justifyContent: 'center' },
+  checkCircleActive: { backgroundColor: T(C.purple, 'bg'), borderColor: T(C.purple, 'border') },
+  insurCard: { backgroundColor: T(C.white, 'bg'), borderRadius: 16, padding: 16, borderWidth: 1, borderColor: T(C.border, 'border') , ...glass(22), },
+  insurHead: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  insurSub: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.green, 'fg'), marginTop: 2 },
   insurPerks: { marginTop: 14, gap: 8 },
   perkRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  perkText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.text },
+  perkText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
   insurToggle: {
     marginTop: 18,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
     borderWidth: 1.5,
-    borderColor: C.green,
+    borderColor: T(C.green, 'border'),
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
   },
-  insurToggleActive: { backgroundColor: C.green },
-  insurToggleText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.green },
+  insurToggleActive: { backgroundColor: T(C.green, 'bg') },
+  insurToggleText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 16,
     paddingTop: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  footerLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
-  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+   ...dockBar(), },
+  footerLabel: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  footerPrice: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   continueBtn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 12,
-  },
-  continueBtnText: { color: C.white, fontSize: 14, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  continueBtnText: { color: T(C.white, 'fg'), fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
+const use_st = () => useThemedStyles(make_st);

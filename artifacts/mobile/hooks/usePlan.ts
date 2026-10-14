@@ -8,7 +8,8 @@ interface Plan {
   price: number;
   original_price: number | null;
   service_discount_percentage: number;
-  referral_commission_percentage: number;
+  referral_commission_l1?: number | null;
+  referral_commission_l2?: number | null;
   is_active: boolean;
   features: string[];
 }

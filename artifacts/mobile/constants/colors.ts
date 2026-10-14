@@ -1,50 +1,80 @@
-export const lightColors = {
-  background: '#FFFFFF',
-  backgroundSecondary: '#F5F6F8',
-  foreground: '#151921',
-  card: '#FFFFFF',
-  primary: '#FF6B33',
-  secondary: '#B44CFF',
-  muted: '#EDEEF1',
-  mutedForeground: '#6B7085',
-  border: '#DCDFE5',
-  input: '#E6E8EC',
-  destructive: '#EF4444',
-  sidebarBackground: '#F5F6F8',
-  sidebarPrimary: '#FF6B33',
-  sidebarAccent: '#EDEEF1',
-  success: '#22C55E',
-  warning: '#F59E0B',
-};
+import { buildNeon, type Neon } from '@/constants/neon';
 
-export const darkColors = {
-  background: '#1E283E',
-  backgroundSecondary: '#253049',
-  foreground: '#F0F1F4',
-  card: '#1A2035',
-  primary: '#FF7F4D',
-  secondary: '#C266FF',
-  muted: '#1F2940',
-  mutedForeground: '#919199',
-  border: '#252F47',
-  input: '#1A2035',
-  destructive: '#EF4444',
-  sidebarBackground: '#171E30',
-  sidebarPrimary: '#FF7F4D',
-  sidebarAccent: '#1F2940',
-  success: '#22C55E',
-  warning: '#F59E0B',
-};
+/**
+ * The app's colours now come from the MyAssistant "Daylight" design system (constants/neon.ts).
+ * The names below are the app's existing ones, remapped, so every screen that already reads
+ * `colors.primary`, `colors.card` and the rest follows the new palette without being touched.
+ * New code should prefer `neon` (from useTheme) for the full token set.
+ */
+export function makeColors(n: Neon) {
+  return {
+    background: n.bg,
+    backgroundSecondary: n.surfaceHigh,
+    foreground: n.textHi,
+    card: n.surface,
+    primary: n.violet,
+    secondary: n.cyan,
+    muted: n.surfaceHigh,
+    mutedForeground: n.textLo,
+    border: n.line,
+    input: n.surfaceHigh,
+    destructive: n.error,
+    sidebarBackground: n.surface,
+    sidebarPrimary: n.violet,
+    sidebarAccent: n.surfaceHigh,
+    success: n.success,
+    warning: n.warning,
+  };
+}
 
-export const gradients = {
-  primary: ['#FF6B33', '#E8527A', '#B44CFF'] as const,
-  primaryHorizontal: ['#FF6B33', '#B44CFF'] as const,
-  purple: ['#B44CFF', '#7B2FFF', '#4B0082'] as const,
-  orange: ['#FF6B33', '#FF8C42', '#FFB347'] as const,
-  pinkPurple: ['#E8527A', '#B44CFF'] as const,
-  bluePurple: ['#4B83FF', '#7B2FFF'] as const,
-  hero: ['#FF6B33', '#E8527A', '#B44CFF'] as const,
-};
+export function makeGradients(n: Neon) {
+  // Dark is the aurora: royal blue through violet into magenta. Light keeps the violet / partner / cyan family.
+  const hero = n.isDark ? ([n.gBrand[0], n.violet, n.gBrand[1]] as const) : ([n.violet, n.pink, n.cyan] as const);
+  return {
+    primary: hero,
+    primaryHorizontal: n.gBrand,
+    purple: n.isDark ? ([n.blue, n.violet, n.pink] as const) : ([n.violet, n.pink, n.accentF] as const),
+    orange: [n.accentD, n.pink, n.violet] as const,
+    pinkPurple: [n.pink, n.violet] as const,
+    bluePurple: [n.accentF, n.violet] as const,
+    hero,
+    assistant: [n.cyan, n.accentF, n.violet] as const,
+  };
+}
+
+const lightNeon = buildNeon(false);
+const darkNeon = buildNeon(true);
+
+export const lightColors = makeColors(lightNeon);
+export const darkColors = makeColors(darkNeon);
+export const gradients = makeGradients(lightNeon);
+
+/**
+ * Accents for the big choice cards in assistant setup and the permissions screen. These are mid
+ * tones on purpose: they stay legible as text on a light card and as text on a dark one, so a
+ * single value works for both themes.
+ */
+export const choiceAccents = {
+  orange: '#D97706',
+  pink: '#DB2777',
+  purple: '#A855F7',
+  blue: '#3B5BDB',
+  cyan: '#0891B2',
+  green: '#16A34A',
+  amber: '#F59E0B',
+} as const;
+
+export type ChoiceAccent = (typeof choiceAccents)[keyof typeof choiceAccents];
+
+/** Two-stop gradients matched to the accents above, for icon tiles and avatars. */
+export const choiceGradients: readonly (readonly [string, string])[] = [
+  ['#D97706', '#DB2777'],
+  ['#A855F7', '#7C3AED'],
+  ['#3B5BDB', '#0891B2'],
+  ['#16A34A', '#65A30D'],
+  ['#F59E0B', '#D97706'],
+  ['#DB2777', '#A855F7'],
+];
 
 export default {
   light: lightColors,

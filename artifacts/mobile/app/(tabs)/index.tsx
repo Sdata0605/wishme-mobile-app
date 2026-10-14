@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, type Href } from 'expo-router';
+import { router, useFocusEffect, type Href } from 'expo-router';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import React, { useCallback, useState } from 'react';
 import {
@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { QrCode } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CelebCard } from '@/components/CelebCard';
 import { HomeAllServicesSection } from '@/components/all-services/HomeAllServicesSection';
@@ -22,9 +23,11 @@ import { Icon, type IconName } from '@/components/Icon';
 import { useAuth } from '@/context/AuthContext';
 import { useDrawer } from '@/context/DrawerContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useTour, useTourTarget } from '@/context/TourContext';
 import { CATEGORIES } from '@/constants/mockData';
 import { useCelebrities } from '@/hooks/useCelebrities';
 import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const { width: W } = Dimensions.get('window');
 const DASH_PAGE_SIZE = 4;
@@ -34,21 +37,21 @@ const BANNERS: { id: string; title: string; subtitle: string; colors: readonly [
     id: '1',
     title: 'Get a Birthday Wish\nfrom Your Idol',
     subtitle: 'Starting from ₹999',
-    colors: ['#FF6B33', '#E8527A', '#B44CFF'] as const,
+    colors: ['#7B5CFA', '#D23FE0', '#1F7BFF'] as const,
     route: '/wish-celebrity',
   },
   {
     id: '2',
     title: 'AI Music Studio\nNow Live!',
     subtitle: 'Generate songs in seconds',
-    colors: ['#B44CFF', '#7B2FFF', '#4B0082'] as const,
+    colors: ['#1F7BFF', '#7C3AED', '#4B0082'] as const,
     route: '/(tabs)/music',
   },
   {
     id: '3',
     title: 'Book a Voice Call\nwith Celebrities',
     subtitle: 'Live 1-on-1 sessions',
-    colors: ['#FF6B33', '#FF8C42', '#FFB347'] as const,
+    colors: ['#7B5CFA', '#F59E0B', '#FFB347'] as const,
     route: '/(tabs)/voice-call',
   },
 ];
@@ -72,9 +75,9 @@ const PRICE_RANGES = [
 ];
 
 const VIDEO_CARDS = [
-  { id: 'v1', title: 'Graduation Wishes', desc: 'Send a heartfelt congratulations video to your graduate', tag: 'Graduation', gradient: ['#4B83FF', '#7B2FFF'] as const },
-  { id: 'v2', title: 'Birthday Magic', desc: 'Make their birthday unforgettable with a celebrity wish', tag: 'Birthday', gradient: ['#FF6B33', '#E8527A'] as const },
-  { id: 'v3', title: 'Anniversary Special', desc: 'Celebrate love with a romantic celebrity message', tag: 'Anniversary', gradient: ['#B44CFF', '#E8527A'] as const },
+  { id: 'v1', title: 'Graduation Wishes', desc: 'Send a heartfelt congratulations video to your graduate', tag: 'Graduation', gradient: ['#3B5BDB', '#7C3AED'] as const },
+  { id: 'v2', title: 'Birthday Magic', desc: 'Make their birthday unforgettable with a celebrity wish', tag: 'Birthday', gradient: ['#7B5CFA', '#D23FE0'] as const },
+  { id: 'v3', title: 'Anniversary Special', desc: 'Celebrate love with a romantic celebrity message', tag: 'Anniversary', gradient: ['#1F7BFF', '#D23FE0'] as const },
 ];
 
 const BIRTHDAY_VIDEO = require('../../assets/videos/happy-birthday.mp4');
@@ -274,6 +277,11 @@ export default function HomeScreen() {
     accessToken: session?.access_token,
   });
   const insets = useSafeAreaInsets();
+  const { begin: beginTour } = useTour();
+  const menuTarget = useTourTarget('menu');
+  const scanTarget = useTourTarget('scan');
+  // First time on Home after install: walk the user through the menu, scanner and bottom bar.
+  useFocusEffect(useCallback(() => beginTour(), [beginTour]));
   const [refreshing, setRefreshing] = useState(false);
   const [activeBanner, setActiveBanner] = useState(0);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
@@ -323,18 +331,20 @@ export default function HomeScreen() {
   const ITEM_W = (W - 52) / 4;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       {/* Header */}
       <LinearGradient
-        colors={['#FF6B33', '#E8527A', '#B44CFF']}
+        colors={['#7B5CFA', '#D23FE0', '#1F7BFF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: topPad + 12 }]}
       >
         <View style={styles.headerRow}>
-          <TouchableOpacity onPress={toggle} style={styles.menuBtn}>
-            <Icon name="menu" size={24} color="#fff" />
-          </TouchableOpacity>
+          <View ref={menuTarget} collapsable={false}>
+            <TouchableOpacity onPress={toggle} style={styles.menuBtn}>
+              <Icon name="menu" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.greeting} numberOfLines={1}>
               {user ? `Welcome back, ${user.firstName}` : 'Welcome to WishMe'}
@@ -342,6 +352,16 @@ export default function HomeScreen() {
             <Text style={styles.greetingSub}>What would you like today?</Text>
           </View>
           <View style={styles.headerRight}>
+            <View ref={scanTarget} collapsable={false}>
+              <TouchableOpacity
+                style={[styles.scanBtn, { backgroundColor: 'rgba(255,255,255,0.25)' }]}
+                onPress={() => router.push('/(tabs)/scan-pay')}
+                accessibilityRole="button"
+                accessibilityLabel="Scan and pay"
+              >
+                <QrCode size={16} color="#fff" />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
               style={[styles.walletPill, { backgroundColor: 'rgba(255,255,255,0.25)' }]}
               onPress={() => router.push('/wallet')}
@@ -574,7 +594,7 @@ export default function HomeScreen() {
                   <Text style={[styles.videoTitle, { color: colors.foreground }]}>{item.title}</Text>
                   <Text style={[styles.videoDesc, { color: colors.mutedForeground }]} numberOfLines={2}>{item.desc}</Text>
                   <TouchableOpacity onPress={() => router.push('/(tabs)/celebrities')} style={{ marginTop: 10 }}>
-                    <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.wishBtn}>
+                    <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.wishBtn}>
                       <Icon name="video" size={14} color="#fff" />
                       <Text style={styles.wishBtnText}>Create Your Wish</Text>
                     </LinearGradient>
@@ -596,7 +616,7 @@ export default function HomeScreen() {
               { num: '3', icon: 'video' as IconName, title: 'Get Your Wish', caption: 'Receive a personal video' },
             ].map((step) => (
               <View key={step.num} style={styles.howStep}>
-                <LinearGradient colors={['#FF6B33', '#B44CFF']} style={styles.stepCircle}>
+                <LinearGradient colors={['#7B5CFA', '#1F7BFF']} style={styles.stepCircle}>
                   <Text style={styles.stepNum}>{step.num}</Text>
                 </LinearGradient>
                 <Icon name={step.icon} size={20} color={colors.primary} />
@@ -609,7 +629,7 @@ export default function HomeScreen() {
 
         {/* Referral Banner */}
         <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
-          <LinearGradient colors={['#7B2FFF', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.referralBanner}>
+          <LinearGradient colors={['#7C3AED', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.referralBanner}>
             <View style={{ flex: 1 }}>
               <Text style={styles.referralTitle}>Earn with WishMe</Text>
               <Text style={styles.referralSub}>Refer friends & earn up to 10% commission</Text>
@@ -622,7 +642,7 @@ export default function HomeScreen() {
       </ScrollView>
 
 
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -634,6 +654,7 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 16, fontFamily: 'Inter_600SemiBold', color: '#fff' },
   greetingSub: { fontSize: 12, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scanBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   walletPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, borderRadius: 9999 },
   walletText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
@@ -650,7 +671,7 @@ const styles = StyleSheet.create({
   bannerBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   dotRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#ccc' },
-  dotActive: { backgroundColor: '#FF6B33', width: 16 },
+  dotActive: { backgroundColor: '#7B5CFA', width: 16 },
   quickGrid: { paddingHorizontal: 16 },
   quickRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   quickItem: { alignItems: 'center', padding: 10, borderRadius: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },

@@ -52,10 +52,58 @@ interface ApiCelebrity {
   occasions?: string[];
 }
 
+interface RestCelebrity {
+  id: string;
+  name: string;
+  category: string;
+  bio: string | null;
+  image_url: string | null;
+  rating: number | null;
+  followers?: number;
+  location?: string;
+  delivery_time?: string;
+  is_verified: boolean;
+  service_prices?: ApiCelebrity['service_prices'];
+  voice_call_price?: number;
+  social_media?: { instagram?: string; twitter?: string };
+  vapi_voice_id?: string | null;
+  vapi_phone_id?: string | null;
+  celebrity_favorite_pricing: { price: number; is_enabled: boolean } | { price: number; is_enabled: boolean }[];
+  celebrity_reviews?: { count: number }[];
+}
+
 interface ApiResponse {
   success: boolean;
   data: ApiCelebrity[];
   total: number;
+}
+
+function normalizeRest(raw: RestCelebrity): Celebrity {
+  const pricing = Array.isArray(raw.celebrity_favorite_pricing) ? raw.celebrity_favorite_pricing[0] : raw.celebrity_favorite_pricing;
+  // The stored rating and review_count are seeded numbers. A celebrity only has a rating once real reviews exist.
+  const realReviews = raw.celebrity_reviews?.[0]?.count ?? 0;
+  return {
+    id: raw.id,
+    name: raw.name,
+    category: raw.category,
+    bio: raw.bio ?? '',
+    imageUrl: raw.image_url ?? '',
+    rating: realReviews > 0 ? raw.rating ?? 0 : 0,
+    reviewCount: realReviews,
+    followers: raw.followers,
+    location: raw.location,
+    deliveryTime: raw.delivery_time,
+    isVerified: raw.is_verified ?? false,
+    isAvailable: true,
+    pricePerWish: raw.service_prices?.general_wish ?? 0,
+    pricePerCall: raw.voice_call_price ?? 0,
+    ratePerMinute: raw.voice_call_price ?? 0,
+    tags: [],
+    subscription: pricing ? { is_enabled: pricing.is_enabled, price: pricing.price } : undefined,
+    socialMedia: raw.social_media,
+    vapiVoiceId: raw.vapi_voice_id ?? undefined,
+    vapiPhoneId: raw.vapi_phone_id ?? undefined,
+  };
 }
 
 function normalizeCelebrity(raw: ApiCelebrity): Celebrity {
@@ -121,51 +169,34 @@ async function fetchOnce() {
 
   const promise = (async () => {
     try {
-      const res = await supabaseFetch('/functions/v1/get-featured-celebrities', {
-        method: 'POST',
-        body: JSON.stringify({ limit: SINGLETON_LIMIT }),
-      });
-
+      // Only celebrities a user can subscribe to: verified, approved, active, with subscription switched on.
+      // (Unverified, pending and duplicate rows have no subscription price, so the inner join drops them too.)
+      const select = [
+        'id', 'name', 'category', 'bio', 'image_url', 'video_thumbnail_url', 'rating', 'followers', 'location',
+        'delivery_time', 'is_verified', 'service_prices', 'voice_call_price', 'social_media', 'vapi_voice_id', 'vapi_phone_id',
+        'celebrity_favorite_pricing!inner(price,is_enabled)',
+        'celebrity_reviews(count)',
+      ].join(',');
+      const res = await supabaseFetch(
+        `/rest/v1/celebrities?select=${encodeURIComponent(select)}` +
+          '&celebrity_favorite_pricing.is_enabled=eq.true&is_active=eq.true&is_verified=eq.true&consent_status=eq.approved' +
+          `&order=rating.desc.nullslast&limit=${SINGLETON_LIMIT}`,
+      );
       if (!res.ok) throw new Error(`API error (${res.status})`);
 
-      const json: ApiResponse = await res.json();
-      if (!json.success || !Array.isArray(json.data)) {
-        throw new Error('Unexpected API response format');
-      }
+      const rows = await res.json() as RestCelebrity[];
+      if (!Array.isArray(rows)) throw new Error('Unexpected API response format');
 
-      store.celebrities = json.data.map(normalizeCelebrity);
-
-      // Enrich with vapi fields that the edge function doesn't return
-      try {
-        const vapiRes = await fetch(
-          `${SUPABASE_URL}/rest/v1/celebrities?select=id,vapi_voice_id,vapi_phone_id`,
-          {
-            headers: {
-              apikey: SUPABASE_ANON_KEY,
-              Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-            },
-          },
-        );
-        if (vapiRes.ok) {
-          const vapiRows: Array<{
-            id: string;
-            vapi_voice_id: string | null;
-            vapi_phone_id: string | null;
-          }> = await vapiRes.json();
-          const vapiMap = new Map(vapiRows.map((r) => [r.id, r]));
-          store.celebrities = store.celebrities.map((c) => {
-            const row = vapiMap.get(c.id);
-            if (!row) return c;
-            return {
-              ...c,
-              vapiVoiceId: row.vapi_voice_id ?? undefined,
-              vapiPhoneId: row.vapi_phone_id ?? undefined,
-            };
-          });
-        }
-      } catch {
-        // Non-fatal: voice calls will show "not set up" for all celebrities
-      }
+      // One card per celebrity even if the catalogue has a repeated name.
+      const seen = new Set<string>();
+      store.celebrities = rows
+        .map(normalizeRest)
+        .filter(c => {
+          const key = `${c.name.trim().toLowerCase()}|${c.category.trim().toLowerCase()}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
 
       store.error = null;
     } catch (err: unknown) {

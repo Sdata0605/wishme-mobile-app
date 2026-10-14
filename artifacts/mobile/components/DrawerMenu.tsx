@@ -31,6 +31,9 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { icon: 'home', label: 'Dashboard', route: '/(tabs)' },
   { icon: 'layers', label: 'All Services', route: '/(tabs)/all-services', highlight: true },
+  { icon: 'calendar', label: 'Hub', route: '/hub', highlight: true },
+  { icon: 'copy', label: 'Documents', route: '/documents' },
+  { icon: 'layers', label: 'Library', route: '/library', highlight: true },
   { icon: 'phone', label: 'Celebrity Call', route: '/(tabs)/voice-call' },
   { icon: 'credit-card', label: 'Wallet', route: '/wallet' },
   { icon: 'calendar', label: 'Bookings', route: '/bookings' },
@@ -42,15 +45,12 @@ const NAV_ITEMS: NavItem[] = [
   { icon: 'image', label: 'Photo Wish', route: '/photo-wish' },
   { icon: 'star', label: 'Wish a Celebrity', route: '/wish-celebrity' },
   { icon: 'video', label: 'Wish a Friend', route: '/wish-friend' },
-  { icon: 'briefcase', label: 'For Business', route: '/for-business' },
   { icon: 'mail', label: 'Greeting Cards', route: '/greeting-cards' },
   { icon: 'zap', label: 'Image Promotions', route: '/image-promotions' },
   { icon: 'video', label: 'UGC Videos', route: '/ugc-videos' },
   { icon: 'play-circle', label: 'UGC Ads', route: '/ugc-ads' },
   { icon: 'search', label: 'Browse Celebrities', route: '/(tabs)/celebrities' },
   { icon: 'share-2', label: 'Referrals', route: '/referrals' },
-  { icon: 'trending-up', label: 'Commission', route: '/commission' },
-  { icon: 'gift', label: 'Occasions', route: '/occasions' },
   { icon: 'bell', label: 'Occasion Alerts', route: '/occasion-alerts' },
   { icon: 'award', label: 'My Plan', route: '/select-plan' },
 ];
@@ -179,6 +179,7 @@ export function DrawerMenu({ children }: { children: React.ReactNode }) {
         style={[
           styles.content,
           {
+            backgroundColor: colors.background,
             transform: [
               { translateX: contentTranslateX },
               { scale: contentScale },

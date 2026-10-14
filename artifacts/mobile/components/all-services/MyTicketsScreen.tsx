@@ -25,6 +25,8 @@ import {
 } from 'lucide-react-native';
 
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles, glass } from './themed';
+import { BrandFill } from './BrandFill';
 
 type TicketStatus = 'upcoming' | 'completed' | 'cancelled';
 
@@ -154,35 +156,36 @@ const STATUS_META: Record<
 > = {
   upcoming: {
     label: 'Confirmed',
-    color: C.green,
+    color: T(C.green, 'fg'),
     bg: '#ECFDF5',
     border: '#A7F3D0',
   },
   completed: {
     label: 'Completed',
-    color: C.purple,
+    color: T(C.purple, 'fg'),
     bg: '#F5F3FF',
     border: '#DDD6FE',
   },
   cancelled: {
     label: 'Cancelled',
-    color: C.red,
+    color: T(C.red, 'fg'),
     bg: '#FEF2F2',
     border: '#FECACA',
   },
 };
 
 function StatusBadge({ status }: { status: TicketStatus }) {
+  const badge = use_badge();
   const meta = STATUS_META[status];
   return (
-    <View style={[badge.wrap, { backgroundColor: meta.bg, borderColor: meta.border }]}>
-      <View style={[badge.dot, { backgroundColor: meta.color }]} />
-      <Text style={[badge.text, { color: meta.color }]}>{meta.label}</Text>
+    <View style={[badge.wrap, { backgroundColor: T(meta.bg, 'bg'), borderColor: T(meta.border, 'border') }]}>
+      <View style={[badge.dot, { backgroundColor: T(meta.color, 'bg') }]} />
+      <Text style={[badge.text, { color: T(meta.color, 'fg') }]}>{meta.label}</Text>
     </View>
   );
 }
 
-const badge = StyleSheet.create({
+const make_badge = () => StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -195,6 +198,7 @@ const badge = StyleSheet.create({
   dot: { width: 6, height: 6, borderRadius: 3 },
   text: { fontSize: 10, fontFamily: 'Inter_600SemiBold' },
 });
+const use_badge = () => useThemedStyles(make_badge);
 
 function ActionChip({
   Icon,
@@ -207,6 +211,7 @@ function ActionChip({
   color: string;
   bg: string;
 }) {
+  const act = use_act();
   return (
     <TouchableOpacity style={[act.chip, { backgroundColor: bg }]} activeOpacity={0.75}>
       <Icon size={13} color={color} />
@@ -215,7 +220,7 @@ function ActionChip({
   );
 }
 
-const act = StyleSheet.create({
+const make_act = () => StyleSheet.create({
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -226,8 +231,10 @@ const act = StyleSheet.create({
   },
   label: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
 });
+const use_act = () => useThemedStyles(make_act);
 
 function TicketCard({ ticket }: { ticket: BookedTicket }) {
+  const card = use_card();
   return (
     <View style={card.wrap}>
       <View style={card.topRow}>
@@ -248,9 +255,9 @@ function TicketCard({ ticket }: { ticket: BookedTicket }) {
           <View style={card.lineRow}>
             <View style={card.dot} />
             <View style={card.line} />
-            <Bus size={12} color={C.orange} />
+            <Bus size={12} color={T(C.orange, 'fg')} />
             <View style={card.line} />
-            <View style={[card.dot, { backgroundColor: C.orange }]} />
+            <View style={[card.dot, { backgroundColor: T(C.orange, 'bg') }]} />
           </View>
           <Text style={card.dateInline}>{ticket.dateLabel}</Text>
         </View>
@@ -262,15 +269,15 @@ function TicketCard({ ticket }: { ticket: BookedTicket }) {
 
       <View style={card.metaRow}>
         <View style={card.metaItem}>
-          <Ticket size={12} color={C.purpleLight} />
+          <Ticket size={12} color={T(C.purpleLight, 'fg')} />
           <Text style={card.metaText}>PNR {ticket.pnr}</Text>
         </View>
         <View style={card.metaItem}>
-          <Calendar size={12} color={C.orange} />
+          <Calendar size={12} color={T(C.orange, 'fg')} />
           <Text style={card.metaText}>{ticket.seats}</Text>
         </View>
         <View style={card.metaItem}>
-          <Clock size={12} color={C.green} />
+          <Clock size={12} color={T(C.green, 'fg')} />
           <Text style={card.metaText}>
             {ticket.passengers} pax
           </Text>
@@ -278,7 +285,7 @@ function TicketCard({ ticket }: { ticket: BookedTicket }) {
       </View>
 
       <View style={card.boardingRow}>
-        <MapPin size={13} color={C.textLight} />
+        <MapPin size={13} color={T(C.textLight, 'fg')} />
         <Text style={card.boardingText} numberOfLines={1}>
           Board: {ticket.boarding}
         </Text>
@@ -292,22 +299,22 @@ function TicketCard({ ticket }: { ticket: BookedTicket }) {
         <View style={card.actions}>
           {ticket.status === 'upcoming' && (
             <>
-              <ActionChip Icon={Download} label="m-Ticket" color={C.purple} bg="#F5F3FF" />
-              <ActionChip Icon={Navigation} label="Track" color={C.orange} bg="#FFF7ED" />
-              <ActionChip Icon={XCircle} label="Cancel" color={C.red} bg="#FEF2F2" />
+              <ActionChip Icon={Download} label="m-Ticket" color={T(C.purple, 'fg')} bg={T('#F5F3FF', 'bg')} />
+              <ActionChip Icon={Navigation} label="Track" color={T(C.orange, 'fg')} bg={T('#F5F0FF', 'bg')} />
+              <ActionChip Icon={XCircle} label="Cancel" color={T(C.red, 'fg')} bg={T('#FEF2F2', 'bg')} />
             </>
           )}
           {ticket.status === 'completed' && (
             <>
-              <ActionChip Icon={Download} label="Invoice" color={C.purple} bg="#F5F3FF" />
-              <ActionChip Icon={RefreshCw} label="Book again" color={C.orange} bg="#FFF7ED" />
-              <ActionChip Icon={Headphones} label="Help" color={C.green} bg="#ECFDF5" />
+              <ActionChip Icon={Download} label="Invoice" color={T(C.purple, 'fg')} bg={T('#F5F3FF', 'bg')} />
+              <ActionChip Icon={RefreshCw} label="Book again" color={T(C.orange, 'fg')} bg={T('#F5F0FF', 'bg')} />
+              <ActionChip Icon={Headphones} label="Help" color={T(C.green, 'fg')} bg={T('#ECFDF5', 'bg')} />
             </>
           )}
           {ticket.status === 'cancelled' && (
             <>
-              <ActionChip Icon={RefreshCw} label="Book again" color={C.orange} bg="#FFF7ED" />
-              <ActionChip Icon={Headphones} label="Help" color={C.green} bg="#ECFDF5" />
+              <ActionChip Icon={RefreshCw} label="Book again" color={T(C.orange, 'fg')} bg={T('#F5F0FF', 'bg')} />
+              <ActionChip Icon={Headphones} label="Help" color={T(C.green, 'fg')} bg={T('#ECFDF5', 'bg')} />
             </>
           )}
         </View>
@@ -316,54 +323,54 @@ function TicketCard({ ticket }: { ticket: BookedTicket }) {
   );
 }
 
-const card = StyleSheet.create({
+const make_card = () => StyleSheet.create({
   wrap: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 16,
     padding: 14,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
-  },
+   ...glass(22), },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
     marginBottom: 12,
   },
-  operator: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
+  operator: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   busType: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 2,
   },
   routeBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.pageBg,
+    backgroundColor: T(C.pageBg, 'bg'),
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
   },
   timeCol: { width: 72 },
-  time: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  time: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   city: {
     fontSize: 11,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 2,
   },
   midCol: { flex: 1, alignItems: 'center', paddingHorizontal: 6 },
   duration: {
     fontSize: 10,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginBottom: 4,
   },
   lineRow: {
@@ -372,17 +379,17 @@ const card = StyleSheet.create({
     width: '100%',
     gap: 3,
   },
-  line: { flex: 1, height: 1, backgroundColor: C.border },
+  line: { flex: 1, height: 1, backgroundColor: T(C.border, 'bg') },
   dot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
   },
   dateInline: {
     fontSize: 10,
     fontFamily: 'Inter_600SemiBold',
-    color: C.orange,
+    color: T(C.orange, 'fg'),
     marginTop: 4,
   },
   metaRow: {
@@ -395,12 +402,12 @@ const card = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     borderRadius: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  metaText: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: C.text },
+  metaText: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
   boardingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -411,27 +418,29 @@ const card = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
   },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingTop: 12,
     gap: 8,
   },
   paidLabel: {
     fontSize: 9,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
   },
-  amount: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.green, marginTop: 1 },
+  amount: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg'), marginTop: 1 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'flex-end' },
 });
+const use_card = () => useThemedStyles(make_card);
 
 function EmptyState({ tab }: { tab: TabKey }) {
+  const empty = use_empty();
   const copy =
     tab === 'upcoming'
       ? 'No upcoming trips. Book a bus and your tickets will show up here.'
@@ -442,43 +451,43 @@ function EmptyState({ tab }: { tab: TabKey }) {
   return (
     <View style={empty.wrap}>
       <View style={empty.icon}>
-        <Ticket size={28} color={C.orange} />
+        <Ticket size={28} color={T(C.orange, 'fg')} />
       </View>
       <Text style={empty.title}>No tickets found</Text>
       <Text style={empty.sub}>{copy}</Text>
-      <TouchableOpacity style={empty.btn} activeOpacity={0.85}>
+      <TouchableOpacity style={empty.btn} activeOpacity={0.85}><BrandFill />
         <Text style={empty.btnText}>Search Buses</Text>
-        <ArrowRight size={14} color={C.white} />
+        <ArrowRight size={14} color={T(C.white, 'fg')} />
       </TouchableOpacity>
     </View>
   );
 }
 
-const empty = StyleSheet.create({
+const make_empty = () => StyleSheet.create({
   wrap: {
     alignItems: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 16,
     paddingVertical: 36,
     paddingHorizontal: 24,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     marginTop: 8,
-  },
+   ...glass(22), },
   icon: {
     width: 56,
     height: 56,
     borderRadius: 16,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: T('#F5F0FF', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
-  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   sub: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     textAlign: 'center',
     lineHeight: 18,
     marginTop: 6,
@@ -488,15 +497,17 @@ const empty = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 20,
     paddingHorizontal: 16,
     paddingVertical: 10,
-  },
-  btnText: { color: C.white, fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+   overflow: 'hidden', },
+  btnText: { color: T(C.white, 'fg'), fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 });
+const use_empty = () => useThemedStyles(make_empty);
 
 export function MyTicketsScreen({ onBack }: { onBack: () => void }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const [tab, setTab] = useState<TabKey>('upcoming');
@@ -515,14 +526,14 @@ export function MyTicketsScreen({ onBack }: { onBack: () => void }) {
     <View style={st.root}>
       <View style={[st.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={24} color={C.text} />
+          <ArrowLeft size={24} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={st.headerTitle}>My Tickets</Text>
           <Text style={st.headerSub}>Your bus booking history</Text>
         </View>
         <View style={st.headerIcon}>
-          <Ticket size={18} color={C.orange} />
+          <Ticket size={18} color={T(C.orange, 'fg')} />
         </View>
       </View>
 
@@ -552,7 +563,7 @@ export function MyTicketsScreen({ onBack }: { onBack: () => void }) {
         bounces
       >
         <View style={st.hintCard}>
-          <Bus size={16} color={C.purple} />
+          <Bus size={16} color={T(C.purple, 'fg')} />
           <Text style={st.hintText}>
             Show m-ticket at boarding · Track live bus · Cancel or rebook anytime
           </Text>
@@ -565,12 +576,12 @@ export function MyTicketsScreen({ onBack }: { onBack: () => void }) {
         )}
 
         <View style={st.helpStrip}>
-          <Headphones size={18} color={C.white} />
+          <Headphones size={18} color={T(C.white, 'fg')} />
           <View style={{ flex: 1 }}>
             <Text style={st.helpTitle}>Need help with a booking?</Text>
             <Text style={st.helpSub}>24x7 trip support for cancellations & boarding</Text>
           </View>
-          <TouchableOpacity style={st.helpBtn} activeOpacity={0.85}>
+          <TouchableOpacity style={st.helpBtn} activeOpacity={0.85}><BrandFill />
             <Text style={st.helpBtnText}>Contact</Text>
           </TouchableOpacity>
         </View>
@@ -581,36 +592,36 @@ export function MyTicketsScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   headerSub: {
     fontSize: 10,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 1,
   },
   headerIcon: {
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: T('#F5F0FF', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     paddingHorizontal: 14,
     paddingBottom: 12,
     gap: 8,
@@ -623,53 +634,53 @@ const st = StyleSheet.create({
     gap: 6,
     borderRadius: 20,
     paddingVertical: 9,
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
   },
-  tabActive: { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: C.orange },
-  tabText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.textLight },
-  tabTextActive: { color: C.orange },
+  tabActive: { backgroundColor: T('#F5F0FF', 'bg'), borderWidth: 1, borderColor: T(C.orange, 'border') },
+  tabText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
+  tabTextActive: { color: T(C.orange, 'fg') },
   countPill: {
     minWidth: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#DCDFE5',
+    backgroundColor: T('#DCDFE5', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 5,
   },
-  countPillActive: { backgroundColor: C.orange },
-  countText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: C.textLight },
-  countTextActive: { color: C.white },
+  countPillActive: { backgroundColor: T(C.orange, 'bg') },
+  countText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: T(C.textLight, 'fg') },
+  countTextActive: { color: T(C.white, 'fg') },
   content: { paddingHorizontal: 14, paddingTop: 14, paddingBottom: 40 },
   hintCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: T('#F5F3FF', 'bg'),
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#DDD6FE',
+    borderColor: T('#DDD6FE', 'border'),
   },
   hintText: {
     flex: 1,
     fontSize: 11,
     fontFamily: 'Inter_500Medium',
-    color: C.purple,
+    color: T(C.purple, 'fg'),
     lineHeight: 15,
   },
   helpStrip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: C.darkBg,
+    backgroundColor: T(C.darkBg, 'bg'),
     borderRadius: 16,
     padding: 14,
     marginTop: 8,
   },
-  helpTitle: { color: C.white, fontSize: 13, fontFamily: 'Inter_700Bold' },
+  helpTitle: { color: T(C.white, 'fg'), fontSize: 13, fontFamily: 'Inter_700Bold' },
   helpSub: {
     color: 'rgba(255,255,255,0.55)',
     fontSize: 10,
@@ -677,10 +688,11 @@ const st = StyleSheet.create({
     marginTop: 2,
   },
   helpBtn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 8,
-  },
-  helpBtnText: { color: C.white, fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+   overflow: 'hidden', },
+  helpBtnText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 });
+const use_st = () => useThemedStyles(make_st);

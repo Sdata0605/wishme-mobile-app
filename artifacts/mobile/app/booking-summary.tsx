@@ -18,6 +18,7 @@ import { Icon } from '@/components/Icon';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 function sbFetch(path: string, token?: string | null): Promise<Response> {
   return fetch(`${SUPABASE_URL}${path}`, {
@@ -97,7 +98,7 @@ export default function BookingSummaryScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <View style={{ width: 22 }} />
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Booking Confirmed</Text>
@@ -164,7 +165,7 @@ export default function BookingSummaryScreen() {
           </View>
 
           <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginTop: 20 }]} onPress={() => router.push('/bookings')}>
-            <LinearGradient colors={['#FF6B33','#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryBtn}>
+            <LinearGradient colors={['#7B5CFA','#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryBtn}>
               <Icon name="calendar" size={18} color="#fff" />
               <Text style={styles.primaryBtnText}>View My Bookings</Text>
             </LinearGradient>
@@ -176,7 +177,7 @@ export default function BookingSummaryScreen() {
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
-    </View>
+    </View></AmbientBackground>
   );
 }
 

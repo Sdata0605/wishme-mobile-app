@@ -24,8 +24,28 @@ import {
 import type { BusTicket } from './BusResultsScreen';
 
 import { serviceColors as C } from './serviceColors';
+import { withAlpha } from '@/constants/neon';
+import { T, useThemedStyles, glass, dockBar, dk, N } from './themed';
+import { BrandFill } from './BrandFill';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+
+/** Seat colours. On the navy page the four states have to stay easy to tell apart. */
+const seatPalette = () =>
+  dk(
+    {
+      available: { bg: 'transparent', border: withAlpha(N().success, 0.85), pillow: withAlpha(N().success, 0.35) },
+      selected: { bg: N().cyan, border: N().cyan, pillow: withAlpha(N().bg, 0.45) },
+      sold: { bg: withAlpha(N().textDim, 0.1), border: N().line, pillow: N().line },
+      women: { bg: withAlpha(N().pink, 0.14), border: withAlpha(N().pink, 0.55), pillow: N().line },
+    },
+    {
+      available: { bg: C.white, border: C.green, pillow: '#BBE7CF' },
+      selected: { bg: C.green, border: C.greenDark, pillow: C.white },
+      sold: { bg: C.soldBg, border: C.soldBorder, pillow: '#BBE7CF' },
+      women: { bg: C.pinkBg, border: C.pinkBorder, pillow: '#BBE7CF' },
+    },
+  );
 
 // ─── Seat model ──────────────────────────────────────────────────────────────
 type SeatStatus = 'available' | 'sold' | 'women';
@@ -76,6 +96,7 @@ function SeatCell({
   selected: boolean;
   onPress: () => void;
 }) {
+  const sc = use_sc();
   const isSold = seat.status === 'sold';
   const isWomen = seat.status === 'women';
   const selectable = seat.status === 'available';
@@ -99,7 +120,7 @@ function SeatCell({
         {(isSold || isWomen) && (
           <PersonStanding
             size={16}
-            color={isWomen ? C.pink : C.soldIcon}
+            color={isWomen ? T(C.pink, 'fg') : T(C.soldIcon, 'fg')}
             style={seat.wide ? { transform: [{ rotate: '90deg' }] } : undefined}
           />
         )}
@@ -107,7 +128,7 @@ function SeatCell({
           <View
             style={[
               seat.wide ? sc.pillowWide : sc.pillow,
-              selected && { backgroundColor: C.white },
+              selected && { backgroundColor: seatPalette().selected.pillow },
             ]}
           />
         )}
@@ -119,7 +140,7 @@ function SeatCell({
   );
 }
 
-const sc = StyleSheet.create({
+const make_sc = () => StyleSheet.create({
   cell: { alignItems: 'center' },
   seat: {
     width: SEAT_W,
@@ -137,22 +158,22 @@ const sc = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  seatSold: { backgroundColor: C.soldBg, borderColor: C.soldBorder },
-  seatWomen: { backgroundColor: C.pinkBg, borderColor: C.pinkBorder },
-  seatAvailable: { backgroundColor: C.white, borderColor: C.green },
-  seatSelected: { backgroundColor: C.green, borderColor: C.greenDark },
+  seatSold: { backgroundColor: seatPalette().sold.bg, borderColor: seatPalette().sold.border },
+  seatWomen: { backgroundColor: seatPalette().women.bg, borderColor: seatPalette().women.border },
+  seatAvailable: { backgroundColor: seatPalette().available.bg, borderColor: seatPalette().available.border },
+  seatSelected: { backgroundColor: seatPalette().selected.bg, borderColor: seatPalette().selected.border },
   pillow: {
     width: 22,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#BBE7CF',
+    backgroundColor: seatPalette().available.pillow,
     marginTop: SEAT_H - 34,
   },
   pillowWide: {
     width: 7,
     height: 22,
     borderRadius: 4,
-    backgroundColor: '#BBE7CF',
+    backgroundColor: seatPalette().available.pillow,
     alignSelf: 'flex-end',
     marginRight: 10,
   },
@@ -160,11 +181,12 @@ const sc = StyleSheet.create({
     marginTop: 4,
     fontSize: 10.5,
     fontFamily: 'Inter_500Medium',
-    color: C.gray,
+    color: T(C.gray, 'fg'),
   },
-  labelPrice: { color: C.text, fontFamily: 'Inter_600SemiBold' },
-  labelSelected: { color: C.greenDark },
+  labelPrice: { color: T(C.text, 'fg'), fontFamily: 'Inter_600SemiBold' },
+  labelSelected: { color: T(C.greenDark, 'fg') },
 });
+const use_sc = () => useThemedStyles(make_sc);
 
 // ─── Deck card ───────────────────────────────────────────────────────────────
 function DeckCard({
@@ -178,13 +200,14 @@ function DeckCard({
   selectedIds: Set<string>;
   onToggle: (seat: Seat) => void;
 }) {
+  const dk = use_dk();
   return (
     <View style={dk.wrap}>
       <View style={dk.card}>
         <View style={dk.head}>
           <Text style={dk.title}>{title}</Text>
           {title === 'Lower deck' ? (
-            <CircleDot size={26} color={C.textLight} />
+            <CircleDot size={26} color={T(C.textLight, 'fg')} />
           ) : (
             <View style={{ width: 26 }} />
           )}
@@ -226,24 +249,24 @@ function DeckCard({
   );
 }
 
-const dk = StyleSheet.create({
+const make_dk = () => StyleSheet.create({
   wrap: { width: SCREEN_WIDTH, paddingHorizontal: 14 },
   card: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     paddingHorizontal: 18,
     paddingTop: 14,
     paddingBottom: 20,
-  },
+   ...glass(22), },
   head: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 14,
   },
-  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -253,6 +276,7 @@ const dk = StyleSheet.create({
   pair: { flexDirection: 'row', gap: 14 },
   wideRow: { alignItems: 'flex-start', marginTop: 2 },
 });
+const use_dk = () => useThemedStyles(make_dk);
 
 // ─── Seat Selection Screen ───────────────────────────────────────────────────
 export function SeatSelectionScreen({
@@ -264,6 +288,7 @@ export function SeatSelectionScreen({
   onBack: () => void;
   onContinue: (seats: Seat[]) => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -300,7 +325,7 @@ export function SeatSelectionScreen({
       {/* Header bar */}
       <View style={[st.headerBar, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={24} color={C.text} />
+          <ArrowLeft size={24} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View>
           <Text style={st.headerTitle}>Select your seats</Text>
@@ -324,12 +349,12 @@ export function SeatSelectionScreen({
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={st.busName}>{bus.company}</Text>
               <View style={st.ratingPill}>
-                <Star size={10} color={C.white} fill={C.white} />
+                <Star size={10} color={T(C.white, 'fg')} fill={T(C.white, 'fg')} />
                 <Text style={st.ratingText}> {bus.rating.toFixed(1)}</Text>
               </View>
             </View>
             <View style={st.travellersRow}>
-              <Users size={12} color={C.textLight} />
+              <Users size={12} color={T(C.textLight, 'fg')} />
               <Text style={st.travellersText}>
                 {' '}
                 {monthly} people travel with this bus every month
@@ -355,19 +380,19 @@ export function SeatSelectionScreen({
         {/* Legend */}
         <View style={st.legendRow}>
           <View style={st.legendItem}>
-            <View style={[st.legendBox, { borderColor: C.green, backgroundColor: C.white }]} />
+            <View style={[st.legendBox, { borderColor: seatPalette().available.border, backgroundColor: seatPalette().available.bg }]} />
             <Text style={st.legendText}>Available</Text>
           </View>
           <View style={st.legendItem}>
-            <View style={[st.legendBox, { borderColor: C.greenDark, backgroundColor: C.green }]} />
+            <View style={[st.legendBox, { borderColor: seatPalette().selected.border, backgroundColor: seatPalette().selected.bg }]} />
             <Text style={st.legendText}>Selected</Text>
           </View>
           <View style={st.legendItem}>
-            <View style={[st.legendBox, { borderColor: C.soldBorder, backgroundColor: C.soldBg }]} />
+            <View style={[st.legendBox, { borderColor: seatPalette().sold.border, backgroundColor: seatPalette().sold.bg }]} />
             <Text style={st.legendText}>Sold</Text>
           </View>
           <View style={st.legendItem}>
-            <View style={[st.legendBox, { borderColor: C.pinkBorder, backgroundColor: C.pinkBg }]} />
+            <View style={[st.legendBox, { borderColor: seatPalette().women.border, backgroundColor: seatPalette().women.bg }]} />
             <Text style={st.legendText}>Women</Text>
           </View>
         </View>
@@ -377,11 +402,11 @@ export function SeatSelectionScreen({
           {deckPage === 0 ? (
             <>
               <Text style={st.hintText}>Swipe left to see Upper deck</Text>
-              <ArrowRight size={13} color={C.orange} />
+              <ArrowRight size={13} color={T(C.orange, 'fg')} />
             </>
           ) : (
             <>
-              <ChevronLeft size={13} color={C.orange} />
+              <ChevronLeft size={13} color={T(C.orange, 'fg')} />
               <Text style={st.hintText}>Swipe right for Lower deck</Text>
             </>
           )}
@@ -426,65 +451,65 @@ export function SeatSelectionScreen({
           activeOpacity={0.85}
           disabled={selectedSeats.length === 0}
           onPress={() => onContinue(selectedSeats)}
-        >
+        ><BrandFill />
           <Text style={st.continueText}>Select boarding & dropping points</Text>
-          <ArrowRight size={15} color={C.white} />
+          <ArrowRight size={15} color={T(C.white, 'fg')} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   headerSub: {
     fontSize: 10,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 1,
   },
   busCard: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     marginHorizontal: 14,
     marginTop: 12,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     overflow: 'hidden',
-  },
+   ...glass(22), },
   busImage: { width: '100%', height: 130 },
   busInfo: { padding: 14 },
-  busName: { flex: 1, fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  busName: { flex: 1, fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   ratingPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  ratingText: { color: C.white, fontSize: 10.5, fontFamily: 'Inter_700Bold' },
+  ratingText: { color: T(C.white, 'fg'), fontSize: 10.5, fontFamily: 'Inter_700Bold' },
   travellersRow: { flexDirection: 'row', alignItems: 'center', marginTop: 6 },
-  travellersText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.textLight },
+  travellersText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
   chipRow: { flexDirection: 'row', gap: 6, marginTop: 10, flexWrap: 'wrap' },
   chip: {
-    backgroundColor: '#F5F3FF',
+    backgroundColor: T('#F5F3FF', 'bg'),
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  chipText: { fontSize: 10.5, fontFamily: 'Inter_600SemiBold', color: C.purple },
+  chipText: { fontSize: 10.5, fontFamily: 'Inter_600SemiBold', color: T(C.purple, 'fg') },
   legendRow: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -493,7 +518,7 @@ const st = StyleSheet.create({
   },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendBox: { width: 13, height: 13, borderRadius: 4, borderWidth: 1.5 },
-  legendText: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: C.textLight },
+  legendText: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
   hintRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -502,11 +527,11 @@ const st = StyleSheet.create({
     marginTop: 12,
     marginBottom: 8,
   },
-  hintText: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: C.orange },
+  hintText: { fontSize: 11.5, fontFamily: 'Inter_600SemiBold', color: T(C.orange, 'fg') },
   deckDots: { flexDirection: 'row', justifyContent: 'center', gap: 4, marginTop: 10 },
   deckDot: { height: 5, borderRadius: 3 },
-  deckDotActive: { width: 16, backgroundColor: C.orange },
-  deckDotInactive: { width: 5, backgroundColor: '#D1D5DB' },
+  deckDotActive: { width: 16, backgroundColor: T(C.orange, 'bg') },
+  deckDotInactive: { width: 5, backgroundColor: T('#D1D5DB', 'bg') },
   footer: {
     position: 'absolute',
     left: 0,
@@ -515,31 +540,32 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 16,
     paddingTop: 12,
-  },
-  footerSeats: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: C.textLight },
-  footerTotal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text, marginTop: 1 },
+   ...dockBar(), },
+  footerSeats: { fontSize: 10.5, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  footerTotal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 1 },
   continueBtn: {
     flex: 1.4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 12,
-  },
-  continueDisabled: { backgroundColor: '#FDBA8C' },
+   overflow: 'hidden', },
+  continueDisabled: { backgroundColor: T('#E9D5FF', 'bg') },
   continueText: {
-    color: C.white,
+    color: T(C.white, 'fg'),
     fontSize: 11.5,
     fontFamily: 'Inter_700Bold',
     textAlign: 'center',
     flexShrink: 1,
   },
 });
+const use_st = () => useThemedStyles(make_st);

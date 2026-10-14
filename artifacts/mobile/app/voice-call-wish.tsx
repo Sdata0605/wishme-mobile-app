@@ -17,8 +17,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useOrderConfirm } from '@/context/OrderConfirmContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useWallet } from '@/hooks/useWallet';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const CALL_PRICE = 100;
 
@@ -55,6 +57,7 @@ export default function VoiceCallWishScreen() {
   const insets = useSafeAreaInsets();
   const { session, getValidSession } = useAuth();
   const wallet = useWallet();
+  const { confirmOrder } = useOrderConfirm();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [tab, setTab] = useState<'call' | 'upload'>('call');
@@ -187,6 +190,11 @@ export default function VoiceCallWishScreen() {
       if (!res.ok || json.error) throw new Error(json.error ?? json.message ?? 'Failed to initiate call');
       wallet.refetch();
       setSuccess(json.message || `Calling ${recipientName.trim()} to wish them on their ${occasion}!`);
+      confirmOrder({
+        item: `an AI voice call to ${recipientName.trim()}`,
+        orderId: json.callId,
+        viewRoute: { pathname: '/bookings', params: { tab: 'Calls' } },
+      });
       setRecipientName('');
       setRecipientPhone('');
       setOccasion('Birthday');
@@ -199,9 +207,9 @@ export default function VoiceCallWishScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <LinearGradient
-        colors={['#FF6B33', '#B44CFF']}
+        colors={['#7B5CFA', '#1F7BFF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.header, { paddingTop: topPad + 12 }]}
@@ -351,7 +359,7 @@ export default function VoiceCallWishScreen() {
             </View>
 
             <TouchableOpacity onPress={handleMakeCall} disabled={submitting || !selectedVoice} activeOpacity={0.85} style={submitting && { opacity: 0.7 }}>
-              <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
+              <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
                 {submitting ? <ActivityIndicator color="#fff" /> : <Icon name="phone" size={18} color="#fff" />}
                 <Text style={styles.ctaText}>{submitting ? 'Initiating Call...' : `Make Wish Call (₹${CALL_PRICE})`}</Text>
               </LinearGradient>
@@ -386,7 +394,7 @@ export default function VoiceCallWishScreen() {
               activeOpacity={0.85}
               style={(uploading || !voiceName.trim() || !audioBase64) && { opacity: 0.6 }}
             >
-              <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
+              <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
                 {uploading ? <ActivityIndicator color="#fff" /> : <Icon name="upload" size={18} color="#fff" />}
                 <Text style={styles.ctaText}>{uploading ? 'Uploading Voice...' : 'Upload Voice'}</Text>
               </LinearGradient>
@@ -406,7 +414,7 @@ export default function VoiceCallWishScreen() {
           </View>
         )}
       </ScrollView>
-    </View>
+    </View></AmbientBackground>
   );
 }
 

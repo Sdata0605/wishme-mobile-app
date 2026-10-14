@@ -14,6 +14,8 @@ import { ArrowLeft, Check, Shield } from 'lucide-react-native';
 import type { FlightResult } from './FlightResultsScreen';
 
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles, glass } from './themed';
+import { BrandFill } from './BrandFill';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -85,6 +87,7 @@ function FareCard({
   index: number;
   onSelect?: () => void;
 }) {
+  const fc = use_fc();
   const price = basePrice + tier.priceOffset;
   const strikePrice = originalPrice + tier.priceOffset;
   const [priceDropChecked, setPriceDropChecked] = React.useState(false);
@@ -131,7 +134,7 @@ function FareCard({
       {/* Promo */}
       {tier.promo && (
         <View style={fc.promoRow}>
-          <Shield size={12} color={C.green} />
+          <Shield size={12} color={T(C.green, 'fg')} />
           <Text style={fc.promoText} numberOfLines={2}>{tier.promo}</Text>
         </View>
       )}
@@ -141,11 +144,11 @@ function FareCard({
       {/* Baggage */}
       <Text style={fc.sectionHead}>Baggage</Text>
       <View style={fc.checkRow}>
-        <View style={fc.checkIcon}><Check size={10} color={C.white} /></View>
+        <View style={fc.checkIcon}><Check size={10} color={T(C.white, 'fg')} /></View>
         <Text style={fc.checkText}>{tier.baggage.cabin}</Text>
       </View>
       <View style={fc.checkRow}>
-        <View style={fc.checkIcon}><Check size={10} color={C.white} /></View>
+        <View style={fc.checkIcon}><Check size={10} color={T(C.white, 'fg')} /></View>
         <Text style={fc.checkText}>{tier.baggage.checkin}</Text>
       </View>
 
@@ -196,7 +199,7 @@ function FareCard({
         onPress={() => setPriceDropChecked(!priceDropChecked)}
       >
         <View style={[fc.checkBox, priceDropChecked && fc.checkBoxActive]}>
-          {priceDropChecked && <Check size={10} color={C.white} />}
+          {priceDropChecked && <Check size={10} color={T(C.white, 'fg')} />}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={fc.priceDropTitle}>Add Price Drop Protection at ₹ 199</Text>
@@ -211,25 +214,25 @@ function FareCard({
         style={fc.bookBtn}
         activeOpacity={0.85}
         onPress={onSelect}
-      >
+      ><BrandFill />
         <Text style={fc.bookText}>BOOK NOW</Text>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
-const fc = StyleSheet.create({
+const make_fc = () => StyleSheet.create({
   card: {
     width: CARD_W,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 16,
     marginBottom: 8,
-  },
+   ...glass(22), },
   cardFeatured: {
-    borderColor: C.amber,
+    borderColor: T(C.amber, 'border'),
     borderWidth: 2,
     shadowColor: C.amber,
     shadowOffset: { width: 0, height: 4 },
@@ -246,81 +249,82 @@ const fc = StyleSheet.create({
   strikePrice: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: C.gray,
+    color: T(C.gray, 'fg'),
     textDecorationLine: 'line-through',
   },
-  price: { fontSize: 20, fontFamily: 'Inter_700Bold', color: C.text },
-  priceFeatured: { color: C.dark },
-  perAdult: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+  price: { fontSize: 20, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  priceFeatured: { color: T(C.dark, 'fg') },
+  perAdult: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
   badge: {
-    backgroundColor: C.dark,
+    backgroundColor: T(C.dark, 'bg'),
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
-  badgeText: { color: C.orange, fontSize: 10, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
-  tierLabel: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.textLight },
+  badgeText: { color: T(C.orange, 'fg'), fontSize: 10, fontFamily: 'Inter_700Bold', letterSpacing: 0.5 },
+  tierLabel: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.textLight, 'fg') },
   promoRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 6,
-    backgroundColor: C.greenLight,
+    backgroundColor: T(C.greenLight, 'bg'),
     borderRadius: 8,
     padding: 8,
     marginBottom: 6,
   },
-  promoText: { flex: 1, fontSize: 11, fontFamily: 'Inter_500Medium', color: C.green },
-  divider: { height: 1, backgroundColor: C.border, marginVertical: 10 },
-  sectionHead: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.text, marginBottom: 6 },
+  promoText: { flex: 1, fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.green, 'fg') },
+  divider: { height: 1, backgroundColor: T(C.border, 'bg'), marginVertical: 10 },
+  sectionHead: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginBottom: 6 },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 4 },
   checkIcon: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkText: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.text, flex: 1 },
+  checkText: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.text, 'fg'), flex: 1 },
   bulletRow: { flexDirection: 'row', gap: 6, marginBottom: 4, alignItems: 'flex-start' },
   bullet: { fontSize: 10, marginTop: 1 },
-  bulletText: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
+  bulletText: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   benefitsWrap: {
-    backgroundColor: C.amberLight,
+    backgroundColor: T(C.amberLight, 'bg'),
     borderRadius: 10,
     padding: 10,
   },
   benefitsHead: {
     fontSize: 11,
     fontFamily: 'Inter_700Bold',
-    color: C.amber,
+    color: T(C.amber, 'fg'),
     letterSpacing: 0.5,
     marginBottom: 6,
   },
-  subText: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+  subText: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
   priceDropRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   checkBox: {
     width: 18,
     height: 18,
     borderRadius: 4,
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 1,
   },
-  checkBoxActive: { backgroundColor: C.blue, borderColor: C.blue },
-  priceDropTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.text },
-  priceDropSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  checkBoxActive: { backgroundColor: T(C.blue, 'bg'), borderColor: T(C.blue, 'border') },
+  priceDropTitle: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  priceDropSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   bookBtn: {
-    backgroundColor: C.blue,
+    backgroundColor: T(C.blue, 'bg'),
     borderRadius: 10,
     paddingVertical: 13,
     alignItems: 'center',
     marginTop: 4,
-  },
-  bookText: { color: C.white, fontSize: 14, fontFamily: 'Inter_700Bold', letterSpacing: 0.8 },
+   overflow: 'hidden', },
+  bookText: { color: T(C.white, 'fg'), fontSize: 14, fontFamily: 'Inter_700Bold', letterSpacing: 0.8 },
 });
+const use_fc = () => useThemedStyles(make_fc);
 
 // ─── FareOptionsScreen ────────────────────────────────────────────────────────
 export function FareOptionsScreen({
@@ -338,6 +342,7 @@ export function FareOptionsScreen({
   onBack: () => void;
   onSelectFare?: (fareKey: string) => void;
 }) {
+  const fs = use_fs();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const scrollRef = useRef<ScrollView>(null);
@@ -374,7 +379,7 @@ export function FareOptionsScreen({
           onPress={onBack}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <ArrowLeft size={22} color={C.text} />
+          <ArrowLeft size={22} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={fs.headerTitle}>Flight Details and Fare Options</Text>
@@ -429,20 +434,20 @@ export function FareOptionsScreen({
   );
 }
 
-const fs = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_fs = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text },
-  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
+  headerTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   subHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -450,15 +455,15 @@ const fs = StyleSheet.create({
     gap: 4,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
-  routeText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.blue },
-  dot: { fontSize: 13, color: C.gray },
+  routeText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.blue, 'fg') },
+  dot: { fontSize: 13, color: T(C.gray, 'fg') },
   logo: { fontSize: 14 },
-  airline: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.text },
-  meta: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
+  airline: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  meta: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   cardRow: {
     paddingHorizontal: 16,
     paddingVertical: 20,
@@ -468,9 +473,10 @@ const fs = StyleSheet.create({
   swipeHint: {
     alignItems: 'center',
     paddingVertical: 8,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
   },
-  swipeText: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.gray },
+  swipeText: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.gray, 'fg') },
 });
+const use_fs = () => useThemedStyles(make_fs);

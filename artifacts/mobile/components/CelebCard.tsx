@@ -21,7 +21,7 @@ export function CelebCard({
   isLoggedIn,
 }: CelebCardProps) {
   const { colors } = useTheme();
-  const showLock = isLoggedIn === true && isSubscribed === false;
+  const showLock = false; // photos stay visible; subscribing is asked for when the user books
 
   const handlePress = () => {
     router.push({ pathname: '/celebrity/[id]', params: { id: celebrity.id } });
@@ -52,7 +52,7 @@ export function CelebCard({
         {showLock && (
           <View style={styles.lockOverlay}>
             <View style={styles.lockCircle}>
-              <Icon name="lock" size={24} color="#FF6B33" />
+              <Icon name="lock" size={24} color="#7B5CFA" />
             </View>
             <Text style={styles.lockText}>Subscription{'\n'}Required</Text>
             <TouchableOpacity onPress={handlePress} style={styles.unlockPill}>
@@ -66,7 +66,7 @@ export function CelebCard({
         <Text style={[styles.category, { color: colors.mutedForeground }]}>{celebrity.category}</Text>
         <View style={styles.ratingRow}>
           <Icon name="star" size={10} color="#FFB347" />
-          <Text style={[styles.rating, { color: colors.mutedForeground }]}>{celebrity.rating}</Text>
+          <Text style={[styles.rating, { color: colors.mutedForeground }]}>{celebrity.reviewCount > 0 && celebrity.rating > 0 ? celebrity.rating.toFixed(1) : 'New'}</Text>
         </View>
         {isSubscribed ? (
           <View style={styles.subscribedBadge}>
@@ -74,7 +74,7 @@ export function CelebCard({
           </View>
         ) : (
           !!celebrity.subscription?.price && (
-            <Text style={[styles.price, { color: colors.primary }]}>₹{celebrity.subscription.price.toLocaleString('en-IN')}/mo</Text>
+            <Text style={[styles.price, { color: colors.primary }]}>₹{celebrity.subscription.price.toLocaleString('en-IN')} one-time</Text>
           )
         )}
       </View>
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   unlockPillText: {
-    color: '#FF6B33',
+    color: '#7B5CFA',
     fontSize: 11,
     fontFamily: 'Inter_700Bold',
   },

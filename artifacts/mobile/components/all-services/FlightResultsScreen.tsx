@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Modal,
   Platform,
   ScrollView,
@@ -31,10 +32,39 @@ import {
 } from 'lucide-react-native';
 
 import { serviceColors as C } from './serviceColors';
+import { tboSearchFlights } from '@/services/tboService';
+import { clearOptionSet, setOptionSet } from '@/services/assistant/bridge';
+import { T, useThemedStyles, glass } from './themed';
+import { BrandFill } from './BrandFill';
+
+export interface FlightSearchQuery {
+  origin: string;
+  destination: string;
+  departDate: string;
+  returnDate?: string;
+  adults: number;
+  children: number;
+  infants: number;
+  cabinClass: number;
+}
 
 // ─── Flight data ──────────────────────────────────────────────────────────────
 export interface FlightResult {
   id: number;
+  /** TBO fare reference — required to re-price and book this exact itinerary. */
+  resultIndex?: string;
+  traceId?: string;
+  isLCC?: boolean;
+  baseFare?: number;
+  tax?: number;
+  baggage?: string;
+  cabinBaggage?: string;
+  seatsAvailable?: number;
+  fareClass?: string;
+  depTerminal?: string;
+  arrTerminal?: string;
+  depCity?: string;
+  arrCity?: string;
   airline: string;
   airlineName?: string;
   airlineCode?: string;
@@ -60,166 +90,6 @@ export interface FlightResult {
 
 type TimeSlot = 'before6' | '6to12' | '12to6' | 'after6';
 
-const FLIGHTS: FlightResult[] = [
-  {
-    id: 1,
-    airline: 'IndiGo',
-    logo: '🟦',
-    depart: '05:30',
-    arrive: '07:45',
-    duration: '2h 15m',
-    durationMins: 135,
-    stops: 0,
-    price: 4299,
-    originalPrice: 5499,
-    refundable: true,
-    depAirport: 'DEL',
-    arrAirport: 'BOM',
-  },
-  {
-    id: 2,
-    airline: 'Air India',
-    logo: '🔴',
-    depart: '07:30',
-    arrive: '10:00',
-    duration: '2h 30m',
-    durationMins: 150,
-    stops: 0,
-    price: 5199,
-    originalPrice: 6499,
-    refundable: true,
-    depAirport: 'DEL',
-    arrAirport: 'BOM',
-  },
-  {
-    id: 3,
-    airline: 'SpiceJet',
-    logo: '🟧',
-    depart: '09:15',
-    arrive: '12:45',
-    duration: '3h 30m',
-    durationMins: 210,
-    stops: 1,
-    price: 3899,
-    originalPrice: 4799,
-    refundable: false,
-    depAirport: 'DEL',
-    arrAirport: 'BOM',
-    layoverAirport: 'AMD',
-    layoverMins: 55,
-  },
-  {
-    id: 4,
-    airline: 'Akasa Air',
-    logo: '🟨',
-    depart: '11:00',
-    arrive: '13:20',
-    duration: '2h 20m',
-    durationMins: 140,
-    stops: 0,
-    price: 4599,
-    originalPrice: 5299,
-    refundable: true,
-    depAirport: 'DEL',
-    arrAirport: 'BOM',
-  },
-  {
-    id: 5,
-    airline: 'Vistara',
-    logo: '🟣',
-    depart: '13:45',
-    arrive: '16:30',
-    duration: '2h 45m',
-    durationMins: 165,
-    stops: 0,
-    price: 6299,
-    originalPrice: 7499,
-    refundable: true,
-    depAirport: 'DEL',
-    arrAirport: 'BOM',
-  },
-  {
-    id: 6,
-    airline: 'GoFirst',
-    logo: '🟩',
-    depart: '15:20',
-    arrive: '19:50',
-    duration: '4h 30m',
-    durationMins: 270,
-    stops: 1,
-    price: 3299,
-    originalPrice: 4199,
-    refundable: false,
-    depAirport: 'DEL',
-    arrAirport: 'BOM',
-    layoverAirport: 'HYD',
-    layoverMins: 90,
-  },
-  {
-    id: 7,
-    airline: 'IndiGo',
-    logo: '🟦',
-    depart: '17:00',
-    arrive: '21:40',
-    duration: '4h 40m',
-    durationMins: 280,
-    stops: 1,
-    price: 3599,
-    originalPrice: 4799,
-    refundable: true,
-    depAirport: 'HDO',
-    arrAirport: 'BOM',
-    layoverAirport: 'PNQ',
-    layoverMins: 70,
-  },
-  {
-    id: 8,
-    airline: 'Air India',
-    logo: '🔴',
-    depart: '20:00',
-    arrive: '22:30',
-    duration: '2h 30m',
-    durationMins: 150,
-    stops: 0,
-    price: 5799,
-    originalPrice: 6999,
-    refundable: true,
-    depAirport: 'DEL',
-    arrAirport: 'BOM',
-  },
-  {
-    id: 9,
-    airline: 'Air India Express',
-    logo: '🟤',
-    depart: '22:15',
-    arrive: '01:05',
-    duration: '2h 50m',
-    durationMins: 170,
-    stops: 0,
-    price: 3999,
-    originalPrice: 4899,
-    refundable: false,
-    depAirport: 'DEL',
-    arrAirport: 'BOM',
-  },
-  {
-    id: 10,
-    airline: 'Vistara',
-    logo: '🟣',
-    depart: '08:10',
-    arrive: '14:55',
-    duration: '6h 45m',
-    durationMins: 405,
-    stops: 2,
-    price: 4999,
-    originalPrice: 6100,
-    refundable: true,
-    depAirport: 'DEL',
-    arrAirport: 'BOM',
-    layoverAirport: 'BLR',
-    layoverMins: 150,
-  },
-];
 
 function timeToMins(t: string) {
   const [h, m] = t.split(':').map(Number);
@@ -290,6 +160,7 @@ function FareTypeBar({
   selected: string;
   onSelect: (k: string) => void;
 }) {
+  const ft = use_ft();
   return (
     <ScrollView
       horizontal
@@ -306,7 +177,7 @@ function FareTypeBar({
             activeOpacity={0.8}
             onPress={() => onSelect(f.key)}
           >
-            {active && <Check size={11} color={C.blue} style={{ marginRight: 3 }} />}
+            {active && <Check size={11} color={T(C.blue, 'fg')} style={{ marginRight: 3 }} />}
             <Text style={[ft.chipText, active && ft.chipTextActive]}>{f.label}</Text>
             {f.isNew && (
               <View style={ft.newBadge}>
@@ -320,46 +191,47 @@ function FareTypeBar({
   );
 }
 
-const ft = StyleSheet.create({
-  wrap: { flexGrow: 0, backgroundColor: C.white, borderBottomWidth: 1, borderBottomColor: C.border },
+const make_ft = () => StyleSheet.create({
+  wrap: { flexGrow: 0, backgroundColor: T(C.white, 'bg'), borderBottomWidth: 1, borderBottomColor: T(C.border, 'border') },
   row: { paddingHorizontal: 12, gap: 8, paddingVertical: 10 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 20,
     paddingHorizontal: 11,
     paddingVertical: 6,
   },
   chipActive: {
-    backgroundColor: C.blueLight,
-    borderColor: C.blue,
+    backgroundColor: T(C.blueLight, 'bg'),
+    borderColor: T(C.blue, 'border'),
   },
   chipText: {
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
   },
   chipTextActive: {
-    color: C.blue,
+    color: T(C.blue, 'fg'),
     fontFamily: 'Inter_600SemiBold',
   },
   newBadge: {
-    backgroundColor: C.red,
+    backgroundColor: T(C.red, 'bg'),
     borderRadius: 4,
     paddingHorizontal: 5,
     paddingVertical: 1,
     marginLeft: 5,
   },
   newText: {
-    color: C.white,
+    color: T(C.white, 'fg'),
     fontSize: 8,
     fontFamily: 'Inter_700Bold',
     letterSpacing: 0.3,
   },
 });
+const use_ft = () => useThemedStyles(make_ft);
 
 // ─── Flight card ──────────────────────────────────────────────────────────────
 function FlightCard({
@@ -369,6 +241,7 @@ function FlightCard({
   flight: FlightResult;
   onViewPrices: (f: FlightResult) => void;
 }) {
+  const fc = use_fc();
   const stopLabel =
     flight.stops === 0 ? 'Non Stop' : flight.stops === 1 ? '1 Stop' : '2 Stops';
   const discount = Math.round(((flight.originalPrice - flight.price) / flight.originalPrice) * 100);
@@ -398,7 +271,7 @@ function FlightCard({
         <View style={fc.routeLine}>
           <View style={fc.dot} />
           <View style={fc.line} />
-          <Plane size={14} color={C.blue} />
+          <Plane size={14} color={T(C.blue, 'fg')} />
           <View style={fc.line} />
           <View style={fc.dot} />
         </View>
@@ -429,21 +302,21 @@ function FlightCard({
           </View>
           <Text style={fc.perPax}>per person</Text>
         </View>
-        <TouchableOpacity style={fc.bookBtn} activeOpacity={0.85} onPress={() => onViewPrices(flight)}>
+        <TouchableOpacity style={fc.bookBtn} activeOpacity={0.85} onPress={() => onViewPrices(flight)}><BrandFill />
           <Text style={fc.bookText}>View Prices</Text>
-          <ArrowRight size={13} color={C.white} />
+          <ArrowRight size={13} color={T(C.white, 'fg')} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const fc = StyleSheet.create({
+const make_fc = () => StyleSheet.create({
   card: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     marginHorizontal: 12,
     marginBottom: 12,
     padding: 14,
@@ -452,7 +325,7 @@ const fc = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 4,
     elevation: 1,
-  },
+   ...glass(18), },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -461,24 +334,24 @@ const fc = StyleSheet.create({
   },
   airlineRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   logo: { fontSize: 20 },
-  airline: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
+  airline: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   discountBadge: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
     borderRadius: 6,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderWidth: 1,
-    borderColor: '#6EE7B7',
+    borderColor: T('#6EE7B7', 'border'),
   },
-  discountText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: C.green },
+  discountText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
   timesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
   },
   timeBlock: { alignItems: 'flex-start' },
-  time: { fontSize: 20, fontFamily: 'Inter_700Bold', color: C.text },
-  timeLabel: { fontSize: 9, fontFamily: 'Inter_400Regular', color: C.gray, marginTop: 1 },
+  time: { fontSize: 20, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  timeLabel: { fontSize: 9, fontFamily: 'Inter_400Regular', color: T(C.gray, 'fg'), marginTop: 1 },
   routeLine: {
     flex: 1,
     flexDirection: 'row',
@@ -486,30 +359,30 @@ const fc = StyleSheet.create({
     paddingHorizontal: 10,
     gap: 4,
   },
-  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: C.blue },
-  line: { flex: 1, height: 1, backgroundColor: C.border },
+  dot: { width: 5, height: 5, borderRadius: 3, backgroundColor: T(C.blue, 'bg') },
+  line: { flex: 1, height: 1, backgroundColor: T(C.border, 'bg') },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  duration: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.textLight },
+  duration: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
   stopPill: {
-    backgroundColor: '#FFF7ED',
+    backgroundColor: T('#F5F0FF', 'bg'),
     borderRadius: 20,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderWidth: 1,
-    borderColor: '#FED7AA',
+    borderColor: T('#FED7AA', 'border'),
   },
   stopPillGreen: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#6EE7B7',
+    backgroundColor: T('#ECFDF5', 'bg'),
+    borderColor: T('#6EE7B7', 'border'),
   },
-  stopText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: C.orange },
-  stopTextGreen: { color: C.green },
-  divider: { height: 1, backgroundColor: C.border, marginBottom: 12 },
+  stopText: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: T(C.orange, 'fg') },
+  stopTextGreen: { color: T(C.green, 'fg') },
+  divider: { height: 1, backgroundColor: T(C.border, 'bg'), marginBottom: 12 },
   priceRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -518,23 +391,24 @@ const fc = StyleSheet.create({
   originalPrice: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: C.gray,
+    color: T(C.gray, 'fg'),
     textDecorationLine: 'line-through',
     marginBottom: 2,
   },
-  price: { fontSize: 20, fontFamily: 'Inter_700Bold', color: C.text },
-  perPax: { fontSize: 9, fontFamily: 'Inter_400Regular', color: C.gray, marginTop: 1 },
+  price: { fontSize: 20, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  perPax: { fontSize: 9, fontFamily: 'Inter_400Regular', color: T(C.gray, 'fg'), marginTop: 1 },
   bookBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 22,
     paddingHorizontal: 18,
     paddingVertical: 10,
-  },
-  bookText: { color: C.white, fontSize: 13, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  bookText: { color: T(C.white, 'fg'), fontSize: 13, fontFamily: 'Inter_700Bold' },
 });
+const use_fc = () => useThemedStyles(make_fc);
 
 // ─── Filters panel ────────────────────────────────────────────────────────────
 type FilterCategory =
@@ -629,10 +503,11 @@ function Checkbox({
   right?: string;
   onToggle: () => void;
 }) {
+  const ch = use_ch();
   return (
     <TouchableOpacity style={ch.row} activeOpacity={0.7} onPress={onToggle}>
       <View style={[ch.box, checked && ch.boxChecked]}>
-        {checked && <Check size={11} color={C.white} />}
+        {checked && <Check size={11} color={T(C.white, 'fg')} />}
       </View>
       <View style={{ flex: 1 }}>
         <Text style={ch.label}>{label}</Text>
@@ -643,23 +518,24 @@ function Checkbox({
   );
 }
 
-const ch = StyleSheet.create({
+const make_ch = () => StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 },
   box: {
     width: 20,
     height: 20,
     borderRadius: 5,
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
-  boxChecked: { backgroundColor: C.blue, borderColor: C.blue },
-  label: { fontSize: 13, fontFamily: 'Inter_500Medium', color: C.text },
-  sub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
-  right: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.textLight },
+  boxChecked: { backgroundColor: T(C.blue, 'bg'), borderColor: T(C.blue, 'border') },
+  label: { fontSize: 13, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
+  sub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
+  right: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
 });
+const use_ch = () => useThemedStyles(make_ch);
 
 function StepSlider({
   label,
@@ -674,6 +550,7 @@ function StepSlider({
   format: (v: number) => string;
   onChange: (v: number) => void;
 }) {
+  const sl = use_sl();
   const idx = Math.max(0, steps.findIndex((s) => s >= value));
   const pct = steps.length <= 1 ? 100 : (idx / (steps.length - 1)) * 100;
 
@@ -705,7 +582,7 @@ function StepSlider({
   );
 }
 
-const sl = StyleSheet.create({
+const make_sl = () => StyleSheet.create({
   wrap: { marginBottom: 8 },
   head: {
     flexDirection: 'row',
@@ -713,22 +590,23 @@ const sl = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
-  label: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.text },
-  value: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.blue },
+  label: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  value: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.blue, 'fg') },
   track: {
     height: 4,
-    backgroundColor: '#DCDFE5',
+    backgroundColor: T('#DCDFE5', 'bg'),
     borderRadius: 2,
     marginBottom: 10,
     overflow: 'hidden',
   },
-  fill: { height: '100%', backgroundColor: C.blue, borderRadius: 2 },
+  fill: { height: '100%', backgroundColor: T(C.blue, 'bg'), borderRadius: 2 },
   steps: { flexDirection: 'row', justifyContent: 'space-between' },
   stepDot: { alignItems: 'center', paddingVertical: 4, paddingHorizontal: 2 },
   stepDotActive: {},
-  stepText: { fontSize: 9, fontFamily: 'Inter_500Medium', color: C.gray },
-  stepTextActive: { color: C.blue, fontFamily: 'Inter_700Bold' },
+  stepText: { fontSize: 9, fontFamily: 'Inter_500Medium', color: T(C.gray, 'fg') },
+  stepTextActive: { color: T(C.blue, 'fg'), fontFamily: 'Inter_700Bold' },
 });
+const use_sl = () => useThemedStyles(make_sl);
 
 function TimeSlotGrid({
   selected,
@@ -737,6 +615,7 @@ function TimeSlotGrid({
   selected: TimeSlot[];
   onToggle: (slot: TimeSlot) => void;
 }) {
+  const tsg = use_tsg();
   return (
     <View style={tsg.grid}>
       {TIME_SLOTS.map((slot) => {
@@ -748,7 +627,7 @@ function TimeSlotGrid({
             activeOpacity={0.8}
             onPress={() => onToggle(slot.key)}
           >
-            <slot.Icon size={18} color={active ? C.blue : C.orange} />
+            <slot.Icon size={18} color={active ? T(C.blue, 'fg') : T(C.orange, 'fg')} />
             <Text style={[tsg.label, active && tsg.labelActive]}>{slot.label}</Text>
             <Text style={[tsg.sub, active && tsg.subActive]}>{slot.sub}</Text>
           </TouchableOpacity>
@@ -758,24 +637,25 @@ function TimeSlotGrid({
   );
 }
 
-const tsg = StyleSheet.create({
+const make_tsg = () => StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   card: {
     width: '48%',
     flexGrow: 1,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     padding: 12,
     gap: 4,
-  },
-  cardActive: { borderColor: C.blue, backgroundColor: C.blueLight },
-  label: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.text, marginTop: 4 },
-  labelActive: { color: C.blue },
-  sub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
-  subActive: { color: C.blue },
+   ...glass(18), },
+  cardActive: { borderColor: T(C.blue, 'border'), backgroundColor: T(C.blueLight, 'bg') },
+  label: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 4 },
+  labelActive: { color: T(C.blue, 'fg') },
+  sub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  subActive: { color: T(C.blue, 'fg') },
 });
+const use_tsg = () => useThemedStyles(make_tsg);
 
 const FILTER_TABS: { key: FilterCategory; label: string }[] = [
   { key: 'popular', label: 'Popular' },
@@ -797,14 +677,17 @@ function formatMins(m: number) {
 function FiltersModal({
   visible,
   value,
+  flights,
   onClose,
   onApply,
 }: {
   visible: boolean;
   value: FilterState;
+  flights: FlightResult[];
   onClose: () => void;
   onApply: (next: FilterState) => void;
 }) {
+  const fm = use_fm();
   const insets = useSafeAreaInsets();
   const [filters, setFilters] = useState<FilterState>(value);
   const [activeTab, setActiveTab] = useState<FilterCategory>('popular');
@@ -840,7 +723,7 @@ function FiltersModal({
         : [...f.airports, code],
     }));
 
-  const previewCount = applyFlightFilters(FLIGHTS, filters).length;
+  const previewCount = applyFlightFilters(flights, filters).length;
   const activeCount = countActiveFilters(filters);
 
   const airlineList = AIRLINES.filter((a) =>
@@ -864,11 +747,11 @@ function FiltersModal({
                 onPress={() => setFilters(DEFAULT_FILTERS)}
                 activeOpacity={0.8}
               >
-                <RotateCcw size={13} color={C.orange} />
+                <RotateCcw size={13} color={T(C.orange, 'fg')} />
                 <Text style={fm.clearText}>Clear</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={onClose} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <X size={20} color={C.text} />
+                <X size={20} color={T(C.text, 'fg')} />
               </TouchableOpacity>
             </View>
           </View>
@@ -912,14 +795,14 @@ function FiltersModal({
                     <Checkbox
                       checked={filters.nonStop}
                       label="Non Stop"
-                      right={`${FLIGHTS.filter((f) => f.stops === 0).length}`}
+                      right={`${flights.filter((f) => f.stops === 0).length}`}
                       onToggle={() => setFilters((f) => ({ ...f, nonStop: !f.nonStop }))}
                     />
                     <View style={fm.separator} />
                     <Checkbox
                       checked={filters.oneStop}
                       label="1 Stop"
-                      right={`${FLIGHTS.filter((f) => f.stops === 1).length}`}
+                      right={`${flights.filter((f) => f.stops === 1).length}`}
                       onToggle={() => setFilters((f) => ({ ...f, oneStop: !f.oneStop }))}
                     />
                     <View style={fm.separator} />
@@ -970,7 +853,7 @@ function FiltersModal({
                           checked={filters.airlines.includes(name)}
                           label={name}
                           right={`₹${Math.min(
-                            ...FLIGHTS.filter((f) => f.airline === name).map((f) => f.price),
+                            ...flights.filter((f) => f.airline === name).map((f) => f.price),
                             99999,
                           ).toLocaleString('en-IN')}`}
                           onToggle={() => toggleAirline(name)}
@@ -1006,9 +889,9 @@ function FiltersModal({
                   <View style={fm.stopsRow}>
                     {(
                       [
-                        { key: 'nonStop' as const, label: 'Non Stop', count: FLIGHTS.filter((f) => f.stops === 0).length },
-                        { key: 'oneStop' as const, label: '1 Stop', count: FLIGHTS.filter((f) => f.stops === 1).length },
-                        { key: 'twoPlusStops' as const, label: '1+ Stop', count: FLIGHTS.filter((f) => f.stops >= 2).length },
+                        { key: 'nonStop' as const, label: 'Non Stop', count: flights.filter((f) => f.stops === 0).length },
+                        { key: 'oneStop' as const, label: '1 Stop', count: flights.filter((f) => f.stops === 1).length },
+                        { key: 'twoPlusStops' as const, label: '1+ Stop', count: flights.filter((f) => f.stops >= 2).length },
                       ] as const
                     ).map((opt) => {
                       const active = filters[opt.key];
@@ -1055,18 +938,18 @@ function FiltersModal({
               {activeTab === 'airlines' && (
                 <>
                   <View style={fm.searchBox}>
-                    <Search size={14} color={C.gray} />
+                    <Search size={14} color={T(C.gray, 'fg')} />
                     <TextInput
                       style={fm.searchInput}
                       placeholder="Search airlines..."
-                      placeholderTextColor={C.gray}
+                      placeholderTextColor={T(C.gray, 'fg')}
                       value={query}
                       onChangeText={setQuery}
                     />
                   </View>
                   <View style={fm.group}>
                     {airlineList.map((name, i) => {
-                      const prices = FLIGHTS.filter((f) => f.airline === name).map((f) => f.price);
+                      const prices = flights.filter((f) => f.airline === name).map((f) => f.price);
                       const minPrice = prices.length ? Math.min(...prices) : 0;
                       return (
                         <React.Fragment key={name}>
@@ -1121,7 +1004,7 @@ function FiltersModal({
                     onChange={(maxLayover) => setFilters((f) => ({ ...f, maxLayover }))}
                   />
                   <View style={fm.priceHint}>
-                    <Clock size={13} color={C.purpleLight} />
+                    <Clock size={13} color={T(C.purpleLight, 'fg')} />
                     <Text style={fm.priceHintText}>
                       Shorter layovers help you reach faster with fewer waits
                     </Text>
@@ -1139,7 +1022,7 @@ function FiltersModal({
                 onApply(filters);
                 onClose();
               }}
-            >
+            ><BrandFill />
               <Text style={fm.applyText}>
                 Show {previewCount} flight{previewCount === 1 ? '' : 's'}
               </Text>
@@ -1151,14 +1034,14 @@ function FiltersModal({
   );
 }
 
-const fm = StyleSheet.create({
+const make_fm = () => StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     height: '88%',
@@ -1171,13 +1054,13 @@ const fm = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
-  title: { fontSize: 17, fontFamily: 'Inter_700Bold', color: C.text },
+  title: { fontSize: 17, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   subtitle: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 2,
   },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -1185,20 +1068,20 @@ const fm = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#FFF7ED',
+    backgroundColor: T('#F5F0FF', 'bg'),
     borderRadius: 14,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
-  clearText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.orange },
+  clearText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.orange, 'fg') },
   body: { flex: 1, flexDirection: 'row', minHeight: 0 },
   side: {
     width: 78,
     flexGrow: 0,
     flexShrink: 0,
-    backgroundColor: C.pageBg,
+    backgroundColor: T(C.pageBg, 'bg'),
     borderRightWidth: 1,
-    borderRightColor: C.border,
+    borderRightColor: T(C.border, 'border'),
   },
   sideItem: {
     paddingVertical: 13,
@@ -1207,53 +1090,53 @@ const fm = StyleSheet.create({
     borderLeftColor: 'transparent',
   },
   sideItemActive: {
-    backgroundColor: C.white,
-    borderLeftColor: C.blue,
+    backgroundColor: T(C.white, 'bg'),
+    borderLeftColor: T(C.blue, 'border'),
   },
-  sideText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.textLight },
-  sideTextActive: { color: C.blue, fontFamily: 'Inter_700Bold' },
+  sideText: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  sideTextActive: { color: T(C.blue, 'fg'), fontFamily: 'Inter_700Bold' },
   content: { flex: 1, minWidth: 0 },
   sectionHint: {
     fontSize: 12,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginBottom: 12,
   },
   groupLabel: {
     fontSize: 11,
     fontFamily: 'Inter_700Bold',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginBottom: 6,
     marginTop: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   group: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     paddingHorizontal: 12,
     marginBottom: 14,
-  },
-  separator: { height: 1, backgroundColor: C.lightGray },
+   ...glass(18), },
+  separator: { height: 1, backgroundColor: T(C.lightGray, 'bg') },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 9,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     marginBottom: 12,
   },
   searchInput: {
     flex: 1,
     fontSize: 13,
     fontFamily: 'Inter_400Regular',
-    color: C.text,
+    color: T(C.text, 'fg'),
     padding: 0,
   },
   stopsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
@@ -1262,22 +1145,22 @@ const fm = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 22,
     paddingHorizontal: 14,
     paddingVertical: 9,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
   },
-  stopChipActive: { borderColor: C.blue, backgroundColor: C.blueLight },
-  stopChipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.textLight },
-  stopChipTextActive: { color: C.blue },
-  stopCount: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.gray },
-  stopCountActive: { color: C.blue },
+  stopChipActive: { borderColor: T(C.blue, 'border'), backgroundColor: T(C.blueLight, 'bg') },
+  stopChipText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg') },
+  stopChipTextActive: { color: T(C.blue, 'fg') },
+  stopCount: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.gray, 'fg') },
+  stopCountActive: { color: T(C.blue, 'fg') },
   priceHint: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#F5F3FF',
+    backgroundColor: T('#F5F3FF', 'bg'),
     borderRadius: 10,
     padding: 10,
     marginTop: 14,
@@ -1286,23 +1169,24 @@ const fm = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     fontFamily: 'Inter_500Medium',
-    color: C.purple,
+    color: T(C.purple, 'fg'),
     lineHeight: 15,
   },
   footer: {
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 14,
     paddingTop: 10,
   },
   applyBtn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
-  },
-  applyText: { color: C.white, fontSize: 15, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  applyText: { color: T(C.white, 'fg'), fontSize: 15, fontFamily: 'Inter_700Bold' },
 });
+const use_fm = () => useThemedStyles(make_fm);
 
 // ─── Quick filter chips (MMT-style popular filters on results) ────────────────
 const QUICK_FILTERS: {
@@ -1371,6 +1255,7 @@ function QuickFiltersBar({
   filters: FilterState;
   onChange: (next: FilterState) => void;
 }) {
+  const qf = use_qf();
   return (
     <ScrollView
       horizontal
@@ -1387,7 +1272,7 @@ function QuickFiltersBar({
             activeOpacity={0.8}
             onPress={() => onChange(q.apply(filters))}
           >
-            {active && <Check size={11} color={C.blue} />}
+            {active && <Check size={11} color={T(C.blue, 'fg')} />}
             <Text style={[qf.text, active && qf.textActive]}>{q.label}</Text>
           </TouchableOpacity>
         );
@@ -1396,29 +1281,30 @@ function QuickFiltersBar({
   );
 }
 
-const qf = StyleSheet.create({
+const make_qf = () => StyleSheet.create({
   wrap: {
     flexGrow: 0,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
   row: { paddingHorizontal: 12, gap: 8, paddingVertical: 10 },
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: C.lightGray,
+    backgroundColor: T(C.lightGray, 'bg'),
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 20,
     paddingHorizontal: 11,
     paddingVertical: 6,
   },
-  chipActive: { backgroundColor: C.blueLight, borderColor: C.blue },
-  text: { fontSize: 12, fontFamily: 'Inter_500Medium', color: C.textLight },
-  textActive: { color: C.blue, fontFamily: 'Inter_600SemiBold' },
+  chipActive: { backgroundColor: T(C.blueLight, 'bg'), borderColor: T(C.blue, 'border') },
+  text: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  textActive: { color: T(C.blue, 'fg'), fontFamily: 'Inter_600SemiBold' },
 });
+const use_qf = () => useThemedStyles(make_qf);
 
 // ─── Flight Results Screen ────────────────────────────────────────────────────
 export function FlightResultsScreen({
@@ -1427,6 +1313,8 @@ export function FlightResultsScreen({
   dateLabel,
   travellers,
   cabin,
+  search,
+  accessToken,
   onBack,
   onViewPrices,
 }: {
@@ -1435,9 +1323,12 @@ export function FlightResultsScreen({
   dateLabel: string;
   travellers: string;
   cabin: string;
+  search?: FlightSearchQuery;
+  accessToken?: string | null;
   onBack: () => void;
   onViewPrices: (flight: FlightResult) => void;
 }) {
+  const rs = use_rs();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const [selectedFare, setSelectedFare] = useState('regular');
@@ -1445,6 +1336,43 @@ export function FlightResultsScreen({
   const [appliedFilters, setAppliedFilters] = useState<FilterState>(DEFAULT_FILTERS);
   const [sortExpanded, setSortExpanded] = useState(false);
   const [sortLabel, setSortLabel] = useState('Price: Low to High');
+
+  const [flights, setFlights] = useState<FlightResult[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    if (!search) {
+      setFlights([]);
+      setLoading(false);
+      setLoadError('Start a new search to see live fares.');
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setLoadError('');
+
+    tboSearchFlights(search, accessToken)
+      .then((res) => {
+        if (cancelled) return;
+        setFlights(res.outbound as FlightResult[]);
+        if (res.outbound.length === 0) {
+          setLoadError('No flights found for this route and date.');
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setFlights([]);
+        setLoadError(err instanceof Error ? err.message : 'Could not load flights.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [search, accessToken, reloadKey]);
 
   const SORT_OPTIONS = [
     'Price: Low to High',
@@ -1455,7 +1383,7 @@ export function FlightResultsScreen({
 
   const activeFilterCount = countActiveFilters(appliedFilters);
 
-  const sortedFlights = applyFlightFilters(FLIGHTS, appliedFilters).sort((a, b) => {
+  const sortedFlights = applyFlightFilters(flights, appliedFilters).sort((a, b) => {
     if (sortLabel === 'Price: Low to High') return a.price - b.price;
     if (sortLabel === 'Price: High to Low') return b.price - a.price;
     if (sortLabel === 'Departure: Early') return a.depart.localeCompare(b.depart);
@@ -1463,17 +1391,38 @@ export function FlightResultsScreen({
     return 0;
   });
 
+  // Let the voice assistant read out and pick from what is on screen.
+  useEffect(() => {
+    setOptionSet({
+      kind: 'flights',
+      loading,
+      error: loadError || undefined,
+      items: sortedFlights.map((f) => ({
+        title: `${f.airlineName ?? f.airline}${f.flightNumber ? ' ' + f.flightNumber : ''}`,
+        detail: `departs ${f.depart}, arrives ${f.arrive}, ${f.duration}, ${
+          f.stops === 0 ? 'non-stop' : `${f.stops} stop${f.stops > 1 ? 's' : ''}`
+        }, ₹${f.price}`,
+      })),
+      select: (i) => {
+        const f = sortedFlights[i];
+        if (f) onViewPrices(f);
+      },
+    });
+    return () => clearOptionSet('flights');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flights, appliedFilters, sortLabel, loading, loadError]);
+
   return (
     <View style={rs.root}>
       {/* Header */}
       <View style={[rs.header, { paddingTop: topPad + 6 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={22} color={C.text} />
+          <ArrowLeft size={22} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <View style={rs.routeRow}>
             <Text style={rs.routeCity}>{from}</Text>
-            <Plane size={13} color={C.blue} style={{ marginHorizontal: 6 }} />
+            <Plane size={13} color={T(C.blue, 'fg')} style={{ marginHorizontal: 6 }} />
             <Text style={rs.routeCity}>{to}</Text>
           </View>
           <Text style={rs.routeMeta}>
@@ -1485,7 +1434,7 @@ export function FlightResultsScreen({
           activeOpacity={0.8}
           onPress={() => setFiltersVisible(true)}
         >
-          <SlidersHorizontal size={15} color={C.blue} />
+          <SlidersHorizontal size={15} color={T(C.blue, 'fg')} />
           <Text style={rs.filterBtnText}>Filters</Text>
           {activeFilterCount > 0 && (
             <View style={rs.filterBadge}>
@@ -1507,13 +1456,13 @@ export function FlightResultsScreen({
         activeOpacity={0.8}
         onPress={() => setSortExpanded(!sortExpanded)}
       >
-        <Filter size={13} color={C.textLight} />
+        <Filter size={13} color={T(C.textLight, 'fg')} />
         <Text style={rs.sortLabel}>Sort: </Text>
         <Text style={rs.sortValue}>{sortLabel}</Text>
         {sortExpanded ? (
-          <ChevronUp size={14} color={C.textLight} />
+          <ChevronUp size={14} color={T(C.textLight, 'fg')} />
         ) : (
-          <ChevronDown size={14} color={C.textLight} />
+          <ChevronDown size={14} color={T(C.textLight, 'fg')} />
         )}
       </TouchableOpacity>
 
@@ -1532,7 +1481,7 @@ export function FlightResultsScreen({
               <Text style={[rs.sortOptionText, sortLabel === opt && rs.sortOptionTextActive]}>
                 {opt}
               </Text>
-              {sortLabel === opt && <Check size={14} color={C.blue} />}
+              {sortLabel === opt && <Check size={14} color={T(C.blue, 'fg')} />}
             </TouchableOpacity>
           ))}
         </View>
@@ -1545,21 +1494,38 @@ export function FlightResultsScreen({
         contentContainerStyle={rs.list}
       >
         <View style={rs.resultHead}>
-          <Text style={rs.resultCount}>{sortedFlights.length} flights found</Text>
-          {activeFilterCount > 0 && (
+          <Text style={rs.resultCount}>
+            {loading ? 'Searching live fares…' : `${sortedFlights.length} flights found`}
+          </Text>
+          {activeFilterCount > 0 && !loading && (
             <TouchableOpacity onPress={() => setAppliedFilters(DEFAULT_FILTERS)}>
               <Text style={rs.clearLink}>Clear filters</Text>
             </TouchableOpacity>
           )}
         </View>
-        {sortedFlights.length === 0 ? (
+        {loading ? (
+          <View style={rs.empty}>
+            <ActivityIndicator size="large" color={T(C.blue, 'fg')} />
+            <Text style={[rs.emptySub, { marginTop: 14 }]}>
+              Fetching live fares from airlines. This can take a few seconds.
+            </Text>
+          </View>
+        ) : loadError && flights.length === 0 ? (
+          <View style={rs.empty}>
+            <Text style={rs.emptyTitle}>Couldn’t load flights</Text>
+            <Text style={rs.emptySub}>{loadError}</Text>
+            <TouchableOpacity style={rs.emptyBtn} onPress={() => setReloadKey((k) => k + 1)}><BrandFill />
+              <Text style={rs.emptyBtnText}>Try Again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : sortedFlights.length === 0 ? (
           <View style={rs.empty}>
             <Text style={rs.emptyTitle}>No flights match</Text>
             <Text style={rs.emptySub}>Try removing some filters to see more options</Text>
             <TouchableOpacity
               style={rs.emptyBtn}
               onPress={() => setAppliedFilters(DEFAULT_FILTERS)}
-            >
+            ><BrandFill />
               <Text style={rs.emptyBtnText}>Reset Filters</Text>
             </TouchableOpacity>
           </View>
@@ -1575,6 +1541,7 @@ export function FlightResultsScreen({
       <FiltersModal
         visible={filtersVisible}
         value={appliedFilters}
+        flights={flights}
         onClose={() => setFiltersVisible(false)}
         onApply={setAppliedFilters}
       />
@@ -1582,59 +1549,59 @@ export function FlightResultsScreen({
   );
 }
 
-const rs = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_rs = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
   routeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
-  routeCity: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text },
-  routeMeta: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: C.textLight },
+  routeCity: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  routeMeta: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   filterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
     borderWidth: 1.5,
-    borderColor: C.blue,
+    borderColor: T(C.blue, 'border'),
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: C.blueLight,
+    backgroundColor: T(C.blueLight, 'bg'),
   },
-  filterBtnText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.blue },
+  filterBtnText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.blue, 'fg') },
   filterBadge: {
     minWidth: 16,
     height: 16,
     borderRadius: 8,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
-  filterBadgeText: { color: C.white, fontSize: 9, fontFamily: 'Inter_700Bold' },
+  filterBadgeText: { color: T(C.white, 'fg'), fontSize: 9, fontFamily: 'Inter_700Bold' },
   sortBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
   },
-  sortLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', color: C.textLight },
-  sortValue: { flex: 1, fontSize: 11, fontFamily: 'Inter_700Bold', color: C.text },
+  sortLabel: { fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  sortValue: { flex: 1, fontSize: 11, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   sortDropdown: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'border'),
     paddingHorizontal: 14,
   },
   sortOption: {
@@ -1643,10 +1610,10 @@ const rs = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: C.lightGray,
+    borderBottomColor: T(C.lightGray, 'border'),
   },
-  sortOptionText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: C.text },
-  sortOptionTextActive: { color: C.blue, fontFamily: 'Inter_700Bold' },
+  sortOptionText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
+  sortOptionTextActive: { color: T(C.blue, 'fg'), fontFamily: 'Inter_700Bold' },
   list: { paddingTop: 12 },
   resultHead: {
     flexDirection: 'row',
@@ -1658,32 +1625,33 @@ const rs = StyleSheet.create({
   resultCount: {
     fontSize: 11,
     fontFamily: 'Inter_500Medium',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
   },
-  clearLink: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.orange },
+  clearLink: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.orange, 'fg') },
   empty: {
     marginHorizontal: 14,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 24,
     alignItems: 'center',
-  },
-  emptyTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text },
+   ...glass(18), },
+  emptyTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   emptySub: {
     fontSize: 12,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     textAlign: 'center',
     marginTop: 6,
     marginBottom: 14,
   },
   emptyBtn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 18,
     paddingHorizontal: 16,
     paddingVertical: 9,
-  },
-  emptyBtnText: { color: C.white, fontSize: 12, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  emptyBtnText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_700Bold' },
 });
+const use_rs = () => useThemedStyles(make_rs);

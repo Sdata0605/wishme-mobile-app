@@ -13,10 +13,13 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DatePickerField, prettyDate } from '@/components/DatePickerField';
+import { fetchAlerts as loadOccasionAlerts, normType, scheduleOccasionNotifications } from '@/services/occasionAlerts';
 import { Icon } from '@/components/Icon';
 import { parseApiError, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const RELATIONS = ['Family', 'Friend', 'Partner', 'Colleague', 'Other'];
 const OCCASION_TYPES = ['Birthday', 'Anniversary', 'Wedding', 'Festival', 'Other'];
@@ -42,9 +45,9 @@ interface LovedOne {
 }
 
 const RELATION_COLORS: Record<string, string> = {
-  Family: '#B44CFF',
+  Family: '#1F7BFF',
   Friend: '#22C55E',
-  Partner: '#E8527A',
+  Partner: '#D23FE0',
   Colleague: '#F59E0B',
   Other: '#6B7280',
 };
@@ -77,10 +80,10 @@ function getDaysUntilBirthday(dob: string | null): number | null {
 
 function typeColor(t: string) {
   const m: Record<string, string> = {
-    Birthday: '#FF6B33',
-    Anniversary: '#E8527A',
-    Wedding: '#B44CFF',
-    Festival: '#4B83FF',
+    Birthday: '#7B5CFA',
+    Anniversary: '#D23FE0',
+    Wedding: '#1F7BFF',
+    Festival: '#3B5BDB',
     Other: '#22C55E',
   };
   return m[t] ?? '#6B7280';
@@ -282,7 +285,7 @@ export default function LovedOnesScreen() {
   };
 
   const addOccasion = () => {
-    if (!addOccName.trim()) return;
+    if (!addOccName.trim() || !addOccDate) return;
     const newOcc: OccasionItem = {
       id: `occ${Date.now()}`,
       name: addOccName.trim(),
@@ -337,6 +340,7 @@ export default function LovedOnesScreen() {
       }
 
       for (const occ of localOccasions) {
+        if (!occ.date) continue; // an alert needs a date
         const ir = await supabaseFetch(
           '/rest/v1/occasion_alerts?on_conflict=user_id,loved_one_id,occasion_name',
           {
@@ -348,11 +352,8 @@ export default function LovedOnesScreen() {
               user_id: user.profileId,
               loved_one_id: occasionTarget.id,
               occasion_name: occ.name,
-              occasion_type: occ.type,
-              occasion_date: occ.date || null,
-              alert_enabled: true,
-              auto_send_enabled: false,
-              alert_days_before: 7,
+              occasion_type: normType(occ.type),
+              occasion_date: occ.date,
             }),
           },
           session?.access_token,
@@ -368,6 +369,9 @@ export default function LovedOnesScreen() {
 
       setOccasionModal(false);
       await fetchLovedOnes();
+      if (user?.profileId && session?.access_token) {
+        loadOccasionAlerts(user.profileId, session.access_token).then(rows => scheduleOccasionNotifications(rows)).catch(() => {});
+      }
     } catch {
       setOccError('Network error. Please check your connection.');
     } finally {
@@ -376,7 +380,7 @@ export default function LovedOnesScreen() {
   };
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -387,7 +391,7 @@ export default function LovedOnesScreen() {
 
       {loading ? (
         <View style={s.centered}>
-          <ActivityIndicator size="large" color="#FF6B33" />
+          <ActivityIndicator size="large" color="#7B5CFA" />
           <Text style={[s.statusText, { color: colors.mutedForeground }]}>Loading...</Text>
         </View>
       ) : fetchError ? (
@@ -425,7 +429,7 @@ export default function LovedOnesScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <Text style={[s.name, { color: colors.foreground }]}>{fullName}</Text>
                         {daysUntil !== null && daysUntil <= 30 && (
-                          <View style={[s.birthdayBadge, { backgroundColor: daysUntil <= 7 ? '#EF4444' : '#FF6B33' }]}>
+                          <View style={[s.birthdayBadge, { backgroundColor: daysUntil <= 7 ? '#EF4444' : '#7B5CFA' }]}>
                             <Icon name="gift" size={10} color="#fff" />
                             <Text style={s.birthdayBadgeText}>
                               {daysUntil === 0 ? 'Today!' : `${daysUntil}d`}
@@ -459,8 +463,8 @@ export default function LovedOnesScreen() {
                   ) : null}
                   {item.date_of_birth ? (
                     <View style={s.infoRow}>
-                      <Icon name="gift" size={13} color="#FF6B33" />
-                      <Text style={[s.infoText, { color: colors.mutedForeground }]}>DOB: {item.date_of_birth}</Text>
+                      <Icon name="gift" size={13} color="#7B5CFA" />
+                      <Text style={[s.infoText, { color: colors.mutedForeground }]}>DOB: {prettyDate(item.date_of_birth)}</Text>
                     </View>
                   ) : null}
 
@@ -468,7 +472,7 @@ export default function LovedOnesScreen() {
                     style={[s.manageBtn, { borderColor: colors.border, backgroundColor: colors.muted }]}
                     onPress={() => openOccasions(item)}
                   >
-                    <Icon name="calendar" size={14} color="#B44CFF" />
+                    <Icon name="calendar" size={14} color="#1F7BFF" />
                     <Text style={[s.manageBtnText, { color: colors.foreground }]}>
                       Manage Occasions
                       {item.occasions?.length > 0 ? ` (${item.occasions.length})` : ''}
@@ -481,7 +485,7 @@ export default function LovedOnesScreen() {
         </ScrollView>
       )}
 
-      <TouchableOpacity style={[s.fab, { backgroundColor: '#FF6B33' }]} onPress={openAdd}>
+      <TouchableOpacity style={[s.fab, { backgroundColor: '#7B5CFA' }]} onPress={openAdd}>
         <Icon name="plus" size={24} color="#fff" />
       </TouchableOpacity>
 
@@ -543,12 +547,14 @@ export default function LovedOnesScreen() {
               />
 
               <Text style={[s.fieldLabel, { color: colors.foreground }]}>Date of Birth</Text>
-              <TextInput
-                style={[s.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
-                placeholder="YYYY-MM-DD"
-                placeholderTextColor={colors.mutedForeground}
+              <DatePickerField
+                label="Date of Birth"
+                kind="birthday"
+                optional
+                accent="#1F7BFF"
+                placeholder="Select date of birth"
                 value={draft.dob}
-                onChangeText={v => setDraft(d => ({ ...d, dob: v }))}
+                onChange={v => setDraft(d => ({ ...d, dob: v }))}
               />
 
               <Text style={[s.fieldLabel, { color: colors.foreground }]}>Relationship</Text>
@@ -557,8 +563,8 @@ export default function LovedOnesScreen() {
                   <TouchableOpacity
                     key={r}
                     style={[s.relChip, {
-                      backgroundColor: draft.relationship === r ? '#FF6B33' : colors.muted,
-                      borderColor: draft.relationship === r ? '#FF6B33' : colors.border,
+                      backgroundColor: draft.relationship === r ? '#7B5CFA' : colors.muted,
+                      borderColor: draft.relationship === r ? '#7B5CFA' : colors.border,
                     }]}
                     onPress={() => setDraft(d => ({ ...d, relationship: r }))}
                   >
@@ -655,7 +661,7 @@ export default function LovedOnesScreen() {
                     <View key={occ.id} style={[s.occRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
                       <View style={{ flex: 1 }}>
                         <Text style={[s.occName, { color: colors.foreground }]}>{occ.name}</Text>
-                        {occ.date ? <Text style={[s.occDate, { color: colors.mutedForeground }]}>{occ.date}</Text> : null}
+                        {occ.date ? <Text style={[s.occDate, { color: colors.mutedForeground }]}>{prettyDate(occ.date)}</Text> : null}
                       </View>
                       <View style={[s.typeBadge, { backgroundColor: tc + '20' }]}>
                         <Text style={[s.typeBadgeText, { color: tc }]}>{occ.type}</Text>
@@ -679,12 +685,13 @@ export default function LovedOnesScreen() {
                     onChangeText={setAddOccName}
                   />
                   <Text style={[s.fieldLabel, { color: colors.foreground }]}>Date</Text>
-                  <TextInput
-                    style={[s.input, { backgroundColor: colors.input, borderColor: colors.border, color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
-                    placeholder="YYYY-MM-DD"
-                    placeholderTextColor={colors.mutedForeground}
+                  <DatePickerField
+                    label="Occasion date"
+                    kind="occasion"
+                    accent="#1F7BFF"
+                    placeholder="Select a date"
                     value={addOccDate}
-                    onChangeText={setAddOccDate}
+                    onChange={setAddOccDate}
                   />
                   <Text style={[s.fieldLabel, { color: colors.foreground }]}>Type</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 4 }}>
@@ -692,8 +699,8 @@ export default function LovedOnesScreen() {
                       <TouchableOpacity
                         key={t}
                         style={[s.relChip, {
-                          backgroundColor: addOccType === t ? '#B44CFF' : colors.muted,
-                          borderColor: addOccType === t ? '#B44CFF' : colors.border,
+                          backgroundColor: addOccType === t ? '#1F7BFF' : colors.muted,
+                          borderColor: addOccType === t ? '#1F7BFF' : colors.border,
                         }]}
                         onPress={() => setAddOccType(t)}
                       >
@@ -705,17 +712,17 @@ export default function LovedOnesScreen() {
                     <TouchableOpacity style={[s.cancelBtn, { borderColor: colors.border }]} onPress={() => setShowAddOcc(false)}>
                       <Text style={[s.cancelBtnText, { color: colors.foreground }]}>Cancel</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity style={s.saveBtn} onPress={addOccasion}>
+                    <TouchableOpacity style={[s.saveBtn, (!addOccName.trim() || !addOccDate) && { opacity: 0.45 }]} onPress={addOccasion} disabled={!addOccName.trim() || !addOccDate}>
                       <Text style={s.saveBtnText}>Add</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
               ) : (
                 <TouchableOpacity
-                  style={[s.addOccBtn, { borderColor: '#B44CFF', backgroundColor: '#B44CFF15' }]}
+                  style={[s.addOccBtn, { borderColor: '#1F7BFF', backgroundColor: '#1F7BFF15' }]}
                   onPress={() => setShowAddOcc(true)}
                 >
-                  <Icon name="plus" size={16} color="#B44CFF" />
+                  <Icon name="plus" size={16} color="#1F7BFF" />
                   <Text style={s.addOccBtnText}>Add Occasion</Text>
                 </TouchableOpacity>
               )}
@@ -742,7 +749,7 @@ export default function LovedOnesScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -759,7 +766,7 @@ const s = StyleSheet.create({
   headerTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24 },
   statusText: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' },
-  retryBtn: { backgroundColor: '#FF6B33', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 },
+  retryBtn: { backgroundColor: '#7B5CFA', borderRadius: 10, paddingHorizontal: 24, paddingVertical: 10 },
   retryBtnText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   emptyState: { alignItems: 'center', gap: 12, paddingTop: 60 },
   emptyStateText: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center' },
@@ -835,7 +842,7 @@ const s = StyleSheet.create({
   relChip: { borderWidth: 1.5, borderRadius: 9999, paddingHorizontal: 14, paddingVertical: 8 },
   relChipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
   saveBtn: {
-    backgroundColor: '#FF6B33',
+    backgroundColor: '#7B5CFA',
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -856,7 +863,7 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: 'rgba(239,68,68,0.10)',
     borderRadius: 8,
     padding: 10,
     marginTop: 8,
@@ -887,7 +894,7 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     marginTop: 8,
   },
-  addOccBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#B44CFF' },
+  addOccBtnText: { fontSize: 14, fontFamily: 'Inter_600SemiBold', color: '#1F7BFF' },
   addOccForm: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 4, marginTop: 8 },
   addOccBtns: { flexDirection: 'row', gap: 10, marginTop: 8 },
   cancelBtn: { flex: 1, borderRadius: 10, borderWidth: 1.5, paddingVertical: 12, alignItems: 'center' },

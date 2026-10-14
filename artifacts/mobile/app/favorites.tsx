@@ -21,6 +21,7 @@ import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const { width: W } = Dimensions.get('window');
 const CARD_W = (W - 44) / 2;
@@ -156,17 +157,17 @@ function PaymentModal({
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.payBtn, { backgroundColor: '#FF6B3312', borderColor: '#FF6B33' }]}
+              style={[styles.payBtn, { backgroundColor: '#7B5CFA12', borderColor: '#7B5CFA' }]}
               onPress={onRazorpayPay}
               disabled={payingWallet || payingRazorpay}
               activeOpacity={0.8}
             >
               {payingRazorpay ? (
-                <ActivityIndicator size="small" color="#FF6B33" />
+                <ActivityIndicator size="small" color="#7B5CFA" />
               ) : (
-                <Icon name="credit-card" size={22} color="#FF6B33" />
+                <Icon name="credit-card" size={22} color="#7B5CFA" />
               )}
-              <Text style={[styles.payBtnLabel, { color: '#FF6B33' }]}>
+              <Text style={[styles.payBtnLabel, { color: '#7B5CFA' }]}>
                 Pay ₹{pricing.price.toLocaleString('en-IN')}
               </Text>
               <Text style={[styles.payBtnSub, { color: colors.mutedForeground }]}>Razorpay</Text>
@@ -210,7 +211,7 @@ function BrowseTab({
     <ScrollView
       contentContainerStyle={[styles.listPad, { paddingBottom: bottomPad }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B33" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7B5CFA" />}
     >
       <View style={[styles.searchWrap, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Icon name="search" size={16} color={colors.mutedForeground} />
@@ -315,13 +316,13 @@ function BrowseTab({
 
                   {pricing && (
                     <View style={styles.badgesRow}>
-                      <View style={[styles.featureBadge, { backgroundColor: '#FF6B3318' }]}>
-                        <Icon name="video" size={9} color="#FF6B33" />
-                        <Text style={[styles.featureBadgeText, { color: '#FF6B33' }]}>UGC</Text>
+                      <View style={[styles.featureBadge, { backgroundColor: '#7B5CFA18' }]}>
+                        <Icon name="video" size={9} color="#7B5CFA" />
+                        <Text style={[styles.featureBadgeText, { color: '#7B5CFA' }]}>UGC</Text>
                       </View>
-                      <View style={[styles.featureBadge, { backgroundColor: '#B44CFF18' }]}>
-                        <Icon name="zap" size={9} color="#B44CFF" />
-                        <Text style={[styles.featureBadgeText, { color: '#B44CFF' }]}>Wishes</Text>
+                      <View style={[styles.featureBadge, { backgroundColor: '#1F7BFF18' }]}>
+                        <Icon name="zap" size={9} color="#1F7BFF" />
+                        <Text style={[styles.featureBadgeText, { color: '#1F7BFF' }]}>Wishes</Text>
                       </View>
                       <View style={[styles.featureBadge, { backgroundColor: '#22C55E18' }]}>
                         <Icon name="image" size={9} color="#22C55E" />
@@ -352,7 +353,7 @@ function BrowseTab({
                       isSub
                         ? { backgroundColor: '#22C55E18', borderColor: '#22C55E' }
                         : pricing
-                          ? { backgroundColor: '#FF6B3318', borderColor: '#FF6B33' }
+                          ? { backgroundColor: '#7B5CFA18', borderColor: '#7B5CFA' }
                           : { backgroundColor: colors.background, borderColor: colors.border },
                     ]}
                     disabled={isSub}
@@ -363,7 +364,7 @@ function BrowseTab({
                         isSub
                           ? { color: '#22C55E' }
                           : pricing
-                            ? { color: '#FF6B33' }
+                            ? { color: '#7B5CFA' }
                             : { color: colors.mutedForeground },
                       ]}
                     >
@@ -394,7 +395,7 @@ function MyFavoritesTab({ favorites, colors, bottomPad, refreshing, onRefresh, o
     return (
       <ScrollView
         contentContainerStyle={styles.emptyFull}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B33" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7B5CFA" />}
       >
         <Icon name="heart" size={48} color={colors.mutedForeground} />
         <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No favorites yet</Text>
@@ -415,7 +416,7 @@ function MyFavoritesTab({ favorites, colors, bottomPad, refreshing, onRefresh, o
     <ScrollView
       contentContainerStyle={[styles.listPad, { paddingBottom: bottomPad }]}
       showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B33" />}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7B5CFA" />}
     >
       <View style={styles.grid}>
         {favorites.map((fav) => {
@@ -496,14 +497,14 @@ function MyFavoritesTab({ favorites, colors, bottomPad, refreshing, onRefresh, o
 
                 <View style={styles.actionRow}>
                   <TouchableOpacity
-                    style={[styles.actionBtn, { backgroundColor: '#FF6B3314', borderColor: '#FF6B3340' }]}
+                    style={[styles.actionBtn, { backgroundColor: '#7B5CFA14', borderColor: '#7B5CFA40' }]}
                     onPress={(e) => {
                       e.stopPropagation();
                       router.push({ pathname: '/occasions', params: { celebrity: celeb.id } });
                     }}
                   >
-                    <Icon name="video" size={12} color="#FF6B33" />
-                    <Text style={[styles.actionBtnText, { color: '#FF6B33' }]}>UGC</Text>
+                    <Icon name="video" size={12} color="#7B5CFA" />
+                    <Text style={[styles.actionBtnText, { color: '#7B5CFA' }]}>UGC</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionBtn, { backgroundColor: '#3B82F614', borderColor: '#3B82F640' }]}
@@ -757,7 +758,7 @@ export default function FavoritesScreen() {
             email: user?.email ?? '',
             contact: user?.phone ?? '',
           },
-          theme: { color: '#FF6B33' },
+          theme: { color: '#7B5CFA' },
           handler: async () => {
             await onPaymentSuccess();
           },
@@ -798,7 +799,7 @@ export default function FavoritesScreen() {
             email: user?.email ?? '',
             contact: user?.phone ?? '',
           },
-          theme: { color: '#FF6B33' },
+          theme: { color: '#7B5CFA' },
         });
 
         if (data?.razorpay_payment_id) {
@@ -817,7 +818,7 @@ export default function FavoritesScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border, backgroundColor: colors.background }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -826,17 +827,17 @@ export default function FavoritesScreen() {
           <View style={{ width: 22 }} />
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#FF6B33" />
+          <ActivityIndicator size="large" color="#7B5CFA" />
           <Text style={[{ marginTop: 12, fontSize: 14, fontFamily: 'Inter_400Regular', color: colors.mutedForeground }]}>
             Loading celebrities...
           </Text>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border, backgroundColor: colors.background }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -917,7 +918,7 @@ export default function FavoritesScreen() {
           colors={colors}
         />
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -980,7 +981,7 @@ const styles = StyleSheet.create({
   },
   featureBadgeText: { fontSize: 9, fontFamily: 'Inter_600SemiBold' },
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  priceText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#FF6B33' },
+  priceText: { fontSize: 13, fontFamily: 'Inter_700Bold', color: '#7B5CFA' },
   lifetimeLabel: { fontSize: 9, fontFamily: 'Inter_400Regular' },
   subDate: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 2 },
   subBtn: {
@@ -991,7 +992,7 @@ const styles = StyleSheet.create({
   wishBtn: {
     borderRadius: 8, paddingVertical: 7,
     alignItems: 'center', marginTop: 6,
-    backgroundColor: '#FF6B33',
+    backgroundColor: '#7B5CFA',
   },
   wishBtnText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold' },
   actionRow: { flexDirection: 'row', gap: 4, marginTop: 5 },
@@ -1025,7 +1026,7 @@ const styles = StyleSheet.create({
   modalSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 20 },
   amtBox: { alignItems: 'center', marginBottom: 16 },
   amtLabel: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  amtValue: { fontSize: 32, fontFamily: 'Inter_700Bold', color: '#FF6B33' },
+  amtValue: { fontSize: 32, fontFamily: 'Inter_700Bold', color: '#7B5CFA' },
   lifetimeText: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   balanceRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const BUSINESS_FEATURES: { icon: IconName; title: string; desc: string }[] = [
   { icon: 'video', title: 'Celebrity Endorsements', desc: 'Get authentic video testimonials from top celebrities that resonate with your audience.' },
@@ -116,7 +117,7 @@ export default function ForBusinessScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -128,7 +129,7 @@ export default function ForBusinessScreen() {
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <ScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}>
 
-          <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroCard}>
+          <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.heroCard}>
             <View style={styles.heroBadge}>
               <Text style={styles.heroBadgeText}>For Business</Text>
             </View>
@@ -144,7 +145,7 @@ export default function ForBusinessScreen() {
             <View style={styles.featuresGrid}>
               {BUSINESS_FEATURES.map((feat) => (
                 <View key={feat.title} style={[styles.featureCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.featureIconCircle}>
+                  <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.featureIconCircle}>
                     <Icon name={feat.icon} size={20} color="#fff" />
                   </LinearGradient>
                   <Text style={[styles.featureCardTitle, { color: colors.foreground }]}>{feat.title}</Text>
@@ -159,7 +160,7 @@ export default function ForBusinessScreen() {
             {HOW_IT_WORKS.map((step, idx) => (
               <View key={idx} style={styles.stepRow}>
                 <View style={styles.stepLeft}>
-                  <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.stepCircle}>
+                  <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.stepCircle}>
                     <Text style={styles.stepNumber}>{idx + 1}</Text>
                   </LinearGradient>
                   {idx < HOW_IT_WORKS.length - 1 && (
@@ -181,7 +182,7 @@ export default function ForBusinessScreen() {
                 key={tier.name}
                 style={[
                   styles.pricingCard,
-                  { backgroundColor: colors.card, borderColor: tier.popular ? '#B44CFF' : colors.border },
+                  { backgroundColor: colors.card, borderColor: tier.popular ? '#1F7BFF' : colors.border },
                   tier.popular && styles.pricingCardPopular,
                 ]}
               >
@@ -196,12 +197,12 @@ export default function ForBusinessScreen() {
                 <View style={[styles.tierDivider, { backgroundColor: colors.border }]} />
                 {tier.features.map((f) => (
                   <View key={f} style={styles.featureRow}>
-                    <Icon name="star" size={14} color="#FF6B33" />
+                    <Icon name="star" size={14} color="#7B5CFA" />
                     <Text style={[styles.featureText, { color: colors.foreground }]}>{f}</Text>
                   </View>
                 ))}
                 <Pressable onPress={scrollToContact} style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }, { marginTop: 16 }]}>
-                  <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.tierBtn}>
+                  <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.tierBtn}>
                     <Text style={styles.tierBtnText}>Get Started</Text>
                   </LinearGradient>
                 </Pressable>
@@ -230,7 +231,7 @@ export default function ForBusinessScreen() {
           </View>
 
           <View style={styles.section}>
-            <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaCard}>
+            <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.ctaCard}>
               <Text style={styles.ctaTitle}>Ready to Transform Your Marketing?</Text>
               <Text style={styles.ctaSub}>Join hundreds of brands already winning with celebrity power.</Text>
               <View style={styles.ctaBtns}>
@@ -308,7 +309,7 @@ export default function ForBusinessScreen() {
                   </View>
 
                   <Pressable onPress={() => setSubmitted(true)} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
-                    <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.submitBtn}>
+                    <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.submitBtn}>
                       <Text style={styles.submitBtnText}>Submit</Text>
                     </LinearGradient>
                   </Pressable>
@@ -325,7 +326,7 @@ export default function ForBusinessScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -346,7 +347,7 @@ const styles = StyleSheet.create({
   heroTitle: { color: '#fff', fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', textAlign: 'center', marginBottom: 10, lineHeight: 34 },
   heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 24, lineHeight: 22 },
   heroBtn: { backgroundColor: '#fff', borderRadius: 999, paddingHorizontal: 32, paddingVertical: 14 },
-  heroBtnText: { color: '#FF6B33', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  heroBtnText: { color: '#7B5CFA', fontSize: 15, fontFamily: 'Inter_700Bold' },
   section: { padding: 20 },
   sectionTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', marginBottom: 18 },
   featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
@@ -363,8 +364,8 @@ const styles = StyleSheet.create({
   stepTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   stepDesc: { fontSize: 13, fontFamily: 'Inter_400Regular', lineHeight: 20 },
   pricingCard: { borderRadius: 18, borderWidth: 1.5, padding: 20, marginBottom: 16, position: 'relative' },
-  pricingCardPopular: { shadowColor: '#B44CFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8 },
-  popularBadge: { position: 'absolute', top: 14, right: 14, backgroundColor: '#B44CFF', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  pricingCardPopular: { shadowColor: '#1F7BFF', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 12, elevation: 8 },
+  popularBadge: { position: 'absolute', top: 14, right: 14, backgroundColor: '#1F7BFF', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
   popularBadgeText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold' },
   tierName: { fontSize: 18, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   tierPrice: { fontSize: 28, fontFamily: 'Inter_700Bold', marginBottom: 4 },
@@ -386,7 +387,7 @@ const styles = StyleSheet.create({
   ctaSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 22, lineHeight: 20 },
   ctaBtns: { gap: 12, width: '100%' },
   ctaBtnPrimary: { backgroundColor: '#fff', borderRadius: 999, paddingVertical: 14, alignItems: 'center' },
-  ctaBtnPrimaryText: { color: '#FF6B33', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  ctaBtnPrimaryText: { color: '#7B5CFA', fontSize: 15, fontFamily: 'Inter_700Bold' },
   ctaBtnSecondary: { borderRadius: 999, paddingVertical: 14, alignItems: 'center', borderWidth: 1.5, borderColor: '#fff' },
   ctaBtnSecondaryText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   formCard: { borderRadius: 20, borderWidth: 1, padding: 20 },

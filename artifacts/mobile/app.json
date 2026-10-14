@@ -2,7 +2,7 @@
   "expo": {
     "name": "WishMe",
     "slug": "mobile",
-    "owner": "prashantuser3",
+    "owner": "prashantuser5",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -19,7 +19,11 @@
       "bundleIdentifier": "com.prashantuser1.wishme",
       "infoPlist": {
         "NSSpeechRecognitionUsageDescription": "Allow WishMe to recognise your speech so you can use the voice assistant.",
-        "NSMicrophoneUsageDescription": "Allow WishMe to use the microphone for voice commands."
+        "NSMicrophoneUsageDescription": "Allow WishMe to use the microphone for voice commands.",
+        "NSContactsUsageDescription": "Allow WishMe to read your contacts so the assistant can call people by name.",
+        "NSCameraUsageDescription": "Allow WishMe to use the camera so you can scan QR codes to pay.",
+        "NSPhotoLibraryUsageDescription": "Allow WishMe to open your photo library so you can pick photos for your wishes.",
+        "NSPhotoLibraryAddUsageDescription": "Allow WishMe to save the wishes and photos you create to your photo library."
       }
     },
     "android": {
@@ -37,7 +41,16 @@
         "android.permission.READ_MEDIA_VIDEO",
         "android.permission.READ_MEDIA_AUDIO",
         "android.permission.RECORD_AUDIO",
-        "android.permission.CAMERA"
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.READ_CONTACTS",
+        "android.permission.CALL_PHONE",
+        "android.permission.CAMERA",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.SCHEDULE_EXACT_ALARM",
+        "android.permission.USE_EXACT_ALARM",
+        "android.permission.VIBRATE",
+        "android.permission.WRITE_CONTACTS"
       ]
     },
     "web": {
@@ -52,6 +65,7 @@
       ],
       "expo-font",
       "expo-web-browser",
+      "./plugins/withLauncherQueries",
       "expo-media-library",
       [
         "expo-camera",
@@ -66,7 +80,21 @@
           "speechRecognitionPermission": "Allow WishMe to recognise your speech so you can use the voice assistant."
         }
       ],
-      "@react-native-community/datetimepicker"
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow WishMe to read your contacts so the voice assistant can call people you ask for."
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#FF6B33",
+          "defaultChannel": "reminders"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -74,7 +102,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "07663ffd-5b47-43b3-a1a6-ef2797942356"
+        "projectId": "8f4bc8a6-1ec4-4fcf-9c79-cdd909a76344"
       }
     }
   }

@@ -16,7 +16,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { supabaseFetch, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useOrderConfirm } from '@/context/OrderConfirmContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
 
@@ -38,12 +40,12 @@ function fmtDate(date: string): string {
 }
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#FF6B33', '#E8527A'],
-  ['#E8527A', '#B44CFF'],
-  ['#B44CFF', '#7B2FFF'],
-  ['#4B83FF', '#7B2FFF'],
-  ['#FF6B33', '#B44CFF'],
-  ['#7B2FFF', '#4B83FF'],
+  ['#7B5CFA', '#D23FE0'],
+  ['#D23FE0', '#1F7BFF'],
+  ['#1F7BFF', '#7C3AED'],
+  ['#3B5BDB', '#7C3AED'],
+  ['#7B5CFA', '#1F7BFF'],
+  ['#7C3AED', '#3B5BDB'],
 ];
 
 function gradientForName(name: string): [string, string] {
@@ -77,6 +79,7 @@ export default function OccasionBookScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { session, user } = useAuth();
+  const { confirmOrder } = useOrderConfirm();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
   const [occasion, setOccasion] = useState<Occasion | null>(null);
@@ -205,8 +208,13 @@ export default function OccasionBookScreen() {
       }
 
       const typeLabel = bookingType === 'video' ? 'video' : 'greeting card';
-      showToast(`Booking created! Your ${typeLabel} is being generated.`);
-      setTimeout(() => router.replace('/dashboard' as never), 1500);
+      confirmOrder({
+        item: `an occasion ${typeLabel} for ${recipientName.trim()}`,
+        orderId: bookingId,
+        note: `Your ${typeLabel} is being generated.`,
+        onView: () => router.replace('/bookings' as never),
+        onDone: () => router.replace('/dashboard' as never),
+      });
     } finally {
       setSubmitting(false);
     }
@@ -216,7 +224,7 @@ export default function OccasionBookScreen() {
 
   if (!user || !session) {
     return (
-      <View style={[s.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -235,13 +243,13 @@ export default function OccasionBookScreen() {
             <Text style={s.gateBtnText}>Sign In</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   if (loading) {
     return (
-      <View style={[s.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -252,13 +260,13 @@ export default function OccasionBookScreen() {
         <View style={s.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   if (celebrities.length === 0) {
     return (
-      <View style={[s.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -277,7 +285,7 @@ export default function OccasionBookScreen() {
             <Text style={s.gateBtnText}>Browse &amp; Subscribe to Celebrities</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
@@ -289,7 +297,7 @@ export default function OccasionBookScreen() {
   }
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -463,7 +471,7 @@ export default function OccasionBookScreen() {
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={canSubmit ? ['#FF6B33', '#B44CFF'] : ['#aaa', '#888']}
+              colors={canSubmit ? ['#7B5CFA', '#1F7BFF'] : ['#aaa', '#888']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={s.submitBtn}
@@ -483,7 +491,7 @@ export default function OccasionBookScreen() {
           <Text style={s.toastText}>{toast}</Text>
         </View>
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 

@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,11 +15,14 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SubscribeSheet, type ServiceKey } from '@/components/celebrity/SubscribeSheet';
 import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Celebrity } from '@/hooks/useCelebrities';
+import { useWallet } from '@/hooks/useWallet';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -82,7 +85,7 @@ export default function CelebrityDetailScreen() {
     setError(null);
     try {
       const res = await supabaseFetch(
-        `/rest/v1/celebrities?id=eq.${id}&select=*&limit=1`,
+        `/rest/v1/celebrities?id=eq.${id}&select=*,celebrity_reviews(count)&limit=1`,
       );
       if (!res.ok) throw new Error(`API error (${res.status})`);
       const rows = await res.json();
@@ -99,8 +102,8 @@ export default function CelebrityDetailScreen() {
           category: raw.category,
           bio: raw.bio ?? '',
           imageUrl: raw.image_url ?? '',
-          rating: raw.rating ?? 0,
-          reviewCount: raw.review_count ?? 0,
+          rating: (raw.celebrity_reviews?.[0]?.count ?? 0) > 0 ? raw.rating ?? 0 : 0,
+          reviewCount: raw.celebrity_reviews?.[0]?.count ?? 0,
           followers: raw.followers,
           location: raw.location,
           deliveryTime: raw.delivery_time,
@@ -136,10 +139,12 @@ export default function CelebrityDetailScreen() {
   const [pricingPrice, setPricingPrice] = useState<number | null>(null);
   const [isPricingDisabled, setIsPricingDisabled] = useState(false);
 
-  const [showStep1, setShowStep1] = useState(false);
-  const [showStep2, setShowStep2] = useState(false);
+  const [scrolledPast, setScrolledPast] = useState(false);
+  const [showSubscribe, setShowSubscribe] = useState(false);
+  const [subscribeStart, setSubscribeStart] = useState<'offer' | 'pay'>('offer');
+  const reopenAfterWallet = useRef(false);
+  const wallet = useWallet();
   const [showServiceSheet, setShowServiceSheet] = useState(false);
-  const [payLoading, setPayLoading] = useState(false);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
 
@@ -262,45 +267,9 @@ export default function CelebrityDetailScreen() {
       router.push('/(auth)');
       return;
     }
-    setShowStep1(true);
-  };
-
-  const handleSubscribe = async () => {
-    if (pricingPrice === null) return;
-    setPayLoading(true);
-    try {
-      const res = await supabaseFetch(
-        '/rest/v1/rpc/purchase_celebrity_subscription',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            p_celebrity_id: id,
-            p_price: pricingPrice,
-            p_payment_method: 'wallet',
-          }),
-        },
-        session?.access_token,
-      );
-      const data = await res.json() as Record<string, unknown>;
-      if (res.ok && data.success) {
-        setShowStep2(false);
-        setIsSubscribed(true);
-        fetchSubscriptionData();
-        Alert.alert('Subscribed!', 'You can now book services from this celebrity.');
-      } else {
-        const errMsg = (data.error as string) ?? 'Subscription failed. Please try again.';
-        const lower = errMsg.toLowerCase();
-        if (lower.includes('insufficient') || lower.includes('balance') || lower.includes('wallet')) {
-          Alert.alert('Insufficient Balance', 'Insufficient balance. Add funds to your wallet.');
-        } else {
-          Alert.alert('Error', errMsg);
-        }
-      }
-    } catch {
-      Alert.alert('Error', 'Network error. Please try again.');
-    } finally {
-      setPayLoading(false);
-    }
+    wallet.refetch();
+    setSubscribeStart('offer');
+    setShowSubscribe(true);
   };
 
   const handleBookOrSubscribe = () => {
@@ -308,16 +277,24 @@ export default function CelebrityDetailScreen() {
       router.push('/(auth)');
       return;
     }
-    if (!hasPricing && !isSubscribed) {
-      Alert.alert('Subscription Not Available', 'This celebrity has not enabled subscription services yet.');
-      return;
-    }
     if (isSubscribed) {
       setShowServiceSheet(true);
-    } else {
-      setShowStep1(true);
+    } else if (hasPricing) {
+      openSubscriptionFlow();
     }
   };
+
+  // Back from the wallet with the sheet waiting: refresh the balance and reopen it on the payment step.
+  useFocusEffect(
+    useCallback(() => {
+      if (!reopenAfterWallet.current) return;
+      reopenAfterWallet.current = false;
+      wallet.refetch();
+      setSubscribeStart('pay');
+      setShowSubscribe(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
 
   if (loading) {
     return (
@@ -366,8 +343,7 @@ export default function CelebrityDetailScreen() {
   const hasPricing = pricingPrice !== null && !isPricingDisabled;
   const bookBtnLabel = !isLoggedIn ? 'Book a Service' : isSubscribed ? 'Book a Service' : !hasPricing ? 'Subscription Not Available' : 'Subscribe to Book';
   const showSubscribeBanner = isLoggedIn && !isSubscribed && !subLoading && hasPricing;
-  const walletBalance = user?.walletBalance ?? 0;
-  const canAffordWallet = pricingPrice !== null && walletBalance >= pricingPrice;
+  const walletBalance = wallet.balance;
 
   const serviceCards = [
     {
@@ -495,8 +471,16 @@ export default function CelebrityDetailScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+    <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        scrollEventThrottle={32}
+        onScroll={e => {
+          const past = e.nativeEvent.contentOffset.y > 120;
+          setScrolledPast(prev => (prev === past ? prev : past));
+        }}
+      >
         {/* Header image */}
         <View style={{ height: 300, position: 'relative' }}>
           <Image source={{ uri: celebrity.imageUrl + '?w=800' }} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -564,8 +548,14 @@ export default function CelebrityDetailScreen() {
           {/* Rating + reviews */}
           <View style={styles.ratingRow}>
             <Icon name="star" size={16} color="#FFB347" />
-            <Text style={[styles.rating, { color: colors.foreground }]}>{celebrity.rating}</Text>
-            <Text style={[styles.reviews, { color: colors.mutedForeground }]}>({celebrity.reviewCount.toLocaleString('en-IN')} reviews)</Text>
+            {celebrity.reviewCount > 0 && celebrity.rating > 0 ? (
+              <>
+                <Text style={[styles.rating, { color: colors.foreground }]}>{celebrity.rating.toFixed(1)}</Text>
+                <Text style={[styles.reviews, { color: colors.mutedForeground }]}>({celebrity.reviewCount.toLocaleString('en-IN')} {celebrity.reviewCount === 1 ? 'review' : 'reviews'})</Text>
+              </>
+            ) : (
+              <Text style={[styles.reviews, { color: colors.mutedForeground }]}>New · no reviews yet</Text>
+            )}
           </View>
 
           {/* Location + Delivery */}
@@ -726,7 +716,7 @@ export default function CelebrityDetailScreen() {
             onPress={handleBookOrSubscribe}
             style={styles.subscribeToBookBtn}
           >
-            <Icon name="lock" size={16} color="#FF6B33" />
+            <Icon name="lock" size={16} color="#7B5CFA" />
             <Text style={styles.subscribeToBookText}>{bookBtnLabel}</Text>
           </TouchableOpacity>
         ) : (
@@ -734,177 +724,33 @@ export default function CelebrityDetailScreen() {
             onPress={handleBookOrSubscribe}
             style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.85 : 1 }]}
           >
-            <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bookBtn}>
+            <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bookBtn}>
               <Text style={styles.bookBtnText}>{bookBtnLabel}</Text>
             </LinearGradient>
           </Pressable>
         )}
       </View>
 
-      {/* Step 1: Info + Benefits Sheet */}
-      <Modal
-        visible={showStep1}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowStep1(false)}
-      >
-        <TouchableOpacity
-          style={styles.sheetOverlay}
-          activeOpacity={1}
-          onPress={() => setShowStep1(false)}
+      {scrolledPast && <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: colors.background, zIndex: 5 }} />}
+
+      {celebrity && pricingPrice !== null && (
+        <SubscribeSheet
+          visible={showSubscribe}
+          onClose={() => setShowSubscribe(false)}
+          celebrity={{ id: celebrity.id, name: celebrity.name, category: celebrity.category, imageUrl: celebrity.imageUrl, isVerified: celebrity.isVerified }}
+          price={pricingPrice}
+          walletBalance={walletBalance}
+          token={session?.access_token ?? null}
+          startAt={subscribeStart}
+          onSubscribed={() => { setIsSubscribed(true); fetchSubscriptionData(); wallet.refetch(); }}
+          onAddMoney={() => { reopenAfterWallet.current = true; setShowSubscribe(false); setTimeout(() => router.push('/wallet' as never), 80); }}
+          onBook={(service: ServiceKey) => {
+            setShowSubscribe(false);
+            setTimeout(() => router.push({ pathname: '/booking/[id]', params: { id: celebrity.id, service } }), 80);
+          }}
+          servicePrices={{ wish: celebrity.pricePerWish ?? 0, ad: ugcPrice, video: promoPrice }}
         />
-        <View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 20 }]}>
-          <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
-
-          {/* Celebrity row */}
-          <View style={styles.step1CelebRow}>
-            {celebrity.imageUrl ? (
-              <Image source={{ uri: celebrity.imageUrl }} style={styles.step1Avatar} />
-            ) : (
-              <View style={[styles.step1Avatar, { backgroundColor: colors.backgroundSecondary, alignItems: 'center', justifyContent: 'center' }]}>
-                <Icon name="user" size={28} color={colors.mutedForeground} />
-              </View>
-            )}
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.step1CelebName, { color: colors.foreground }]}>{celebrity.name}</Text>
-              <View style={[styles.step1CategoryBadge, { backgroundColor: colors.primary + '20' }]}>
-                <Text style={[styles.step1CategoryText, { color: colors.primary }]}>{celebrity.category}</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Gradient price card */}
-          {pricingPrice !== null && (
-            <LinearGradient
-              colors={['#FF6B33', '#B44CFF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.step1PriceCard}
-            >
-              <Text style={styles.step1PriceAmount}>₹{pricingPrice.toLocaleString('en-IN')}</Text>
-              <Text style={styles.step1PriceSubtitle}>Lifetime Access — Pay Once, Use Forever</Text>
-            </LinearGradient>
-          )}
-
-          {/* Benefits list */}
-          <View style={{ gap: 10, marginBottom: 20 }}>
-            {BENEFITS.map((b) => (
-              <View key={b.label} style={styles.benefitRow}>
-                <Text style={styles.benefitEmoji}>{b.emoji}</Text>
-                <Text style={[styles.benefitLabel, { color: colors.foreground }]}>{b.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Subscribe Now button */}
-          {isPricingDisabled ? (
-            <View style={styles.unavailableBox}>
-              <Icon name="info" size={20} color={colors.mutedForeground} />
-              <Text style={[styles.unavailableText, { color: colors.mutedForeground }]}>
-                Subscription not available for this celebrity
-              </Text>
-              <TouchableOpacity onPress={() => setShowStep1(false)} style={[styles.viewProfileBtn, { borderColor: colors.border }]}>
-                <Text style={[styles.viewProfileText, { color: colors.foreground }]}>View Profile Only</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <Pressable
-              onPress={() => {
-                setShowStep1(false);
-                setShowStep2(true);
-              }}
-              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-            >
-              <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.payBtn}>
-                <Text style={styles.payBtnText}>Subscribe Now →</Text>
-              </LinearGradient>
-            </Pressable>
-          )}
-
-          <TouchableOpacity onPress={() => setShowStep1(false)} style={styles.cancelLink}>
-            <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
-
-      {/* Step 2: Payment Selector Sheet */}
-      <Modal
-        visible={showStep2}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowStep2(false)}
-      >
-        <TouchableOpacity
-          style={styles.sheetOverlay}
-          activeOpacity={1}
-          onPress={() => setShowStep2(false)}
-        />
-        <View style={[styles.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 20 }]}>
-          <View style={[styles.sheetHandle, { backgroundColor: colors.border }]} />
-          <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Complete Payment</Text>
-
-          {/* Amount card */}
-          {pricingPrice !== null && (
-            <View style={[styles.step2AmountCard, { backgroundColor: colors.backgroundSecondary }]}>
-              <Text style={[styles.step2AmountLabel, { color: colors.mutedForeground }]}>Amount</Text>
-              <Text style={[styles.step2AmountValue, { color: colors.foreground }]}>₹{pricingPrice.toLocaleString('en-IN')}</Text>
-            </View>
-          )}
-
-          {/* Wallet balance row */}
-          <View style={[styles.walletRow, { borderColor: colors.border }]}>
-            <Text style={[styles.walletLabel, { color: colors.foreground }]}>Wallet Balance</Text>
-            <Text style={[styles.walletAmount, { color: colors.primary }]}>₹{walletBalance.toLocaleString('en-IN')}</Text>
-          </View>
-
-          {/* Payment buttons grid */}
-          {pricingPrice !== null && (
-            <View style={styles.paymentGrid}>
-              {/* Wallet payment */}
-              <Pressable
-                onPress={canAffordWallet ? handleSubscribe : undefined}
-                disabled={!canAffordWallet || payLoading}
-                style={({ pressed }) => [
-                  styles.paymentBtn,
-                  { backgroundColor: colors.backgroundSecondary, borderColor: canAffordWallet ? colors.primary : colors.border, opacity: (!canAffordWallet || payLoading) && !pressed ? 0.6 : pressed ? 0.8 : 1 },
-                ]}
-              >
-                {payLoading ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <>
-                    <Icon name="credit-card" size={24} color={canAffordWallet ? colors.primary : colors.mutedForeground} />
-                    <Text style={[styles.paymentBtnPrice, { color: canAffordWallet ? colors.foreground : colors.mutedForeground }]}>Pay ₹{pricingPrice.toLocaleString('en-IN')}</Text>
-                    <Text style={[styles.paymentBtnSub, { color: colors.mutedForeground }]}>Wallet</Text>
-                    {!canAffordWallet && (
-                      <View style={styles.insufficientBadge}>
-                        <Text style={styles.insufficientText}>Insufficient</Text>
-                      </View>
-                    )}
-                  </>
-                )}
-              </Pressable>
-
-              {/* Razorpay payment */}
-              <Pressable
-                onPress={() => Alert.alert('Coming Soon', 'Razorpay payments are coming soon!')}
-                style={({ pressed }) => [
-                  styles.paymentBtn,
-                  { backgroundColor: colors.backgroundSecondary, borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
-                ]}
-              >
-                <Icon name="credit-card" size={24} color={colors.mutedForeground} />
-                <Text style={[styles.paymentBtnPrice, { color: colors.foreground }]}>Pay ₹{pricingPrice.toLocaleString('en-IN')}</Text>
-                <Text style={[styles.paymentBtnSub, { color: colors.mutedForeground }]}>Razorpay</Text>
-              </Pressable>
-            </View>
-          )}
-
-          <TouchableOpacity onPress={() => setShowStep2(false)} style={styles.cancelLink}>
-            <Text style={[styles.cancelLinkText, { color: colors.mutedForeground }]}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      )}
 
       {/* Service Selection Sheet */}
       <Modal
@@ -960,7 +806,7 @@ export default function CelebrityDetailScreen() {
           </TouchableOpacity>
         </View>
       </Modal>
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -981,13 +827,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#FF6B33',
+    backgroundColor: '#7B5CFA',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   subscribeBannerText: { flex: 1, color: '#fff', fontSize: 13, fontFamily: 'Inter_500Medium' },
   subscribeBannerPill: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 9999 },
-  subscribeBannerPillText: { color: '#FF6B33', fontSize: 12, fontFamily: 'Inter_700Bold' },
+  subscribeBannerPillText: { color: '#7B5CFA', fontSize: 12, fontFamily: 'Inter_700Bold' },
   infoSection: { padding: 20 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
   rating: { fontSize: 18, fontFamily: 'Inter_700Bold' },
@@ -1036,8 +882,8 @@ const styles = StyleSheet.create({
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1 },
   voiceCallBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 14, borderRadius: 12, borderWidth: 2 },
   voiceCallText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  subscribeToBookBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 12, borderWidth: 2, borderColor: '#FF6B33' },
-  subscribeToBookText: { color: '#FF6B33', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  subscribeToBookBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 12, borderWidth: 2, borderColor: '#7B5CFA' },
+  subscribeToBookText: { color: '#7B5CFA', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   bookBtn: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   bookBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },

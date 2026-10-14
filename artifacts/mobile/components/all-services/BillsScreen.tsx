@@ -28,6 +28,8 @@ import {
 } from './billData';
 
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles, glass } from './themed';
+import { BrandFill } from './BrandFill';
 
 const HUB: Record<
   BillGroup,
@@ -54,7 +56,7 @@ const HUB: Record<
     ctaKind: 'electricity',
     Icon: FileText,
     accent: C.orange,
-    accentBg: '#FFF7ED',
+    accentBg: '#F5F0FF',
   },
   recharge: {
     title: 'Recharge',
@@ -91,6 +93,7 @@ export function ServiceCategoryScreen({
   onBack: () => void;
   onOpenBill: (kind: BillKind) => void;
 }) {
+  const st = use_st(); const hero = use_hero(); const sec = use_sec(); const ofr = use_ofr(); const ts = use_ts();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const hub = HUB[group];
@@ -100,15 +103,15 @@ export function ServiceCategoryScreen({
     <View style={st.root}>
       <View style={[st.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={24} color={C.text} />
+          <ArrowLeft size={24} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View>
           <Text style={st.headerTitle}>{hub.title}</Text>
           <Text style={st.headerSub}>{hub.sub}</Text>
         </View>
         <View style={{ flex: 1 }} />
-        <View style={[st.headerIcon, { backgroundColor: hub.accentBg }]}>
-          <hub.Icon size={18} color={hub.accent} />
+        <View style={[st.headerIcon, { backgroundColor: T(hub.accentBg, 'bg') }]}>
+          <hub.Icon size={18} color={T(hub.accent, 'fg')} />
         </View>
       </View>
 
@@ -118,20 +121,20 @@ export function ServiceCategoryScreen({
             <Text style={hero.title}>
               {hub.heroTitle}
               {'\n'}
-              <Text style={{ color: C.orange }}>{hub.heroHighlight}</Text>
+              <Text style={{ color: T(C.orange, 'fg') }}>{hub.heroHighlight}</Text>
             </Text>
             <Text style={hero.sub}>{hub.heroSub}</Text>
-            <TouchableOpacity style={hero.btn} onPress={() => onOpenBill(hub.ctaKind)}>
+            <TouchableOpacity style={hero.btn} onPress={() => onOpenBill(hub.ctaKind)}><BrandFill />
               <Text style={hero.btnText}>{hub.cta}</Text>
             </TouchableOpacity>
           </View>
           <View style={hero.right}>
-            <View style={[hero.mini, { backgroundColor: hub.accent }]}>
-              <hub.Icon size={22} color={C.white} />
+            <View style={[hero.mini, { backgroundColor: T(hub.accent, 'bg') }]}>
+              <hub.Icon size={22} color={T(C.white, 'fg')} />
               <Text style={hero.miniLabel}>{hub.title.split(' ')[0]}</Text>
             </View>
-            <View style={hero.miniPurple}>
-              <Percent size={18} color={C.white} />
+            <View style={hero.miniPurple}><BrandFill />
+              <Percent size={18} color={T(C.white, 'fg')} />
               <Text style={hero.miniLabel}>Offers</Text>
             </View>
           </View>
@@ -147,8 +150,8 @@ export function ServiceCategoryScreen({
               activeOpacity={0.8}
               onPress={() => onOpenBill(s.key)}
             >
-              <View style={[sec.iconBox, { backgroundColor: s.bg }]}>
-                <s.Icon size={24} color={s.color} />
+              <View style={[sec.iconBox, { backgroundColor: T(s.bg, 'bg') }]}>
+                <s.Icon size={24} color={T(s.color, 'fg')} />
               </View>
               <View style={{ flex: 1 }}>
                 <View style={sec.titleRow}>
@@ -161,14 +164,14 @@ export function ServiceCategoryScreen({
                 </View>
                 <Text style={sec.cardDesc}>{s.desc}</Text>
               </View>
-              <ChevronRight size={18} color={C.gray} />
+              <ChevronRight size={18} color={T(C.gray, 'fg')} />
             </TouchableOpacity>
           ))}
         </View>
 
-        <View style={ofr.container}>
+        <View style={ofr.container}><BrandFill />
           <View style={ofr.iconBox}>
-            <Tag size={22} color="#FCD34D" />
+            <Tag size={22} color={T('#FCD34D', 'fg')} />
           </View>
           <View style={{ flex: 1 }}>
             <Text style={ofr.headline}>Flat ₹75 cashback</Text>
@@ -177,7 +180,7 @@ export function ServiceCategoryScreen({
               <Text style={ofr.codeText}>Use Code: WISH75</Text>
             </View>
           </View>
-          <TouchableOpacity style={ofr.btn} onPress={() => onOpenBill(hub.ctaKind)}>
+          <TouchableOpacity style={ofr.btn} onPress={() => onOpenBill(hub.ctaKind)}><BrandFill />
             <Text style={ofr.btnText}>Claim</Text>
           </TouchableOpacity>
         </View>
@@ -185,14 +188,14 @@ export function ServiceCategoryScreen({
         <View style={ts.container}>
           {(
             [
-              { Icon: ShieldCheck, color: C.green, title: 'Secure', sub: 'Safe payments' },
-              { Icon: Zap, color: '#FBBF24', title: 'Instant', sub: 'Quick confirm' },
-              { Icon: Headphones, color: '#60A5FA', title: '24x7', sub: 'Always help' },
-              { Icon: Percent, color: C.orange, title: 'Offers', sub: 'Cashback deals' },
+              { Icon: ShieldCheck, color: T(C.green, 'fg'), title: 'Secure', sub: 'Safe payments' },
+              { Icon: Zap, color: T('#FBBF24', 'fg'), title: 'Instant', sub: 'Quick confirm' },
+              { Icon: Headphones, color: T('#60A5FA', 'fg'), title: '24x7', sub: 'Always help' },
+              { Icon: Percent, color: T(C.orange, 'fg'), title: 'Offers', sub: 'Cashback deals' },
             ] as { Icon: LucideIcon; color: string; title: string; sub: string }[]
           ).map((b, i, arr) => (
             <View key={b.title} style={[ts.item, i < arr.length - 1 && ts.border]}>
-              <b.Icon size={18} color={b.color} />
+              <b.Icon size={18} color={T(b.color, 'fg')} />
               <Text style={ts.title}>{b.title}</Text>
               <Text style={ts.sub}>{b.sub}</Text>
             </View>
@@ -213,9 +216,9 @@ export function BillsScreen(props: {
   return <ServiceCategoryScreen group="bills" {...props} />;
 }
 
-const hero = StyleSheet.create({
+const make_hero = () => StyleSheet.create({
   wrap: {
-    backgroundColor: '#0D0C35',
+    backgroundColor: T('#0D0C35', 'bg'),
     marginHorizontal: 14,
     marginTop: 12,
     borderRadius: 18,
@@ -224,7 +227,7 @@ const hero = StyleSheet.create({
     gap: 10,
   },
   left: { flex: 1 },
-  title: { fontSize: 20, fontFamily: 'Inter_700Bold', color: C.white, lineHeight: 28 },
+  title: { fontSize: 20, fontFamily: 'Inter_700Bold', color: T(C.white, 'fg'), lineHeight: 28 },
   sub: {
     fontSize: 11,
     color: 'rgba(255,255,255,0.65)',
@@ -235,31 +238,32 @@ const hero = StyleSheet.create({
   },
   btn: {
     alignSelf: 'flex-start',
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
-  },
-  btnText: { color: C.white, fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+   overflow: 'hidden', },
+  btnText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   right: { gap: 8, width: 72 },
   mini: { borderRadius: 12, padding: 10, alignItems: 'flex-start', gap: 6 },
   miniPurple: {
-    backgroundColor: C.purple,
+    backgroundColor: T(C.purple, 'bg'),
     borderRadius: 12,
     padding: 10,
     alignItems: 'flex-start',
     gap: 6,
-  },
-  miniLabel: { color: C.white, fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+   overflow: 'hidden', },
+  miniLabel: { color: T(C.white, 'fg'), fontSize: 11, fontFamily: 'Inter_600SemiBold' },
 });
+const use_hero = () => useThemedStyles(make_hero);
 
-const sec = StyleSheet.create({
+const make_sec = () => StyleSheet.create({
   section: { marginTop: 20, paddingHorizontal: 14 },
-  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   sub: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 2,
     marginBottom: 12,
   },
@@ -267,13 +271,13 @@ const sec = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 16,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: C.border,
-  },
+    borderColor: T(C.border, 'border'),
+   ...glass(22), },
   iconBox: {
     width: 50,
     height: 50,
@@ -282,25 +286,26 @@ const sec = StyleSheet.create({
     justifyContent: 'center',
   },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  cardTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
+  cardTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   badge: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
     borderRadius: 8,
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
-  badgeText: { fontSize: 9, fontFamily: 'Inter_600SemiBold', color: C.green },
+  badgeText: { fontSize: 9, fontFamily: 'Inter_600SemiBold', color: T(C.green, 'fg') },
   cardDesc: {
     fontSize: 11,
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     fontFamily: 'Inter_400Regular',
     marginTop: 3,
   },
 });
+const use_sec = () => useThemedStyles(make_sec);
 
-const ofr = StyleSheet.create({
+const make_ofr = () => StyleSheet.create({
   container: {
-    backgroundColor: C.purple,
+    backgroundColor: T(C.purple, 'bg'),
     marginHorizontal: 14,
     marginTop: 10,
     borderRadius: 16,
@@ -308,7 +313,7 @@ const ofr = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-  },
+   overflow: 'hidden', },
   iconBox: {
     width: 44,
     height: 44,
@@ -317,7 +322,7 @@ const ofr = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headline: { color: C.white, fontSize: 14, fontFamily: 'Inter_700Bold' },
+  headline: { color: T(C.white, 'fg'), fontSize: 14, fontFamily: 'Inter_700Bold' },
   sub: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 11,
@@ -334,19 +339,20 @@ const ofr = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  codeText: { color: C.white, fontSize: 10, fontFamily: 'Inter_600SemiBold' },
+  codeText: { color: T(C.white, 'fg'), fontSize: 10, fontFamily: 'Inter_600SemiBold' },
   btn: {
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
-  },
-  btnText: { color: C.white, fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+   overflow: 'hidden', },
+  btnText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_600SemiBold' },
 });
+const use_ofr = () => useThemedStyles(make_ofr);
 
-const ts = StyleSheet.create({
+const make_ts = () => StyleSheet.create({
   container: {
-    backgroundColor: C.darkBg,
+    backgroundColor: T(C.darkBg, 'bg'),
     marginTop: 16,
     marginHorizontal: 14,
     borderRadius: 16,
@@ -356,7 +362,7 @@ const ts = StyleSheet.create({
   },
   item: { flex: 1, alignItems: 'center', gap: 4, paddingHorizontal: 4 },
   border: { borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.08)' },
-  title: { color: C.white, fontSize: 11, fontFamily: 'Inter_600SemiBold' },
+  title: { color: T(C.white, 'fg'), fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   sub: {
     color: 'rgba(255,255,255,0.45)',
     fontSize: 9,
@@ -364,24 +370,25 @@ const ts = StyleSheet.create({
     textAlign: 'center',
   },
 });
+const use_ts = () => useThemedStyles(make_ts);
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   headerSub: {
     fontSize: 10,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 1,
   },
   headerIcon: {
@@ -393,3 +400,4 @@ const st = StyleSheet.create({
   },
   content: { paddingBottom: 40 },
 });
+const use_st = () => useThemedStyles(make_st);

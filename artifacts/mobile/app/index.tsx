@@ -22,7 +22,7 @@ export default function Index() {
               router.replace('/celebrity-dashboard');
               return;
             } else if (user?.role === 'user') {
-              router.replace('/(tabs)');
+              router.replace('/(tabs)/assistant' as never);
               return;
             }
           } catch {}
@@ -42,7 +42,7 @@ export default function Index() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0A0D14', alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator size="large" color="#FF6B33" />
+      <ActivityIndicator size="large" color="#7B5CFA" />
     </View>
   );
 }

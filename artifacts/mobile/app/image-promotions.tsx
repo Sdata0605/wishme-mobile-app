@@ -22,10 +22,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { useOrderConfirm } from '@/context/OrderConfirmContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 interface ImagePromotion {
   id: string;
@@ -74,6 +76,7 @@ export default function ImagePromotionsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { user, session } = useAuth();
+  const { confirmOrder } = useOrderConfirm();
   const wallet = useWallet();
   const { discountPercentage, getDiscountedPrice } = usePlan();
   const { favoriteIds, loading: favLoading } = useCelebrityFavorites({
@@ -313,6 +316,10 @@ export default function ImagePromotionsScreen() {
         setCurrentGeneration({ ...gen, wishme_payment_id: paymentRecorded ? wishmePaymentId : undefined });
         wallet.refetch();
         void fetchHistory();
+        confirmOrder({
+          item: `an image promotion${celebrities.find(x => x.id === selectedCelebId)?.name ? ` with ${celebrities.find(x => x.id === selectedCelebId)?.name}` : ''}`,
+          orderId: gen.id,
+        });
       }
     } catch {
       Alert.alert('Network Error', 'Please check your connection and try again.');
@@ -379,7 +386,7 @@ export default function ImagePromotionsScreen() {
   }, []);
 
   const statusColor = (st: string) =>
-    st === 'completed' ? '#22c55e' : st === 'pending' ? '#FF6B33' : '#ef4444';
+    st === 'completed' ? '#22c55e' : st === 'pending' ? '#7B5CFA' : '#ef4444';
 
   const statusLabel = (st: string) =>
     st.charAt(0).toUpperCase() + st.slice(1);
@@ -402,7 +409,7 @@ export default function ImagePromotionsScreen() {
   }
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -416,7 +423,7 @@ export default function ImagePromotionsScreen() {
         {/* Stats Row */}
         <View style={s.statsRow}>
           <View style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Icon name="credit-card" size={18} color="#4B83FF" />
+            <Icon name="credit-card" size={18} color="#3B5BDB" />
             <Text style={[s.statValue, { color: colors.foreground }]}>₹{wallet.balance.toLocaleString('en-IN')}</Text>
             <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Wallet</Text>
             <TouchableOpacity style={s.addFundsBtn} onPress={() => router.push('/wallet' as never)}>
@@ -424,7 +431,7 @@ export default function ImagePromotionsScreen() {
             </TouchableOpacity>
           </View>
           <View style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Icon name="calendar" size={18} color="#FF6B33" />
+            <Icon name="calendar" size={18} color="#7B5CFA" />
             <Text style={[s.statValue, { color: colors.foreground }]}>{todayCount}</Text>
             <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Today's</Text>
           </View>
@@ -447,7 +454,7 @@ export default function ImagePromotionsScreen() {
         <View style={[s.tabRow, { borderBottomColor: colors.border }]}>
           {(['create', 'history'] as const).map(t => (
             <TouchableOpacity key={t} style={s.tabPill} onPress={() => setTab(t)}>
-              <Text style={[s.tabText, { color: tab === t ? '#FF6B33' : colors.mutedForeground }]}>
+              <Text style={[s.tabText, { color: tab === t ? '#7B5CFA' : colors.mutedForeground }]}>
                 {t === 'create' ? 'Create Promotion' : 'My Promotions'}
               </Text>
               {tab === t && <View style={s.tabUnderline} />}
@@ -459,10 +466,10 @@ export default function ImagePromotionsScreen() {
           <View style={s.formWrap}>
             {/* Subscription Gate */}
             {noSubscriptions && (
-              <View style={[s.alertBanner, { backgroundColor: '#FF6B3315', borderColor: '#FF6B3340' }]}>
-                <Icon name="lock" size={18} color="#FF6B33" />
+              <View style={[s.alertBanner, { backgroundColor: '#7B5CFA15', borderColor: '#7B5CFA40' }]}>
+                <Icon name="lock" size={18} color="#7B5CFA" />
                 <View style={{ flex: 1 }}>
-                  <Text style={[s.alertTitle, { color: '#FF6B33' }]}>No Celebrity Subscriptions</Text>
+                  <Text style={[s.alertTitle, { color: '#7B5CFA' }]}>No Celebrity Subscriptions</Text>
                   <Text style={[s.alertSub, { color: colors.mutedForeground }]}>
                     You need to subscribe to at least one celebrity to create promotions
                   </Text>
@@ -479,7 +486,7 @@ export default function ImagePromotionsScreen() {
             {/* Celebrity Select */}
             <Text style={[s.label, { color: colors.foreground }]}>Select Celebrity</Text>
             {celebsLoading ? (
-              <ActivityIndicator color="#FF6B33" style={{ marginVertical: 8 }} />
+              <ActivityIndicator color="#7B5CFA" style={{ marginVertical: 8 }} />
             ) : noSubscriptions ? (
               <Text style={[s.emptyHint, { color: colors.mutedForeground }]}>
                 Subscribe to a celebrity to create promotions.
@@ -492,8 +499,8 @@ export default function ImagePromotionsScreen() {
                     style={[
                       s.celebChip,
                       {
-                        backgroundColor: selectedCelebId === c.id ? '#FF6B33' : colors.muted,
-                        borderColor: selectedCelebId === c.id ? '#FF6B33' : colors.border,
+                        backgroundColor: selectedCelebId === c.id ? '#7B5CFA' : colors.muted,
+                        borderColor: selectedCelebId === c.id ? '#7B5CFA' : colors.border,
                       },
                     ]}
                     onPress={() => setSelectedCelebId(selectedCelebId === c.id ? '' : c.id)}
@@ -547,7 +554,7 @@ export default function ImagePromotionsScreen() {
                     if (opt === 'none') { clearRefImage(); }
                   }}
                 >
-                  <View style={[s.radioOuter, { borderColor: refImgSource === opt ? '#FF6B33' : colors.border }]}>
+                  <View style={[s.radioOuter, { borderColor: refImgSource === opt ? '#7B5CFA' : colors.border }]}>
                     {refImgSource === opt && <View style={s.radioInner} />}
                   </View>
                   <View style={{ flex: 1 }}>
@@ -572,11 +579,11 @@ export default function ImagePromotionsScreen() {
                   </View>
                 ) : (
                   <TouchableOpacity
-                    style={[s.uploadZone, { borderColor: '#FF6B33', backgroundColor: '#FF6B3310' }]}
+                    style={[s.uploadZone, { borderColor: '#7B5CFA', backgroundColor: '#7B5CFA10' }]}
                     onPress={pickImage}
                   >
-                    <Icon name="upload" size={18} color="#FF6B33" />
-                    <Text style={[s.uploadZoneText, { color: '#FF6B33' }]}>Choose Image</Text>
+                    <Icon name="upload" size={18} color="#7B5CFA" />
+                    <Text style={[s.uploadZoneText, { color: '#7B5CFA' }]}>Choose Image</Text>
                   </TouchableOpacity>
                 )
               )}
@@ -645,7 +652,7 @@ export default function ImagePromotionsScreen() {
               style={{ opacity: generating || !selectedCelebId || !concept.trim() || wallet.balance < finalPrice ? 0.55 : 1, marginTop: 20 }}
             >
               <LinearGradient
-                colors={['#FF6B33', '#B44CFF']}
+                colors={['#7B5CFA', '#1F7BFF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={s.genBtn}
@@ -672,7 +679,7 @@ export default function ImagePromotionsScreen() {
               {history.length} promotion{history.length !== 1 ? 's' : ''} created
             </Text>
             {historyLoading ? (
-              <ActivityIndicator color="#FF6B33" style={{ marginTop: 32 }} />
+              <ActivityIndicator color="#7B5CFA" style={{ marginTop: 32 }} />
             ) : history.length === 0 ? (
               <View style={[s.emptyState, { borderColor: colors.border }]}>
                 <Icon name="image" size={36} color={colors.mutedForeground} />
@@ -694,7 +701,7 @@ export default function ImagePromotionsScreen() {
                         contentFit="cover"
                       />
                     ) : (
-                      <LinearGradient colors={['#FF6B33', '#B44CFF']} style={s.histThumb}>
+                      <LinearGradient colors={['#7B5CFA', '#1F7BFF']} style={s.histThumb}>
                         <Icon name="zap" size={22} color="rgba(255,255,255,0.8)" />
                       </LinearGradient>
                     )}
@@ -721,7 +728,7 @@ export default function ImagePromotionsScreen() {
                             style={s.dlBtn}
                             onPress={() => downloadPromo(item.generated_image_url!, item.id)}
                           >
-                            <Icon name="download" size={13} color="#FF6B33" />
+                            <Icon name="download" size={13} color="#7B5CFA" />
                             <Text style={s.dlText}>Download</Text>
                           </TouchableOpacity>
                         )}
@@ -734,14 +741,14 @@ export default function ImagePromotionsScreen() {
           </View>
         )}
       </ScrollView>
-    </View>
+    </View></AmbientBackground>
   );
 }
 
 const s = StyleSheet.create({
   container: { flex: 1 },
   gateTitle: { fontSize: 20, fontFamily: 'Inter_700Bold', textAlign: 'center' },
-  gateBtn: { backgroundColor: '#FF6B33', borderRadius: 9999, paddingHorizontal: 32, paddingVertical: 14 },
+  gateBtn: { backgroundColor: '#7B5CFA', borderRadius: 9999, paddingHorizontal: 32, paddingVertical: 14 },
   gateBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingBottom: 14, borderBottomWidth: 1 },
   headerTitle: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
@@ -749,19 +756,19 @@ const s = StyleSheet.create({
   statCard: { flex: 1, borderRadius: 14, borderWidth: 1, padding: 12, alignItems: 'center', gap: 4 },
   statValue: { fontSize: 16, fontFamily: 'Inter_700Bold', marginTop: 4 },
   statLabel: { fontSize: 11, fontFamily: 'Inter_400Regular' },
-  addFundsBtn: { marginTop: 6, backgroundColor: '#4B83FF15', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
-  addFundsText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#4B83FF' },
+  addFundsBtn: { marginTop: 6, backgroundColor: '#3B5BDB15', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  addFundsText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: '#3B5BDB' },
   freeBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderRadius: 12, borderWidth: 1, marginHorizontal: 16, marginBottom: 4, padding: 12 },
   freeBannerText: { flex: 1, fontSize: 13, fontFamily: 'Inter_500Medium' },
   tabRow: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 20 },
   tabPill: { paddingHorizontal: 4, paddingVertical: 10, marginRight: 24, position: 'relative' },
   tabText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#FF6B33', borderRadius: 1 },
+  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#7B5CFA', borderRadius: 1 },
   formWrap: { padding: 20, gap: 4 },
   alertBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, borderRadius: 12, borderWidth: 1, padding: 14, marginBottom: 8 },
   alertTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   alertSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  subGateBtn: { marginTop: 10, backgroundColor: '#FF6B33', borderRadius: 9999, paddingHorizontal: 16, paddingVertical: 8, alignSelf: 'flex-start' },
+  subGateBtn: { marginTop: 10, backgroundColor: '#7B5CFA', borderRadius: 9999, paddingHorizontal: 16, paddingVertical: 8, alignSelf: 'flex-start' },
   subGateBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   label: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginTop: 16, marginBottom: 8 },
   optionalTag: { fontSize: 12, fontFamily: 'Inter_400Regular' },
@@ -774,14 +781,14 @@ const s = StyleSheet.create({
   refImgCard: { borderRadius: 14, borderWidth: 1, padding: 14, gap: 12 },
   radioRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginTop: 2 },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FF6B33' },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#7B5CFA' },
   radioText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
   radioSub: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   uploadZone: { borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
   uploadZoneText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   uploadedPreview: { position: 'relative', alignSelf: 'flex-start' },
   uploadedThumb: { width: 100, height: 100, borderRadius: 10 },
-  removeImgBtn: { position: 'absolute', top: -8, right: -8, backgroundColor: '#FF6B33', borderRadius: 9999, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  removeImgBtn: { position: 'absolute', top: -8, right: -8, backgroundColor: '#7B5CFA', borderRadius: 9999, width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   pricingCard: { borderRadius: 14, borderWidth: 1, padding: 16, gap: 8, marginTop: 4 },
   pricingTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 4 },
   pricingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -792,7 +799,7 @@ const s = StyleSheet.create({
   pricingDiscount: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   pricingDivider: { height: 1 },
   pricingFinalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FF6B33' },
+  pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#7B5CFA' },
   pricingNote: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 },
   previewCard: { borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginTop: 16 },
   previewImg: { width: '100%', height: 260 },
@@ -820,5 +827,5 @@ const s = StyleSheet.create({
   histFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
   histDate: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   dlBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dlText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#FF6B33' },
+  dlText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#7B5CFA' },
 });

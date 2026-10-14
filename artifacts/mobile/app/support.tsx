@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const FAQS = [
   {
@@ -48,7 +49,7 @@ const CONTACT_CHANNELS = [
     title: 'Email Support',
     contact: 'support@wishme.today',
     responseTime: 'Within 24 hours',
-    color: '#FF6B33',
+    color: '#7B5CFA',
     onPress: () => Linking.openURL('mailto:support@wishme.today'),
   },
   {
@@ -56,7 +57,7 @@ const CONTACT_CHANNELS = [
     title: 'Phone Support',
     contact: '+91 98765 43210',
     responseTime: 'Mon–Fri, 9 AM – 6 PM IST',
-    color: '#B44CFF',
+    color: '#1F7BFF',
     onPress: () => Linking.openURL('tel:+919876543210'),
   },
   {
@@ -176,7 +177,7 @@ export default function SupportScreen() {
   }
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[styles.root, { backgroundColor: 'transparent' }]}>
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
@@ -193,7 +194,7 @@ export default function SupportScreen() {
 
         {/* Gradient Sub-banner */}
         <LinearGradient
-          colors={['#FF6B33', '#B44CFF']}
+          colors={['#7B5CFA', '#1F7BFF']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.banner}
@@ -349,7 +350,7 @@ export default function SupportScreen() {
           )}
           <TouchableOpacity onPress={handleSubmit} activeOpacity={0.85} style={styles.submitBtnWrapper}>
             <LinearGradient
-              colors={['#FF6B33', '#B44CFF']}
+              colors={['#7B5CFA', '#1F7BFF']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.submitBtn}
@@ -371,7 +372,7 @@ export default function SupportScreen() {
                 { borderBottomColor: colors.border },
                 i === QUICK_LINKS.length - 1 && { borderBottomWidth: 0 },
               ]}
-              onPress={() => router.push(link.route as Parameters<typeof router.push>[0])}
+              onPress={() => Linking.openURL(`https://wishme.today${link.route}`).catch(() => {})}
               activeOpacity={0.7}
             >
               <Text style={[styles.quickLinkLabel, { color: colors.foreground }]}>{link.label}</Text>
@@ -392,7 +393,7 @@ export default function SupportScreen() {
         message="Support request submitted! We'll get back to you within 24 hours."
         visible={toastVisible}
       />
-    </View>
+    </View></AmbientBackground>
   );
 }
 

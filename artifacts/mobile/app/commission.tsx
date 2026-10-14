@@ -19,6 +19,7 @@ import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 interface ReferralTransaction {
   id: string;
@@ -62,7 +63,7 @@ const STATUS_COLORS: Record<string, string> = {
   Failed: '#EF4444',
 };
 
-const LEVEL_COLORS: Record<string, string> = { L1: '#FF6B33', L2: '#B44CFF' };
+const LEVEL_COLORS: Record<string, string> = { L1: '#7B5CFA', L2: '#1F7BFF' };
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-IN', {
@@ -219,7 +220,7 @@ export default function CommissionScreen() {
 
   if (!user || !session) {
     return (
-      <View style={[s.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -230,16 +231,16 @@ export default function CommissionScreen() {
         <View style={s.authGate}>
           <Icon name="trending-up" size={48} color={colors.mutedForeground} />
           <Text style={[s.authGateTitle, { color: colors.foreground }]}>Sign in to view commissions</Text>
-          <TouchableOpacity style={s.signInBtn} onPress={() => router.push('/login' as never)}>
+          <TouchableOpacity style={s.signInBtn} onPress={() => router.push('/(auth)' as never)}>
             <Text style={s.signInBtnText}>Sign In</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -256,7 +257,7 @@ export default function CommissionScreen() {
         }
       >
         {/* Top hero */}
-        <LinearGradient colors={['#FF6B33', '#B44CFF']} style={s.topCard}>
+        <LinearGradient colors={['#7B5CFA', '#1F7BFF']} style={s.topCard}>
           <Text style={s.earningsLabel}>Total Earned</Text>
           <Text style={s.earnings}>₹{(totalReferral + totalCelebrity).toLocaleString('en-IN')}</Text>
           <View style={s.heroStats}>
@@ -276,12 +277,12 @@ export default function CommissionScreen() {
         {/* 3-card summary */}
         <View style={s.summaryRow}>
           <View style={[s.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Icon name="users" size={18} color="#FF6B33" />
+            <Icon name="users" size={18} color="#7B5CFA" />
             <Text style={[s.summaryVal, { color: colors.foreground }]}>₹{totalReferral.toLocaleString('en-IN')}</Text>
             <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Referral Earned</Text>
           </View>
           <View style={[s.summaryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Icon name="star" size={18} color="#B44CFF" />
+            <Icon name="star" size={18} color="#1F7BFF" />
             <Text style={[s.summaryVal, { color: colors.foreground }]}>₹{totalCelebrity.toLocaleString('en-IN')}</Text>
             <Text style={[s.summaryLabel, { color: colors.mutedForeground }]}>Celebrity Earned</Text>
           </View>
@@ -385,7 +386,7 @@ export default function CommissionScreen() {
                       setShowStartPicker(false);
                     }}
                   >
-                    <Text style={[s.iosPickerDone, { color: '#FF6B33' }]}>Done</Text>
+                    <Text style={[s.iosPickerDone, { color: '#7B5CFA' }]}>Done</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
@@ -419,7 +420,7 @@ export default function CommissionScreen() {
                       setShowEndPicker(false);
                     }}
                   >
-                    <Text style={[s.iosPickerDone, { color: '#FF6B33' }]}>Done</Text>
+                    <Text style={[s.iosPickerDone, { color: '#7B5CFA' }]}>Done</Text>
                   </TouchableOpacity>
                 </View>
                 <DateTimePicker
@@ -438,7 +439,7 @@ export default function CommissionScreen() {
 
         {/* Loading state */}
         {loading ? (
-          <ActivityIndicator size="large" color="#FF6B33" style={{ marginTop: 40 }} />
+          <ActivityIndicator size="large" color="#7B5CFA" style={{ marginTop: 40 }} />
         ) : isEmpty ? (
           /* Empty state */
           <View style={s.emptyState}>
@@ -540,7 +541,7 @@ export default function CommissionScreen() {
                   {earnings.map((e) => (
                     <View key={e.month} style={s.barWrap}>
                       <LinearGradient
-                        colors={['#FF6B33', '#B44CFF']}
+                        colors={['#7B5CFA', '#1F7BFF']}
                         style={[s.bar, { height: Math.max((e.amount / max) * 120, 4) }]}
                       />
                       <Text style={[s.barMonth, { color: colors.mutedForeground }]}>{e.month}</Text>
@@ -552,7 +553,7 @@ export default function CommissionScreen() {
           </>
         )}
       </ScrollView>
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -625,7 +626,7 @@ const s = StyleSheet.create({
   authGate: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 32 },
   authGateTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
   signInBtn: {
-    backgroundColor: '#FF6B33',
+    backgroundColor: '#7B5CFA',
     paddingHorizontal: 32,
     paddingVertical: 12,
     borderRadius: 9999,

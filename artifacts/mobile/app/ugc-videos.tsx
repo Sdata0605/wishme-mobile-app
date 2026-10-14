@@ -1,227 +1,102 @@
-import { Image } from 'expo-image';
-import { router } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon } from '@/components/Icon';
-import { supabaseFetch } from '@/constants/supabase';
+import React, { useEffect, useState } from 'react';
+import { View } from 'react-native';
+import { UGC_VIDEOS_CONFIG } from '@/components/ugc/configs';
+import { UgcHistory } from '@/components/ugc/UgcHistory';
+import { UgcOrderShell } from '@/components/ugc/UgcOrderShell';
+import { buildDetails, displayValue, type CelebrityLite, type Values } from '@/components/ugc/types';
+import { parseApiError, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 
-interface Celeb { id: string; name: string; category: string; image_url?: string }
-interface Generation {
-  id: string;
-  celebrity_id: string;
-  concept: string;
-  script: string | null;
-  video_url: string | null;
-  thumbnail_url: string | null;
-  status: string;
-  price_paid: number;
-  created_at: string;
-  celebrities?: Celeb | Celeb[] | null;
-}
-
-function celebOf(g: Generation): Celeb | null {
-  const c = g.celebrities;
-  if (Array.isArray(c)) return c[0] ?? null;
-  return c ?? null;
-}
+const DEFAULT_PRICE = 500;
 
 export default function UgcVideosScreen() {
   const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
   const { user, session } = useAuth();
   const wallet = useWallet();
   const { getDiscountedPrice } = usePlan();
-  const { favoriteIds, loading: favLoading } = useCelebrityFavorites({
-    profileId: user?.profileId,
-    accessToken: session?.access_token,
-  });
+  const token = session?.access_token ?? null;
+  const [fallbackPrice, setFallbackPrice] = useState(DEFAULT_PRICE);
 
-  const [tab, setTab] = useState<'create' | 'history'>('create');
-  const [celebrities, setCelebrities] = useState<Celeb[]>([]);
-  const [selectedCelebrity, setSelectedCelebrity] = useState('');
-  const [concept, setConcept] = useState('');
-  const [basePrice, setBasePrice] = useState(500);
-  const [history, setHistory] = useState<Generation[]>([]);
-  const [generating, setGenerating] = useState(false);
-  const price = getDiscountedPrice(basePrice);
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  useEffect(() => { wallet.refetch(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const load = useCallback(async () => {
-    if (!session?.access_token || !wallet.profileId) return;
-    const ids = [...favoriteIds];
-    const [priceRes, histRes, celebRes] = await Promise.all([
-      supabaseFetch('/rest/v1/platform_settings?setting_key=eq.ugc_video_price&select=setting_value&limit=1', {}, session.access_token),
-      supabaseFetch(
-        `/rest/v1/ugc_video_generations?user_id=eq.${wallet.profileId}&select=*,celebrities(id,name,category,image_url)&order=created_at.desc`,
-        {},
-        session.access_token,
-      ),
-      ids.length
-        ? supabaseFetch(
-            `/rest/v1/celebrities?id=in.(${ids.join(',')})&is_active=eq.true&select=id,name,category,image_url`,
-            {},
-            session.access_token,
-          )
-        : Promise.resolve(null),
-    ]);
-    if (priceRes.ok) {
-      const rows = await priceRes.json() as Array<{ setting_value: string }>;
-      if (rows[0]?.setting_value) setBasePrice(parseInt(rows[0].setting_value, 10) || 500);
-    }
-    if (histRes.ok) setHistory(await histRes.json() as Generation[]);
-    if (celebRes && celebRes.ok) setCelebrities(await celebRes.json() as Celeb[]);
-  }, [session?.access_token, wallet.profileId, favoriteIds]);
+  useEffect(() => {
+    if (!token) return;
+    supabaseFetch('/rest/v1/platform_settings?setting_key=eq.ugc_video_price&select=setting_value&limit=1', {}, token)
+      .then(r => (r.ok ? r.json() : []))
+      .then((rows: Array<{ setting_value: string }>) => {
+        const v = parseInt(rows[0]?.setting_value ?? '', 10);
+        if (v > 0) setFallbackPrice(v);
+      })
+      .catch(() => {});
+  }, [token]);
 
-  useEffect(() => { void load(); }, [load]);
+  const baseFor = (c: CelebrityLite) => c.service_prices?.ugc_ad || fallbackPrice;
+  const getPrice = (v: Values) => (v.celebrity ? getDiscountedPrice(baseFor(v.celebrity as CelebrityLite)) : null);
 
-  const generate = async () => {
-    if (!selectedCelebrity) { Alert.alert('Select a celebrity'); return; }
-    if (!concept.trim()) { Alert.alert('Enter a concept'); return; }
-    if (wallet.balance < price) {
-      Alert.alert('Insufficient balance', `Need ₹${price}`, [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Wallet', onPress: () => router.push('/wallet' as never) },
-      ]);
-      return;
-    }
-    if (!session?.access_token || !wallet.profileId) return;
-    setGenerating(true);
-    try {
-      const tx = await supabaseFetch('/rest/v1/wallet_transactions', {
-        method: 'POST',
-        headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({
-          user_id: wallet.profileId,
-          transaction_type: 'ugc_video',
-          amount: price,
-          status: 'completed',
-          payment_method: 'wallet',
-          transaction_details: { celebrity_id: selectedCelebrity, concept: concept.slice(0, 100) },
-        }),
-      }, session.access_token);
-      if (!tx.ok) throw new Error('Wallet payment failed');
+  const fieldOf = (sectionKey: string, key: string) =>
+    UGC_VIDEOS_CONFIG.sections.find(s => s.key === sectionKey)!.fields.find(f => f.key === key)!;
 
-      const ins = await supabaseFetch('/rest/v1/ugc_video_generations', {
-        method: 'POST',
-        headers: { Prefer: 'return=representation' } as Record<string, string>,
-        body: JSON.stringify({
-          user_id: wallet.profileId,
-          celebrity_id: selectedCelebrity,
-          concept: concept.trim(),
-          status: 'processing',
-          price_paid: price,
-        }),
-      }, session.access_token);
-      if (!ins.ok) throw new Error('Could not create generation');
-      const rows = await ins.json() as Generation[];
-      const generationId = rows[0]?.id;
-      if (!generationId) throw new Error('No generation id');
+  const onSubmit = async (v: Values) => {
+    if (!token) throw new Error('Please sign in again.');
+    const celeb = v.celebrity as CelebrityLite;
+    const forMe = v.for_whom === 'me';
+    const photos: string[] = v.photos ?? [];
 
-      const res = await supabaseFetch('/functions/v1/generate-ugc-video', {
-        method: 'POST',
-        body: JSON.stringify({
-          concept: concept.trim(),
-          celebrity_id: selectedCelebrity,
-          user_id: wallet.profileId,
-          generation_id: generationId,
-        }),
-      }, session.access_token);
-      const data = await res.json() as { message?: string; script?: string; error?: string };
-      if (!res.ok || data.error) throw new Error(data.error || data.message || 'Generation failed');
-      setConcept('');
-      wallet.refetch();
-      await load();
-      setTab('history');
-      Alert.alert('Ready', data.message || 'UGC video script generated');
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Generation failed');
-    } finally {
-      setGenerating(false);
-    }
+    const res = await supabaseFetch('/rest/v1/rpc/create_wish_friend_order', {
+      method: 'POST',
+      body: JSON.stringify({
+        p_order_type: 'ugc_video',
+        p_celebrity_id: celeb.id,
+        p_recipient_name: forMe ? (user?.firstName || 'Me') : (v.name ?? ''),
+        p_occasion: displayValue(fieldOf('who', 'occasion'), v.occasion),
+        p_relationship: !forMe && v.relationship ? displayValue(fieldOf('who', 'relationship'), v.relationship) : '',
+        p_tone: Array.isArray(v.tone) ? displayValue(fieldOf('style', 'tone'), v.tone) : '',
+        p_prompt: v.message ?? '',
+        p_aspect_ratio: v.aspect_ratio ?? '9:16',
+        p_hook_style: '',
+        p_call_to_action: '',
+        p_reference_image_url: photos[0] ?? '',
+        p_details: buildDetails(UGC_VIDEOS_CONFIG, v),
+      }),
+    }, token);
+    if (!res.ok) throw new Error(await parseApiError(res));
+    const order = await res.json() as { id: string };
+    return { id: order.id };
   };
 
   return (
-    <View style={[s.root, { backgroundColor: colors.background, paddingTop: topPad }]}>
-      <View style={s.header}>
-        <TouchableOpacity onPress={() => router.back()}><Icon name="chevron-left" size={22} color={colors.foreground} /></TouchableOpacity>
-        <Text style={[s.title, { color: colors.foreground }]}>UGC Videos</Text>
-      </View>
-      <View style={s.tabs}>
-        {(['create', 'history'] as const).map((id) => (
-          <TouchableOpacity key={id} onPress={() => setTab(id)} style={[s.tab, tab === id && { borderBottomColor: colors.primary }]}>
-            <Text style={{ color: tab === id ? colors.primary : colors.mutedForeground, fontFamily: 'Inter_600SemiBold' }}>{id === 'create' ? 'Create' : 'My Videos'}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 40 }}>
-        {tab === 'create' ? (
-          <>
-            <Text style={[s.label, { color: colors.mutedForeground }]}>Favorite celebrity</Text>
-            {favLoading ? <ActivityIndicator /> : celebrities.map((c) => (
-              <TouchableOpacity key={c.id} onPress={() => setSelectedCelebrity(c.id)} style={[s.celeb, { borderColor: selectedCelebrity === c.id ? colors.primary : colors.border }]}>
-                {c.image_url ? <Image source={{ uri: c.image_url }} style={s.avatar} /> : <View style={s.avatar} />}
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_500Medium' }}>{c.name}</Text>
-              </TouchableOpacity>
-            ))}
-            <Text style={[s.label, { color: colors.mutedForeground }]}>Concept</Text>
-            <TextInput
-              value={concept}
-              onChangeText={setConcept}
-              placeholder="Describe the UGC video concept"
-              placeholderTextColor={colors.mutedForeground}
-              multiline
-              style={[s.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.input }]}
-            />
-            <TouchableOpacity disabled={generating} onPress={generate} style={[s.btn, { backgroundColor: colors.primary, opacity: generating ? 0.6 : 1 }]}>
-              <Text style={s.btnText}>{generating ? 'Generating…' : `Generate · ₹${price}`}</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          history.map((g) => {
-            const c = celebOf(g);
-            return (
-              <View key={g.id} style={[s.card, { borderColor: colors.border }]}>
-                <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{c?.name ?? 'Celebrity'}</Text>
-                <Text style={{ color: colors.mutedForeground, marginTop: 4 }}>{g.concept}</Text>
-                <Text style={{ color: colors.primary, marginTop: 6 }}>{g.status}</Text>
-                {g.script ? <Text style={{ color: colors.foreground, marginTop: 8 }}>{g.script}</Text> : null}
-                {g.video_url ? <Text style={{ color: colors.primary, marginTop: 8 }}>{g.video_url}</Text> : null}
-              </View>
-            );
-          })
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <UgcOrderShell
+        config={UGC_VIDEOS_CONFIG}
+        title="UGC Videos"
+        subtitle="A personal, creator-style video with a celebrity, made for someone you care about."
+        headerIcon="video"
+        pills={['Made by our team', 'Paid from wallet', 'Delivered to My orders']}
+        getPrice={getPrice}
+        walletBalance={wallet.balance}
+        onSubmit={onSubmit}
+        onPaid={() => wallet.refetch()}
+        celebrityPrice={c => getDiscountedPrice(baseFor(c))}
+        token={token}
+        authUid={user?.id ?? ''}
+        successTitle="Video order placed"
+        itemLabel={v => `a UGC video${v.for_whom === 'me' ? '' : v.name ? ` for ${v.name}` : ''}`}
+        historySlot={(refreshKey, goToNew) => (
+          <UgcHistory
+            kind="video"
+            gradient={UGC_VIDEOS_CONFIG.gradient}
+            accent={UGC_VIDEOS_CONFIG.accent}
+            token={token}
+            authUid={user?.id ?? ''}
+            profileId={user?.profileId ?? ''}
+            refreshKey={refreshKey}
+            onCreate={goToNew}
+          />
         )}
-      </ScrollView>
+      />
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingBottom: 8 },
-  title: { fontSize: 18, fontFamily: 'Inter_700Bold' },
-  tabs: { flexDirection: 'row', paddingHorizontal: 16 },
-  tab: { marginRight: 16, paddingBottom: 8, borderBottomWidth: 2, borderBottomColor: 'transparent' },
-  label: { marginTop: 12, marginBottom: 6, fontFamily: 'Inter_500Medium', fontSize: 12 },
-  input: { minHeight: 100, borderWidth: 1, borderRadius: 12, padding: 12, textAlignVertical: 'top' },
-  celeb: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, padding: 10, marginBottom: 8 },
-  avatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#ddd' },
-  btn: { marginTop: 16, borderRadius: 12, padding: 14, alignItems: 'center' },
-  btnText: { color: '#fff', fontFamily: 'Inter_600SemiBold' },
-  card: { borderWidth: 1, borderRadius: 12, padding: 12, marginBottom: 10 },
-});

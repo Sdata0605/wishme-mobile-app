@@ -17,6 +17,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
+import { useOrderConfirm } from '@/context/OrderConfirmContext';
 import { useAgentPrefill } from '@/context/AgentStateContext';
 import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 import { useVoiceCallCelebrities, type VoiceCallCelebrity } from '@/hooks/useVoiceCallCelebrities';
@@ -307,6 +308,7 @@ export default function VoiceCallScreen() {
   const celebrityId = Array.isArray(celebrityParam) ? celebrityParam[0] : celebrityParam;
   const { user, session, getValidSession } = useAuth();
   const wallet = useWallet();
+  const { confirmOrder } = useOrderConfirm();
   const { discountPercentage, getDiscountedPrice, plan } = usePlan();
   const agentPrefill = useAgentPrefill();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -483,6 +485,12 @@ export default function VoiceCallScreen() {
       }
 
       wallet.refetch();
+      confirmOrder({
+        item: `a celebrity call from ${selectedCeleb.name} to ${recipientName.trim()}`,
+        orderId: json.callId,
+        note: json.scheduled ? `Scheduled for ${new Date(json.scheduledAt ?? scheduledAt ?? '').toLocaleString('en-IN')}` : undefined,
+        viewRoute: { pathname: '/bookings', params: { tab: 'Calls' } },
+      });
       if (json.scheduled) {
         const when = json.scheduledAt ?? scheduledAt ?? '';
         setSuccess({
@@ -507,7 +515,7 @@ export default function VoiceCallScreen() {
     return (
       <View style={[styles.root, { paddingTop: topPad + 24, paddingBottom: bottomPad }]}>
         <View style={styles.successCard}>
-          <LinearGradient colors={['#F97316', '#EC4899', '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.successIcon}>
+          <LinearGradient colors={['#F97316', '#EC4899', '#7B5CFA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.successIcon}>
             <Icon name={success.scheduled ? 'calendar' : 'phone-call'} size={32} color="#fff" />
           </LinearGradient>
           <Text style={styles.successTitle}>{success.scheduled ? 'Call scheduled!' : 'Call initiated!'}</Text>
@@ -519,7 +527,7 @@ export default function VoiceCallScreen() {
             </View>
           ) : null}
           <TouchableOpacity onPress={resetForm} activeOpacity={0.85} style={{ width: '100%' }}>
-            <LinearGradient colors={['#F97316', '#EC4899', '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
+            <LinearGradient colors={['#F97316', '#EC4899', '#7B5CFA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
               <Icon name="phone" size={16} color="#fff" />
               <Text style={styles.ctaText}>Book another call</Text>
             </LinearGradient>
@@ -756,7 +764,7 @@ export default function VoiceCallScreen() {
             activeOpacity={0.85}
             style={[(!canSubmit || submitting) && { opacity: 0.4 }]}
           >
-            <LinearGradient colors={['#F97316', '#EC4899', '#A855F7']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
+            <LinearGradient colors={['#F97316', '#EC4899', '#7B5CFA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
               {submitting ? (
                 <>
                   <ActivityIndicator color="#fff" />
@@ -943,7 +951,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.02)',
   },
   timingCardActive: { borderColor: 'rgba(249,115,22,0.4)', backgroundColor: 'rgba(249,115,22,0.08)' },
-  timingCardPurple: { borderColor: 'rgba(168,85,247,0.4)', backgroundColor: 'rgba(168,85,247,0.08)' },
+  timingCardPurple: { borderColor: 'rgba(123,92,250,0.4)', backgroundColor: 'rgba(123,92,250,0.08)' },
   timingTitle: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   dateText: { flex: 1, color: '#fff', fontSize: 14, fontFamily: 'Inter_400Regular' },
   dropdown: {

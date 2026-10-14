@@ -18,6 +18,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
 import { useAgentPrefill } from '@/context/AgentStateContext';
 import { supabaseFetch } from '@/constants/supabase';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
 function imgUrl(url: string | null): string {
@@ -101,7 +102,7 @@ export default function WishCelebrityScreen() {
 
   if (!session) {
     return (
-      <View style={[s.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -114,17 +115,17 @@ export default function WishCelebrityScreen() {
           <Text style={[s.stateTitle, { color: colors.foreground }]}>Please sign in</Text>
           <Text style={[s.stateBody, { color: colors.mutedForeground }]}>You need to be logged in to wish celebrities.</Text>
           <TouchableOpacity onPress={() => router.push('/(auth)' as never)}>
-            <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
+            <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
               <Text style={s.primaryBtnText}>Login</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -168,7 +169,7 @@ export default function WishCelebrityScreen() {
           <Text style={[s.stateTitle, { color: colors.foreground }]}>Something went wrong</Text>
           <Text style={[s.stateBody, { color: colors.mutedForeground }]}>Could not load celebrities. Please try again.</Text>
           <TouchableOpacity onPress={fetchAll}>
-            <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
+            <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
               <Text style={s.primaryBtnText}>Try Again</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -226,7 +227,7 @@ export default function WishCelebrityScreen() {
           )}
         </ScrollView>
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -272,7 +273,7 @@ function CelebrityCard({
       <View style={s.cardBody}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <Text style={[s.celebName, { color: colors.foreground }]} numberOfLines={1}>{celeb.name}</Text>
-          {celeb.is_verified && <Icon name="check-circle" size={14} color="#4B83FF" />}
+          {celeb.is_verified && <Icon name="check-circle" size={14} color="#3B5BDB" />}
         </View>
         <Text style={[s.celebCat, { color: colors.mutedForeground }]} numberOfLines={1}>{celeb.category}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
@@ -288,7 +289,7 @@ function CelebrityCard({
         {subscribed ? (
           <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
             <LinearGradient
-              colors={['#FF6B33', '#B44CFF']}
+              colors={['#7B5CFA', '#1F7BFF']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={s.wishNowBtn}

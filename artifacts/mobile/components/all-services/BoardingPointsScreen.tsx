@@ -19,6 +19,9 @@ import {
 import type { BusTicket } from './BusResultsScreen';
 
 import { serviceColors as C } from './serviceColors';
+import { withAlpha } from '@/constants/neon';
+import { T, useThemedStyles, glass, dockBar, dk, N } from './themed';
+import { BrandFill } from './BrandFill';
 
 export interface StopPoint {
   id: string;
@@ -56,16 +59,17 @@ function StopRow({
   onPress: () => void;
   accent: string;
 }) {
+  const st = use_st();
   return (
     <TouchableOpacity
-      style={[st.stopRow, selected && { borderColor: accent, backgroundColor: '#FFFDF9' }]}
+      style={[st.stopRow, selected && { borderColor: accent, backgroundColor: dk(withAlpha(accent, 0.1), '#FFFDF9') }]}
       activeOpacity={0.7}
       onPress={onPress}
     >
       {selected ? (
         <CheckCircle2 size={20} color={accent} />
       ) : (
-        <Circle size={20} color={C.gray} />
+        <Circle size={20} color={T(C.gray, 'fg')} />
       )}
       <View style={{ flex: 1 }}>
         <Text style={st.stopName}>{stop.name}</Text>
@@ -89,6 +93,7 @@ export function BoardingPointsScreen({
   onBack: () => void;
   onFillInfo: (boarding: StopPoint, dropping: StopPoint) => void;
 }) {
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -102,7 +107,7 @@ export function BoardingPointsScreen({
       {/* Header */}
       <View style={[st.headerBar, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={24} color={C.text} />
+          <ArrowLeft size={24} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View>
           <Text style={st.headerTitle}>Boarding & dropping points</Text>
@@ -119,8 +124,8 @@ export function BoardingPointsScreen({
       >
         {/* Boarding points */}
         <View style={st.sectionHead}>
-          <View style={[st.sectionIcon, { backgroundColor: '#FFF7ED' }]}>
-            <Navigation size={15} color={C.orange} />
+          <View style={[st.sectionIcon, { backgroundColor: T('#F5F0FF', 'bg') }]}>
+            <Navigation size={15} color={T(C.orange, 'fg')} />
           </View>
           <View>
             <Text style={st.sectionTitle}>Boarding points</Text>
@@ -134,15 +139,15 @@ export function BoardingPointsScreen({
               stop={s}
               selected={boarding?.id === s.id}
               onPress={() => setBoarding(boarding?.id === s.id ? null : s)}
-              accent={C.orange}
+              accent={dk(N().cyan, C.orange)}
             />
           ))}
         </View>
 
         {/* Dropping points */}
         <View style={[st.sectionHead, { marginTop: 20 }]}>
-          <View style={[st.sectionIcon, { backgroundColor: '#ECFDF5' }]}>
-            <MapPin size={15} color={C.green} />
+          <View style={[st.sectionIcon, { backgroundColor: T('#ECFDF5', 'bg') }]}>
+            <MapPin size={15} color={T(C.green, 'fg')} />
           </View>
           <View>
             <Text style={st.sectionTitle}>Dropping points</Text>
@@ -156,7 +161,7 @@ export function BoardingPointsScreen({
               stop={s}
               selected={dropping?.id === s.id}
               onPress={() => setDropping(dropping?.id === s.id ? null : s)}
-              accent={C.green}
+              accent={dk(N().success, C.green)}
             />
           ))}
         </View>
@@ -166,9 +171,9 @@ export function BoardingPointsScreen({
       <View style={[st.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
         <View style={{ flex: 1 }}>
           <Text style={st.footerLine} numberOfLines={1}>
-            <Text style={{ color: C.orange }}>{boarding ? boarding.name : 'Pick boarding'}</Text>
+            <Text style={{ color: T(C.orange, 'fg') }}>{boarding ? boarding.name : 'Pick boarding'}</Text>
             {'  →  '}
-            <Text style={{ color: C.green }}>{dropping ? dropping.name : 'Pick dropping'}</Text>
+            <Text style={{ color: T(C.green, 'fg') }}>{dropping ? dropping.name : 'Pick dropping'}</Text>
           </Text>
           <Text style={st.footerSub}>
             {ready ? `${boarding!.time} board · ${dropping!.time} drop` : 'Select one of each to continue'}
@@ -179,32 +184,32 @@ export function BoardingPointsScreen({
           activeOpacity={0.85}
           disabled={!ready}
           onPress={() => ready && onFillInfo(boarding!, dropping!)}
-        >
+        ><BrandFill />
           <Text style={st.confirmText}>Fill passenger information</Text>
-          <ArrowRight size={15} color={C.white} />
+          <ArrowRight size={15} color={T(C.white, 'fg')} />
         </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const st = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   headerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
+  headerTitle: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   headerSub: {
     fontSize: 10,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 1,
   },
   sectionHead: {
@@ -222,28 +227,28 @@ const st = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text },
-  sectionSub: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  sectionTitle: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  sectionSub: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   listWrap: { paddingHorizontal: 14, gap: 8 },
   stopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 14,
     paddingHorizontal: 12,
     paddingVertical: 12,
-  },
-  stopName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
+   ...glass(18), },
+  stopName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
   stopLandmark: {
     fontSize: 10.5,
     fontFamily: 'Inter_400Regular',
-    color: C.textLight,
+    color: T(C.textLight, 'fg'),
     marginTop: 2,
   },
-  stopTime: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: C.textLight },
+  stopTime: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: T(C.textLight, 'fg') },
   footer: {
     position: 'absolute',
     left: 0,
@@ -252,23 +257,24 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 16,
     paddingTop: 12,
-  },
-  footerLine: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: C.text },
-  footerSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+   ...dockBar(), },
+  footerLine: { fontSize: 12.5, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  footerSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
   confirmBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: C.orange,
+    backgroundColor: T(C.orange, 'bg'),
     borderRadius: 22,
     paddingHorizontal: 20,
     paddingVertical: 12,
-  },
-  confirmDisabled: { backgroundColor: '#FDBA8C' },
-  confirmText: { color: C.white, fontSize: 13.5, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  confirmDisabled: { backgroundColor: T('#E9D5FF', 'bg') },
+  confirmText: { color: T(C.white, 'fg'), fontSize: 13.5, fontFamily: 'Inter_700Bold' },
 });
+const use_st = () => useThemedStyles(make_st);

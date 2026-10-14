@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Platform,
   ScrollView,
@@ -12,10 +12,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
+import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useCelebrity } from '@/hooks/useCelebrity';
 import { useWallet } from '@/hooks/useWallet';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 function ProfileItem({
   icon,
@@ -45,7 +47,7 @@ function ProfileItem({
 }
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, session, logout } = useAuth();
   const { colors, isDark, toggle } = useTheme();
   const insets = useSafeAreaInsets();
   const tabBarHeight = insets.bottom + 49;
@@ -53,7 +55,40 @@ export default function ProfileScreen() {
   const { balance: liveBalance, refetch: refetchWallet } = useWallet();
   const { isCelebrity, loading: celebrityLoading } = useCelebrity();
 
-  useFocusEffect(useCallback(() => { refetchWallet(); }, [refetchWallet]));
+  // Real counts for this user (they used to be fixed at 12 / 8 / 5). Shown as a dash until they arrive.
+  const [counts, setCounts] = useState<{ bookings: number; favorites: number; referrals: number } | null>(null);
+
+  const loadCounts = useCallback(async () => {
+    const token = session?.access_token;
+    const pid = user?.profileId;
+    if (!token || !pid) return;
+    const count = async (path: string): Promise<number> => {
+      try {
+        const res = await supabaseFetch(path, { method: 'HEAD', headers: { Prefer: 'count=exact' } }, token);
+        const m = (res.headers.get('content-range') ?? '').match(/\/(\d+)$/);
+        return m ? parseInt(m[1], 10) : 0;
+      } catch {
+        return 0;
+      }
+    };
+    const referrals = async (): Promise<number> => {
+      try {
+        const res = await supabaseFetch('/rest/v1/rpc/get_my_referrals', { method: 'POST', body: '{}' }, token);
+        return res.ok ? ((await res.json()) as unknown[]).length : 0;
+      } catch {
+        return 0;
+      }
+    };
+    const [bookings, wishFriend, favorites, refs] = await Promise.all([
+      count(`/rest/v1/bookings?select=id&user_id=eq.${pid}&limit=1`),
+      count(`/rest/v1/wish_friend_orders?select=id&user_id=eq.${pid}&limit=1`),
+      count(`/rest/v1/celebrity_favorites?select=id&user_id=eq.${pid}&limit=1`),
+      referrals(),
+    ]);
+    setCounts({ bookings: bookings + wishFriend, favorites, referrals: refs });
+  }, [session?.access_token, user?.profileId]);
+
+  useFocusEffect(useCallback(() => { refetchWallet(); void loadCounts(); }, [refetchWallet, loadCounts]));
 
   const initials = user ? `${user.firstName[0]}${user.lastName[0]}` : 'WM';
 
@@ -63,14 +98,14 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.background }]}
+    <AmbientBackground><ScrollView
+      style={[styles.container, { backgroundColor: 'transparent' }]}
       contentContainerStyle={{ paddingBottom: tabBarHeight + 20 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
       <LinearGradient
-        colors={['#FF6B33', '#E8527A', '#B44CFF']}
+        colors={['#7B5CFA', '#D23FE0', '#1F7BFF']}
         style={[styles.header, { paddingTop: topPad + 20 }]}
       >
         <View style={styles.avatarCircle}>
@@ -91,7 +126,7 @@ export default function ProfileScreen() {
           </Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/wallet')}>
-          <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.addMoneyBtn}>
+          <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.addMoneyBtn}>
             <Icon name="plus" size={14} color="#fff" />
             <Text style={styles.addMoneyText}>Add Money</Text>
           </LinearGradient>
@@ -101,9 +136,9 @@ export default function ProfileScreen() {
       {/* Stats */}
       <View style={[styles.statsRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
         {([
-          { label: 'Bookings', value: '12', icon: 'calendar' },
-          { label: 'Favorites', value: '8', icon: 'heart' },
-          { label: 'Referrals', value: '5', icon: 'users' },
+          { label: 'Bookings', value: counts ? String(counts.bookings) : '–', icon: 'calendar' },
+          { label: 'Favorites', value: counts ? String(counts.favorites) : '–', icon: 'heart' },
+          { label: 'Referrals', value: counts ? String(counts.referrals) : '–', icon: 'users' },
         ] as Array<{ label: string; value: string; icon: IconName }>).map((stat) => (
           <View key={stat.label} style={styles.statItem}>
             <Icon name={stat.icon} size={20} color={colors.primary} />
@@ -141,7 +176,7 @@ export default function ProfileScreen() {
             style={[styles.dashboardBtn]}
             onPress={() => router.push('/celebrity-dashboard')}
           >
-            <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.dashboardBtnGrad}>
+            <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.dashboardBtnGrad}>
               <Icon name="star" size={18} color="#fff" />
               <Text style={styles.dashboardBtnText}>Celebrity Dashboard</Text>
             </LinearGradient>
@@ -153,7 +188,7 @@ export default function ProfileScreen() {
         <Icon name="log-out" size={18} color="#EF4444" />
         <Text style={[styles.logoutText, { color: '#EF4444' }]}>Logout</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </ScrollView></AmbientBackground>
   );
 }
 

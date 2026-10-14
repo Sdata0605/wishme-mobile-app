@@ -43,3 +43,20 @@ export async function parseApiError(res: Response): Promise<string> {
     return `Request failed (${res.status})`;
   }
 }
+
+let warmedAt = 0;
+
+/**
+ * Opens the connection (DNS + TLS) and wakes the sign-up edge functions before the user needs them.
+ * Called when the sign-in screen appears, so the first real request skips that setup.
+ */
+export function warmUpBackend(): void {
+  if (Date.now() - warmedAt < 60_000) return;
+  warmedAt = Date.now();
+  const headers = { apikey: SUPABASE_ANON_KEY };
+  fetch(`${SUPABASE_URL}/auth/v1/health`, { headers }).catch(() => {});
+  // OPTIONS returns immediately but still boots the function's worker.
+  for (const fn of ['send-email-otp', 'verify-email-otp']) {
+    fetch(`${SUPABASE_URL}/functions/v1/${fn}`, { method: 'OPTIONS', headers }).catch(() => {});
+  }
+}

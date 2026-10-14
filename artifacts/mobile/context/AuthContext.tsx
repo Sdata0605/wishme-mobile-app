@@ -2,6 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { parseApiError, supabaseFetch } from '@/constants/supabase';
 
+/** How the user wants to be addressed: 'male' is sir, 'female' is ma'am, 'other' is no title. Unknown until they say. */
+export type Gender = 'male' | 'female' | 'other';
+
 export interface User {
   id: string;
   profileId: string;
@@ -13,6 +16,7 @@ export interface User {
   walletBalance: number;
   memberSince: string;
   referralCode: string;
+  gender?: Gender;
 }
 
 export interface Session {
@@ -26,6 +30,7 @@ export interface PendingSignup {
   lastName: string;
   phone: string;
   referral?: string;
+  gender?: Gender;
 }
 
 interface InternalSignupData extends PendingSignup {
@@ -84,11 +89,14 @@ interface AuthContextValue {
     lastName: string,
     phone: string,
     referral?: string,
+    gender?: Gender,
   ) => Promise<{ error: string | null }>;
   verifyOtp: (code: string) => Promise<{ error: string | null }>;
   resendOtp: () => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
+  /** Saves how the user wants to be addressed, on the phone at once and on their account in the background. */
+  setGender: (gender: Gender) => void;
   forgotPasswordByEmail: (email: string) => Promise<{ error: string | null }>;
   forgotPasswordByPhone: (phone: string) => Promise<{ error: string | null }>;
   applyCelebrity: (data: CelebrityApplyData) => Promise<{ error: string | null }>;
@@ -107,6 +115,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const STORAGE_SESSION = '@wishme/session';
 const STORAGE_USER = '@wishme/user';
 const STORAGE_PENDING = '@wishme/pending_signup';
+
+const PROFILE_COLUMNS = 'id,first_name,last_name,phone,role,wallet_balance,referral_code';
 
 /** Pure-JS base64 character set used as fallback decoder. */
 const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
@@ -165,6 +175,10 @@ function isTokenStale(token: string): boolean {
   return exp === 0 || Date.now() > exp - 5 * 60 * 1000;
 }
 
+function asGender(v: unknown): Gender | undefined {
+  return v === 'male' || v === 'female' || v === 'other' ? v : undefined;
+}
+
 function buildUserFromSupabase(supaUser: Record<string, unknown>, fallback: Partial<User> = {}): User {
   const meta = (supaUser.user_metadata ?? {}) as Record<string, unknown>;
   return {
@@ -180,7 +194,9 @@ function buildUserFromSupabase(supaUser: Record<string, unknown>, fallback: Part
       (meta.member_since as string) ??
       fallback.memberSince ??
       new Date().toISOString().split('T')[0],
-    referralCode: (meta.referral_code as string) ?? fallback.referralCode ?? '',
+    // meta.referral_code is the code the user signed up WITH (their referrer's), never their own.
+    referralCode: fallback.referralCode ?? '',
+    gender: asGender(meta.gender) ?? fallback.gender,
   };
 }
 
@@ -196,8 +212,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { pendingRef.current = pendingSignup; }, [pendingSignup]);
   useEffect(() => { sessionRef.current = session; }, [session]);
 
+  // Single-flight: Supabase rotates refresh tokens, so two overlapping refreshes would make the
+  // second one fail and (wrongly) look like a revoked session.
+  const refreshInFlight = useRef<Promise<Session | null> | null>(null);
+
+  /** Resolves to the new session, `null` if the server rejected the refresh token, or `'offline'`. */
+  const doRefresh = useCallback(async (
+    currentSession: Session,
+  ): Promise<Session | null | 'offline'> => {
+    try {
+      const res = await supabaseFetch('/auth/v1/token?grant_type=refresh_token', {
+        method: 'POST',
+        body: JSON.stringify({ refresh_token: currentSession.refresh_token }),
+      });
+      if (!res.ok) return res.status >= 500 ? 'offline' : null;
+      const data = await res.json() as Record<string, unknown>;
+      if (!data.access_token) return null;
+      const newSession: Session = {
+        access_token: data.access_token as string,
+        refresh_token: (data.refresh_token as string) ?? currentSession.refresh_token,
+      };
+      setSession(newSession);
+      sessionRef.current = newSession;
+      await AsyncStorage.setItem(STORAGE_SESSION, JSON.stringify(newSession));
+      return newSession;
+    } catch {
+      return 'offline';
+    }
+  }, []);
+
+  const refreshSession = useCallback((currentSession: Session): Promise<Session | null> => {
+    if (!refreshInFlight.current) {
+      refreshInFlight.current = doRefresh(currentSession)
+        .then((r) => (r === 'offline' ? null : r))
+        .finally(() => { refreshInFlight.current = null; });
+    }
+    return refreshInFlight.current;
+  }, [doRefresh]);
+
   useEffect(() => {
+    // The app opens straight from what is stored on the phone. A stale token is renewed in the
+    // background — never in front of the user — and only a refusal from the server signs them out
+    // (being offline must not).
     const restore = async () => {
+      let toRefresh: { session: Session; user: User } | null = null;
       try {
         const pairs = await AsyncStorage.multiGet([STORAGE_SESSION, STORAGE_USER, STORAGE_PENDING]);
         const sessionStr = pairs[0][1];
@@ -209,81 +267,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userStr && sessionStr) {
           const storedSession = JSON.parse(sessionStr) as Session;
           const storedUser    = JSON.parse(userStr) as User;
-
-          if (!isTokenStale(storedSession.access_token)) {
-            setSession(storedSession);
-            sessionRef.current = storedSession;
-            setUser(storedUser);
-          } else {
-            // Token expired — try to refresh inline before showing the app
-            try {
-              const res = await supabaseFetch('/auth/v1/token?grant_type=refresh_token', {
-                method: 'POST',
-                body: JSON.stringify({ refresh_token: storedSession.refresh_token }),
-              });
-              if (res.ok) {
-                const data = await res.json() as Record<string, unknown>;
-                if (data.access_token) {
-                  const refreshed: Session = {
-                    access_token: data.access_token as string,
-                    refresh_token: (data.refresh_token as string) ?? storedSession.refresh_token,
-                  };
-                  setSession(refreshed);
-                  sessionRef.current = refreshed;
-                  await AsyncStorage.setItem(STORAGE_SESSION, JSON.stringify(refreshed));
-
-                  // Re-fetch profile to ensure profileId is fresh
-                  try {
-                    const profileRes = await supabaseFetch(
-                      `/rest/v1/profiles?select=id,wallet_balance,first_name,last_name,phone,role,member_since,referral_code&user_id=eq.${storedUser.id}&limit=1`,
-                      {},
-                      refreshed.access_token,
-                    );
-                    if (profileRes.ok) {
-                      const rows = await profileRes.json() as Array<Record<string, unknown>>;
-                      if (rows?.length > 0) {
-                        const p = rows[0];
-                        const freshUser: User = {
-                          ...storedUser,
-                          profileId: (p.id as string) ?? storedUser.profileId,
-                          firstName: (p.first_name as string) ?? storedUser.firstName,
-                          lastName:  (p.last_name  as string) ?? storedUser.lastName,
-                          phone:     (p.phone      as string) ?? storedUser.phone,
-                          role: ((p.role as string) === 'celebrity' ? 'celebrity' : 'user'),
-                          walletBalance: (p.wallet_balance as number) ?? storedUser.walletBalance,
-                          memberSince:   (p.member_since as string)   ?? storedUser.memberSince,
-                          referralCode:  (p.referral_code as string)  ?? storedUser.referralCode,
-                        };
-                        setUser(freshUser);
-                        await AsyncStorage.setItem(STORAGE_USER, JSON.stringify(freshUser));
-                      } else {
-                        setUser(storedUser);
-                      }
-                    } else {
-                      setUser(storedUser);
-                    }
-                  } catch {
-                    setUser(storedUser);
-                  }
-                } else {
-                  // Refresh returned ok but no token — clear session
-                  setUser(null);
-                  setSession(null);
-                  await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
-                }
-              } else {
-                // Refresh failed (revoked/expired) — clear session, show login
-                setUser(null);
-                setSession(null);
-                await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
-              }
-            } catch {
-              // Network error during refresh — clear session to be safe
-              setUser(null);
-              setSession(null);
-              await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
-            }
-          }
+          setSession(storedSession);
+          sessionRef.current = storedSession;
+          setUser(storedUser);
+          if (isTokenStale(storedSession.access_token)) toRefresh = { session: storedSession, user: storedUser };
         } else if (userStr && !sessionStr) {
           // Legacy: had user but no session — clear both
           await AsyncStorage.removeItem(STORAGE_USER);
@@ -303,33 +290,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } finally {
         setIsLoading(false);
       }
+
+      if (!toRefresh) return;
+      const { session: stored, user: storedUser } = toRefresh;
+      const refreshed = await doRefresh(stored);
+      if (refreshed === 'offline') return;
+      if (!refreshed) {
+        setUser(null);
+        setSession(null);
+        sessionRef.current = null;
+        await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
+        return;
+      }
+      // Pick up anything that changed while the app was closed (wallet balance, role...).
+      try {
+        const profileRes = await supabaseFetch(
+          `/rest/v1/profiles?select=${PROFILE_COLUMNS}&user_id=eq.${storedUser.id}&limit=1`,
+          {},
+          refreshed.access_token,
+        );
+        if (!profileRes.ok) return;
+        const rows = await profileRes.json() as Array<Record<string, unknown>>;
+        if (!rows?.length) return;
+        const p = rows[0];
+        const freshUser: User = {
+          ...storedUser,
+          profileId: (p.id as string) ?? storedUser.profileId,
+          firstName: (p.first_name as string) ?? storedUser.firstName,
+          lastName:  (p.last_name  as string) ?? storedUser.lastName,
+          phone:     (p.phone      as string) ?? storedUser.phone,
+          role: ((p.role as string) === 'celebrity' ? 'celebrity' : storedUser.role),
+          walletBalance: (p.wallet_balance as number) ?? storedUser.walletBalance,
+          memberSince:   (p.member_since as string)   ?? storedUser.memberSince,
+          referralCode:  (p.referral_code as string)  ?? storedUser.referralCode,
+        };
+        setUser(freshUser);
+        await AsyncStorage.setItem(STORAGE_USER, JSON.stringify(freshUser));
+      } catch {}
     };
     restore();
-  }, []);
-
-  const refreshSession = useCallback(async (
-    currentSession: Session,
-  ): Promise<Session | null> => {
-    try {
-      const res = await supabaseFetch('/auth/v1/token?grant_type=refresh_token', {
-        method: 'POST',
-        body: JSON.stringify({ refresh_token: currentSession.refresh_token }),
-      });
-      if (!res.ok) return null;
-      const data = await res.json() as Record<string, unknown>;
-      if (!data.access_token) return null;
-      const newSession: Session = {
-        access_token: data.access_token as string,
-        refresh_token: (data.refresh_token as string) ?? currentSession.refresh_token,
-      };
-      setSession(newSession);
-      sessionRef.current = newSession;
-      await AsyncStorage.setItem(STORAGE_SESSION, JSON.stringify(newSession));
-      return newSession;
-    } catch {
-      return null;
-    }
-  }, []);
+  }, [doRefresh]);
 
   const getValidSession = useCallback(async (): Promise<Session | null> => {
     const current = sessionRef.current;
@@ -364,8 +364,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const supaUser = data.user as Record<string, unknown>;
       let u = buildUserFromSupabase(supaUser, { email: normalizedEmail });
 
+      // One request for the profile AND the celebrity check (celebrities(id) is an embedded join).
       const profileRes = await supabaseFetch(
-        `/rest/v1/profiles?select=*&user_id=eq.${supaUser.id}&limit=1`,
+        `/rest/v1/profiles?select=${PROFILE_COLUMNS},celebrities(id)&user_id=eq.${supaUser.id}&limit=1`,
         {},
         newSession.access_token,
       );
@@ -379,41 +380,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { error: 'Account profile not found. Please contact support.', role: null };
       }
       const p = profiles[0];
+      const celebs = p.celebrities as Array<{ id: string }> | null | undefined;
       u = {
         ...u,
         profileId: (p.id as string) ?? '',
         firstName: (p.first_name as string) ?? u.firstName,
         lastName: (p.last_name as string) ?? u.lastName,
         phone: (p.phone as string) ?? u.phone,
-        role: ((p.role as string) === 'celebrity' ? 'celebrity' : 'user'),
+        role: ((p.role as string) === 'celebrity' || (celebs && celebs.length > 0)) ? 'celebrity' : 'user',
         walletBalance: (p.wallet_balance as number) ?? u.walletBalance,
         memberSince: (p.member_since as string) ?? u.memberSince,
         referralCode: (p.referral_code as string) ?? u.referralCode,
       };
 
-      if (u.profileId) {
-        try {
-          const celebRes = await supabaseFetch(
-            `/rest/v1/celebrities?select=id&profile_id=eq.${u.profileId}&limit=1`,
-            {},
-            newSession.access_token,
-          );
-          if (celebRes.ok) {
-            const celebs = await celebRes.json() as Array<{ id: string }>;
-            if (celebs && celebs.length > 0) {
-              u = { ...u, role: 'celebrity' };
-            }
-          } else {
-            console.error('[AUTH] Celebrity check failed:', celebRes.status);
-          }
-        } catch (celebEx) {
-          console.error('[AUTH] Celebrity check exception:', celebEx);
-        }
-      }
-
       setSession(newSession);
+      sessionRef.current = newSession;
       setUser(u);
-      await AsyncStorage.multiSet([
+      // Persist without making the user wait for the disk.
+      void AsyncStorage.multiSet([
         [STORAGE_SESSION, JSON.stringify(newSession)],
         [STORAGE_USER, JSON.stringify(u)],
       ]);
@@ -431,9 +415,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     lastName: string,
     phone: string,
     referral?: string,
+    gender?: Gender,
   ): Promise<{ error: string | null }> => {
     try {
-      const pending: PendingSignup = { email, firstName, lastName, phone, referral };
+      const pending: PendingSignup = { email, firstName, lastName, phone, referral, gender };
       const internal: InternalSignupData = { ...pending, password };
       setPendingSignup(pending);
       pendingRef.current = pending;
@@ -503,6 +488,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             last_name: internal.lastName,
             phone: internal.phone,
             referral_code: internal.referral ?? '',
+            gender: internal.gender ?? null,
             role: 'user',
             wallet_balance: 0,
             member_since: new Date().toISOString().split('T')[0],
@@ -541,7 +527,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
 
-      const referralCode = (internal.firstName.toUpperCase() + '2025').slice(0, 10);
+      // The real code is created by the database; it is read from the profile just below.
+      const referralCode = '';
       const supaUser = (signupData.user ?? signupData) as Record<string, unknown>;
       const u = buildUserFromSupabase(supaUser, {
         firstName: internal.firstName,
@@ -551,6 +538,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         referralCode,
         walletBalance: 0,
         memberSince: new Date().toISOString().split('T')[0],
+        gender: internal.gender,
       });
 
       setSession(newSession);
@@ -663,6 +651,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+
+  const setGender = useCallback((gender: Gender) => {
+    updateUser({ gender });
+    // Keep it on the account too (auth user metadata, so no database change is needed). Best effort: the phone copy is what counts.
+    void (async () => {
+      try {
+        const token = (await getValidSession())?.access_token;
+        if (!token) return;
+        await supabaseFetch('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ data: { gender } }) }, token);
+      } catch {
+        // offline: it syncs the next time the user picks
+      }
+    })();
+  }, [updateUser, getValidSession]);
 
   const forgotPasswordByEmail = useCallback(async (email: string): Promise<{ error: string | null }> => {
     try {
@@ -860,6 +862,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resendOtp,
         logout,
         updateUser,
+        setGender,
         forgotPasswordByEmail,
         forgotPasswordByPhone,
         applyCelebrity,

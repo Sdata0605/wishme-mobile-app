@@ -28,6 +28,7 @@ import type { BillKind } from '@/components/all-services/billData';
 import type { ServiceView } from '@/components/all-services/ServicesFlow';
 
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles } from './themed';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -44,19 +45,19 @@ interface ServiceItem {
 }
 
 const HOME_SERVICES: ServiceItem[] = [
-  { name: 'Flights', Icon: Plane, color: C.purple, bgColor: '#F5F3FF', action: { type: 'screen', view: 'flights' } },
-  { name: 'Hotels', Icon: HotelIcon, color: C.purple, bgColor: '#F5F3FF', action: { type: 'screen', view: 'hotels' } },
-  { name: 'Bus', Icon: Bus, color: C.purple, bgColor: '#F5F3FF', action: { type: 'screen', view: 'busTickets' } },
+  { name: 'Flights', Icon: Plane, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'screen', view: 'flights' } },
+  { name: 'Hotels', Icon: HotelIcon, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'screen', view: 'hotels' } },
+  { name: 'Bus', Icon: Bus, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'screen', view: 'busTickets' } },
   { name: 'Electricity', Icon: Zap, color: '#D97706', bgColor: '#FFFBEB', action: { type: 'bill', kind: 'electricity' } },
   { name: 'Water', Icon: Droplet, color: '#2563EB', bgColor: '#EFF6FF', action: { type: 'bill', kind: 'water' } },
-  { name: 'Gas', Icon: Flame, color: C.orange, bgColor: '#FFF7ED', action: { type: 'bill', kind: 'gas' } },
-  { name: 'Mobile', Icon: Smartphone, color: C.purple, bgColor: '#F5F3FF', action: { type: 'bill', kind: 'mobile' } },
+  { name: 'Gas', Icon: Flame, color: T(C.orange, 'fg'), bgColor: '#F5F0FF', action: { type: 'bill', kind: 'gas' } },
+  { name: 'Mobile', Icon: Smartphone, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'bill', kind: 'mobile' } },
   { name: 'DTH', Icon: Tv, color: '#374151', bgColor: '#F9FAFB', action: { type: 'bill', kind: 'dth' } },
-  { name: 'FASTag', Icon: Car, color: C.orange, bgColor: '#FFF7ED', action: { type: 'bill', kind: 'fastag' } },
-  { name: 'Broadband', Icon: Wifi, color: C.purple, bgColor: '#F5F3FF', action: { type: 'bill', kind: 'broadband' } },
-  { name: 'Credit Card', Icon: CreditCard, color: C.orange, bgColor: '#FFF7ED', action: { type: 'bill', kind: 'creditCard' } },
-  { name: 'Loan EMI', Icon: Banknote, color: C.green, bgColor: '#ECFDF5', action: { type: 'bill', kind: 'loanEmi' } },
-  { name: 'Insurance', Icon: ShieldCheck, color: C.green, bgColor: '#ECFDF5', action: { type: 'bill', kind: 'insurance' } },
+  { name: 'FASTag', Icon: Car, color: T(C.orange, 'fg'), bgColor: '#F5F0FF', action: { type: 'bill', kind: 'fastag' } },
+  { name: 'Broadband', Icon: Wifi, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'bill', kind: 'broadband' } },
+  { name: 'Credit Card', Icon: CreditCard, color: T(C.orange, 'fg'), bgColor: '#F5F0FF', action: { type: 'bill', kind: 'creditCard' } },
+  { name: 'Loan EMI', Icon: Banknote, color: T(C.green, 'fg'), bgColor: '#ECFDF5', action: { type: 'bill', kind: 'loanEmi' } },
+  { name: 'Insurance', Icon: ShieldCheck, color: T(C.green, 'fg'), bgColor: '#ECFDF5', action: { type: 'bill', kind: 'insurance' } },
 ];
 
 const COL_W = (SCREEN_WIDTH - 48) / 6;
@@ -73,14 +74,15 @@ function pushService(action: HomeAction) {
 }
 
 function ServiceCell({ item }: { item: ServiceItem }) {
+  const styles = use_styles();
   return (
     <TouchableOpacity
       style={[styles.cell, { width: COL_W }]}
       activeOpacity={0.75}
       onPress={() => pushService(item.action)}
     >
-      <View style={[styles.iconBg, { backgroundColor: item.bgColor }]}>
-        <item.Icon size={20} color={item.color} />
+      <View style={[styles.iconBg, { backgroundColor: T(item.bgColor, 'bg') }]}>
+        <item.Icon size={20} color={T(item.color, 'fg')} />
       </View>
       <Text style={styles.cellLabel}>{item.name}</Text>
     </TouchableOpacity>
@@ -89,6 +91,7 @@ function ServiceCell({ item }: { item: ServiceItem }) {
 
 /** Wish-Me home All Services grid — replaces Quick Actions on WishMe-UI home. */
 export function HomeAllServicesSection() {
+  const styles = use_styles();
   const rows: ServiceItem[][] = [];
   for (let i = 0; i < HOME_SERVICES.length; i += 6) {
     rows.push(HOME_SERVICES.slice(i, i + 6));
@@ -103,7 +106,7 @@ export function HomeAllServicesSection() {
           onPress={() => router.push('/(tabs)/all-services')}
         >
           <Text style={styles.exploreText}>Explore All</Text>
-          <ChevronRight size={14} color={C.purple} />
+          <ChevronRight size={14} color={T(C.purple, 'fg')} />
         </TouchableOpacity>
       </View>
       {rows.map((row, ri) => (
@@ -117,9 +120,9 @@ export function HomeAllServicesSection() {
   );
 }
 
-const styles = StyleSheet.create({
+const make_styles = () => StyleSheet.create({
   container: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     marginHorizontal: 16,
     marginTop: 4,
     borderRadius: 16,
@@ -134,8 +137,8 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     paddingHorizontal: 4,
   },
-  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.text },
-  exploreText: { fontSize: 13, color: C.purple, fontFamily: 'Inter_600SemiBold' },
+  title: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  exploreText: { fontSize: 13, color: T(C.purple, 'fg'), fontFamily: 'Inter_600SemiBold' },
   row: { flexDirection: 'row', marginBottom: 12 },
   cell: { alignItems: 'center' },
   iconBg: {
@@ -148,9 +151,10 @@ const styles = StyleSheet.create({
   },
   cellLabel: {
     fontSize: 9.5,
-    color: C.text,
+    color: T(C.text, 'fg'),
     fontFamily: 'Inter_500Medium',
     textAlign: 'center',
     lineHeight: 13,
   },
 });
+const use_styles = () => useThemedStyles(make_styles);

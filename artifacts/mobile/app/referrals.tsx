@@ -1,9 +1,9 @@
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Clipboard,
   Platform,
   RefreshControl,
   ScrollView,
@@ -19,6 +19,7 @@ import type { IconName } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const STATUS_COLORS: Record<string, string> = {
   completed: '#22C55E',
@@ -32,53 +33,61 @@ interface CommissionRates {
   planName: string;
 }
 
-interface ReferralTransaction {
-  id: string;
-  referrer_id: string;
-  referred_id: string | null;
-  booking_id: string | null;
-  commission_level: 1 | 2;
-  commission_amount: number;
-  status: 'completed' | 'pending';
-  created_at: string;
-  order_type: string | null;
+interface PlanRates {
+  name: string;
+  price: number;
+  l1: number;
+  l2: number;
 }
 
-interface ReferredUser {
+interface ReferralTransaction {
   id: string;
-  first_name: string | null;
-  last_name: string | null;
-  email: string | null;
+  commission_level: 1 | 2;
+  commission_amount: number;
+  status: string;
+  created_at: string;
+  order_type: string | null;
+  referred_name: string;
 }
+
+const ORDER_LABELS: Record<string, string> = {
+  ugc_video: 'UGC video',
+  ugc_ad: 'UGC ad',
+  wish_friend: 'Wish a Friend',
+};
 
 export default function ReferralsScreen() {
   const { colors } = useTheme();
   const { user, session } = useAuth();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const code = user?.referralCode ?? 'WISHME2025';
 
   const [copied, setCopied] = useState(false);
   const [toast, setToast] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [commissionRates, setCommissionRates] = useState<CommissionRates>({ l1: 10, l2: 5, planName: 'Basic' });
+  const [code, setCode] = useState('');
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [commissionRates, setCommissionRates] = useState<CommissionRates>({ l1: 5, l2: 0, planName: 'Basic' });
   const [transactions, setTransactions] = useState<ReferralTransaction[]>([]);
-  const [referredUsersMap, setReferredUsersMap] = useState<Map<string, ReferredUser>>(new Map());
   const [totalReferrals, setTotalReferrals] = useState(0);
+  const [allPlans, setAllPlans] = useState<PlanRates[]>([]);
   const [referralUrl, setReferralUrl] = useState<string>('');
 
-  const copy = () => {
-    Clipboard.setString(code);
+  const linkFor = (c: string) => referralUrl || `https://wishme.today/auth?ref=${c}`;
+
+  const copy = async () => {
+    if (!code) return;
+    await Clipboard.setStringAsync(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
 
   const share = async () => {
-    const url = referralUrl || `https://wishme.app/invite?ref=${code}`;
+    if (!code) return;
     try {
-      await Share.share({ message: `Join WishMe and book celebrity wishes! Use my referral code: ${code}\n${url}` });
+      await Share.share({ message: `Join WishMe and book celebrity wishes! Use my referral code: ${code}\n${linkFor(code)}` });
     } catch {
       showToast('Share not available');
     }
@@ -95,81 +104,50 @@ export default function ReferralsScreen() {
     try {
       const token = session.access_token;
 
+      // The real code comes from the profile. Never show a made-up one: friends who type it would not be linked to you.
       const profileRes = await supabaseFetch(
-        `/rest/v1/profiles?select=plan,referral_url&id=eq.${user.profileId}&limit=1`,
+        `/rest/v1/profiles?select=plan,referral_code,referral_url&id=eq.${user.profileId}&limit=1`,
         {},
         token,
       );
-      const profileData = profileRes.ok ? await profileRes.json() : [];
-      const profile = profileData[0] ?? {};
-      const planName: string = profile.plan ?? 'Basic';
-      const fetchedUrl: string = profile.referral_url ?? '';
-      setReferralUrl(fetchedUrl || `https://wishme.app/invite?ref=${code}`);
+      if (!profileRes.ok) throw new Error('profile');
+      const profile = ((await profileRes.json()) as Array<{ plan?: string; referral_code?: string; referral_url?: string }>)[0] ?? {};
+      const planName: string = profile.plan ?? 'basic';
+      setCode(profile.referral_code ?? '');
+      setReferralUrl(profile.referral_url ?? '');
 
-      const [ratesRes, txRes, directRes] = await Promise.all([
+      // Profiles are private, so the people you referred and their names come from functions, not from the profiles table.
+      const [ratesRes, historyRes, directRes] = await Promise.all([
         supabaseFetch(
-          `/rest/v1/plans?select=name,referral_commission_l1,referral_commission_l2&name=eq.${encodeURIComponent(planName)}`,
+          '/rest/v1/plans?select=name,price,referral_commission_l1,referral_commission_l2&is_active=eq.true&order=price.asc',
           {},
           token,
         ),
-        supabaseFetch(
-          `/rest/v1/referral_transactions?select=*&referrer_id=eq.${user.profileId}&order=created_at.desc`,
-          {},
-          token,
-        ),
-        supabaseFetch(
-          `/rest/v1/profiles?select=id,first_name,last_name,email,created_at&referred_by=eq.${user.profileId}`,
-          {},
-          token,
-        ),
+        supabaseFetch('/rest/v1/rpc/get_my_referral_history', { method: 'POST', body: '{}' }, token),
+        supabaseFetch('/rest/v1/rpc/get_my_referrals', { method: 'POST', body: '{}' }, token),
       ]);
 
       if (ratesRes.ok) {
-        const ratesData = await ratesRes.json();
-        if (ratesData.length > 0) {
-          setCommissionRates({
-            l1: ratesData[0].referral_commission_l1 ?? 10,
-            l2: ratesData[0].referral_commission_l2 ?? 5,
-            planName: ratesData[0].name ?? planName,
-          });
-        } else {
-          setCommissionRates((prev) => ({ ...prev, planName }));
-        }
+        const rows = await ratesRes.json() as Array<{ name: string; price: number; referral_commission_l1: number | null; referral_commission_l2: number | null }>;
+        const plans: PlanRates[] = rows.map(r => ({
+          name: r.name.replace(/^./, c => c.toUpperCase()),
+          price: r.price,
+          l1: r.referral_commission_l1 ?? 0,
+          l2: r.referral_commission_l2 ?? 0,
+        }));
+        setAllPlans(plans);
+        const mine = plans.find(pl => pl.name.toLowerCase() === planName.toLowerCase());
+        if (mine) setCommissionRates({ l1: mine.l1, l2: mine.l2, planName: mine.name });
       }
 
-      const txData: ReferralTransaction[] = txRes.ok ? await txRes.json() : [];
-      setTransactions(txData);
-
-      const directData: ReferredUser[] = directRes.ok ? await directRes.json() : [];
-      setTotalReferrals(directData.length);
-
-      const allIds = new Set<string>();
-      for (const tx of txData) {
-        if (tx.referred_id) allIds.add(tx.referred_id);
-      }
-      for (const u of directData) {
-        allIds.add(u.id);
-      }
-
-      if (allIds.size > 0) {
-        const idsStr = Array.from(allIds).join(',');
-        const usersRes = await supabaseFetch(
-          `/rest/v1/profiles?select=id,first_name,last_name,email&id=in.(${idsStr})`,
-          {},
-          token,
-        );
-        const usersData: ReferredUser[] = usersRes.ok ? await usersRes.json() : [];
-        const map = new Map<string, ReferredUser>();
-        for (const u of directData) map.set(u.id, u);
-        for (const u of usersData) map.set(u.id, u);
-        setReferredUsersMap(map);
-      } else {
-        setReferredUsersMap(new Map());
-      }
+      setTransactions(historyRes.ok ? await historyRes.json() as ReferralTransaction[] : []);
+      setTotalReferrals(directRes.ok ? ((await directRes.json()) as unknown[]).length : 0);
+      setLoadFailed(false);
     } catch {
+      setLoadFailed(true);
       showToast('Failed to load referral data');
     }
-  }, [user?.profileId, session?.access_token, code]);
+  }, [user?.profileId, session?.access_token]);
 
   useEffect(() => {
     setLoading(true);
@@ -188,15 +166,15 @@ export default function ReferralsScreen() {
   const level2Count = transactions.filter((t) => t.commission_level === 2).length;
 
   const stats: { label: string; value: string; icon: IconName; color: string }[] = [
-    { label: 'Total Referrals', value: String(totalReferrals), icon: 'users', color: '#FF6B33' },
+    { label: 'Total Referrals', value: String(totalReferrals), icon: 'users', color: '#7B5CFA' },
     { label: 'Total Earnings', value: `₹${totalEarnings.toLocaleString('en-IN')}`, icon: 'trending-up', color: '#22C55E' },
     { label: 'Pending', value: `₹${pendingEarnings.toLocaleString('en-IN')}`, icon: 'clock', color: '#F59E0B' },
-    { label: 'L1 / L2 refs', value: `${level1Count} / ${level2Count}`, icon: 'bar-chart-2', color: '#B44CFF' },
+    { label: 'Level 1 / 2 earnings', value: `${level1Count} / ${level2Count}`, icon: 'bar-chart-2', color: '#1F7BFF' },
   ];
 
   if (!user || !session) {
     return (
-      <View style={[s.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
         <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -211,12 +189,12 @@ export default function ReferralsScreen() {
             <Text style={s.signInBtnText}>Sign In</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -235,29 +213,36 @@ export default function ReferralsScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         >
-          <LinearGradient colors={['#7B2FFF', '#B44CFF']} style={s.topCard}>
+          {loadFailed && (
+            <TouchableOpacity onPress={onRefresh} style={s.retry}>
+              <Icon name="refresh-cw" size={14} color="#fff" />
+              <Text style={s.retryText}>Could not load your referral data. Tap to retry.</Text>
+            </TouchableOpacity>
+          )}
+          <LinearGradient colors={['#7C3AED', '#1F7BFF']} style={s.topCard}>
             <Text style={s.topTitle}>Invite & Earn</Text>
-            <Text style={s.topSub}>Earn {commissionRates.l1}% on direct bookings</Text>
+            <Text style={s.topSub}>Earn {commissionRates.l1}% when people you invite book{commissionRates.l2 > 0 ? `, and ${commissionRates.l2}% on their invites` : ''}</Text>
             <View style={s.codeBox}>
-              <Text style={s.codeText}>{code}</Text>
+              <Text style={s.codeText}>{code || (loadFailed ? 'Unavailable' : '...')}</Text>
               <View style={s.codeActions}>
                 <TouchableOpacity onPress={copy} style={s.codeBtn}>
-                  <Icon name="copy" size={16} color="#7B2FFF" />
+                  <Icon name="copy" size={16} color="#7C3AED" />
                   <Text style={s.codeBtnText}>{copied ? 'Copied!' : 'Copy'}</Text>
                 </TouchableOpacity>
                 <View style={s.codeDivider} />
                 <TouchableOpacity onPress={share} style={s.codeBtn}>
-                  <Icon name="share-2" size={16} color="#7B2FFF" />
+                  <Icon name="share-2" size={16} color="#7C3AED" />
                   <Text style={s.codeBtnText}>Share</Text>
                 </TouchableOpacity>
               </View>
             </View>
             <View style={s.urlBox}>
-              <Text style={s.urlText} numberOfLines={1} ellipsizeMode="middle">{referralUrl || `https://wishme.app/invite?ref=${code}`}</Text>
+              <Text style={s.urlText} numberOfLines={1} ellipsizeMode="middle">{code ? linkFor(code) : 'Your link will appear here'}</Text>
               <View style={s.codeActions}>
                 <TouchableOpacity
-                  onPress={() => {
-                    Clipboard.setString(referralUrl || `https://wishme.app/invite?ref=${code}`);
+                  onPress={async () => {
+                    if (!code) return;
+                    await Clipboard.setStringAsync(linkFor(code));
                     showToast('Link copied!');
                   }}
                   style={s.codeBtn}
@@ -288,15 +273,15 @@ export default function ReferralsScreen() {
             <Text style={[s.commCardTitle, { color: colors.foreground }]}>Commission Rates</Text>
             <View style={s.commRates}>
               <View style={s.commRate}>
-                <Text style={[s.commLevel, { color: '#FF6B33' }]}>L1</Text>
+                <Text style={[s.commLevel, { color: '#7B5CFA' }]}>L1</Text>
                 <Text style={[s.commPct, { color: colors.foreground }]}>{commissionRates.l1}%</Text>
                 <Text style={[s.commDesc, { color: colors.mutedForeground }]}>Direct referral commission</Text>
               </View>
               <View style={[s.commSep, { backgroundColor: colors.border }]} />
               <View style={s.commRate}>
-                <Text style={[s.commLevel, { color: '#B44CFF' }]}>L2</Text>
+                <Text style={[s.commLevel, { color: '#1F7BFF' }]}>L2</Text>
                 <Text style={[s.commPct, { color: colors.foreground }]}>{commissionRates.l2}%</Text>
-                <Text style={[s.commDesc, { color: colors.mutedForeground }]}>2nd-level commission</Text>
+                <Text style={[s.commDesc, { color: colors.mutedForeground }]}>{commissionRates.l2 > 0 ? '2nd-level commission' : 'Upgrade your plan to earn here'}</Text>
               </View>
             </View>
             <View style={[s.planBadge, { backgroundColor: colors.muted }]}>
@@ -310,7 +295,7 @@ export default function ReferralsScreen() {
               <Text style={[s.thCell, s.colUser, { color: colors.mutedForeground }]}>User</Text>
               <Text style={[s.thCell, s.colLevel, { color: colors.mutedForeground }]}>Lvl</Text>
               <Text style={[s.thCell, s.colAmt, { color: colors.mutedForeground }]}>Amount</Text>
-              <Text style={[s.thCell, s.colStatus, { color: colors.mutedForeground }]}>Status</Text>
+              <Text style={[s.thCell, s.colStatusHead, { color: colors.mutedForeground }]}>Status</Text>
               <Text style={[s.thCell, s.colDate, { color: colors.mutedForeground }]}>Date</Text>
             </View>
             {transactions.length === 0 ? (
@@ -325,17 +310,7 @@ export default function ReferralsScreen() {
                 const sc = STATUS_COLORS[statusKey] ?? '#6B7280';
                 const isLast = i === transactions.length - 1;
                 const level = `L${row.commission_level}` as 'L1' | 'L2';
-                const referredUser = row.referred_id ? referredUsersMap.get(row.referred_id) : null;
-                let userName = 'Unknown';
-                if (referredUser) {
-                  const fn = referredUser.first_name ?? '';
-                  const ln = referredUser.last_name ?? '';
-                  if (fn || ln) {
-                    userName = `${fn} ${ln}`.trim();
-                  } else if (referredUser.email) {
-                    userName = referredUser.email;
-                  }
-                }
+                const userName = row.referred_name || 'A WishMe member';
                 const dateStr = new Date(row.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
                 const displayStatus = statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
 
@@ -344,13 +319,16 @@ export default function ReferralsScreen() {
                     key={row.id}
                     style={[s.tableRow, { borderBottomWidth: isLast ? 0 : 1, borderBottomColor: colors.border }]}
                   >
-                    <Text style={[s.tdCell, s.colUser, { color: colors.foreground }]} numberOfLines={1}>{userName}</Text>
+                    <View style={s.colUser}>
+                      <Text style={[s.tdCell, { color: colors.foreground }]} numberOfLines={1}>{userName}</Text>
+                      {row.order_type && ORDER_LABELS[row.order_type] ? <Text style={[s.orderLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{ORDER_LABELS[row.order_type]}</Text> : null}
+                    </View>
                     <View style={s.colLevel}>
-                      <View style={[s.levelBadge, { backgroundColor: level === 'L1' ? '#FF6B3320' : '#B44CFF20' }]}>
-                        <Text style={[s.levelText, { color: level === 'L1' ? '#FF6B33' : '#B44CFF' }]}>{level}</Text>
+                      <View style={[s.levelBadge, { backgroundColor: level === 'L1' ? '#7B5CFA20' : '#1F7BFF20' }]}>
+                        <Text style={[s.levelText, { color: level === 'L1' ? '#7B5CFA' : '#1F7BFF' }]}>{level}</Text>
                       </View>
                     </View>
-                    <Text style={[s.tdCell, s.colAmt, { color: '#22C55E' }]}>₹{row.commission_amount}</Text>
+                    <Text style={[s.tdCell, s.colAmt, { color: '#22C55E' }]}>₹{row.commission_amount.toLocaleString('en-IN')}</Text>
                     <View style={s.colStatus}>
                       <View style={[s.statusBadge, { backgroundColor: sc + '20' }]}>
                         <Text style={[s.statusText, { color: sc }]} numberOfLines={1}>{displayStatus}</Text>
@@ -375,7 +353,30 @@ export default function ReferralsScreen() {
             </View>
           </View>
 
-          <TouchableOpacity style={[s.upgradeBtn, { borderColor: colors.primary }]} onPress={() => router.push('/plan' as never)}>
+          {allPlans.length > 1 && (
+            <View style={[s.commCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <Text style={[s.commCardTitle, { color: colors.foreground }]}>Earn more with a higher plan</Text>
+              <View style={[s.planRow, s.planHead]}>
+                <Text style={[s.planCell, { flex: 1.4, color: colors.mutedForeground, textAlign: 'left' }]}>Plan</Text>
+                <Text style={[s.planCell, { color: colors.mutedForeground }]}>Level 1</Text>
+                <Text style={[s.planCell, { color: colors.mutedForeground }]}>Level 2</Text>
+              </View>
+              {allPlans.map(pl => {
+                const mine = pl.name.toLowerCase() === commissionRates.planName.toLowerCase();
+                return (
+                  <View key={pl.name} style={[s.planRow, mine && { backgroundColor: colors.primary + '18', borderRadius: 10 }]}>
+                    <Text style={[s.planCell, { flex: 1.4, color: colors.foreground, textAlign: 'left', fontFamily: 'Inter_600SemiBold' }]}>
+                      {pl.name}{mine ? '  (yours)' : ''}
+                    </Text>
+                    <Text style={[s.planCell, { color: '#7B5CFA', fontFamily: 'Inter_700Bold' }]}>{pl.l1}%</Text>
+                    <Text style={[s.planCell, { color: pl.l2 > 0 ? '#1F7BFF' : colors.mutedForeground, fontFamily: 'Inter_700Bold' }]}>{pl.l2}%</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          <TouchableOpacity style={[s.upgradeBtn, { borderColor: colors.primary }]} onPress={() => router.push('/select-plan' as never)}>
             <Icon name="trending-up" size={18} color={colors.primary} />
             <Text style={[s.upgradeBtnText, { color: colors.primary }]}>Upgrade Plan for Higher Commissions</Text>
           </TouchableOpacity>
@@ -387,7 +388,7 @@ export default function ReferralsScreen() {
           <Text style={s.toastText}>{toast}</Text>
         </View>
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -404,11 +405,11 @@ const s = StyleSheet.create({
   topTitle: { color: '#fff', fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', marginBottom: 8 },
   topSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
   codeBox: { backgroundColor: '#fff', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, width: '100%' },
-  codeText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#7B2FFF', letterSpacing: 2 },
+  codeText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#7C3AED', letterSpacing: 2 },
   codeActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   codeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 },
-  codeBtnText: { color: '#7B2FFF', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  codeDivider: { width: 1, height: 18, backgroundColor: '#7B2FFF40' },
+  codeBtnText: { color: '#7C3AED', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  codeDivider: { width: 1, height: 18, backgroundColor: '#7C3AED40' },
   urlBox: { marginTop: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8, width: '100%' },
   urlText: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.9)', marginRight: 8 },
   urlBtnText: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontFamily: 'Inter_600SemiBold' },
@@ -433,11 +434,13 @@ const s = StyleSheet.create({
   tableHead: {},
   thCell: { fontSize: 11, fontFamily: 'Inter_600SemiBold' },
   tdCell: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  colUser: { flex: 2 },
+  colUser: { flex: 2.2 },
   colLevel: { flex: 1, alignItems: 'center' },
-  colAmt: { flex: 1.5, textAlign: 'right' },
-  colStatus: { flex: 1.5, alignItems: 'center' },
-  colDate: { flex: 1.5, textAlign: 'right', fontSize: 11 },
+  colAmt: { flex: 1.5, textAlign: 'right', paddingRight: 12 },
+  colStatus: { flex: 1.6, alignItems: 'center' },
+  colStatusHead: { flex: 1.6, textAlign: 'center' },
+  colDate: { flex: 1.4, textAlign: 'right', fontSize: 11 },
+  orderLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', marginTop: 1 },
   levelBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9999 },
   levelText: { fontSize: 10, fontFamily: 'Inter_700Bold' },
   statusBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 9999 },
@@ -452,6 +455,11 @@ const s = StyleSheet.create({
   summaryVal: { fontSize: 18, fontFamily: 'Inter_700Bold' },
   upgradeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, marginHorizontal: 16, borderRadius: 14, borderWidth: 2, paddingVertical: 14 },
   upgradeBtnText: { fontSize: 14, fontFamily: 'Inter_700Bold' },
+  planRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 8 },
+  planHead: { paddingVertical: 4 },
+  planCell: { flex: 1, fontSize: 12, fontFamily: 'Inter_500Medium', textAlign: 'center' },
+  retry: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#DC2626', marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 12 },
+  retryText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_500Medium', flex: 1 },
   toast: { position: 'absolute', bottom: 80, left: 24, right: 24, backgroundColor: 'rgba(0,0,0,0.8)', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' },
   toastText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_500Medium', textAlign: 'center' },
 });

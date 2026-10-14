@@ -24,6 +24,7 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supa
 import { useAuth } from '@/context/AuthContext';
 import type { Session, User } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 type ColorsType = ReturnType<typeof import('@/context/ThemeContext').useTheme>['colors'];
 
@@ -192,14 +193,14 @@ export default function CelebrityDashboardScreen() {
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color="#FF6B33" />
+        <ActivityIndicator size="large" color="#7B5CFA" />
       </View>
     );
   }
 
   if (fetchError) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -215,13 +216,13 @@ export default function CelebrityDashboardScreen() {
             <Text style={[styles.backBtnText, { color: colors.primary }]}>Retry</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   if (notCeleb) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
         <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => router.back()}>
             <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -237,14 +238,14 @@ export default function CelebrityDashboardScreen() {
             <Text style={[styles.backBtnText, { color: colors.primary }]}>Go Back</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </View></AmbientBackground>
     );
   }
 
   if (!celebrity) return null;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.foreground }]}>Celebrity Dashboard</Text>
         <TouchableOpacity
@@ -259,7 +260,7 @@ export default function CelebrityDashboardScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#FF6B33" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#7B5CFA" />}
       >
         {celebrity.consent_status !== 'submitted' && celebrity.consent_status !== 'approved' && (
           <View style={styles.consentBanner}>
@@ -269,7 +270,7 @@ export default function CelebrityDashboardScreen() {
             </Text>
           </View>
         )}
-        <LinearGradient colors={['#FF6B33', '#E8527A', '#B44CFF']} style={styles.heroBg}>
+        <LinearGradient colors={['#7B5CFA', '#D23FE0', '#1F7BFF']} style={styles.heroBg}>
           <Text style={styles.heroName}>{celebrity.name}</Text>
           <Text style={styles.heroCategory}>{celebrity.category}</Text>
         </LinearGradient>
@@ -279,7 +280,7 @@ export default function CelebrityDashboardScreen() {
             { label: 'Pending', value: fmtRupee(stats.pendingEarnings), icon: 'clock' as IconName, color: '#F59E0B' },
             { label: 'Bookings', value: String(stats.totalBookings), icon: 'credit-card' as IconName, color: '#3B82F6' },
             { label: 'Rating', value: (celebrity.rating ?? 0).toFixed(1), icon: 'star' as IconName, color: '#EAB308' },
-            { label: 'Reviews', value: String(celebrity.review_count ?? 0), icon: 'message-circle' as IconName, color: '#A855F7' },
+            { label: 'Reviews', value: String(celebrity.review_count ?? 0), icon: 'message-circle' as IconName, color: '#7B5CFA' },
           ].map((s) => (
             <View key={s.label} style={[styles.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[styles.statCardIcon, { backgroundColor: s.color + '22' }]}>
@@ -297,10 +298,10 @@ export default function CelebrityDashboardScreen() {
               <TouchableOpacity
                 key={tab.key}
                 onPress={() => setActiveTab(tab.key)}
-                style={[styles.tabItem, activeTab === tab.key && { borderBottomColor: '#FF6B33', borderBottomWidth: 2 }]}
+                style={[styles.tabItem, activeTab === tab.key && { borderBottomColor: '#7B5CFA', borderBottomWidth: 2 }]}
               >
-                <Icon name={tab.icon} size={15} color={activeTab === tab.key ? '#FF6B33' : colors.mutedForeground} />
-                <Text style={[styles.tabLabel, { color: activeTab === tab.key ? '#FF6B33' : colors.mutedForeground }]}>
+                <Icon name={tab.icon} size={15} color={activeTab === tab.key ? '#7B5CFA' : colors.mutedForeground} />
+                <Text style={[styles.tabLabel, { color: activeTab === tab.key ? '#7B5CFA' : colors.mutedForeground }]}>
                   {tab.label}
                 </Text>
               </TouchableOpacity>
@@ -322,7 +323,7 @@ export default function CelebrityDashboardScreen() {
         </View>
       </ScrollView>
 
-    </View>
+    </View></AmbientBackground>
   );
 }
 
@@ -338,7 +339,7 @@ function SectionEmpty({ icon, text, colors }: { icon: IconName; text: string; co
 function LoadingBox() {
   return (
     <View style={{ alignItems: 'center', paddingTop: 60 }}>
-      <ActivityIndicator color="#FF6B33" />
+      <ActivityIndicator color="#7B5CFA" />
     </View>
   );
 }
@@ -361,7 +362,7 @@ function PrimaryBtn({ label, onPress, loading: ld, colors }: { label: string; on
       onPress={onPress}
       disabled={ld}
       activeOpacity={0.85}
-      style={[styles.primaryBtn, { backgroundColor: '#FF6B33' }]}
+      style={[styles.primaryBtn, { backgroundColor: '#7B5CFA' }]}
     >
       {ld ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>{label}</Text>}
     </TouchableOpacity>
@@ -573,7 +574,7 @@ function BookingsTab({ celebrity, colors, session }: TabProps) {
                 <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{b.service_type?.replace(/_/g, ' ')}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[styles.priceText, { color: '#FF6B33' }]}>{fmtRupee(b.final_price)}</Text>
+                <Text style={[styles.priceText, { color: '#7B5CFA' }]}>{fmtRupee(b.final_price)}</Text>
                 <StatusBadge status={b.status} />
               </View>
             </View>
@@ -581,8 +582,8 @@ function BookingsTab({ celebrity, colors, session }: TabProps) {
             {requestDetails && (
               <TouchableOpacity onPress={() => toggleExpand(b.id)} style={{ marginTop: 8 }}>
                 <View style={[styles.rowBetween, { paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border }]}>
-                  <Text style={{ color: '#FF6B33', fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>Request Details</Text>
-                  <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="#FF6B33" />
+                  <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 12 }}>Request Details</Text>
+                  <Icon name={isExpanded ? 'chevron-up' : 'chevron-down'} size={14} color="#7B5CFA" />
                 </View>
                 {isExpanded && (
                   <View style={{ marginTop: 8, gap: 4 }}>
@@ -629,7 +630,7 @@ function BookingsTab({ celebrity, colors, session }: TabProps) {
                   <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{customer}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
-                  <Text style={[styles.priceText, { color: '#FF6B33' }]}>{fmtRupee(ip.price_paid)}</Text>
+                  <Text style={[styles.priceText, { color: '#7B5CFA' }]}>{fmtRupee(ip.price_paid)}</Text>
                   <StatusBadge status={ip.status} />
                 </View>
               </View>
@@ -791,7 +792,7 @@ function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: TabProp
 
   return (
     <View style={styles.tabPad}>
-      <LinearGradient colors={['#FF6B33', '#B44CFF']} style={styles.balanceCard}>
+      <LinearGradient colors={['#7B5CFA', '#1F7BFF']} style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
         <Text style={styles.balanceAmt}>{fmtRupee(celebrity.available_balance ?? 0)}</Text>
         {pendingClearance > 0 && (
@@ -812,7 +813,7 @@ function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: TabProp
             <TouchableOpacity
               key={bk.id}
               onPress={() => setSelectedBank(bk)}
-              style={[styles.bankOption, { borderColor: selectedBank?.id === bk.id ? '#FF6B33' : colors.border, backgroundColor: selectedBank?.id === bk.id ? '#FF6B3310' : 'transparent' }]}
+              style={[styles.bankOption, { borderColor: selectedBank?.id === bk.id ? '#7B5CFA' : colors.border, backgroundColor: selectedBank?.id === bk.id ? '#7B5CFA10' : 'transparent' }]}
             >
               <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>{bk.bank_name}</Text>
               <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>****{bk.bank_account_number.slice(-4)} · {bk.account_holder_name}</Text>
@@ -823,7 +824,7 @@ function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: TabProp
         <PrimaryBtn label="Submit Payout Request" onPress={submitPayout} loading={submitting} colors={colors} />
 
         <TouchableOpacity onPress={() => setShowAddBank(v => !v)} style={{ marginTop: 12, alignItems: 'center' }}>
-          <Text style={{ color: '#FF6B33', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>
+          <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>
             {showAddBank ? 'Cancel' : '+ Add Bank Account'}
           </Text>
         </TouchableOpacity>
@@ -851,7 +852,7 @@ function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: TabProp
                 <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{fmtDate(p.requested_at)}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[styles.priceText, { color: '#FF6B33' }]}>{fmtRupee(p.requested_amount)}</Text>
+                <Text style={[styles.priceText, { color: '#7B5CFA' }]}>{fmtRupee(p.requested_amount)}</Text>
                 <StatusBadge status={p.status} />
               </View>
             </View>
@@ -1150,10 +1151,10 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
             disabled={generatingAI || fanMessages.length === 0}
             style={[styles.aiBtnSmall, { opacity: fanMessages.length === 0 ? 0.4 : 1 }]}
           >
-            {generatingAI ? <ActivityIndicator size="small" color="#A855F7" /> : (
+            {generatingAI ? <ActivityIndicator size="small" color="#7B5CFA" /> : (
               <>
-                <Text style={{ color: '#A855F7', fontFamily: 'Inter_700Bold', fontSize: 11 }}>AI</Text>
-                <Text style={{ color: '#A855F7', fontFamily: 'Inter_500Medium', fontSize: 11, marginLeft: 3 }}>Reply</Text>
+                <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_700Bold', fontSize: 11 }}>AI</Text>
+                <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_500Medium', fontSize: 11, marginLeft: 3 }}>Reply</Text>
               </>
             )}
           </TouchableOpacity>
@@ -1168,10 +1169,10 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
                 <View key={m.id} style={{ alignItems: isMine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
                   {m.is_ai_generated && isMine && (
                     <View style={styles.aiBadge}>
-                      <Text style={{ color: '#A855F7', fontFamily: 'Inter_700Bold', fontSize: 10 }}>AI</Text>
+                      <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_700Bold', fontSize: 10 }}>AI</Text>
                     </View>
                   )}
-                  <View style={[styles.bubble, { backgroundColor: isMine ? '#FF6B33' : colors.card, borderColor: m.is_ai_generated ? '#A855F7' : colors.border }]}>
+                  <View style={[styles.bubble, { backgroundColor: isMine ? '#7B5CFA' : colors.card, borderColor: m.is_ai_generated ? '#7B5CFA' : colors.border }]}>
                     <Text style={{ color: isMine ? '#fff' : colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 13 }}>{m.message_text}</Text>
                   </View>
                   <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 }}>{fmtDate(m.created_at)}</Text>
@@ -1210,7 +1211,7 @@ function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
           <TouchableOpacity
             onPress={toggleAIAutoReply}
             disabled={togglingAI}
-            style={[styles.toggleBtn, { backgroundColor: aiSettings?.ai_auto_reply_enabled ? '#A855F7' : colors.border }]}
+            style={[styles.toggleBtn, { backgroundColor: aiSettings?.ai_auto_reply_enabled ? '#7B5CFA' : colors.border }]}
           >
             {togglingAI ? <ActivityIndicator size="small" color="#fff" /> : (
               <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 12 }}>
@@ -1374,7 +1375,7 @@ function EventsTab({ celebrity, colors, session }: TabProps) {
       <View style={styles.rowBetween}>
         <SectionTitle text={`Events (${events.length})`} colors={colors} />
         <TouchableOpacity onPress={showForm ? closeForm : openCreate} style={{ padding: 4 }}>
-          <Icon name={showForm ? 'x' : 'plus'} size={22} color="#FF6B33" />
+          <Icon name={showForm ? 'x' : 'plus'} size={22} color="#7B5CFA" />
         </TouchableOpacity>
       </View>
 
@@ -1388,9 +1389,9 @@ function EventsTab({ celebrity, colors, session }: TabProps) {
               <TouchableOpacity
                 key={t}
                 onPress={() => setForm(p => ({ ...p, event_type: t }))}
-                style={[styles.chipBtn, { borderColor: form.event_type === t ? '#FF6B33' : colors.border, backgroundColor: form.event_type === t ? '#FF6B3318' : 'transparent' }]}
+                style={[styles.chipBtn, { borderColor: form.event_type === t ? '#7B5CFA' : colors.border, backgroundColor: form.event_type === t ? '#7B5CFA18' : 'transparent' }]}
               >
-                <Text style={{ color: form.event_type === t ? '#FF6B33' : colors.mutedForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>{t}</Text>
+                <Text style={{ color: form.event_type === t ? '#7B5CFA' : colors.mutedForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>{t}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -1402,7 +1403,7 @@ function EventsTab({ celebrity, colors, session }: TabProps) {
             <Switch
               value={form.is_public}
               onValueChange={(v) => setForm(p => ({ ...p, is_public: v }))}
-              trackColor={{ false: colors.border, true: '#FF6B33' }}
+              trackColor={{ false: colors.border, true: '#7B5CFA' }}
               thumbColor="#fff"
             />
           </View>
@@ -1837,8 +1838,8 @@ function ContentTab({ celebrity, colors, session, onRefresh }: TabPropsWithRefre
               <Icon name="user" size={40} color={colors.mutedForeground} />
             </View>
           )}
-          <TouchableOpacity onPress={changeAvatar} disabled={uploading} style={[styles.changePhotoBtn, { borderColor: '#FF6B33' }]}>
-            {uploading ? <ActivityIndicator size="small" color="#FF6B33" /> : <Text style={{ color: '#FF6B33', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Change Photo</Text>}
+          <TouchableOpacity onPress={changeAvatar} disabled={uploading} style={[styles.changePhotoBtn, { borderColor: '#7B5CFA' }]}>
+            {uploading ? <ActivityIndicator size="small" color="#7B5CFA" /> : <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Change Photo</Text>}
           </TouchableOpacity>
         </View>
       </Card>
@@ -1920,9 +1921,9 @@ function TdsTab({ celebrity, colors, session }: TabProps) {
           <TouchableOpacity
             key={fy}
             onPress={() => setSelectedFY(fy)}
-            style={[styles.chipBtn, { borderColor: selectedFY === fy ? '#FF6B33' : colors.border, backgroundColor: selectedFY === fy ? '#FF6B3318' : 'transparent' }]}
+            style={[styles.chipBtn, { borderColor: selectedFY === fy ? '#7B5CFA' : colors.border, backgroundColor: selectedFY === fy ? '#7B5CFA18' : 'transparent' }]}
           >
-            <Text style={{ color: selectedFY === fy ? '#FF6B33' : colors.mutedForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>{fy}</Text>
+            <Text style={{ color: selectedFY === fy ? '#7B5CFA' : colors.mutedForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>{fy}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -2236,7 +2237,7 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: '80%', borderRadius: 16, padding: 10, borderWidth: 1 },
   replyRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderTopWidth: 1, gap: 10 },
   replyInput: { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontFamily: 'Inter_400Regular', fontSize: 14, maxHeight: 80 },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#FF6B33', alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#7B5CFA', alignItems: 'center', justifyContent: 'center' },
   avatarLg: { width: 100, height: 100, borderRadius: 50, marginBottom: 12 },
   changePhotoBtn: { borderWidth: 1.5, borderRadius: 99, paddingHorizontal: 20, paddingVertical: 8 },
   uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderRadius: 10, padding: 10, borderStyle: 'dashed' },
@@ -2249,12 +2250,12 @@ const styles = StyleSheet.create({
   rupeePrefix: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginRight: 4 },
   copyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 12 },
   unreadBadge: { backgroundColor: '#EF4444', borderRadius: 99, minWidth: 18, height: 18, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
-  aiBadge: { backgroundColor: '#A855F722', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 2, alignSelf: 'flex-end' },
-  aiBtnSmall: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#A855F7', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
+  aiBadge: { backgroundColor: '#7B5CFA22', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 2, alignSelf: 'flex-end' },
+  aiBtnSmall: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#7B5CFA', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
   aiBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#22C55E18', borderRadius: 8, padding: 8, marginTop: 10 },
   toggleBtn: { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', minWidth: 52 },
   ratingBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   ratingBarFill: { height: 8, backgroundColor: '#F59E0B', borderRadius: 4 },
-  headerDashBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#FF6B33', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 },
+  headerDashBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#7B5CFA', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 },
   headerDashBtnText: { color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 12 },
 });

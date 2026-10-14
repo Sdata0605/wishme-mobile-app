@@ -20,6 +20,7 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
 import { lightColors } from '@/constants/colors';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 type Colors = typeof lightColors;
 
@@ -834,7 +835,7 @@ export default function BookingWizardScreen() {
             disabled={isPayDisabled}
           >
             <LinearGradient
-              colors={isPayDisabled ? ['#ccc','#ccc'] : ['#FF6B33','#B44CFF']}
+              colors={isPayDisabled ? ['#ccc','#ccc'] : ['#7B5CFA','#1F7BFF']}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.payBtn}
             >
@@ -853,7 +854,7 @@ export default function BookingWizardScreen() {
   const stepContent = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5, renderStep6][step - 1];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={goBack}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -869,7 +870,7 @@ export default function BookingWizardScreen() {
         {([1,2,3,4,5,6] as const).map((s) => (
           <View key={s} style={styles.dotWrap}>
             <LinearGradient
-              colors={s <= step ? ['#FF6B33','#B44CFF'] : [colors.muted, colors.muted]}
+              colors={s <= step ? ['#7B5CFA','#1F7BFF'] : [colors.muted, colors.muted]}
               style={[styles.dot, s === step && styles.dotActive]}
             >
               <Text style={[styles.dotText, { color: s <= step ? '#fff' : colors.mutedForeground }]}>{s}</Text>
@@ -894,7 +895,7 @@ export default function BookingWizardScreen() {
         </TouchableOpacity>
         {step < 6 ? (
           <Pressable style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.85 : 1 }]} onPress={goNext}>
-            <LinearGradient colors={['#FF6B33','#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.nextBtn}>
+            <LinearGradient colors={['#7B5CFA','#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.nextBtn}>
               <Text style={styles.nextBtnText}>Next</Text>
               <Icon name="arrow-right" size={16} color="#fff" />
             </LinearGradient>
@@ -907,7 +908,7 @@ export default function BookingWizardScreen() {
           <Text style={{ color: colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 13 }}>{toast}</Text>
         </View>
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 

@@ -1,11 +1,14 @@
-import { useFocusEffect } from 'expo-router';
-import React, { useCallback, useState, useMemo } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { router, useFocusEffect } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
+  Animated,
   Dimensions,
+  FlatList,
+  Modal,
   Platform,
+  Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,45 +16,89 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { CelebCard } from '@/components/CelebCard';
+import { CelebGridCard, CelebHeroCard } from '@/components/celebrity/CelebrityCards';
 import { Icon } from '@/components/Icon';
-import { CATEGORIES } from '@/constants/mockData';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
-import { useCelebrities } from '@/hooks/useCelebrities';
+import { useCelebrities, type Celebrity } from '@/hooks/useCelebrities';
 import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const { width: W } = Dimensions.get('window');
-const CARD_WIDTH = (W - 52) / 2;
-const PAGE_SIZE = 8;
+const PAD = 16;
+const GAP = 12;
+const CARD_W = (W - PAD * 2 - GAP) / 2;
+const PAGE = 20;
 
-const CATEGORY_MAP: Record<string, string> = {
-  'All': '',
-  'Actors': 'Actor',
-  'Singers': 'Singer',
-  'Athletes': 'Athlete',
-  'Comedians': 'Comedian',
-  'Influencers': 'Influencer',
-  'TV Stars': 'TV Stars',
-};
-
-const DELIVERY_TIMES = [
-  { label: 'All', maxPrice: Infinity },
-  { label: 'Under 24h', maxPrice: 1500 },
-  { label: '24-48h', maxPrice: 3000 },
-  { label: '48-72h', maxPrice: 5000 },
-  { label: '1 week+', maxPrice: Infinity },
+type SortKey = 'top' | 'fast' | 'low' | 'high';
+const SORTS: { key: SortKey; label: string }[] = [
+  { key: 'top', label: 'Top rated' },
+  { key: 'fast', label: 'Fastest delivery' },
+  { key: 'low', label: 'Price: low to high' },
+  { key: 'high', label: 'Price: high to low' },
 ];
+
+const priceOf = (c: Celebrity) => c.subscription?.price ?? 0;
+/** "24-48 hours" -> 24, "1 week" -> 168, unknown -> last. */
+function hoursOf(c: Celebrity): number {
+  const t = (c.deliveryTime ?? '').toLowerCase();
+  const n = parseInt(t.match(/\d+/)?.[0] ?? '', 10);
+  if (!Number.isFinite(n)) return 9999;
+  if (t.includes('week')) return n * 168;
+  if (t.includes('day')) return n * 24;
+  return n;
+}
+
+function Skeleton() {
+  const { colors } = useTheme();
+  const v = useRef(new Animated.Value(0.5)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(v, { toValue: 1, duration: 900, useNativeDriver: true }),
+      Animated.timing(v, { toValue: 0.5, duration: 900, useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [v]);
+  return (
+    <Animated.View style={{ opacity: v, paddingHorizontal: PAD, gap: GAP }}>
+      <View style={{ aspectRatio: 16 / 10, borderRadius: 20, backgroundColor: colors.border }} />
+      <View style={{ flexDirection: 'row', gap: GAP }}>
+        {[0, 1].map(i => <View key={i} style={{ width: CARD_W, height: CARD_W * 1.33 + 40, borderRadius: 16, backgroundColor: colors.border }} />)}
+      </View>
+    </Animated.View>
+  );
+}
+
+function StateView({ icon, title, body, button, onPress }: { icon: 'search' | 'alert-circle' | 'star'; title: string; body: string; button: string; onPress: () => void }) {
+  const { colors } = useTheme();
+  return (
+    <View style={s.state}>
+      <LinearGradient colors={['#7B5CFA', '#D23FE0', '#1F7BFF']} style={s.stateRing}>
+        <View style={[s.stateInner, { backgroundColor: colors.background }]}>
+          <Icon name={icon} size={30} color={colors.primary} />
+        </View>
+      </LinearGradient>
+      <Text style={[s.stateTitle, { color: colors.foreground }]}>{title}</Text>
+      <Text style={[s.stateBody, { color: colors.mutedForeground }]}>{body}</Text>
+      <TouchableOpacity onPress={onPress} style={[s.stateBtn, { backgroundColor: colors.primary }]}>
+        <Text style={s.stateBtnText}>{button}</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function CelebritiesScreen() {
   const { colors } = useTheme();
   const { user, session } = useAuth();
   const insets = useSafeAreaInsets();
+  const topPad = Platform.OS === 'web' ? 24 : insets.top;
+
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [activeDelivery, setActiveDelivery] = useState('All');
-  const [sortOrder, setSortOrder] = useState<'rating' | 'price_asc' | 'price_desc'>('rating');
-  const [page, setPage] = useState(1);
+  const [category, setCategory] = useState('All');
+  const [sort, setSort] = useState<SortKey>('top');
+  const [sortOpen, setSortOpen] = useState(false);
+  const [visible, setVisible] = useState(PAGE);
 
   const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
   const { hasFavorite, refetch: refetchFavorites } = useCelebrityFavorites({
@@ -61,273 +108,203 @@ export default function CelebritiesScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      if (user?.profileId && session?.access_token) {
-        refetchFavorites();
-      }
+      if (user?.profileId && session?.access_token) refetchFavorites();
     }, [user?.profileId, session?.access_token, refetchFavorites]),
   );
 
-  const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  // Only categories that really have a celebrity.
+  const categories = useMemo(() => ['All', ...Array.from(new Set(celebrities.map(c => c.category).filter(Boolean)))], [celebrities]);
 
   const filtered = useMemo(() => {
-    const list = celebrities.filter((c) => {
-      const matchSearch =
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.category.toLowerCase().includes(search.toLowerCase());
+    const q = search.trim().toLowerCase();
+    const list = celebrities.filter(c =>
+      (category === 'All' || c.category === category) &&
+      (!q || c.name.toLowerCase().includes(q) || c.category.toLowerCase().includes(q)),
+    );
+    const byTop = (a: Celebrity, b: Celebrity) => (b.rating - a.rating) || (b.reviewCount - a.reviewCount) || a.name.localeCompare(b.name);
+    return [...list].sort(
+      sort === 'low' ? (a, b) => priceOf(a) - priceOf(b)
+        : sort === 'high' ? (a, b) => priceOf(b) - priceOf(a)
+        : sort === 'fast' ? (a, b) => hoursOf(a) - hoursOf(b) || byTop(a, b)
+        : byTop,
+    );
+  }, [celebrities, search, category, sort]);
 
-      const catValue = CATEGORY_MAP[activeCategory] ?? '';
-      const matchCat =
-        activeCategory === 'All' ||
-        c.category === catValue ||
-        c.category.toLowerCase().includes(catValue.toLowerCase()) ||
-        catValue.toLowerCase().includes(c.category.toLowerCase());
+  const showHero = category === 'All' && !search.trim() && sort === 'top' && filtered.length > 0;
+  const hero = showHero ? filtered[0] : null;
+  const gridItems = (showHero ? filtered.slice(1) : filtered).slice(0, visible);
+  const hasMore = (showHero ? filtered.length - 1 : filtered.length) > visible;
 
-      const matchDelivery =
-        activeDelivery === 'All' ||
-        (activeDelivery === 'Under 24h' && c.pricePerWish < 1500) ||
-        (activeDelivery === '24-48h' && c.pricePerWish >= 1500 && c.pricePerWish < 3000) ||
-        (activeDelivery === '48-72h' && c.pricePerWish >= 3000 && c.pricePerWish < 5000) ||
-        (activeDelivery === '1 week+' && c.pricePerWish >= 5000);
+  const clearFilters = () => { setSearch(''); setCategory('All'); setSort('top'); setVisible(PAGE); };
+  const sortLabel = SORTS.find(x => x.key === sort)!.label;
 
-      return matchSearch && matchCat && matchDelivery;
-    });
-
-    if (sortOrder === 'price_asc') {
-      return [...list].sort((a, b) => a.pricePerWish - b.pricePerWish);
-    } else if (sortOrder === 'price_desc') {
-      return [...list].sort((a, b) => b.pricePerWish - a.pricePerWish);
-    }
-    return list;
-  }, [celebrities, search, activeCategory, activeDelivery, sortOrder]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-
-  const onCategoryChange = (cat: string) => {
-    setActiveCategory(cat);
-    setPage(1);
-  };
-
-  const onDeliveryChange = (label: string) => {
-    setActiveDelivery(label);
-    setPage(1);
-  };
-
-  const onSortChange = (order: 'rating' | 'price_asc' | 'price_desc') => {
-    setSortOrder(order);
-    setPage(1);
-  };
-
-  const SORT_OPTIONS: { key: 'rating' | 'price_asc' | 'price_desc'; label: string }[] = [
-    { key: 'rating', label: 'Rating ↓' },
-    { key: 'price_asc', label: 'Price ↑' },
-    { key: 'price_desc', label: 'Price ↓' },
-  ];
-
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { paddingTop: topPad + 12, backgroundColor: colors.background }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Browse Celebrities</Text>
-
-        {/* Search */}
-        <View style={[styles.searchBar, { backgroundColor: colors.input, borderColor: colors.border }]}>
-          <Icon name="search" size={18} color={colors.mutedForeground} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground, fontFamily: 'Inter_400Regular' }]}
-            placeholder="Search celebrities..."
-            placeholderTextColor={colors.mutedForeground}
-            value={search}
-            onChangeText={(t) => { setSearch(t); setPage(1); }}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => { setSearch(''); setPage(1); }}>
-              <Icon name="x" size={16} color={colors.mutedForeground} />
+  const header = (
+    <View>
+      <View style={[s.header, { paddingTop: topPad + 8 }]}>
+        <View style={s.headSide}>
+          {router.canGoBack() && (
+            <TouchableOpacity onPress={() => router.back()} hitSlop={12} accessibilityLabel="Back">
+              <Icon name="chevron-left" size={24} color={colors.foreground} />
             </TouchableOpacity>
           )}
         </View>
-
-        {/* Category chips */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: activeCategory === cat ? colors.primary : colors.muted,
-                  borderColor: activeCategory === cat ? colors.primary : colors.border,
-                },
-              ]}
-              onPress={() => onCategoryChange(cat)}
-            >
-              <Text style={[styles.chipText, { color: activeCategory === cat ? '#fff' : colors.foreground }]}>
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Delivery Time chips */}
-        <View style={styles.deliveryRow}>
-          <View style={{ marginRight: 4 }}>
-            <Icon name="clock" size={13} color={colors.mutedForeground} />
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
-            {DELIVERY_TIMES.map((dt) => (
-              <TouchableOpacity
-                key={dt.label}
-                style={[
-                  styles.chip,
-                  styles.chipSm,
-                  {
-                    backgroundColor: activeDelivery === dt.label ? '#FF6B33' : colors.muted,
-                    borderColor: activeDelivery === dt.label ? '#FF6B33' : colors.border,
-                  },
-                ]}
-                onPress={() => onDeliveryChange(dt.label)}
-              >
-                <Text style={[styles.chipText, { fontSize: 11, color: activeDelivery === dt.label ? '#fff' : colors.foreground }]}>
-                  {dt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Sort chips */}
-        <View style={[styles.deliveryRow, { marginTop: 4 }]}>
-          <Text style={[styles.sortLabel, { color: colors.mutedForeground }]}>Sort:</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.chipRow, { marginLeft: 4 }]}>
-            {SORT_OPTIONS.map((so) => (
-              <TouchableOpacity
-                key={so.key}
-                style={[
-                  styles.chip,
-                  styles.chipSm,
-                  {
-                    backgroundColor: sortOrder === so.key ? '#B44CFF' : colors.muted,
-                    borderColor: sortOrder === so.key ? '#B44CFF' : colors.border,
-                  },
-                ]}
-                onPress={() => onSortChange(so.key)}
-              >
-                <Text style={[styles.chipText, { fontSize: 11, color: sortOrder === so.key ? '#fff' : colors.foreground }]}>
-                  {so.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        <Text style={[s.title, { color: colors.foreground }]}>Celebrities</Text>
+        <View style={s.headSide} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={colors.primary} />}
-      >
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading celebrities...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorWrap}>
-            <Icon name="alert-circle" size={40} color={colors.primary} />
-            <Text style={[styles.errorTitle, { color: colors.foreground }]}>Could not load celebrities</Text>
-            <Text style={[styles.errorSub, { color: colors.mutedForeground }]}>{error}</Text>
-            <TouchableOpacity style={[styles.retryBtn, { backgroundColor: colors.primary }]} onPress={refetch}>
-              <Text style={styles.retryText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
-            {/* Results count */}
-            <View style={styles.resultsRow}>
-              <Text style={[styles.resultsText, { color: colors.mutedForeground }]}>
-                {filtered.length} {filtered.length === 1 ? 'celebrity' : 'celebrities'} found
-              </Text>
-            </View>
-
-            {/* Grid */}
-            {paged.length > 0 ? (
-              <View style={styles.grid}>
-                {paged.map((item) => (
-                  <CelebCard
-                    key={item.id}
-                    celebrity={item}
-                    width={CARD_WIDTH}
-                    isLoggedIn={!!user}
-                    isSubscribed={hasFavorite(item.id)}
-                  />
-                ))}
-              </View>
-            ) : (
-              <View style={styles.empty}>
-                <Icon name="search" size={48} color={colors.mutedForeground} />
-                <Text style={[styles.emptyTitle, { color: colors.foreground }]}>No celebrities found</Text>
-                <Text style={[styles.emptyText, { color: colors.mutedForeground }]}>Try a different search or filter</Text>
-              </View>
-            )}
-
-            {/* Pagination */}
-            {filtered.length > PAGE_SIZE && (
-              <View style={styles.paginationRow}>
-                <TouchableOpacity
-                  style={[styles.pageBtn, { backgroundColor: colors.card, opacity: page <= 1 ? 0.4 : 1 }]}
-                  onPress={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page <= 1}
-                >
-                  <Icon name="chevron-left" size={16} color={colors.foreground} />
-                  <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Previous</Text>
-                </TouchableOpacity>
-                <Text style={[styles.pageLabel, { color: colors.mutedForeground }]}>
-                  Page {page} of {totalPages}
-                </Text>
-                <TouchableOpacity
-                  style={[styles.pageBtn, { backgroundColor: colors.card, opacity: page >= totalPages ? 0.4 : 1 }]}
-                  onPress={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page >= totalPages}
-                >
-                  <Text style={[styles.pageBtnText, { color: colors.foreground }]}>Next</Text>
-                  <Icon name="chevron-right" size={16} color={colors.foreground} />
-                </TouchableOpacity>
-              </View>
-            )}
-          </>
+      <View style={[s.search, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Icon name="search" size={18} color={colors.mutedForeground} />
+        <TextInput
+          style={[s.searchInput, { color: colors.foreground }]}
+          placeholder="Search celebrities"
+          placeholderTextColor={colors.mutedForeground}
+          value={search}
+          onChangeText={t => { setSearch(t); setVisible(PAGE); }}
+          returnKeyType="search"
+        />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch('')} hitSlop={10} accessibilityLabel="Clear search">
+            <Icon name="x" size={16} color={colors.mutedForeground} />
+          </TouchableOpacity>
         )}
-      </ScrollView>
+      </View>
+
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        data={categories}
+        keyExtractor={c => c}
+        contentContainerStyle={s.chips}
+        renderItem={({ item }) => {
+          const on = item === category;
+          return (
+            <TouchableOpacity
+              onPress={() => { setCategory(item); setVisible(PAGE); }}
+              hitSlop={{ top: 4, bottom: 4 }}
+              style={[s.chip, on ? { backgroundColor: colors.primary, borderColor: colors.primary } : { borderColor: colors.border }]}
+            >
+              <Text style={{ color: on ? '#fff' : colors.foreground, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{item}</Text>
+            </TouchableOpacity>
+          );
+        }}
+      />
+
+      <View style={s.resultRow}>
+        <Text style={{ color: colors.mutedForeground, fontSize: 13 }}>
+          {filtered.length} {filtered.length === 1 ? 'celebrity' : 'celebrities'}
+        </Text>
+        <TouchableOpacity onPress={() => setSortOpen(true)} style={s.sortBtn} hitSlop={8}>
+          <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>Sort: {sortLabel}</Text>
+          <Icon name="chevron-down" size={14} color={colors.foreground} />
+        </TouchableOpacity>
+      </View>
+
+      {hero && (
+        <View style={{ paddingHorizontal: PAD, marginBottom: GAP }}>
+          <CelebHeroCard celebrity={hero} subscribed={hasFavorite(hero.id)} />
+        </View>
+      )}
     </View>
+  );
+
+  return (
+    <AmbientBackground><View style={[s.root, { backgroundColor: 'transparent' }]}>
+      {loading && celebrities.length === 0 ? (
+        <>
+          {header}
+          <Skeleton />
+        </>
+      ) : error && celebrities.length === 0 ? (
+        <>
+          {header}
+          <StateView icon="alert-circle" title="Couldn't load celebrities" body={error} button="Retry" onPress={refetch} />
+        </>
+      ) : celebrities.length === 0 ? (
+        <>
+          {header}
+          <StateView
+            icon="star"
+            title="No celebrities available for subscription yet"
+            body="We're onboarding verified stars. Check back soon."
+            button="Go to Home"
+            onPress={() => router.replace('/(tabs)' as never)}
+          />
+        </>
+      ) : (
+        <FlatList
+          data={gridItems}
+          keyExtractor={c => c.id}
+          numColumns={2}
+          columnWrapperStyle={{ gap: GAP, paddingHorizontal: PAD }}
+          contentContainerStyle={{ gap: GAP, paddingBottom: insets.bottom + 100 }}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={header}
+          initialNumToRender={6}
+          windowSize={7}
+          removeClippedSubviews
+          onEndReachedThreshold={0.5}
+          onEndReached={() => { if (hasMore) setVisible(v => v + PAGE); }}
+          refreshControl={<RefreshControl refreshing={loading} onRefresh={refetch} tintColor={colors.primary} />}
+          keyboardShouldPersistTaps="handled"
+          renderItem={({ item }) => <CelebGridCard celebrity={item} subscribed={hasFavorite(item.id)} width={CARD_W} />}
+          ListEmptyComponent={
+            !hero ? (
+              <StateView
+                icon="search"
+                title={search.trim() ? `No results for "${search.trim()}"` : 'No celebrities here'}
+                body="Try a different search or category."
+                button="Clear filters"
+                onPress={clearFilters}
+              />
+            ) : null
+          }
+        />
+      )}
+
+      <Modal visible={sortOpen} transparent animationType="fade" onRequestClose={() => setSortOpen(false)} statusBarTranslucent>
+        <Pressable style={s.backdrop} onPress={() => setSortOpen(false)}>
+          <Pressable onPress={() => {}} style={[s.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 12 }]}>
+            <Text style={[s.sheetTitle, { color: colors.foreground }]}>Sort by</Text>
+            {SORTS.map(o => {
+              const on = o.key === sort;
+              return (
+                <TouchableOpacity
+                  key={o.key}
+                  onPress={() => { setSort(o.key); setVisible(PAGE); setSortOpen(false); }}
+                  style={[s.sortRow, { borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + '14' : colors.card }]}
+                >
+                  <Text style={{ color: on ? colors.primary : colors.foreground, fontSize: 15, fontFamily: 'Inter_600SemiBold' }}>{o.label}</Text>
+                  {on && <Icon name="check" size={18} color={colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </View></AmbientBackground>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: { paddingHorizontal: 20, paddingBottom: 8 },
-  title: { fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', marginBottom: 14 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, height: 44, borderRadius: 12, borderWidth: 1.5, marginBottom: 12 },
-  searchInput: { flex: 1, fontSize: 15, height: 44 },
-  chipRow: { gap: 8, paddingBottom: 4 },
-  chip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 9999, borderWidth: 1.5 },
-  chipSm: { paddingHorizontal: 12, paddingVertical: 6 },
-  chipText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  deliveryRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, marginBottom: 4 },
-  sortLabel: { fontSize: 12, fontFamily: 'Inter_500Medium', marginRight: 2 },
-  scrollContent: { paddingHorizontal: 20 },
-  loadingWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12 },
-  loadingText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  errorWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 12, paddingHorizontal: 20 },
-  errorTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
-  errorSub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },
-  retryBtn: { paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
-  retryText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  resultsRow: { paddingVertical: 10 },
-  resultsText: { fontSize: 12, fontFamily: 'Inter_400Regular' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  empty: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, gap: 8 },
-  emptyTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
-  emptyText: { fontSize: 14, fontFamily: 'Inter_400Regular' },
-  paginationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
-  pageBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
-  pageBtnText: { fontSize: 13, fontFamily: 'Inter_500Medium' },
-  pageLabel: { fontSize: 13, fontFamily: 'Inter_400Regular' },
+const s = StyleSheet.create({
+  root: { flex: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: PAD, paddingBottom: 8 },
+  headSide: { width: 40, alignItems: 'flex-start' },
+  title: { fontSize: 17, fontFamily: 'Inter_600SemiBold' },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: PAD, height: 44, borderRadius: 22, borderWidth: 1, paddingHorizontal: 14 },
+  searchInput: { flex: 1, height: 44, fontSize: 15, fontFamily: 'Inter_400Regular' },
+  chips: { gap: 8, paddingHorizontal: PAD, paddingVertical: 12 },
+  chip: { height: 36, paddingHorizontal: 16, borderRadius: 18, borderWidth: 1.2, alignItems: 'center', justifyContent: 'center' },
+  resultRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: PAD, marginBottom: 10 },
+  sortBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44, justifyContent: 'center' },
+  state: { alignItems: 'center', paddingHorizontal: 32, paddingTop: 48, gap: 10 },
+  stateRing: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center', padding: 3 },
+  stateInner: { width: '100%', height: '100%', borderRadius: 40, alignItems: 'center', justifyContent: 'center' },
+  stateTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', textAlign: 'center', marginTop: 6 },
+  stateBody: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20 },
+  stateBtn: { paddingHorizontal: 24, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
+  stateBtnText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold' },
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, gap: 8 },
+  sheetTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', marginBottom: 6 },
+  sortRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 50, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1.2 },
 });

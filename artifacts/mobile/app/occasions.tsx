@@ -17,6 +17,7 @@ import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
 
@@ -42,12 +43,12 @@ function fmtDate(date: string, long?: boolean): string {
 }
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#FF6B33', '#E8527A'],
-  ['#E8527A', '#B44CFF'],
-  ['#B44CFF', '#7B2FFF'],
-  ['#4B83FF', '#7B2FFF'],
-  ['#FF6B33', '#B44CFF'],
-  ['#7B2FFF', '#4B83FF'],
+  ['#7B5CFA', '#D23FE0'],
+  ['#D23FE0', '#1F7BFF'],
+  ['#1F7BFF', '#7C3AED'],
+  ['#3B5BDB', '#7C3AED'],
+  ['#7B5CFA', '#1F7BFF'],
+  ['#7C3AED', '#3B5BDB'],
 ];
 
 function gradientForName(name: string): [string, string] {
@@ -105,7 +106,7 @@ export default function OccasionsScreen() {
   }
 
   return (
-    <View style={[s.container, { backgroundColor: colors.background }]}>
+    <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <View style={[s.header, { paddingTop: topPad + 12, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
           <Icon name="arrow-left" size={22} color={colors.foreground} />
@@ -126,7 +127,7 @@ export default function OccasionsScreen() {
         >
           {/* Hero */}
           <LinearGradient
-            colors={['#FF6B33', '#B44CFF']}
+            colors={['#7B5CFA', '#1F7BFF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.hero}
@@ -239,7 +240,7 @@ export default function OccasionsScreen() {
 
           {/* Info Banner */}
           <LinearGradient
-            colors={['#B44CFF', '#E8527A']}
+            colors={['#1F7BFF', '#D23FE0']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.banner}
@@ -252,7 +253,7 @@ export default function OccasionsScreen() {
           </LinearGradient>
         </ScrollView>
       )}
-    </View>
+    </View></AmbientBackground>
   );
 }
 

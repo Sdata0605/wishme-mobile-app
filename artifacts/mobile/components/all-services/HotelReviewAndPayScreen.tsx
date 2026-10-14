@@ -27,6 +27,8 @@ import {
 } from 'lucide-react-native';
 import type { Hotel, HotelRoom, HotelSearchParams } from './hotelData';
 import { serviceColors as C } from './serviceColors';
+import { T, useThemedStyles, glass, dockBar } from './themed';
+import { BrandFill } from './BrandFill';
 
 export interface HotelGuestData {
   name: string;
@@ -73,6 +75,7 @@ export function HotelReviewAndPayScreen({
   onBack,
   onPaymentSuccess,
 }: HotelReviewAndPayScreenProps) {
+  const s = use_s();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
 
@@ -142,7 +145,7 @@ export function HotelReviewAndPayScreen({
       {/* Header */}
       <View style={[s.header, { paddingTop: topPad + 8 }]}>
         <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={22} color={C.text} />
+          <ArrowLeft size={22} color={T(C.text, 'fg')} />
         </TouchableOpacity>
         <View>
           <Text style={s.headerTitle}>Review & Payment</Text>
@@ -159,12 +162,12 @@ export function HotelReviewAndPayScreen({
         <View style={s.card}>
           <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
             <View style={s.hotelIconBox}>
-              <HotelIcon size={24} color={C.green} />
+              <HotelIcon size={24} color={T(C.green, 'fg')} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={s.hotelName}>{hotel.name}</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                <MapPin size={12} color={C.textLight} />
+                <MapPin size={12} color={T(C.textLight, 'fg')} />
                 <Text style={s.hotelCity}>{hotel.city} · ★ {hotel.rating}</Text>
               </View>
             </View>
@@ -200,7 +203,7 @@ export function HotelReviewAndPayScreen({
         {/* Primary Guest Info */}
         <View style={s.card}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <User size={16} color={C.dark} />
+            <User size={16} color={T(C.dark, 'fg')} />
             <Text style={s.cardTitle}>Guest Information</Text>
           </View>
           <Text style={s.guestName}>{guest.name}</Text>
@@ -213,7 +216,7 @@ export function HotelReviewAndPayScreen({
         {/* Coupon Code Section */}
         <View style={s.card}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-            <Tag size={16} color={C.green} />
+            <Tag size={16} color={T(C.green, 'fg')} />
             <Text style={s.cardTitle}>Offers & Promo Codes</Text>
           </View>
 
@@ -232,7 +235,7 @@ export function HotelReviewAndPayScreen({
               <TextInput
                 style={s.couponInput}
                 placeholder="Enter Coupon Code"
-                placeholderTextColor={C.gray}
+                placeholderTextColor={T(C.gray, 'fg')}
                 value={couponCode}
                 onChangeText={setCouponCode}
                 autoCapitalize="characters"
@@ -257,7 +260,7 @@ export function HotelReviewAndPayScreen({
                   activeOpacity={0.7}
                   onPress={() => applyCoupon(cp.code)}
                 >
-                  <Percent size={14} color={C.green} />
+                  <Percent size={14} color={T(C.green, 'fg')} />
                   <View style={{ flex: 1 }}>
                     <Text style={s.promoCode}>{cp.code}</Text>
                     <Text style={s.promoDesc}>{cp.desc}</Text>
@@ -281,7 +284,7 @@ export function HotelReviewAndPayScreen({
             <View style={s.radioCircle}>
               {paymentMethod === 'wallet' && <View style={s.radioInner} />}
             </View>
-            <Wallet size={18} color={C.dark} />
+            <Wallet size={18} color={T(C.dark, 'fg')} />
             <View style={{ flex: 1 }}>
               <Text style={s.payMethodTitle}>WishMe Wallet</Text>
               <Text style={s.payMethodSub}>Instant 1-click checkout · Balance ₹25,000</Text>
@@ -299,7 +302,7 @@ export function HotelReviewAndPayScreen({
             <View style={s.radioCircle}>
               {paymentMethod === 'upi' && <View style={s.radioInner} />}
             </View>
-            <Smartphone size={18} color={C.dark} />
+            <Smartphone size={18} color={T(C.dark, 'fg')} />
             <View style={{ flex: 1 }}>
               <Text style={s.payMethodTitle}>UPI (GPay / PhonePe / Paytm)</Text>
               <Text style={s.payMethodSub}>Zero transaction fees</Text>
@@ -314,7 +317,7 @@ export function HotelReviewAndPayScreen({
             <View style={s.radioCircle}>
               {paymentMethod === 'card' && <View style={s.radioInner} />}
             </View>
-            <CreditCard size={18} color={C.dark} />
+            <CreditCard size={18} color={T(C.dark, 'fg')} />
             <View style={{ flex: 1 }}>
               <Text style={s.payMethodTitle}>Credit / Debit Card</Text>
               <Text style={s.payMethodSub}>Visa, MasterCard, RuPay, Amex</Text>
@@ -329,7 +332,7 @@ export function HotelReviewAndPayScreen({
             <View style={s.radioCircle}>
               {paymentMethod === 'pay_at_hotel' && <View style={s.radioInner} />}
             </View>
-            <HotelIcon size={18} color={C.dark} />
+            <HotelIcon size={18} color={T(C.dark, 'fg')} />
             <View style={{ flex: 1 }}>
               <Text style={s.payMethodTitle}>Pay at Hotel</Text>
               <Text style={s.payMethodSub}>Pay during check-in at reception</Text>
@@ -353,8 +356,8 @@ export function HotelReviewAndPayScreen({
 
           {appliedCoupon && (
             <View style={s.priceRow}>
-              <Text style={[s.priceLabel, { color: C.green }]}>Promo Code ({appliedCoupon.code})</Text>
-              <Text style={[s.priceValue, { color: C.green }]}>
+              <Text style={[s.priceLabel, { color: T(C.green, 'fg') }]}>Promo Code ({appliedCoupon.code})</Text>
+              <Text style={[s.priceValue, { color: T(C.green, 'fg') }]}>
                 − ₹{appliedCoupon.discount.toLocaleString('en-IN')}
               </Text>
             </View>
@@ -381,9 +384,9 @@ export function HotelReviewAndPayScreen({
           disabled={isProcessing}
           activeOpacity={0.85}
           onPress={handlePay}
-        >
+        ><BrandFill />
           {isProcessing ? (
-            <ActivityIndicator size="small" color={C.white} />
+            <ActivityIndicator size="small" color={T(C.white, 'fg')} />
           ) : (
             <Text style={s.payBtnText}>
               {paymentMethod === 'pay_at_hotel' ? 'Confirm Booking' : `Pay ₹${grandTotal.toLocaleString('en-IN')}`}
@@ -395,152 +398,152 @@ export function HotelReviewAndPayScreen({
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.pageBg },
+const make_s = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 14,
     paddingBottom: 12,
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'page'),
     borderBottomWidth: 1,
-    borderBottomColor: C.border,
+    borderBottomColor: T(C.border, 'page'),
   },
-  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: C.text },
-  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  headerTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  headerSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   card: {
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     padding: 14,
     marginBottom: 10,
-  },
-  cardTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: C.text },
+   ...glass(18), },
+  cardTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   hotelIconBox: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  hotelName: { fontSize: 15, fontFamily: 'Inter_700Bold', color: C.text },
-  hotelCity: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight },
-  divider: { height: 1, backgroundColor: C.border, marginVertical: 10 },
+  hotelName: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  hotelCity: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  divider: { height: 1, backgroundColor: T(C.border, 'bg'), marginVertical: 10 },
   datesRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  dateLabel: { fontSize: 9, fontFamily: 'Inter_700Bold', color: C.gray, letterSpacing: 0.5 },
-  dateVal: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text, marginTop: 2 },
-  dateHint: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  dateLabel: { fontSize: 9, fontFamily: 'Inter_700Bold', color: T(C.gray, 'fg'), letterSpacing: 0.5 },
+  dateVal: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg'), marginTop: 2 },
+  dateHint: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   nightsBadge: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: T('#F3F4F6', 'bg'),
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
-  nightsText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: C.dark },
+  nightsText: { fontSize: 11, fontFamily: 'Inter_600SemiBold', color: T(C.dark, 'fg') },
   roomMeta: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: T('#F8FAFC', 'bg'),
     padding: 10,
     borderRadius: 8,
     marginTop: 10,
   },
-  roomName: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.text },
-  roomDetail: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
-  guestName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text, marginTop: 2 },
-  guestSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 2 },
+  roomName: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  roomDetail: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
+  guestName: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg'), marginTop: 2 },
+  guestSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
   specialReq: {
     fontSize: 11,
     fontFamily: 'Inter_400Regular',
-    color: '#4B5563',
+    color: T('#4B5563', 'fg'),
     fontStyle: 'italic',
     marginTop: 4,
   },
   appliedBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: T('#A7F3D0', 'border'),
     padding: 10,
   },
-  appliedCode: { fontSize: 12, fontFamily: 'Inter_700Bold', color: C.green },
-  appliedSavings: { fontSize: 11, fontFamily: 'Inter_400Regular', color: '#065F46', marginTop: 1 },
-  removeCouponText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#EF4444' },
+  appliedCode: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
+  appliedSavings: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T('#065F46', 'fg'), marginTop: 1 },
+  removeCouponText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: T('#EF4444', 'fg') },
   couponInputRow: { flexDirection: 'row', gap: 8 },
   couponInput: {
     flex: 1,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: T('#F9FAFB', 'bg'),
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     fontSize: 13,
     fontFamily: 'Inter_600SemiBold',
-    color: C.text,
+    color: T(C.text, 'fg'),
   },
   applyBtn: {
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
     borderRadius: 10,
     paddingHorizontal: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  applyBtnText: { color: C.white, fontSize: 12, fontFamily: 'Inter_700Bold' },
+  applyBtnText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_700Bold' },
   promoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: T('#F8FAFC', 'bg'),
     borderRadius: 8,
     padding: 8,
     borderWidth: 1,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
   },
-  promoCode: { fontSize: 11, fontFamily: 'Inter_700Bold', color: C.dark },
-  promoDesc: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
-  tapApply: { fontSize: 10, fontFamily: 'Inter_700Bold', color: C.green },
+  promoCode: { fontSize: 11, fontFamily: 'Inter_700Bold', color: T(C.dark, 'fg') },
+  promoDesc: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  tapApply: { fontSize: 10, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
   payMethod: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: T('#FAFAFA', 'bg'),
     borderWidth: 1.5,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     borderRadius: 12,
     padding: 12,
     marginTop: 8,
   },
-  payMethodActive: { borderColor: C.green, backgroundColor: '#F0FDF4' },
+  payMethodActive: { borderColor: T(C.green, 'border'), backgroundColor: T('#F0FDF4', 'bg') },
   radioCircle: {
     width: 18,
     height: 18,
     borderRadius: 9,
     borderWidth: 2,
-    borderColor: C.border,
+    borderColor: T(C.border, 'border'),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.green },
-  payMethodTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: C.text },
-  payMethodSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight, marginTop: 1 },
+  radioInner: { width: 10, height: 10, borderRadius: 5, backgroundColor: T(C.green, 'bg') },
+  payMethodTitle: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
+  payMethodSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
   instantBadge: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: T('#ECFDF5', 'bg'),
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
   },
-  instantText: { fontSize: 8, fontFamily: 'Inter_700Bold', color: C.green },
+  instantText: { fontSize: 8, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  priceLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: C.textLight },
-  priceValue: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: C.text },
+  priceLabel: { fontSize: 12, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  priceValue: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  totalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold', color: C.text },
-  totalValue: { fontSize: 16, fontFamily: 'Inter_700Bold', color: C.green },
-  taxNotice: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.gray, marginTop: 4 },
+  totalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  totalValue: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
+  taxNotice: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.gray, 'fg'), marginTop: 4 },
   footer: {
     position: 'absolute',
     bottom: 0,
@@ -549,21 +552,22 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: C.white,
+    backgroundColor: T(C.white, 'bg'),
     borderTopWidth: 1,
-    borderTopColor: C.border,
+    borderTopColor: T(C.border, 'border'),
     paddingHorizontal: 16,
     paddingTop: 12,
-  },
-  footerLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: C.textLight },
-  footerTotal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: C.text },
+   ...dockBar(), },
+  footerLabel: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  footerTotal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
   payBtn: {
-    backgroundColor: C.green,
+    backgroundColor: T(C.green, 'bg'),
     borderRadius: 22,
     paddingHorizontal: 22,
     paddingVertical: 12,
     minWidth: 150,
     alignItems: 'center',
-  },
-  payBtnText: { color: C.white, fontSize: 14, fontFamily: 'Inter_700Bold' },
+   overflow: 'hidden', },
+  payBtnText: { color: T(C.white, 'fg'), fontSize: 14, fontFamily: 'Inter_700Bold' },
 });
+const use_s = () => useThemedStyles(make_s);
