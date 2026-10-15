@@ -1,5 +1,6 @@
+import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { UGC_ADS_CONFIG } from '@/components/ugc/configs';
 import { UgcHistory } from '@/components/ugc/UgcHistory';
 import { UgcOrderShell } from '@/components/ugc/UgcOrderShell';
@@ -7,10 +8,12 @@ import { buildDetails, displayValue, type CelebrityLite, type Values } from '@/c
 import { parseApiError, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrityById } from '@/hooks/useCelebrityById';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 
 const DEFAULT_PRICE = 999;
+const CELEBRITY_SELECT = 'id,name,category,image_url,service_prices';
 
 export default function UgcAdsScreen() {
   const { colors } = useTheme();
@@ -19,6 +22,9 @@ export default function UgcAdsScreen() {
   const { getDiscountedPrice } = usePlan();
   const token = session?.access_token ?? null;
   const [basePrice, setBasePrice] = useState(DEFAULT_PRICE);
+  // Opened from a celebrity's profile: start with them as the presenter.
+  const { celebrity: celebrityParam } = useLocalSearchParams<{ celebrity?: string }>();
+  const preset = useCelebrityById<CelebrityLite>(celebrityParam, CELEBRITY_SELECT);
 
   useEffect(() => { wallet.refetch(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -63,10 +69,19 @@ export default function UgcAdsScreen() {
     return { id: order.id };
   };
 
+  if (preset.loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <UgcOrderShell
         config={UGC_ADS_CONFIG}
+        initialValues={preset.celebrity ? { presenter: 'celebrity', celebrity: preset.celebrity } : undefined}
         title="UGC Ads"
         subtitle="Order a creator-style promo video for your product or brand."
         headerIcon="zap"

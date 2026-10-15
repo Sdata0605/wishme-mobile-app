@@ -7,8 +7,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
 import { parseApiError, supabaseFetch } from '@/constants/supabase';
 import { useTheme } from '@/context/ThemeContext';
+import { SERVICES, SERVICE_KEYS, type ServiceKey } from './services';
 
-export type ServiceKey = 'wish' | 'ad' | 'video';
+export type { ServiceKey };
 
 interface Props {
   visible: boolean;
@@ -201,15 +202,11 @@ export function SubscribeSheet({
                   <Text style={[s.title, { color: colors.foreground, textAlign: 'center', marginTop: 12 }]} accessibilityRole="header">You're subscribed to {celebrity.name}</Text>
                   <Text style={{ color: colors.mutedForeground, fontSize: 14, marginTop: 4, marginBottom: 16 }}>Lifetime access. Book anytime.</Text>
                   <View style={s.tiles}>
-                    {([
-                      { key: 'wish' as const, icon: 'video' as IconName, label: 'Video Wish' },
-                      { key: 'ad' as const, icon: 'zap' as IconName, label: 'UGC Ad' },
-                      { key: 'video' as const, icon: 'play-circle' as IconName, label: 'Video Promo' },
-                    ]).map(t => (
-                      <TouchableOpacity key={t.key} onPress={() => onBook(t.key)} activeOpacity={0.85} style={[s.tile, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                        <View style={[s.benefitIcon, { backgroundColor: colors.primary + '1F' }]}><Icon name={t.icon} size={18} color={colors.primary} /></View>
-                        <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>{t.label}</Text>
-                        {servicePrices[t.key] > 0 && <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>from {inr(servicePrices[t.key])}</Text>}
+                    {SERVICE_KEYS.map(key => (
+                      <TouchableOpacity key={key} onPress={() => onBook(key)} activeOpacity={0.85} style={[s.tile, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                        <View style={[s.benefitIcon, { backgroundColor: colors.primary + '1F' }]}><Icon name={SERVICES[key].icon} size={18} color={colors.primary} /></View>
+                        <Text style={{ color: colors.foreground, fontSize: 13, fontFamily: 'Inter_600SemiBold', textAlign: 'center' }}>{SERVICES[key].short}</Text>
+                        {servicePrices[key] > 0 && <Text style={{ color: colors.mutedForeground, fontSize: 11 }}>from {inr(servicePrices[key])}</Text>}
                       </TouchableOpacity>
                     ))}
                   </View>

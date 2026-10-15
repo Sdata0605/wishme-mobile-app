@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -90,6 +90,8 @@ export default function ImagePromotionsScreen() {
   const [celebsLoading, setCelebsLoading] = useState(false);
 
   const [selectedCelebId, setSelectedCelebId] = useState('');
+  // Opened from a celebrity's profile: start with them selected (they must be one of the user's subscriptions).
+  const { celebrity: presetCelebId } = useLocalSearchParams<{ celebrity?: string }>();
 
   const [concept, setConcept] = useState('');
   const [branding, setBranding] = useState('');
@@ -133,10 +135,11 @@ export default function ImagePromotionsScreen() {
         const rows = await celebRes.json() as SubscribedCeleb[];
         setCelebrities(rows ?? []);
         if (rows.length === 1) setSelectedCelebId(rows[0].id);
+        else if (presetCelebId && rows.some(r => r.id === presetCelebId)) setSelectedCelebId(prev => prev || presetCelebId);
       }
     } catch {}
     setCelebsLoading(false);
-  }, [session, favoriteIds]);
+  }, [session, favoriteIds, presetCelebId]);
 
   const fetchPricing = useCallback(async () => {
     try {

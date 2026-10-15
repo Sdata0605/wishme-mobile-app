@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,10 +21,12 @@ import { parseApiError, supabaseFetch, SUPABASE_URL } from '@/constants/supabase
 import { useAuth } from '@/context/AuthContext';
 import { useOrderConfirm } from '@/context/OrderConfirmContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrityById } from '@/hooks/useCelebrityById';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
+const CELEBRITY_SELECT = 'id,name,category,image_url,delivery_time,service_prices';
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
 
 function imgUri(url: string | null | undefined): string | null {
@@ -66,6 +68,9 @@ export default function WishFriendScreen() {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const token = session?.access_token ?? null;
+  // Opened from a celebrity's profile: the order goes to them without a pick-a-celebrity step.
+  const { celebrity: celebrityParam } = useLocalSearchParams<{ celebrity?: string }>();
+  const preset = useCelebrityById<Celebrity>(celebrityParam, CELEBRITY_SELECT);
 
   const [step, setStep] = useState<Step>('type');
   const [videoType, setVideoType] = useState<VideoType>('video_wish');
@@ -143,9 +148,9 @@ export default function WishFriendScreen() {
     return () => clearTimeout(timer);
   }, [step, search, token]);
 
-  const basePriceFor = (c: Celebrity | null): number => {
+  const basePriceFor = (c: Celebrity | null, type: VideoType = videoType): number => {
     if (!c) return 0;
-    if (videoType === 'video_wish') return c.service_prices?.general_wish ?? 0;
+    if (type === 'video_wish') return c.service_prices?.general_wish ?? 0;
     return c.service_prices?.ugc_ad || ugcFallbackPrice;
   };
 
@@ -163,12 +168,21 @@ export default function WishFriendScreen() {
       return;
     }
     setVideoType(key);
+    const chosen = preset.celebrity;
+    if (chosen) {
+      if (basePriceFor(chosen, key) > 0) {
+        setCelebrity(chosen);
+        setStep('details');
+        return;
+      }
+      Alert.alert('Not available', `${chosen.name} does not offer this yet. Please pick another celebrity.`);
+    }
     setStep('celebrity');
   };
 
   const goBack = () => {
     if (step === 'celebrity') setStep('type');
-    else if (step === 'details') setStep('celebrity');
+    else if (step === 'details') setStep(celebrity && celebrity.id === preset.celebrity?.id ? 'type' : 'celebrity');
     else if (step === 'review') setStep('details');
     else router.back();
   };
@@ -281,14 +295,31 @@ export default function WishFriendScreen() {
     <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       {header}
 
-      {step === 'type' && (
+      {step === 'type' && (preset.loading ? (
+        <ActivityIndicator style={{ marginTop: 48 }} color={colors.primary} />
+      ) : (
         <KeyboardAwareScrollViewCompat contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
+          {preset.celebrity ? (
+            <View style={[s.presetBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {imgUri(preset.celebrity.image_url) ? (
+                <Image source={{ uri: imgUri(preset.celebrity.image_url)! }} style={s.presetAvatar} contentFit="cover" />
+              ) : (
+                <View style={[s.presetAvatar, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Icon name="star" size={18} color={colors.mutedForeground} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Your order goes to</Text>
+                <Text style={[s.optionTitle, { color: colors.foreground }]} numberOfLines={1}>{preset.celebrity.name}</Text>
+              </View>
+            </View>
+          ) : null}
           <WishFriendLanding
             onPick={pickType}
             onOpenOrders={() => router.push({ pathname: '/bookings', params: { tab: 'Wish a Friend' } } as never)}
           />
         </KeyboardAwareScrollViewCompat>
-      )}
+      ))}
 
       {step === 'celebrity' && (
         <View style={{ flex: 1 }}>
@@ -520,6 +551,8 @@ const s = StyleSheet.create({
   label: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginTop: 16, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  presetBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 16, padding: 12, borderRadius: 14, borderWidth: 1 },
+  presetAvatar: { width: 44, height: 44, borderRadius: 22 },
   celebCard: { flex: 1, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   celebImg: { width: '100%', height: 130 },
   celebName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
