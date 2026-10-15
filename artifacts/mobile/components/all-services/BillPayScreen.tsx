@@ -366,7 +366,9 @@ export function BillPayScreen({
             {isGas && gasMode === 'cylinder'
               ? 'Book LPG Cylinder'
               : isRechargeFlow
-                ? `Recharge ${meta.title}`
+                // Several titles already end in "Recharge" ("Mobile Recharge"), which read as
+                // "Recharge Mobile Recharge" (QA audit L-06).
+                ? (/recharge/i.test(meta.title) ? meta.title : `Recharge ${meta.title}`)
                 : `Pay ${meta.title}`}
           </Text>
 

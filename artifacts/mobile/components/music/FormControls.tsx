@@ -1,6 +1,7 @@
 /** Small form controls shared by the studio tabs: voice picker, chips, language dropdown, duration slider, buttons, labels, message boxes and the wallet card. */
 import { Audio } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ScrollView,
@@ -180,12 +181,30 @@ export function SL({ text }: { text: string }) {
   return <Text style={[s.sectionLabel, { color: colors.foreground }]}>{text}</Text>;
 }
 
+/**
+ * Every studio tab's error line. A balance error also gets an "Add funds" link, because the message
+ * alone left the user stuck with no way to act on it (QA audit M-20).
+ */
 export function ErrBox({ msg }: { msg: string }) {
   if (!msg) return null;
+  const outOfFunds = /insufficient balance/i.test(msg);
   return (
     <View style={s.errBox}>
       <Icon name="alert-circle" size={14} color="#ef4444" />
-      <Text style={s.errorText}>{msg}</Text>
+      <View style={{ flex: 1, gap: 6 }}>
+        <Text style={s.errorText}>{msg}</Text>
+        {outOfFunds ? (
+          <TouchableOpacity
+            onPress={() => router.push('/(tabs)/wallet' as never)}
+            accessibilityRole="button"
+            accessibilityLabel="Add funds to your wallet"
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
+          >
+            <Icon name="plus" size={12} color="#1F7BFF" />
+            <Text style={{ color: '#1F7BFF', fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>Add funds</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
     </View>
   );
 }

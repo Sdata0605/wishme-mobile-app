@@ -9,6 +9,7 @@ import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router, Stack, useSegments } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
+import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
@@ -18,6 +19,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { adoptRootFromInstance } from '@/assistant-hook';
+import '@/constants/cancelableAlerts';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AssistantOverlay } from '@/components/assistant/AssistantOverlay';
 
@@ -26,7 +28,7 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DrawerProvider } from '@/context/DrawerContext';
 import { OrderConfirmProvider } from '@/context/OrderConfirmContext';
 import { OccasionInApp } from '@/components/OccasionInApp';
-import { ThemeProvider } from '@/context/ThemeContext';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import { AgentStateProvider } from '@/context/AgentStateContext';
 import { VoiceAssistantProvider } from '@/context/VoiceAssistantContext';
 import { reminderIdFrom, syncScheduledReminders } from '@/services/hub/notifications';
@@ -120,6 +122,15 @@ function ReminderNotifications() {
   }, []);
 
   return null;
+}
+
+/**
+ * Status-bar icons follow the theme: dark on light surfaces, light on dark ones. Without this the
+ * clock, battery and signal icons stayed white and vanished on every light screen (QA audit M-04).
+ */
+function ThemedStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
 }
 
 function RootLayoutNav() {
@@ -230,6 +241,7 @@ export default function RootLayout() {
                       <DrawerProvider>
                       <OrderConfirmProvider>
                         <View style={{ flex: 1 }} ref={adoptRootFromInstance}>
+                          <ThemedStatusBar />
                           <RootLayoutNav />
                           <FloatingButtons />
                           <AssistantSetupGate />
