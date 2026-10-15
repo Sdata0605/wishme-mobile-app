@@ -373,6 +373,15 @@ split (the TDS tab file exported its date helper instead of the tab), which was 
   done by a script that sliced at top-level declaration boundaries, computed each file's imports from real
   identifier use, and refused to proceed on any cross-tab reference. A second script confirmed every original
   line is present exactly once and every import resolves.
+- **Music, wallet and bookings screens split** the same way: `app/(tabs)/music.tsx` (1,793 → 99 lines),
+  `app/(tabs)/wallet.tsx` (1,451 → 127) and `app/bookings.tsx` (1,383 → 248) are now thin shells over
+  `components/music/`, `components/wallet/` and `components/bookings/`. Each folder has a `shared.tsx` (types,
+  constants, helpers, stylesheet), a few building-block files and one file per tab or card group. The slicing
+  script now walks the TypeScript AST (per-declaration identifier use, layered files so a tab can never import a
+  sibling tab, every original line verified present exactly once). One part was done by hand: the wallet deposit
+  and withdraw sheets lived inside `WalletScreen`, so they became `useDeposit`/`DepositModal` and
+  `useWithdraw`/`WithdrawModal` pairs in `components/wallet/`; the state and handler code moved verbatim into the
+  hooks, which the screen calls in the same order as before. `tsc --noEmit` passes after each of the three splits.
 - **Typed REST helper**: `services/supabaseRest.ts` plus migration of `useWallet`, `usePlan`, `useCelebrity`
   and `useCelebrityFavorites`. Behaviour is unchanged; `usePlan` now tolerates one of its two requests failing.
 - **Dead code removed**: `constants/mockData.ts` (only `CATEGORIES` and a type re-export were used) replaced by
