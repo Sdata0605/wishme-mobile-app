@@ -40,6 +40,17 @@ const MAX_RECONNECTS = 3;
 const LISTEN_IDLE_TIMEOUT_MS = 45_000;
 const SPEECH_PEAK = 1500;
 const HISTORY_LINES = 10;
+/** The idle standby connection sends a tiny message this often so no gateway on the way closes it for being quiet. */
+const STANDBY_PING_MS = 25_000;
+/** After this many standby connections in a row that died within seconds, stop opening new ones until the next warm-up. */
+const STANDBY_MAX_FAST_FAILS = 4;
+
+interface Standby {
+  ws: WebSocket;
+  born: number;
+  authSent: boolean;
+  ping: ReturnType<typeof setInterval> | null;
+}
 
 export interface SarvamLiveOptions {
   /** Supabase user access token, refreshed if stale. */
@@ -92,6 +103,12 @@ export class SarvamLiveClient {
   private pendingUser = '';
   private pendingAssistant = '';
   private lastQuickOpen = { app: '', at: 0 };
+  /** A relay connection that is already open and logged in, waiting for the user's tap (see openStandby). */
+  private standby: Standby | null = null;
+  private standbyFastFails = 0;
+  private standbyTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the user tapped, to log how long the assistant took to start listening. */
+  private tapAt = 0;
 
   constructor(private opts: SarvamLiveOptions) {}
 
@@ -111,19 +128,108 @@ export class SarvamLiveClient {
   // ─── Public API (same shape as GeminiLiveClient) ───────────────────────────
 
   /**
-   * Nothing to keep connected in advance (the relay session starts on tap), but a cold function
-   * can take several seconds to boot, so ping it now so it is already awake when the user taps.
+   * No conversation is kept running in advance, but a relay connection is opened and logged in ahead of the tap
+   * (a "standby"), so the tap only has to send the session setup: no function boot, no TLS and WebSocket handshake and
+   * no login check on the way to the first word.
    */
   warm() {
     this.wantWarm = true;
     if (!this.wantListening) this.setState('ready');
-    this.wakeRelay();
+    this.standbyFastFails = 0;
+    void this.openStandby();
+  }
+
+  private relayWsUrl() {
+    return this.relayUrl || `${SUPABASE_URL.replace('https://', 'wss://')}/functions/v1/sarvam-voice`;
   }
 
   private wakeRelay() {
-    const url = (this.relayUrl || `${SUPABASE_URL.replace('https://', 'wss://')}/functions/v1/sarvam-voice`).replace('wss://', 'https://');
     // A plain request is answered "expected a WebSocket" straight away, but it boots the function.
-    fetch(url, { method: 'GET' }).catch(() => {});
+    fetch(this.relayWsUrl().replace('wss://', 'https://'), { method: 'GET' }).catch(() => {});
+  }
+
+  /** Opens and logs in a relay connection that waits for the user's tap. Quietly does nothing if it can't. */
+  private async openStandby() {
+    if (this.standby || this.ws || !this.wantWarm) return;
+    let token: string | null | undefined;
+    try {
+      token = await this.opts.getAccessToken();
+    } catch {
+      token = null;
+    }
+    if (!token) {
+      this.wakeRelay();
+      return;
+    }
+    if (this.standby || this.ws || !this.wantWarm) return;
+
+    const ws = new WebSocket(this.relayWsUrl());
+    const entry: Standby = { ws, born: Date.now(), authSent: false, ping: null };
+    this.standby = entry;
+    ws.onopen = () => {
+      log('standby open');
+      ws.send(JSON.stringify({ type: 'auth', token }));
+      entry.authSent = true;
+      entry.ping = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) ws.send('{"type":"ping"}');
+      }, STANDBY_PING_MS);
+    };
+    ws.onmessage = (ev) => {
+      // Only a refusal matters here (a bad login): the next connect will report it properly.
+      try {
+        if (JSON.parse(String(ev.data)).type === 'error') this.discardStandby(entry);
+      } catch {
+        /* not JSON */
+      }
+    };
+    const lost = () => {
+      const wasCurrent = this.standby === entry;
+      this.discardStandby(entry, false);
+      if (!wasCurrent) return;
+      // One that dies within seconds, again and again, means something is wrong: stop retrying until the next warm-up.
+      this.standbyFastFails = Date.now() - entry.born < 10_000 ? this.standbyFastFails + 1 : 0;
+      if (this.wantWarm && !this.wantListening) this.scheduleStandby(Math.min(30_000, 1500 * 2 ** this.standbyFastFails));
+    };
+    ws.onclose = lost;
+    ws.onerror = lost;
+  }
+
+  private scheduleStandby(delayMs: number) {
+    if (this.standbyTimer || this.standbyFastFails >= STANDBY_MAX_FAST_FAILS) return;
+    this.standbyTimer = setTimeout(() => {
+      this.standbyTimer = null;
+      void this.openStandby();
+    }, delayMs);
+  }
+
+  private discardStandby(entry: Standby, close = true) {
+    if (entry.ping) clearInterval(entry.ping);
+    entry.ping = null;
+    if (this.standby === entry) this.standby = null;
+    if (close) {
+      entry.ws.onclose = null;
+      entry.ws.onerror = null;
+      entry.ws.onmessage = null;
+      try {
+        entry.ws.close();
+      } catch {
+        /* already closed */
+      }
+    }
+  }
+
+  /** Hands over the standby connection (still opening or open) for the session to use, or null if there is none. */
+  private takeStandby(): Standby | null {
+    const s = this.standby;
+    if (!s || s.ws.readyState > WebSocket.OPEN) return null;
+    if (s.ping) clearInterval(s.ping);
+    s.ping = null;
+    this.standby = null;
+    s.ws.onclose = null;
+    s.ws.onerror = null;
+    s.ws.onmessage = null;
+    s.ws.onopen = null;
+    return s;
   }
 
   /**
@@ -132,6 +238,7 @@ export class SarvamLiveClient {
    */
   async startListening(suppressErrors = false): Promise<boolean> {
     log('startListening');
+    this.tapAt = Date.now();
     this.wantWarm = true;
     this.wantListening = true;
     this.greeted = false;
@@ -192,6 +299,9 @@ export class SarvamLiveClient {
   shutdown() {
     this.wantWarm = false;
     this.wantListening = false;
+    if (this.standbyTimer) clearTimeout(this.standbyTimer);
+    this.standbyTimer = null;
+    if (this.standby) this.discardStandby(this.standby);
     this.teardownSession();
     this.setState('idle');
   }
@@ -262,10 +372,12 @@ export class SarvamLiveClient {
   private async connect(first: boolean): Promise<void> {
     const token = await this.opts.getAccessToken();
     if (!token) throw new Error('Please log in to use the voice assistant.');
-    const url = this.relayUrl || `${SUPABASE_URL.replace('https://', 'wss://')}/functions/v1/sarvam-voice`;
+    const url = this.relayWsUrl();
+    // A connection that was opened and logged in ahead of the tap saves the function boot, the handshake and the login check.
+    const adopted = this.takeStandby();
 
     await new Promise<void>((resolve, reject) => {
-      const ws = new WebSocket(url);
+      const ws = adopted?.ws ?? new WebSocket(url);
       this.ws = ws;
       this.relayReady = false;
       let settled = false;
@@ -292,9 +404,9 @@ export class SarvamLiveClient {
       // With the other engine ready to take over, don't make the user wait long for this one.
       const timer = setTimeout(() => done(new Error('The voice service took too long to answer.')), this.suppressErrors ? FAST_CONNECT_TIMEOUT_MS : CONNECT_TIMEOUT_MS);
 
-      ws.onopen = () => {
-        log('socket open');
-        ws.send(JSON.stringify({ type: 'auth', token }));
+      // Logs in (unless the standby already did) and sends the session setup.
+      const begin = () => {
+        if (!adopted?.authSent) ws.send(JSON.stringify({ type: 'auth', token }));
         ws.send(
           JSON.stringify({
             type: 'start',
@@ -307,6 +419,10 @@ export class SarvamLiveClient {
           }),
         );
         this.greeted = true;
+      };
+      ws.onopen = () => {
+        log('socket open');
+        begin();
       };
       ws.onmessage = (ev) => {
         const raw = typeof ev.data === 'string' ? ev.data : '';
@@ -343,6 +459,10 @@ export class SarvamLiveClient {
         done(new Error('The voice service closed the connection.'));
         if (wasReady && this.wantListening) void this.reconnect();
       };
+      if (adopted && ws.readyState === WebSocket.OPEN) {
+        log('using the standby connection');
+        begin();
+      }
     });
   }
 
@@ -578,6 +698,10 @@ export class SarvamLiveClient {
   private setState(state: LiveState) {
     if (this.state === state) return;
     log('state', this.state, '->', state);
+    if (this.tapAt && (state === 'listening' || state === 'speaking')) {
+      log('tap -> listening in', Date.now() - this.tapAt, 'ms');
+      this.tapAt = 0;
+    }
     this.state = state;
     this.opts.onState?.(state);
   }
@@ -600,6 +724,8 @@ export class SarvamLiveClient {
       } catch {
         /* already closed */
       }
+      // The conversation's connection is spent: have the next one ready for the next tap.
+      if (this.wantWarm && !this.wantListening) this.scheduleStandby(400);
     }
     this.releaseAudio();
   }

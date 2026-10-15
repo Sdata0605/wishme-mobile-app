@@ -319,10 +319,13 @@ interface StoredContact {
 
 /** The whole address book, kept for a minute: a call needs one lookup, and re-reading thousands of contacts is slow. */
 let contactCache: { at: number; list: StoredContact[] } | null = null;
-const CONTACT_CACHE_MS = 60_000;
+/** Reading a big address book blocks the app for a moment, so it is kept for a while (a miss re-reads it once, below). */
+const CONTACT_CACHE_MS = 10 * 60_000;
 
-async function loadContacts(): Promise<StoredContact[]> {
-  if (contactCache && Date.now() - contactCache.at < CONTACT_CACHE_MS) return contactCache.list;
+const contactsFresh = () => !!contactCache && Date.now() - contactCache.at < CONTACT_CACHE_MS;
+
+async function loadContacts(force = false): Promise<StoredContact[]> {
+  if (!force && contactCache && contactsFresh()) return contactCache.list;
   const { data } = await Contacts.getContactsAsync({
     fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Nickname],
   });
@@ -374,12 +377,19 @@ export async function findContacts(query: string): Promise<ContactLookup> {
   }
 
   let contacts: StoredContact[];
+  const wasCached = contactsFresh();
   try {
     contacts = await loadContacts();
+    let matches = pickContacts(query, contacts);
+    // Someone saved a minute ago is not in the kept list: look again once before saying there is no such contact.
+    if (!matches.length && wasCached) {
+      contacts = await loadContacts(true);
+      matches = pickContacts(query, contacts);
+    }
+    return { matches };
   } catch {
     return { matches: [], error: 'The contacts could not be read.' };
   }
-  return { matches: pickContacts(query, contacts) };
 }
 
 /** Places the call. On Android with the call permission it dials straight away, otherwise it opens the dialer. */

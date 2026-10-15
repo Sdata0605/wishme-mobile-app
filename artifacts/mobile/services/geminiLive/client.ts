@@ -61,9 +61,8 @@ const DEFAULT_GREETING_PROMPT =
 const TOKEN_TIMEOUT_MS = 6000;
 const SETUP_TIMEOUT_MS = 8000;
 const GREETING_REPLY_TIMEOUT_MS = 6000;
-
-/** Set when the live model refuses a setup that includes Google Search twice in a row, so it is left out after that. */
-let searchDisabled = false;
+/** Reply audio that arrives while the speaker is still starting is kept (up to ~2 s at 24 kHz) and played once it is up. */
+const EARLY_AUDIO_MAX_BYTES = 96_000;
 
 export type LiveState = 'idle' | 'connecting' | 'ready' | 'listening' | 'speaking' | 'error';
 
@@ -91,6 +90,8 @@ export interface GeminiLiveOptions {
   /** 0..1 microphone / speaker loudness, used to animate the assistant. */
   onLevels?: (levels: { input: number; output: number }) => void;
   onError?: (message: string) => void;
+  /** The server's answer to "which engine is active" rides back with every token, so the app needs no separate question. */
+  onServerConfig?: (config: { engine?: string; fallback: 'gemini' | 'sarvam' | null; relayUrl?: string }) => void;
 }
 
 export class GeminiLiveClient {
@@ -127,8 +128,11 @@ export class GeminiLiveClient {
   private greetTimer: ReturnType<typeof setTimeout> | null = null;
   private greetAt = 0;
   private lastContentAt = 0;
-  private earlyCloses = 0;
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the user tapped, to log how long the assistant took to start listening. */
+  private tapAt = 0;
+  private earlyAudio: Uint8Array[] = [];
+  private earlyAudioBytes = 0;
   private model = 'gemini-3.8-live';
   private levels = { input: 0, output: 0 };
 
@@ -161,6 +165,7 @@ export class GeminiLiveClient {
   /** Switches the microphone on (opening the socket first if it isn't ready yet). */
   async startListening() {
     log('startListening, socketReady =', this.socketReady);
+    this.tapAt = Date.now();
     this.wantListening = true;
     this.greeted = false;
     if (!this.wantWarm) this.warm();
@@ -180,6 +185,10 @@ export class GeminiLiveClient {
         this.requestingPermission = false;
       }
       if (!perm.granted) throw new Error('Microphone permission is needed for the voice assistant.');
+
+      // The spoken hello takes a moment to come back, and the audio engine takes a moment to start: do both at once.
+      // Whatever the model says before the speaker is up is kept and played as soon as it is (see enqueueAudio).
+      if (!this.audioReady && this.socketReady) this.maybeGreet(true);
 
       if (!this.audioReady) {
         // Start from a clean native engine (see the Sarvam client): a stale one survives JavaScript reloads.
@@ -216,7 +225,8 @@ export class GeminiLiveClient {
       if (!recording) throw new Error('Could not start the microphone.');
       this.touch();
       if (this.socketReady) {
-        this.setState('listening');
+        // If the greeting already started talking, play what was held back and show it as speaking.
+        this.setState(this.flushEarlyAudio() ? 'speaking' : 'listening');
         this.maybeGreet();
       } else {
         this.setState('connecting');
@@ -232,9 +242,19 @@ export class GeminiLiveClient {
     }
   }
 
-  /** Asks Gemini to say its spoken hello once the mic and speaker are both ready. */
-  private maybeGreet() {
-    if (this.greeted || !this.wantListening || !this.socketReady || !this.audioReady) return;
+  /** Plays reply audio that arrived before the speaker was ready. Returns true if there was any. */
+  private flushEarlyAudio(): boolean {
+    const held = this.earlyAudio;
+    this.earlyAudio = [];
+    this.earlyAudioBytes = 0;
+    if (!held.length || !this.audioReady) return false;
+    for (const chunk of held) this.enqueueAudio(chunk);
+    return true;
+  }
+
+  /** Asks Gemini to say its spoken hello once the mic and speaker are both ready (or, with `early`, while they start). */
+  private maybeGreet(early = false) {
+    if (this.greeted || !this.wantListening || !this.socketReady || (!this.audioReady && !early)) return;
     this.greeted = true;
     log('greeting');
     this.lastUserWordAt = 0; // timings below are measured from the user's last word of THIS session
@@ -353,6 +373,8 @@ export class GeminiLiveClient {
           apikey: SUPABASE_ANON_KEY,
           Authorization: `Bearer ${accessToken}`,
         },
+        // `want: 'gemini'`: mint the token whatever the admin chose, and report the admin's choice alongside it.
+        body: JSON.stringify({ want: 'gemini', supports: ['gemini', 'sarvam'] }),
         signal: abort.signal,
       });
     } catch {
@@ -362,6 +384,13 @@ export class GeminiLiveClient {
     }
     if (!res.ok) throw new Error(`Voice service unavailable (${res.status}).`);
     const data = await res.json();
+    if (data.engine) {
+      this.opts.onServerConfig?.({
+        engine: data.engine,
+        fallback: data.fallback_engine === 'gemini' || data.fallback_engine === 'sarvam' ? data.fallback_engine : null,
+        relayUrl: typeof data.relay_url === 'string' ? data.relay_url : undefined,
+      });
+    }
     if (!data.token) throw new Error('Voice service returned no token.');
     this.model = data.model;
     return data.token as string;
@@ -395,7 +424,6 @@ export class GeminiLiveClient {
       this.setupWatchdog = null;
       if (this.ws !== ws || this.setupDone) return;
       log('setup timed out, starting over');
-      this.earlyClose();
       this.dropSocket();
       if (this.wantWarm) this.scheduleReconnect();
     }, SETUP_TIMEOUT_MS);
@@ -416,7 +444,6 @@ export class GeminiLiveClient {
       if (this.ws !== ws) return;
       if (this.setupWatchdog) clearTimeout(this.setupWatchdog);
       this.setupWatchdog = null;
-      if (!this.setupDone) this.earlyClose();
       if (this.greetAt > this.lastContentAt) this.greeted = false;
       this.ws = null;
       this.socketReady = false;
@@ -451,15 +478,6 @@ export class GeminiLiveClient {
     }
   }
 
-  /** A socket that died before finishing setup. Twice in a row with Google Search in the setup means the model dislikes it. */
-  private earlyClose() {
-    this.earlyCloses += 1;
-    if (this.earlyCloses >= 2 && !searchDisabled) {
-      searchDisabled = true;
-      log('setup keeps failing: leaving Google Search out');
-    }
-  }
-
   private scheduleReconnect(errorMessage?: string) {
     if (!this.wantWarm || this.reconnectTimer) return;
     this.reconnectAttempts += 1;
@@ -473,7 +491,8 @@ export class GeminiLiveClient {
     }
     // Never show "Listening" while the line is actually down.
     this.setState('connecting');
-    const delay = Math.min(MAX_RECONNECT_DELAY_MS, 300 * 2 ** (this.reconnectAttempts - 1));
+    // The first retry while the user is waiting goes out at once; after that it backs off.
+    const delay = this.wantListening && this.reconnectAttempts === 1 ? 0 : Math.min(MAX_RECONNECT_DELAY_MS, 300 * 2 ** (this.reconnectAttempts - 1));
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
       void this.openSocket();
@@ -527,9 +546,10 @@ export class GeminiLiveClient {
       contextWindowCompression: { slidingWindow: {} },
       sessionResumption: this.resumeHandle ? { handle: this.resumeHandle } : {},
     };
-    // Google Search lets it answer anything fresh (news, weather, scores); the app's own tools sit beside it.
+    // Fresh facts come from the app's own `web_search` tool, not Gemini's built-in Google Search: with this project's key
+    // Google refuses a live session that has the built-in one (close code 1011, "exceeded your current quota"), which
+    // made every cold start waste about three seconds on two doomed connections before it connected without it.
     const tools: Record<string, unknown>[] = [];
-    if (!searchDisabled) tools.push({ googleSearch: {} });
     if (this.opts.functionDeclarations?.length) tools.push({ functionDeclarations: this.opts.functionDeclarations });
     if (tools.length) setup.tools = tools;
     return { setup };
@@ -549,7 +569,6 @@ export class GeminiLiveClient {
     if (msg.setupComplete) {
       if (this.setupWatchdog) clearTimeout(this.setupWatchdog);
       this.setupWatchdog = null;
-      this.earlyCloses = 0;
       this.reconnectAttempts = 0;
       this.socketReady = true;
       this.setupDone = true;
@@ -670,7 +689,15 @@ export class GeminiLiveClient {
   }
 
   private enqueueAudio(pcm24k: Uint8Array) {
-    if (!this.audioReady) return; // assistant spoke while mic/speaker engine is off
+    if (!this.audioReady) {
+      // The speaker is still starting for the greeting we asked for: keep a short stretch of it. Otherwise the
+      // assistant spoke while the mic/speaker engine is off, so there is nobody to hear it.
+      if (this.wantListening && this.greeted && this.earlyAudioBytes < EARLY_AUDIO_MAX_BYTES) {
+        this.earlyAudio.push(pcm24k);
+        this.earlyAudioBytes += pcm24k.length;
+      }
+      return;
+    }
     if (CAN_FLUSH) {
       playPCMData(pcm24k);
       return;
@@ -780,11 +807,17 @@ export class GeminiLiveClient {
   private setState(state: LiveState) {
     if (this.state === state) return;
     log('state', this.state, '->', state);
+    if (this.tapAt && (state === 'listening' || state === 'speaking')) {
+      log('tap -> listening in', Date.now() - this.tapAt, 'ms');
+      this.tapAt = 0;
+    }
     this.state = state;
     this.opts.onState?.(state);
   }
 
   private releaseAudio() {
+    this.earlyAudio = [];
+    this.earlyAudioBytes = 0;
     this.subs.forEach((s) => s.remove());
     this.subs = [];
     if (this.tailTimer) clearTimeout(this.tailTimer);

@@ -16,6 +16,7 @@ import {
   type LiveState,
 } from '@/services/geminiLive/client';
 import { SarvamLiveClient, type SarvamLiveOptions } from '@/services/sarvamLive/client';
+import { warmWebSearch } from '@/services/assistant/webSearch';
 
 export type EngineKind = 'gemini' | 'sarvam';
 
@@ -100,6 +101,7 @@ export class AssistantEngine {
       onTranscript: forward('gemini', opts.onTranscript),
       onLevels: forward('gemini', opts.onLevels),
       onError: forward('gemini', opts.onError),
+      onServerConfig: (cfg) => void this.applyServerConfig({ engine: cfg.engine, fallback: cfg.fallback, relayUrl: cfg.relayUrl }),
     });
 
     const sarvamOpts: SarvamLiveOptions = {
@@ -157,10 +159,20 @@ export class AssistantEngine {
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const j = (await res.json()) as { engine?: EngineKind; fallback_engine?: EngineKind | null; relay_url?: string };
+      await this.applyServerConfig({ engine: j.engine, fallback: j.fallback_engine ?? null, relayUrl: j.relay_url });
+    } catch {
+      // Can't ask: keep whatever we were using (Gemini by default), and try again soon.
+      log('could not resolve the engine');
+    }
+  }
+
+  /** Takes in what the server says about the active engine (from the probe, or riding back with a Gemini token). */
+  private async applyServerConfig(cfg: { engine?: string; fallback: EngineKind | null; relayUrl?: string }) {
+    try {
       this.resolvedAt = Date.now();
-      this.fallback = j.fallback_engine ?? null;
-      if (j.relay_url) this.sarvam.setRelayUrl(j.relay_url);
-      const next: EngineKind = j.engine === 'sarvam' ? 'sarvam' : 'gemini';
+      this.fallback = cfg.fallback;
+      if (cfg.relayUrl) this.sarvam.setRelayUrl(cfg.relayUrl);
+      const next: EngineKind = cfg.engine === 'sarvam' ? 'sarvam' : 'gemini';
       this.haveChoice = true;
       void AsyncStorage.setItem(ENGINE_KEY, JSON.stringify({ engine: next, fallback: this.fallback })).catch(() => {});
       if (next !== this.active) {
@@ -199,6 +211,10 @@ export class AssistantEngine {
     void this.remembered.then(() => {
       if (!this.wantWarm) return;
       this.current.warm();
+      // Gemini's own token request carries the server's choice back with it, so a second request to the same cold function
+      // (it raced the token request and was the source of the "slow to respond" aborts) is only needed when Sarvam is
+      // remembered, or on the very first run when nothing is remembered.
+      if (this.active === 'gemini' && this.haveChoice) return;
       void this.resolve(true).then(() => {
         if (this.wantWarm) this.current.warm();
       });
@@ -229,6 +245,8 @@ export class AssistantEngine {
     // The conversation starts now. Only wait for the server's answer on the very first run; after that the choice it made
     // last time is used straight away and refreshed in the background.
     this.wantListening = true;
+    // Boot the web-search function now, so the first question that needs it does not wait for a cold start.
+    warmWebSearch(this.opts.getAccessToken);
     await this.remembered;
     if (!this.haveChoice) await Promise.race([this.resolve(), new Promise<void>((r) => setTimeout(r, FIRST_RUN_WAIT_MS))]);
     else void this.resolve();

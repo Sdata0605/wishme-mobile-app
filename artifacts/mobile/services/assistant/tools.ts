@@ -27,6 +27,7 @@ import { UI_FUNCTION_DECLARATIONS, runUiTool } from './uiTools';
 import { HUB_FUNCTION_DECLARATIONS, runHubTool, type HubToolContext } from './hubTools';
 import { resolveLanguage, SARVAM_LANGUAGE_NAMES, type LanguageRequest } from './languages';
 import { DOC_FUNCTION_DECLARATIONS, runDocTool, type DocToolContext } from './docTools';
+import { WEB_FUNCTION_DECLARATIONS, runWebTool } from './webSearch';
 
 export interface ToolContext extends HubToolContext, DocToolContext {
   router: Router;
@@ -326,7 +327,7 @@ const APP_FUNCTION_DECLARATIONS = [
   {
     name: 'open_website',
     description:
-      'Open a website in the phone browser, or run a Google search. Give url for a specific site, or search_query for a search. This leaves the WishMe app: right after using the screen it asks for a spoken confirmation first.',
+      'Open a website in the phone browser, only when the user asks to open a site or to search in the browser. NEVER use it to answer a question: use web_search for that. Give url for a specific site, or search_query for a search. This leaves the WishMe app: right after using the screen it asks for a spoken confirmation first.',
     parameters: {
       type: 'OBJECT',
       properties: {
@@ -411,6 +412,7 @@ export const FUNCTION_DECLARATIONS = [
   ...APP_FUNCTION_DECLARATIONS,
   ...HUB_FUNCTION_DECLARATIONS,
   ...DOC_FUNCTION_DECLARATIONS,
+  ...WEB_FUNCTION_DECLARATIONS,
   ...UI_FUNCTION_DECLARATIONS,
 ];
 
@@ -502,6 +504,10 @@ export async function runAssistantTool(
   call: LiveToolCall,
   ctx: ToolContext,
 ): Promise<Record<string, unknown>> {
+  // Looking something up on the internet.
+  const webResult = await runWebTool(call.name, call.args ?? {}, ctx);
+  if (webResult) return webResult;
+
   // Generic screen control (read_screen / tap / fill_field / scroll_screen) is handled first.
   const uiResult = await runUiTool({ name: call.name, args: call.args ?? {} });
   if (uiResult) {

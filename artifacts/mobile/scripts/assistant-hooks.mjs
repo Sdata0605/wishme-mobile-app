@@ -49,6 +49,7 @@ const FAKES = {
   '@react-native-async-storage/async-storage': `export default { getItem: async () => null, setItem: async () => {}, removeItem: async () => {} };`,
   '@/constants/supabase': `
     export const SUPABASE_URL = 'https://example.invalid';
+    export const SUPABASE_ANON_KEY = 'anon-test-key';
     export async function supabaseFetch(path, init) {
       (globalThis.__requests ??= []).push({ path, body: init?.body ? JSON.parse(init.body) : null });
       return { ok: true, status: 200, json: async () => ({ callId: 'call-1', status: 'queued' }) };
