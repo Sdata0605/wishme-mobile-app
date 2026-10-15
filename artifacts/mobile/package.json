@@ -5,9 +5,14 @@
   "main": "index.js",
   "scripts": {
     "dev": "EXPO_PACKAGER_PROXY_URL=https://$REPLIT_EXPO_DEV_DOMAIN EXPO_PUBLIC_DOMAIN=$REPLIT_DEV_DOMAIN EXPO_PUBLIC_REPL_ID=$REPL_ID REACT_NATIVE_PACKAGER_HOSTNAME=$REPLIT_DEV_DOMAIN pnpm exec expo start --localhost --port $PORT",
+    "start": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "selfcheck": "node scripts/selfcheck.mjs",
+    "check": "pnpm run typecheck && pnpm run selfcheck",
     "eas:build:android": "npx eas-cli build --platform android",
     "eas:build:ios": "npx eas-cli build --platform ios"
   },

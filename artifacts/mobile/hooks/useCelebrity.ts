@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
+import { fetchOne } from '@/services/supabaseRest';
 
+/** Whether the signed-in user has a celebrity profile (re-checked whenever the screen gains focus). */
 export function useCelebrity() {
   const { session, user } = useAuth();
   const [isCelebrity, setIsCelebrity] = useState(false);
@@ -16,22 +17,11 @@ export function useCelebrity() {
     }
     setLoading(true);
     try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/celebrities?select=id&profile_id=eq.${user.profileId}&limit=1`,
-        {
-          headers: {
-            apikey: SUPABASE_ANON_KEY,
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-            Accept: 'application/vnd.pgrst.object+json',
-          },
-        },
+      const row = await fetchOne<{ id: string }>(
+        `/rest/v1/celebrities?select=id&profile_id=eq.${user.profileId}&limit=1`,
+        session.access_token,
       );
-      if (res.status === 200) {
-        setIsCelebrity(true);
-      } else {
-        setIsCelebrity(false);
-      }
+      setIsCelebrity(!!row);
     } catch {
       setIsCelebrity(false);
     }

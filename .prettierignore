@@ -1,0 +1,11 @@
+node_modules
+dist
+static-build
+.expo
+android
+ios
+pnpm-lock.yaml
+artifacts/mobile/assets
+artifacts/mockup-sandbox/src/.generated
+lib/*/src/generated
+*.md
