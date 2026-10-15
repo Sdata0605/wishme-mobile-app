@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabaseFetch } from '@/constants/supabase';
+import { fetchRows } from '@/services/supabaseRest';
 
 interface UseCelebrityFavoritesOptions {
   profileId: string | null | undefined;
@@ -27,15 +27,11 @@ export function useCelebrityFavorites({
     }
     setLoading(true);
     try {
-      const res = await supabaseFetch(
+      const rows = await fetchRows<{ celebrity_id: string }>(
         `/rest/v1/celebrity_favorites?user_id=eq.${profileId}&status=eq.active&select=celebrity_id`,
-        {},
         accessToken,
       );
-      if (res.ok) {
-        const rows = await res.json() as Array<{ celebrity_id: string }>;
-        setFavoriteIds(new Set((rows ?? []).map((r) => r.celebrity_id)));
-      }
+      setFavoriteIds(new Set(rows.map((r) => r.celebrity_id)));
     } catch {
       setFavoriteIds(new Set());
     } finally {

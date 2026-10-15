@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
+import { fetchOne, fetchRows } from '@/services/supabaseRest';
 
 interface Plan {
   id: string;
@@ -21,6 +21,8 @@ interface UsePlanResult {
   loading: boolean;
 }
 
+const DEFAULT_PLAN = 'basic';
+
 export function usePlan(): UsePlanResult {
   const { user, session } = useAuth();
   const [plan, setPlan] = useState<string | null>(null);
@@ -34,42 +36,22 @@ export function usePlan(): UsePlanResult {
         return;
       }
       try {
-        const [profileRes, plansRes] = await Promise.all([
-          supabaseFetch(
+        // Each request fails on its own: a missing profile row must not hide the plan list, and vice versa.
+        const [profile, plans] = await Promise.all([
+          fetchOne<{ plan: string | null }>(
             `/rest/v1/profiles?select=plan&id=eq.${user.profileId}&limit=1`,
-            {},
             session.access_token,
-          ),
-          supabaseFetch(
-            '/rest/v1/plans?select=*&is_active=eq.true',
-            {},
-            session.access_token,
-          ),
+          ).catch(() => null),
+          fetchRows<Plan>('/rest/v1/plans?select=*&is_active=eq.true', session.access_token).catch(() => []),
         ]);
 
-        let currentPlan = 'basic';
-        if (profileRes.ok) {
-          const rows = await profileRes.json() as Array<{ plan: string }>;
-          if (rows && rows.length > 0 && rows[0].plan) {
-            currentPlan = rows[0].plan;
-          }
-        }
-
-        let discount = 0;
-        if (plansRes.ok) {
-          const plans = await plansRes.json() as Plan[];
-          const matchedPlan = plans.find(
-            (p) => p.name.toLowerCase() === currentPlan.toLowerCase(),
-          );
-          if (matchedPlan) {
-            discount = matchedPlan.service_discount_percentage ?? 0;
-          }
-        }
+        const currentPlan = profile?.plan || DEFAULT_PLAN;
+        const matched = plans.find((p) => p.name.toLowerCase() === currentPlan.toLowerCase());
 
         setPlan(currentPlan);
-        setDiscountPercentage(discount);
+        setDiscountPercentage(matched?.service_discount_percentage ?? 0);
       } catch {
-        setPlan('basic');
+        setPlan(DEFAULT_PLAN);
         setDiscountPercentage(0);
       } finally {
         setLoading(false);

@@ -1,6 +1,11 @@
 import { useCallback, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
-import { supabaseFetch } from '@/constants/supabase';
+import { fetchOne } from '@/services/supabaseRest';
+
+interface WalletRow {
+  id: string;
+  wallet_balance: number | null;
+}
 
 export function useWallet() {
   const { user, getValidSession } = useAuth();
@@ -14,20 +19,17 @@ export function useWallet() {
     try {
       const validSession = await getValidSession();
       if (!validSession?.access_token) return;
-      const res = await supabaseFetch(
+      const row = await fetchOne<WalletRow>(
         `/rest/v1/profiles?select=id,wallet_balance&user_id=eq.${user.id}&limit=1`,
-        {},
         validSession.access_token,
       );
-      if (res.ok) {
-        const rows = await res.json() as Array<{ id: string; wallet_balance: number }>;
-        if (rows?.length) {
-          setBalance(rows[0].wallet_balance ?? 0);
-          setProfileId(rows[0].id);
-        }
+      if (row) {
+        setBalance(row.wallet_balance ?? 0);
+        setProfileId(row.id);
       }
-    } catch {}
-    finally {
+    } catch {
+      // Keep whatever balance is showing; the caller can try again.
+    } finally {
       setLoading(false);
     }
   }, [user, getValidSession]);

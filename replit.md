@@ -1,123 +1,77 @@
-# Workspace
+# WishMe workspace
 
-## Overview
-
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+pnpm workspace monorepo. The product is the Expo app in `artifacts/mobile`; the other packages are Replit
+template scaffolding that the app does not depend on. A fuller walkthrough is in `PROJECT_REPORT.md`.
 
 ## Stack
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
+- **Monorepo**: pnpm workspaces (`artifacts/*`, `lib/*`, `scripts`), Node 24, TypeScript 5.9
+- **Mobile app**: Expo SDK 54, Expo Router v6, React Native 0.81, React 19 (New Architecture + React Compiler on)
+- **Backend**: Supabase (Postgres via PostgREST, Auth, Edge Functions). The app calls it directly with `fetch`;
+  nothing in this repo runs server-side. The database schema and edge functions live in the Supabase project.
+- **Payments**: Razorpay through the `create-razorpay-order` / `verify-razorpay-payment` edge functions
+- **Voice**: Gemini Live or Sarvam (chosen server-side), audio through a patched `@speechmatics/expo-two-way-audio`
+- **Native code**: one Android Expo module (`artifacts/mobile/modules/installed-apps`) and a config plugin
 
 ## Structure
 
 ```text
-artifacts-monorepo/
-├── artifacts/              # Deployable applications
-│   └── api-server/         # Express API server
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI spec + Orval codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas from OpenAPI
-│   └── db/                 # Drizzle ORM schema + DB connection
-├── scripts/                # Utility scripts (single workspace package)
-│   └── src/                # Individual .ts scripts, run via `pnpm --filter @workspace/scripts run <script>`
-├── pnpm-workspace.yaml     # pnpm workspace (artifacts/*, lib/*, lib/integrations/*, scripts)
-├── tsconfig.base.json      # Shared TS options (composite, bundler resolution, es2022)
-├── tsconfig.json           # Root TS project references
-└── package.json            # Root package with hoisted devDeps
+wishme-mobile-app/
+├── artifacts/
+│   ├── mobile/              ★ the WishMe app (see below)
+│   ├── api-server/          Express 5 scaffold with one /api/healthz route — not used by the app
+│   └── mockup-sandbox/      Vite playground for Replit's mockup tool — not used by the app
+├── lib/
+│   ├── db/                  Drizzle + pg scaffold; the schema file is empty
+│   ├── api-spec/            OpenAPI spec (only /healthz) + Orval config
+│   ├── api-zod/             Generated zod schemas from that spec
+│   └── api-client-react/    Generated React Query hooks from that spec
+├── scripts/                 Root utility package (hello.ts)
+├── patches/                 pnpm patch for expo-two-way-audio (24 kHz playback + flush)
+├── .github/workflows/ci.yml Typecheck + self-checks + prettier on push and PR
+└── PROJECT_REPORT.md        Architecture walkthrough, risks and onboarding notes
 ```
 
-## TypeScript & Composite Projects
+## Root scripts
 
-Every package extends `tsconfig.base.json` which sets `composite: true`. The root `tsconfig.json` lists all packages as project references. This means:
+- `pnpm run typecheck` — `tsc --build` for the lib packages, then each artifact's own typecheck
+- `pnpm run check` — the mobile app's typecheck and self-check scripts (what CI runs)
+- `pnpm run format` / `format:check` — Prettier over the mobile app's non-screen code
 
-- **Always typecheck from the root** — run `pnpm run typecheck` (which runs `tsc --build --emitDeclarationOnly`). This builds the full dependency graph so that cross-package imports resolve correctly. Running `tsc` inside a single package will fail if its dependencies haven't been built yet.
-- **`emitDeclarationOnly`** — we only emit `.d.ts` files during typecheck; actual JS bundling is handled by esbuild/tsx/vite...etc, not `tsc`.
-- **Project references** — when package A depends on package B, A's `tsconfig.json` must list B in its `references` array. `tsc --build` uses this to determine build order and skip up-to-date packages.
+## `artifacts/mobile` (`@workspace/mobile`)
 
-## Root Scripts
+- **Entry**: `index.js` imports `assistant-hook.ts` first (captures React's fiber root for the voice
+  assistant), then `expo-router/entry`.
+- **Routing**: `app/_layout.tsx` holds the provider tree and the stack; `app/index.tsx` decides where to land
+  (celebrity dashboard, the AI home tab, sign-in or onboarding). The visible tabs are Home, Services, the mic
+  orb (AI home), Hub and You; wallet, scan-pay, celebrities, music and voice-call are hidden tabs.
+- **Data access**: `constants/supabase.ts` (`supabaseFetch`) and the typed helpers in
+  `services/supabaseRest.ts` (`fetchRows`, `fetchOne`, `insertRows`, `updateRows`, `deleteRows`, `callRpc`).
+  Prefer the helpers in new code. The Supabase URL and anon key can be overridden with
+  `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` (see `.env.example`).
+- **Auth**: `context/AuthContext.tsx` — Supabase Auth REST, session in AsyncStorage, single-flight token refresh,
+  OTP sign-up through the `send-email-otp` / `verify-email-otp` functions.
+- **Voice assistant**: `context/VoiceAssistantContext.tsx` owns one `AssistantEngine`
+  (`services/voice/engine.ts`) that wraps `services/geminiLive/client.ts` and `services/sarvamLive/client.ts`.
+  Tools live in `services/assistant/` (`tools.ts` is the dispatcher; `uiTools.ts` is generic screen control over
+  the fiber tree in `screenControl.ts`; `hubTools.ts`, `docTools.ts`). The system prompt is
+  `services/assistant/systemPrompt.ts`. Safety rules (no payments, no secret fields, confirm before calls) are
+  enforced in code.
+- **Services flow**: `components/all-services/ServicesFlow.tsx` is a view state machine for flights, hotels,
+  buses (TBO through `services/tboService.ts`) and bills.
+- **Celebrity dashboard**: `app/celebrity-dashboard.tsx` is the shell; each tab is a file in
+  `components/celebrity-dashboard/`, with the shared types, building blocks and stylesheet in `shared.tsx`.
+- **Design tokens**: `constants/neon.ts` (accent-seeded palette, dark/light) via `useTheme().neon`;
+  `constants/colors.ts` keeps the older WishMe tokens for existing screens.
+- **Scripts**: `pnpm --filter @workspace/mobile run start` (dev client), `android`, `ios`, `typecheck`,
+  `selfcheck` (runs every `scripts/*.selfcheck.ts` with plain Node), `check` (both), `eas:build:*`.
+  The `dev` script is Replit-specific.
 
-- `pnpm run build` — runs `typecheck` first, then recursively runs `build` in all packages that define it
-- `pnpm run typecheck` — runs `tsc --build --emitDeclarationOnly` using project references
+Expo Go cannot run this app (custom native module + patched audio library): use a development build
+(`expo run:android` locally with JDK 17 and the Android SDK, or `eas build --profile development`).
 
-## Packages
+## Other packages
 
-### `artifacts/api-server` (`@workspace/api-server`)
-
-Express 5 API server. Routes live in `src/routes/` and use `@workspace/api-zod` for request and response validation and `@workspace/db` for persistence.
-
-- Entry: `src/index.ts` — reads `PORT`, starts Express
-- App setup: `src/app.ts` — mounts CORS, JSON/urlencoded parsing, routes at `/api`
-- Routes: `src/routes/index.ts` mounts sub-routers; `src/routes/health.ts` exposes `GET /health` (full path: `/api/health`)
-- Depends on: `@workspace/db`, `@workspace/api-zod`
-- `pnpm --filter @workspace/api-server run dev` — run the dev server
-- `pnpm --filter @workspace/api-server run build` — production esbuild bundle (`dist/index.cjs`)
-- Build bundles an allowlist of deps (express, cors, pg, drizzle-orm, zod, etc.) and externalizes the rest
-
-### `lib/db` (`@workspace/db`)
-
-Database layer using Drizzle ORM with PostgreSQL. Exports a Drizzle client instance and schema models.
-
-- `src/index.ts` — creates a `Pool` + Drizzle instance, exports schema
-- `src/schema/index.ts` — barrel re-export of all models
-- `src/schema/<modelname>.ts` — table definitions with `drizzle-zod` insert schemas (no models definitions exist right now)
-- `drizzle.config.ts` — Drizzle Kit config (requires `DATABASE_URL`, automatically provided by Replit)
-- Exports: `.` (pool, db, schema), `./schema` (schema only)
-
-Production migrations are handled by Replit when publishing. In development, we just use `pnpm --filter @workspace/db run push`, and we fallback to `pnpm --filter @workspace/db run push-force`.
-
-### `lib/api-spec` (`@workspace/api-spec`)
-
-Owns the OpenAPI 3.1 spec (`openapi.yaml`) and the Orval config (`orval.config.ts`). Running codegen produces output into two sibling packages:
-
-1. `lib/api-client-react/src/generated/` — React Query hooks + fetch client
-2. `lib/api-zod/src/generated/` — Zod schemas
-
-Run codegen: `pnpm --filter @workspace/api-spec run codegen`
-
-### `lib/api-zod` (`@workspace/api-zod`)
-
-Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used by `api-server` for response validation.
-
-### `lib/api-client-react` (`@workspace/api-client-react`)
-
-Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
-
-### `artifacts/mobile` (`@workspace/mobile`)
-
-Expo React Native app — **WishMe**, a celebrity video wish platform for Indian users.
-
-- **Tech**: Expo SDK 53, Expo Router v6, React Native, TypeScript
-- **Design**: Orange-to-purple gradient branding (#FF6B33 → #B44CFF), PlayfairDisplay_700Bold for headings, Inter for body
-- **Theme**: Dark/light mode via ThemeContext + AsyncStorage persistence
-- **Auth**: Supabase auth integration (AuthContext) — login, signup (OTP flow), logout, forgot password (email+phone), celebrity apply, OTP verify/resend, session persistence in AsyncStorage
-- **Supabase**: `constants/supabase.ts` — URL + anon key + `supabaseFetch` helper; Project: eqikeuqwbphwongtfzhe.supabase.co
-- **Navigation**: File-based Expo Router, 5-tab layout (Home, Stars, Music, Calls, Profile) + Drawer sidebar
-- **Drawer**: Slide-and-scale animated sidebar (DrawerContext) with 20+ nav items
-- **Fonts**: `@expo-google-fonts/inter`, `@expo-google-fonts/playfair-display`
-- **Indian Rupees** (₹) throughout, 12 mock celebrities with picsum.photos images
-
-Key screens:
-- `app/onboarding.tsx` — 4-slide animated onboarding
-- `app/(auth)/index.tsx` — Sign In / Sign Up / Celebrity tabs + password strength meter
-- `app/(auth)/verify-otp.tsx` — 6-digit OTP verification
-- `app/(tabs)/index.tsx` — Home (banners, quick actions, celebrity grid, video cards, how-it-works)
-- `app/(tabs)/celebrities.tsx` — Browse/search/filter celebrity grid
-- `app/(tabs)/music.tsx` — AI Music Studio: 7 real-API tabs (TTS, Convert, Clone, SFX, Isolate, Music, Img+Music) with expo-av playback/recording, expo-document-picker, expo-file-system/legacy, real wallet deduction, real DB inserts
-- `app/(tabs)/voice-call.tsx` — Live celebrity voice calls
-- `app/(tabs)/profile.tsx` — User profile, wallet, stats, settings
-- `app/celebrity/[id].tsx` — Celebrity detail with reviews + booking
-- `app/booking/[id].tsx` — Booking detail with rating form
-- Plus: bookings, wallet, messages, chat, favorites, wish-orders, loved-ones, wish-celebrity, photo-wish, for-business, greeting-cards, image-promotions, referrals, commission, occasions, occasion-alerts, settings, celebrity-dashboard
-
-### `scripts` (`@workspace/scripts`)
-
-Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
+- `artifacts/api-server`: `pnpm --filter @workspace/api-server run dev|build`; bundles to `dist/index.cjs`.
+- `lib/db`: `pnpm --filter @workspace/db run push` (needs `DATABASE_URL`). No tables are defined.
+- `lib/api-spec`: `pnpm --filter @workspace/api-spec run codegen` regenerates `api-zod` and `api-client-react`.

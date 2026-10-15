@@ -24,7 +24,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useDrawer } from '@/context/DrawerContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useTour, useTourTarget } from '@/context/TourContext';
-import { CATEGORIES } from '@/constants/mockData';
+import { CATEGORIES } from '@/constants/celebrities';
 import { useCelebrities } from '@/hooks/useCelebrities';
 import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
