@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -12,6 +13,9 @@ import {
 } from 'react-native';
 import Reanimated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AuthButton, AuthMark } from '@/components/auth/AuthUI';
+import { Icon } from '@/components/Icon';
+import { AmbientBackground } from '@/components/neon/AmbientBackground';
 import { Reveal } from '@/components/neon/Motion';
 import { withAlpha } from '@/constants/neon';
 import { useTheme } from '@/context/ThemeContext';
@@ -81,25 +85,44 @@ function VideoIntroScreen({ onDone }: { onDone: () => void }) {
         contentFit="cover"
         nativeControls={false}
       />
+      <LinearGradient
+        pointerEvents="none"
+        colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']}
+        style={styles.videoScrim}
+      />
       <Pressable
         onPress={done}
         style={[styles.videoSkip, { top: insets.top + 12 }]}
+        accessibilityRole="button"
+        accessibilityLabel="Skip the intro video"
       >
         <Text style={styles.skipText}>Skip</Text>
+        <Icon name="chevron-right" size={15} color="#fff" />
       </Pressable>
     </View>
   );
 }
 
-/** A page dot: 7px, stretching to 22px for the live one (MyAssistant's guide). */
+/** A page dot: 8px, stretching to 22px for the live one, which carries the brand gradient. */
 function Dot({ active }: { active: boolean }) {
-  const { neon } = useTheme();
-  const w = useSharedValue(active ? 22 : 7);
+  const { neon, isDark } = useTheme();
+  const w = useSharedValue(active ? 22 : 8);
   useEffect(() => {
-    w.value = withTiming(active ? 22 : 7, { duration: 220 });
+    w.value = withTiming(active ? 22 : 8, { duration: 250 });
   }, [active, w]);
   const style = useAnimatedStyle(() => ({ width: w.value }));
-  return <Reanimated.View style={[styles.dot, { backgroundColor: active ? neon.violet : withAlpha(neon.violet, 0.18) }, style]} />;
+  return (
+    <Reanimated.View style={[styles.dot, { backgroundColor: active ? neon.violet : withAlpha(neon.textHi, 0.25) }, style]}>
+      {active && isDark ? (
+        <LinearGradient
+          colors={neon.gBrand as unknown as [string, string]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+      ) : null}
+    </Reanimated.View>
+  );
 }
 
 function SlideScreen({
@@ -120,8 +143,14 @@ function SlideScreen({
   const last = index === total - 1;
 
   return (
-    <View style={[StyleSheet.absoluteFill, { backgroundColor: neon.bg }]}>
+    <View style={StyleSheet.absoluteFill}>
+      <AmbientBackground />
+
       <View style={[styles.topBar, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.brandRow}>
+          <AuthMark size={32} />
+          <Text style={[styles.brandName, { color: neon.textHi }]}>WishMe</Text>
+        </View>
         <Pressable onPress={onSkip} hitSlop={10} accessibilityRole="button" accessibilityLabel="Skip the introduction">
           <Text style={[styles.skipLink, { color: neon.textLo }]}>Skip</Text>
         </Pressable>
@@ -129,8 +158,16 @@ function SlideScreen({
 
       <View style={styles.pageBody}>
         <Reveal key={slide.key}>
-          <View style={[styles.photoCard, { borderColor: neon.line }]}>
+          <View style={[styles.photoCard, { borderColor: neon.cardBorder }]}>
             <Image source={slide.image} style={styles.photo} resizeMode="cover" />
+            <LinearGradient
+              pointerEvents="none"
+              colors={[withAlpha(neon.bg, 0), withAlpha(neon.bg, 0.7)]}
+              style={styles.photoFade}
+            />
+            <View style={[styles.counter, { backgroundColor: neon.glass, borderColor: neon.cardBorder }]}>
+              <Text style={[styles.counterText, { color: neon.textHi }]}>{`0${index + 1} / 0${total}`}</Text>
+            </View>
           </View>
         </Reveal>
         <Reveal key={`t${slide.key}`} delayMs={60}>
@@ -141,25 +178,23 @@ function SlideScreen({
         </Reveal>
       </View>
 
-      <View style={[styles.bottomRow, { paddingBottom: insets.bottom + 24 }]}>
+      <View style={[styles.bottom, { paddingBottom: insets.bottom + 24 }]}>
         <View style={styles.dots} accessibilityRole="progressbar" accessibilityValue={{ min: 1, max: total, now: index + 1 }}>
           {Array.from({ length: total }).map((_, i) => <Dot key={i} active={i === index} />)}
         </View>
-        <Pressable
+        <AuthButton
+          label={last ? 'Get started' : 'Next'}
+          icon="arrow-right"
+          iconAfter
           onPress={onNext}
-          accessibilityRole="button"
-          accessibilityLabel={last ? 'Get started' : 'Next slide'}
-          style={({ pressed }) => [styles.nextBtn, { backgroundColor: neon.violet, opacity: pressed ? 0.85 : 1 }]}
-        >
-          <Text style={styles.nextText}>{last ? 'Get started' : 'Next'}</Text>
-        </Pressable>
+          style={{ marginTop: 22 }}
+        />
       </View>
     </View>
   );
 }
 
 export default function OnboardingScreen() {
-  const { neon } = useTheme();
   const [phase, setPhase] = useState<'video' | 'slides'>('video');
   const [current, setCurrent] = useState(0);
 
@@ -181,7 +216,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: phase === 'video' ? '#000' : neon.bg }]}>
+    <View style={[styles.container, { backgroundColor: phase === 'video' ? '#000' : 'transparent' }]}>
       {phase === 'video' ? (
         <VideoIntroScreen onDone={() => setPhase('slides')} />
       ) : (
@@ -199,25 +234,35 @@ export default function OnboardingScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  topBar: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 24 },
+  topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20 },
+  brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brandName: { fontSize: 15, fontFamily: 'Inter_700Bold' },
   skipLink: { fontSize: 14, fontFamily: 'Inter_600SemiBold', paddingVertical: 6 },
-  pageBody: { flex: 1, paddingHorizontal: 32, justifyContent: 'center' },
-  photoCard: { height: H * 0.34, borderRadius: 24, borderWidth: 1, overflow: 'hidden', marginBottom: 26 },
+  pageBody: { flex: 1, paddingHorizontal: 20, justifyContent: 'center' },
+  photoCard: { height: H * 0.34, borderRadius: 28, borderWidth: 1.5, overflow: 'hidden', marginBottom: 28 },
   photo: { width: '100%', height: '100%' },
-  slideTitle: { fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', letterSpacing: -0.5, lineHeight: 30 },
-  slideDesc: { fontSize: 15.5, fontFamily: 'Inter_400Regular', lineHeight: 24, marginTop: 12 },
-  bottomRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 8 },
-  dots: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  dot: { height: 7, borderRadius: 4 },
-  nextBtn: { borderRadius: 12, paddingHorizontal: 28, paddingVertical: 14 },
-  nextText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  photoFade: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '45%' },
+  counter: { position: 'absolute', top: 14, left: 14, borderWidth: 1, borderRadius: 14, paddingHorizontal: 10, paddingVertical: 5 },
+  counterText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', letterSpacing: 0.4 },
+  slideTitle: { fontSize: 30, lineHeight: 36, fontFamily: 'PlayfairDisplay_700Bold', letterSpacing: -0.5, textAlign: 'center' },
+  slideDesc: { fontSize: 15, lineHeight: 22, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 12, maxWidth: 320, alignSelf: 'center' },
+  bottom: { paddingHorizontal: 20, paddingTop: 8 },
+  dots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  dot: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  videoScrim: { position: 'absolute', top: 0, left: 0, right: 0, height: 120 },
   videoSkip: {
     position: 'absolute',
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 9999,
+    right: 16,
+    height: 34,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingLeft: 16,
+    paddingRight: 10,
+    borderRadius: 17,
+    backgroundColor: 'rgba(10,21,86,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.25)',
   },
-  skipText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_500Medium' },
+  skipText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 });

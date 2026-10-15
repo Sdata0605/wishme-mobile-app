@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import { SplashView } from '@/components/auth/SplashView';
 
 const STORAGE_ONBOARDING = '@wishme/onboarding_seen';
 const STORAGE_USER = '@wishme/user';
@@ -40,9 +40,5 @@ export default function Index() {
     resolve();
   }, []);
 
-  return (
-    <View style={{ flex: 1, backgroundColor: '#0A0D14', alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator size="large" color="#7B5CFA" />
-    </View>
-  );
+  return <SplashView />;
 }
