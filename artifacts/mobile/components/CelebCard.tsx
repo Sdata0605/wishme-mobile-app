@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import React from 'react';
 import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from '@/components/Icon';
-import type { Celebrity } from '@/constants/mockData';
+import type { Celebrity } from '@/constants/celebrities';
 import { useTheme } from '@/context/ThemeContext';
 
 interface CelebCardProps {

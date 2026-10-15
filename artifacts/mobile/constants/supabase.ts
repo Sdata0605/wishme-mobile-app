@@ -1,5 +1,14 @@
-export const SUPABASE_URL = 'https://eqikeuqwbphwongtfzhe.supabase.co';
+/**
+ * Supabase connection and the one fetch wrapper every request goes through.
+ *
+ * The URL and anon key can be overridden per build with `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+ * (see .env.example), so a staging project can be used without editing code. Expo inlines these at bundle time,
+ * which is why they are read with the full `process.env.EXPO_PUBLIC_*` spelling and not destructured.
+ */
+
+export const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://eqikeuqwbphwongtfzhe.supabase.co';
 export const SUPABASE_ANON_KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y';
 
 const FETCH_TIMEOUT_MS = 20_000;
