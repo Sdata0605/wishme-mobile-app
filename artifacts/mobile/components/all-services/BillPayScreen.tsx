@@ -141,9 +141,12 @@ const use_md = () => useThemedStyles(make_md);
 
 export function BillPayScreen({
   kind,
+  initialProviderId,
   onBack,
 }: {
   kind: BillKind;
+  /** A provider id from billData to pre-select (from a saved shortcut); an id that is not in this kind's list is ignored. */
+  initialProviderId?: string;
   onBack: () => void;
 }) {
   const st = use_st();
@@ -155,7 +158,9 @@ export function BillPayScreen({
   const [mode, setMode] = useState<'boards' | 'apartments'>('boards');
   const [gasMode, setGasMode] = useState<'piped' | 'cylinder'>('piped');
   const [prepaid, setPrepaid] = useState(true);
-  const [provider, setProvider] = useState<BillProvider | null>(null);
+  const [provider, setProvider] = useState<BillProvider | null>(
+    () => providersFor(kind).find((p) => p.id === initialProviderId) ?? null,
+  );
   const [consumerId, setConsumerId] = useState('');
   const [amount, setAmount] = useState('');
   const [pickerOpen, setPickerOpen] = useState(false);

@@ -20,7 +20,6 @@ export default function AllServicesTab() {
           onOpenBills={() => open('bills')}
           onOpenRecharge={() => open('recharge')}
           onOpenFinance={() => open('finance')}
-          onOpenWallet={() => router.push('/wallet')}
         />
       </View>
     </AmbientBackground>

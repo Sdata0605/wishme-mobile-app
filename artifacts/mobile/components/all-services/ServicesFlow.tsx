@@ -113,9 +113,12 @@ function isoToShortLabel(iso: string) {
 export function ServicesFlow({
   initialView,
   initialBillKind,
+  initialProviderId,
 }: {
   initialView: ServiceView;
   initialBillKind?: BillKind;
+  /** Pre-selects this provider (a billData provider id) in the pay form opened for `initialBillKind`. */
+  initialProviderId?: string;
 }) {
   const styles = use_styles();
   const router = useRouter();
@@ -230,15 +233,8 @@ export function ServicesFlow({
   useEffect(() => {
     setView(initialView);
     if (initialBillKind) setBillKind(initialBillKind);
-    if (initialView === 'billPay') {
-      setHubReturn((prev) => ({ ...prev, billPay: 'hub' }));
-    } else if (
-      initialView === 'flights' ||
-      initialView === 'hotels' ||
-      initialView === 'busTickets'
-    ) {
-      setHubReturn((prev) => ({ ...prev, [initialView]: 'hub' }));
-    }
+    // Whatever screen the flow was opened on is its root: Back leaves the flow instead of stepping to a parent screen.
+    setHubReturn((prev) => ({ ...prev, [initialView]: 'hub' }));
   }, [initialView, initialBillKind]);
 
   const goHub = () => {
@@ -648,7 +644,11 @@ export function ServicesFlow({
     if (view === 'billPay') {
       return (
         <View style={rootStyle}>
-          <BillPayScreen kind={billKind} onBack={() => backFrom('billPay')} />
+          <BillPayScreen
+            kind={billKind}
+            initialProviderId={billKind === initialBillKind ? initialProviderId : undefined}
+            onBack={() => backFrom('billPay')}
+          />
         </View>
       );
     }

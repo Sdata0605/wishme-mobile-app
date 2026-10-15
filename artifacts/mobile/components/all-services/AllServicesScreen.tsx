@@ -6,45 +6,40 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { router, type Href } from 'expo-router';
 import { serviceColors as C } from './serviceColors';
 import {
-  Award,
   Banknote,
   Bus,
+  CalendarCheck,
   Car,
   ChevronRight,
   CreditCard,
   Droplet,
   FileText,
   Flame,
-  Gauge,
   Gift,
   Headphones,
   Hotel,
-  Image as ImageIcon,
   Landmark,
   MoreHorizontal,
-  Music,
   Plane,
-  Play,
-  Plus,
-  Receipt,
-  RefreshCw,
   Scan,
   Search,
   ShieldCheck,
   Smartphone,
-  Sparkles,
-  Star,
-  Tag,
   Tv,
   Users,
-  Wallet,
   Zap,
   type LucideIcon,
 } from 'lucide-react-native';
 import { T, useThemedStyles, glass } from './themed';
 import { BrandFill } from './BrandFill';
+import { SavedShortcuts } from './SavedShortcuts';
+import type { ShortcutCategory } from './shortcuts';
+
+/** The filter chips under the search bar. 'all' shows everything. */
+type ServiceFilter = 'all' | ShortcutCategory;
 
 
 
@@ -89,22 +84,27 @@ const use_srch = () => useThemedStyles(make_srch);
 
 // ─── Category Filter Row ──────────────────────────────────────────────────────
 interface Filter {
+  key: ServiceFilter;
   label: string;
   Icon: LucideIcon;
 }
 
 const FILTERS: Filter[] = [
-  { label: 'All', Icon: MoreHorizontal },
-  { label: 'Wishes', Icon: ShieldCheck },
-  { label: 'Bills', Icon: FileText },
-  { label: 'Recharge', Icon: Zap },
-  { label: 'Travel', Icon: Plane },
-  { label: 'Wallet', Icon: Wallet },
+  { key: 'all', label: 'All', Icon: MoreHorizontal },
+  { key: 'bills', label: 'Bills', Icon: FileText },
+  { key: 'recharge', label: 'Recharge', Icon: Zap },
+  { key: 'travel', label: 'Travel', Icon: Plane },
+  { key: 'finance', label: 'Finance', Icon: Landmark },
 ];
 
-function CategoryFilter() {
+function CategoryFilter({
+  active,
+  onChange,
+}: {
+  active: ServiceFilter;
+  onChange: (next: ServiceFilter) => void;
+}) {
   const filt = use_filt();
-  const [active, setActive] = useState(0);
   return (
     <ScrollView
       horizontal
@@ -112,12 +112,12 @@ function CategoryFilter() {
       contentContainerStyle={filt.row}
       style={{ marginTop: 12 }}
     >
-      {FILTERS.map((f, i) => {
-        const isActive = i === active;
+      {FILTERS.map((f) => {
+        const isActive = f.key === active;
         return (
           <TouchableOpacity
-            key={f.label}
-            onPress={() => setActive(i)}
+            key={f.key}
+            onPress={() => onChange(f.key)}
             style={[filt.chip, isActive && filt.chipActive]}
             activeOpacity={0.8}
           >
@@ -166,27 +166,17 @@ interface SubItem {
 
 interface Category {
   title: string;
+  filter: ShortcutCategory;
   color: string;
   Icon: LucideIcon;
   desc: string;
   subs: SubItem[];
-  badge?: string;
 }
 
 const CATEGORIES: Category[] = [
   {
-    title: 'Wishes',
-    color: T(C.purple, 'fg'),
-    Icon: Gift,
-    desc: 'Celebrate every special moment',
-    subs: [
-      { label: 'Celebrity\nWishes', Icon: Star },
-      { label: 'AI\nGreetings', Icon: Sparkles },
-      { label: 'Video\nWishes', Icon: Play },
-    ],
-  },
-  {
     title: 'Bills',
+    filter: 'bills',
     color: T(C.orange, 'fg'),
     Icon: FileText,
     desc: 'Electricity, water & gas only',
@@ -198,6 +188,7 @@ const CATEGORIES: Category[] = [
   },
   {
     title: 'Recharge',
+    filter: 'recharge',
     color: T(C.orange, 'fg'),
     Icon: Smartphone,
     desc: 'Instant recharges in a few clicks',
@@ -209,6 +200,7 @@ const CATEGORIES: Category[] = [
   },
   {
     title: 'Travel',
+    filter: 'travel',
     color: T(C.purple, 'fg'),
     Icon: Plane,
     desc: 'Book travel at best prices',
@@ -219,18 +211,8 @@ const CATEGORIES: Category[] = [
     ],
   },
   {
-    title: 'Wallet',
-    color: T(C.purple, 'fg'),
-    Icon: Wallet,
-    desc: 'Manage money & make payments',
-    subs: [
-      { label: 'Add\nMoney', Icon: Plus },
-      { label: 'Transactions', Icon: Receipt },
-      { label: 'Referrals', Icon: Gift },
-    ],
-  },
-  {
     title: 'Financial\nServices',
+    filter: 'finance',
     color: T(C.navy, 'fg'),
     Icon: Landmark,
     desc: 'Loans, cards & more services',
@@ -238,29 +220,6 @@ const CATEGORIES: Category[] = [
       { label: 'Loan\nEMI', Icon: Banknote },
       { label: 'Credit\nCard Bill', Icon: CreditCard },
       { label: 'Insurance', Icon: ShieldCheck },
-    ],
-  },
-  {
-    title: 'AI Studio',
-    color: T(C.purpleLight, 'fg'),
-    Icon: Sparkles,
-    desc: 'Create unique content with AI',
-    badge: 'New',
-    subs: [
-      { label: 'AI\nGreetings', Icon: Sparkles },
-      { label: 'AI\nImages', Icon: ImageIcon },
-      { label: 'AI\nMusic', Icon: Music },
-    ],
-  },
-  {
-    title: 'Rewards',
-    color: T(C.orange, 'fg'),
-    Icon: Gift,
-    desc: 'Earn points & exciting rewards',
-    subs: [
-      { label: 'My\nPoints', Icon: Award },
-      { label: 'Redeem\nNow', Icon: Gift },
-      { label: 'Offers', Icon: Tag },
     ],
   },
 ];
@@ -276,11 +235,6 @@ function CategoryCard({ item, onPress }: { item: Category; onPress?: () => void 
     >
       <View style={cat.cardTop}>
         <Text style={[cat.cardTitle, { color: T(item.color, 'fg') }]}>{item.title}</Text>
-        {item.badge && (
-          <View style={cat.newBadge}>
-            <Text style={cat.newBadgeText}>{item.badge}</Text>
-          </View>
-        )}
       </View>
 
       <View style={[cat.iconBox, { backgroundColor: item.color + '15' }]}>
@@ -312,27 +266,26 @@ function CategoryCard({ item, onPress }: { item: Category; onPress?: () => void 
 }
 
 function ServiceGrid({
+  filter,
   onOpenTravel,
   onOpenBills,
   onOpenRecharge,
   onOpenFinance,
-  onOpenWallet,
 }: {
+  filter: ServiceFilter;
   onOpenTravel?: () => void;
   onOpenBills?: () => void;
   onOpenRecharge?: () => void;
   onOpenFinance?: () => void;
-  onOpenWallet?: () => void;
 }) {
   const cat = use_cat();
-  const openFor = (title: string) => {
-    if (title === 'Travel') return onOpenTravel;
-    if (title === 'Bills') return onOpenBills;
-    if (title === 'Recharge') return onOpenRecharge;
-    if (title === 'Financial\nServices') return onOpenFinance;
-    if (title === 'Wallet') return onOpenWallet;
-    return undefined;
+  const openFor = (c: Category) => {
+    if (c.filter === 'travel') return onOpenTravel;
+    if (c.filter === 'bills') return onOpenBills;
+    if (c.filter === 'recharge') return onOpenRecharge;
+    return onOpenFinance;
   };
+  const shown = CATEGORIES.filter((c) => filter === 'all' || c.filter === filter);
 
   return (
     <View style={cat.section}>
@@ -344,8 +297,8 @@ function ServiceGrid({
         </TouchableOpacity>
       </View>
       <View style={cat.grid}>
-        {CATEGORIES.map((c) => (
-          <CategoryCard key={c.title} item={c} onPress={openFor(c.title)} />
+        {shown.map((c) => (
+          <CategoryCard key={c.title} item={c} onPress={openFor(c)} />
         ))}
       </View>
     </View>
@@ -393,17 +346,6 @@ const make_cat = () => StyleSheet.create({
     justifyContent: 'space-between',
   },
   cardTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
-  newBadge: {
-    backgroundColor: T('#EF4444', 'bg'),
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  newBadgeText: {
-    color: T(C.white, 'fg'),
-    fontSize: 9,
-    fontFamily: 'Inter_600SemiBold',
-  },
   iconBox: {
     width: 48,
     height: 48,
@@ -454,109 +396,6 @@ const make_cat = () => StyleSheet.create({
   },
 });
 const use_cat = () => useThemedStyles(make_cat);
-
-// ─── Saved Shortcuts ──────────────────────────────────────────────────────────
-interface Shortcut {
-  brand: string;
-  sub: string;
-  color: string;
-  bg: string;
-}
-
-const SHORTCUTS: Shortcut[] = [
-  { brand: 'BESCOM', sub: 'Electricity', color: '#F59E0B', bg: '#F5F0FF' },
-  { brand: 'airtel', sub: 'Mobile', color: '#E4002B', bg: '#FEE2E2' },
-  { brand: 'IndiGo', sub: 'Flights', color: '#0B1F6B', bg: '#E0E7FF' },
-  { brand: 'HDFC', sub: 'Credit Card', color: '#004B8D', bg: '#DBEAFE' },
-  { brand: 'amazon', sub: 'Add Money', color: '#232F3E', bg: '#EDEEF1' },
-];
-
-function SavedShortcuts() {
-  const sc = use_sc();
-  return (
-    <View style={sc.section}>
-      <View style={sc.head}>
-        <Text style={sc.title}>Saved Shortcuts</Text>
-        <TouchableOpacity>
-          <Text style={sc.manage}>Manage</Text>
-        </TouchableOpacity>
-      </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={sc.row}
-      >
-        {SHORTCUTS.map((s) => (
-          <TouchableOpacity key={s.brand} style={sc.item} activeOpacity={0.8}>
-            <View style={[sc.badge, { backgroundColor: T(s.bg, 'bg') }]}>
-              <Text style={[sc.badgeText, { color: T(s.color, 'fg') }]} numberOfLines={1}>
-                {s.brand}
-              </Text>
-            </View>
-            <Text style={sc.itemSub} numberOfLines={1}>
-              {s.sub}
-            </Text>
-          </TouchableOpacity>
-        ))}
-        <TouchableOpacity style={sc.item} activeOpacity={0.8}>
-          <View style={sc.addBadge}>
-            <Plus size={22} color={T(C.orange, 'fg')} />
-          </View>
-          <Text style={sc.itemSub}>Add New</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
-  );
-}
-
-const make_sc = () => StyleSheet.create({
-  section: {
-    backgroundColor: T(C.white, 'bg'),
-    marginTop: 16,
-    marginHorizontal: 14,
-    borderRadius: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: T(C.border, 'border'),
-   ...glass(22), },
-  head: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 14,
-    marginBottom: 12,
-  },
-  title: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
-  manage: { fontSize: 13, fontFamily: 'Inter_600SemiBold', color: T(C.purpleLight, 'fg') },
-  row: { paddingHorizontal: 14, gap: 16 },
-  item: { alignItems: 'center', width: 60, gap: 6 },
-  badge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: { fontSize: 11, fontFamily: 'Inter_700Bold' },
-  itemSub: {
-    fontSize: 10,
-    color: T(C.textLight, 'fg'),
-    fontFamily: 'Inter_400Regular',
-    textAlign: 'center',
-  },
-  addBadge: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 1.5,
-    borderColor: T(C.orange, 'border'),
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
-const use_sc = () => useThemedStyles(make_sc);
 
 // ─── Cashback Banner ──────────────────────────────────────────────────────────
 function CashbackBanner() {
@@ -645,14 +484,23 @@ interface ExploreItem {
   label: string;
   Icon: LucideIcon;
   color: string;
+  open: () => void;
 }
 
+const openService = (params: Record<string, string>) =>
+  router.push({ pathname: '/services', params } as Href);
+
 const EXPLORE: ExploreItem[] = [
-  { label: 'Insurance', Icon: ShieldCheck, color: T(C.green, 'fg') },
-  { label: 'Credit Score', Icon: Gauge, color: T(C.purpleLight, 'fg') },
-  { label: 'Gift Cards', Icon: Gift, color: T(C.orange, 'fg') },
-  { label: 'Subscriptions', Icon: RefreshCw, color: '#EF4444' },
-  { label: 'More Services', Icon: MoreHorizontal, color: T(C.textLight, 'fg') },
+  { label: 'Scan & Pay', Icon: Scan, color: T(C.purpleLight, 'fg'), open: () => router.push('/(tabs)/scan-pay') },
+  {
+    label: 'Insurance',
+    Icon: ShieldCheck,
+    color: T(C.green, 'fg'),
+    open: () => openService({ start: 'billPay', kind: 'insurance' }),
+  },
+  { label: 'My Bookings', Icon: CalendarCheck, color: T(C.orange, 'fg'), open: () => router.push('/bookings') },
+  { label: 'Wish a Friend', Icon: Gift, color: '#EF4444', open: () => router.push('/wish-friend' as Href) },
+  { label: 'More Services', Icon: MoreHorizontal, color: T(C.textLight, 'fg'), open: () => router.navigate('/hub') },
 ];
 
 function ExploreMore() {
@@ -666,7 +514,7 @@ function ExploreMore() {
         contentContainerStyle={ex.row}
       >
         {EXPLORE.map((e) => (
-          <TouchableOpacity key={e.label} style={ex.card} activeOpacity={0.85}>
+          <TouchableOpacity key={e.label} style={ex.card} activeOpacity={0.85} onPress={e.open}>
             <View style={[ex.iconBg, { backgroundColor: e.color + '15' }]}>
               <e.Icon size={20} color={T(e.color, 'fg')} />
             </View>
@@ -780,15 +628,14 @@ export function AllServicesScreen({
   onOpenBills,
   onOpenRecharge,
   onOpenFinance,
-  onOpenWallet,
 }: {
   onOpenTravel?: () => void;
   onOpenBills?: () => void;
   onOpenRecharge?: () => void;
   onOpenFinance?: () => void;
-  onOpenWallet?: () => void;
 }) {
-  const styles = use_styles();
+  const styles = useScreenStyles();
+  const [filter, setFilter] = useState<ServiceFilter>('all');
   return (
     <ScrollView
       style={styles.scroll}
@@ -797,17 +644,17 @@ export function AllServicesScreen({
       bounces
     >
       <SearchBar />
-      <CategoryFilter />
+      <CategoryFilter active={filter} onChange={setFilter} />
       <ServiceGrid
+        filter={filter}
         onOpenTravel={onOpenTravel}
         onOpenBills={onOpenBills}
         onOpenRecharge={onOpenRecharge}
         onOpenFinance={onOpenFinance}
-        onOpenWallet={onOpenWallet}
       />
-      <SavedShortcuts />
+      <SavedShortcuts filter={filter} />
       <CashbackBanner />
-      <ExploreMore />
+      {filter === 'all' && <ExploreMore />}
       <TrustBadges />
       <View style={{ height: 30 }} />
     </ScrollView>
@@ -818,4 +665,4 @@ const make_styles = () => StyleSheet.create({
   scroll: { flex: 1 },
   content: { paddingBottom: 110 },
 });
-const use_styles = () => useThemedStyles(make_styles);
+const useScreenStyles = () => useThemedStyles(make_styles);

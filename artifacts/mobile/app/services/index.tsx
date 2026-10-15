@@ -34,7 +34,7 @@ const VALID_VIEWS = new Set<ServiceView>([
 ]);
 
 export default function ServicesRoute() {
-  const params = useLocalSearchParams<{ start?: string; kind?: string }>();
+  const params = useLocalSearchParams<{ start?: string; kind?: string; provider?: string }>();
 
   const initialView = useMemo<ServiceView>(() => {
     const start = params.start;
@@ -46,5 +46,13 @@ export default function ServicesRoute() {
     return params.kind as BillKind | undefined;
   }, [params.kind]);
 
-  return <ServicesFlow initialView={initialView} initialBillKind={initialBillKind} />;
+  // Keyed on the params so a shortcut opened while the flow is still mounted starts fresh instead of showing old state.
+  return (
+    <ServicesFlow
+      key={`${params.start}|${params.kind}|${params.provider}`}
+      initialView={initialView}
+      initialBillKind={initialBillKind}
+      initialProviderId={params.provider}
+    />
+  );
 }
