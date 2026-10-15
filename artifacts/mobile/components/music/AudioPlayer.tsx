@@ -59,8 +59,11 @@ export function AudioPlayerCard({ title, audioUri, badge }: { title: string; aud
       });
       soundRef.current = sound;
       setPlaying(true);
-    } catch {
+    } catch (err) {
       setPlaying(false);
+      const reason = err instanceof Error ? err.message : String(err);
+      console.warn('[music] playback failed', audioUri.slice(0, 120), reason);
+      Alert.alert('Could not play audio', reason);
     } finally {
       setLoading(false);
     }
