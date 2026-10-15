@@ -58,12 +58,18 @@ export function useLovedCelebrities() {
 
   const isLoved = useCallback((celebrityId: string) => lovedIds.has(celebrityId), [lovedIds]);
 
-  /** Flips the heart. Returns the new state, or null when signed out / still loading. */
-  const toggle = useCallback((celebrityId: string): boolean | null => {
+  /** Flips the heart once it is saved. Resolves to the new state, or null when signed out / still loading. */
+  const toggle = useCallback(async (celebrityId: string): Promise<boolean | null> => {
     if (!userId || store.loadedFor !== userId || !store.ready) return null;
     const has = store.ids.includes(celebrityId);
-    store.ids = has ? store.ids.filter(x => x !== celebrityId) : [celebrityId, ...store.ids];
-    AsyncStorage.setItem(keyFor(userId), JSON.stringify(store.ids)).catch(() => {});
+    const next = has ? store.ids.filter(x => x !== celebrityId) : [celebrityId, ...store.ids];
+    try {
+      await AsyncStorage.setItem(keyFor(userId), JSON.stringify(next));
+    } catch {
+      return null;
+    }
+    if (store.loadedFor !== userId) return null;
+    store.ids = next;
     notify();
     return !has;
   }, [userId]);

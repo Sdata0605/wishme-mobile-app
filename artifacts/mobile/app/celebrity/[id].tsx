@@ -135,6 +135,7 @@ export default function CelebrityDetailScreen() {
   }, [fetchCelebrity]);
 
   const { isLoved, toggle: toggleLoved } = useLovedCelebrities();
+  const [lovedSaving, setLovedSaving] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subLoading, setSubLoading] = useState(false);
   const [pricingPrice, setPricingPrice] = useState<number | null>(null);
@@ -285,12 +286,20 @@ export default function CelebrityDetailScreen() {
     }
   };
 
-  const handleToggleLoved = () => {
+  const handleToggleLoved = async () => {
     if (!user) {
       router.push('/(auth)');
       return;
     }
-    if (id && toggleLoved(id) !== null) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    if (!id || lovedSaving) return;
+    setLovedSaving(true);
+    try {
+      // Hold the spinner a moment so the save is visible even though it finishes fast.
+      const [result] = await Promise.all([toggleLoved(id), new Promise(r => setTimeout(r, 600))]);
+      if (result !== null) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    } finally {
+      setLovedSaving(false);
+    }
   };
 
   // Back from the wallet with the sheet waiting: refresh the balance and reopen it on the payment step.
@@ -517,9 +526,14 @@ export default function CelebrityDetailScreen() {
             style={[styles.favBtn, { top: insets.top + 12 }]}
             accessibilityRole="button"
             accessibilityLabel={loved ? 'Remove from favorites' : 'Add to favorites'}
-            accessibilityState={{ selected: loved }}
+            accessibilityState={{ selected: loved, busy: lovedSaving }}
+            disabled={lovedSaving}
           >
-            <Icon name="heart" size={22} color={loved ? '#EF4444' : '#fff'} filled={loved} />
+            {lovedSaving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Icon name="heart" size={22} color={loved ? '#EF4444' : '#fff'} filled={loved} />
+            )}
           </TouchableOpacity>
         </View>
 
