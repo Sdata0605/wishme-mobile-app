@@ -19,6 +19,7 @@ import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
+import { NeonCard } from '@/components/neon/NeonCard';
 
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
 
@@ -71,8 +72,20 @@ interface LastMessage {
   sender_type: string;
 }
 
+interface SubscriptionRow {
+  celebrity: Celebrity | null;
+}
+
+/** One line in the list: a celebrity the user is subscribed to, or an older conversation, with its chat if it exists. */
+interface ChatRow {
+  key: string;
+  celebrity: Celebrity;
+  conversation: Conversation | null;
+  subscribed: boolean;
+}
+
 export default function MessagesScreen() {
-  const { colors } = useTheme();
+  const { colors, neon } = useTheme();
   const { user, session } = useAuth();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -81,30 +94,54 @@ export default function MessagesScreen() {
   const accessToken = session?.access_token ?? null;
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [subscribed, setSubscribed] = useState<Celebrity[]>([]);
   const [lastMessages, setLastMessages] = useState<Record<string, LastMessage>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
+  const [startingId, setStartingId] = useState<string | null>(null);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchConversations = useCallback(async () => {
     if (!profileId || !accessToken) {
       setConversations([]);
+      setSubscribed([]);
       return;
     }
     try {
-      const res = await supabaseFetch(
-        `/rest/v1/conversations?select=*,celebrity:celebrities!conversations_celebrity_id_fkey(id,name,image_url)&user_id=eq.${profileId}&order=last_message_at.desc`,
-        {},
-        accessToken,
-      );
+      const [res, subRes] = await Promise.all([
+        supabaseFetch(
+          `/rest/v1/conversations?select=*,celebrity:celebrities!conversations_celebrity_id_fkey(id,name,image_url)&user_id=eq.${profileId}&order=last_message_at.desc`,
+          {},
+          accessToken,
+        ),
+        supabaseFetch(
+          `/rest/v1/celebrity_favorites?select=celebrity:celebrities(id,name,image_url)&user_id=eq.${profileId}&status=eq.active&order=created_at.desc`,
+          {},
+          accessToken,
+        ),
+      ]);
       if (!res.ok) {
         Alert.alert('Error', `Could not load conversations (${res.status}). Please try again.`);
         return;
       }
       const convs = await res.json() as Conversation[];
       setConversations(convs ?? []);
+
+      // Subscribed celebrities are the ones the user can start a new chat with. If this call fails, keep the old list.
+      if (subRes.ok) {
+        const rows = await subRes.json() as SubscriptionRow[];
+        const seen = new Set<string>();
+        const celebs: Celebrity[] = [];
+        for (const r of rows ?? []) {
+          if (r.celebrity && !seen.has(r.celebrity.id)) {
+            seen.add(r.celebrity.id);
+            celebs.push(r.celebrity);
+          }
+        }
+        setSubscribed(celebs);
+      }
 
       // Fetch last message for each conversation in parallel
       if (convs && convs.length > 0) {
@@ -154,61 +191,150 @@ export default function MessagesScreen() {
     setRefreshing(false);
   }, [fetchConversations]);
 
-  const filtered = conversations.filter((c) =>
-    c.celebrity?.name?.toLowerCase().includes(search.toLowerCase()),
-  );
+  // Subscribed celebrities first-class: each appears once, with its chat when there is one. Chats with celebrities the
+  // user is not subscribed to (e.g. started by sending a wish) stay in the list too.
+  const rows: ChatRow[] = (() => {
+    const byCeleb = new Map<string, Conversation>();
+    conversations.forEach((c) => byCeleb.set(c.celebrity_id, c));
+    const subIds = new Set(subscribed.map((c) => c.id));
 
-  const renderItem = ({ item }: { item: Conversation }) => {
-    const avatarUri = imageUri(item.celebrity?.image_url);
-    const lastMsg = lastMessages[item.id];
+    const out: ChatRow[] = subscribed.map((celebrity) => ({
+      key: celebrity.id,
+      celebrity,
+      conversation: byCeleb.get(celebrity.id) ?? null,
+      subscribed: true,
+    }));
+    conversations.forEach((c) => {
+      if (!subIds.has(c.celebrity_id) && c.celebrity) {
+        out.push({ key: c.celebrity_id, celebrity: c.celebrity, conversation: c, subscribed: false });
+      }
+    });
+
+    // Chats that have messages come first, newest on top; celebrities not yet messaged follow, A to Z.
+    const talked = (r: ChatRow) => (r.conversation && r.conversation.message_count > 0 ? 1 : 0);
+    return out.sort((a, b) => {
+      if (talked(a) !== talked(b)) return talked(b) - talked(a);
+      if (talked(a) === 1) {
+        return (b.conversation!.last_message_at ?? '').localeCompare(a.conversation!.last_message_at ?? '');
+      }
+      return a.celebrity.name.localeCompare(b.celebrity.name);
+    });
+  })();
+
+  const filtered = rows.filter((r) => r.celebrity.name?.toLowerCase().includes(search.toLowerCase()));
+
+  const openChat = (conversationId: string) =>
+    router.push({ pathname: '/chat/[id]', params: { id: conversationId } });
+
+  // Opens the chat with a subscribed celebrity, creating the conversation the first time. There is one conversation
+  // per user and celebrity, so if it already exists (e.g. created by a wish) it is reused.
+  const startChat = async (celebrity: Celebrity) => {
+    if (!profileId || !accessToken || startingId) return;
+    setStartingId(celebrity.id);
+    try {
+      let conversationId: string | undefined;
+      const created = await supabaseFetch(
+        '/rest/v1/conversations',
+        {
+          method: 'POST',
+          headers: { Prefer: 'return=representation' } as Record<string, string>,
+          body: JSON.stringify({ user_id: profileId, celebrity_id: celebrity.id }),
+        },
+        accessToken,
+      );
+      if (created.ok) {
+        const inserted = await created.json() as Array<{ id: string }>;
+        conversationId = inserted?.[0]?.id;
+      } else {
+        const existing = await supabaseFetch(
+          `/rest/v1/conversations?select=id&user_id=eq.${profileId}&celebrity_id=eq.${celebrity.id}&limit=1`,
+          {},
+          accessToken,
+        );
+        if (existing.ok) {
+          const found = await existing.json() as Array<{ id: string }>;
+          conversationId = found?.[0]?.id;
+        }
+      }
+      if (!conversationId) {
+        Alert.alert('Error', `Could not start a chat with ${celebrity.name}. Please try again.`);
+        return;
+      }
+      openChat(conversationId);
+      fetchConversations();
+    } catch {
+      Alert.alert('Error', 'Could not start the chat. Please check your connection.');
+    } finally {
+      setStartingId(null);
+    }
+  };
+
+  const renderItem = ({ item }: { item: ChatRow }) => {
+    const { celebrity, conversation } = item;
+    const avatarUri = imageUri(celebrity.image_url);
+    const lastMsg = conversation ? lastMessages[conversation.id] : undefined;
     const preview = previewText(lastMsg?.message_text);
-    const isClosed = item.is_closed;
+    const isClosed = conversation?.is_closed ?? false;
+    const hasChat = !!conversation && conversation.message_count > 0;
+    const unread = conversation?.unread_count_user ?? 0;
+    const starting = startingId === celebrity.id;
 
     return (
       <TouchableOpacity
-        style={[s.row, { borderBottomColor: colors.border, opacity: isClosed ? 0.65 : 1 }]}
-        onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.id } })}
+        style={{ opacity: isClosed ? 0.65 : 1 }}
+        onPress={() => (conversation ? openChat(conversation.id) : startChat(celebrity))}
+        disabled={starting}
         activeOpacity={0.75}
       >
-        <View style={s.avatarWrap}>
-          {avatarUri ? (
-            <Image source={{ uri: avatarUri }} style={s.avatar} contentFit="cover" />
-          ) : (
-            <View style={[s.avatarPlaceholder, { backgroundColor: colors.border }]}>
-              <Icon name="heart" size={20} color={colors.mutedForeground} />
-            </View>
-          )}
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <View style={s.rowTop}>
-            <Text style={[s.name, { color: colors.foreground }]} numberOfLines={1}>
-              {item.celebrity?.name ?? 'Unknown'}
-            </Text>
-            <Text style={[s.time, { color: colors.mutedForeground }]}>
-              {relativeTime(item.last_message_at)}
-            </Text>
-          </View>
-          <View style={s.rowBottom}>
-            <Text
-              style={[
-                s.lastMsg,
-                { color: isClosed ? colors.mutedForeground : colors.mutedForeground, flex: 1 },
-                isClosed && { fontStyle: 'italic' },
-              ]}
-              numberOfLines={1}
-            >
-              {isClosed ? '🔒 Conversation closed' : preview || 'No messages yet'}
-            </Text>
-            {item.unread_count_user > 0 && !isClosed && (
-              <View style={[s.badge, { backgroundColor: colors.primary }]}>
-                <Text style={s.badgeText}>
-                  {item.unread_count_user > 99 ? '99+' : item.unread_count_user}
-                </Text>
+        <NeonCard radius={18} style={s.row}>
+          <View style={s.avatarWrap}>
+            {avatarUri ? (
+              <Image source={{ uri: avatarUri }} style={s.avatar} contentFit="cover" />
+            ) : (
+              <View style={[s.avatarPlaceholder, { backgroundColor: colors.border }]}>
+                <Icon name="heart" size={20} color={colors.mutedForeground} />
               </View>
             )}
           </View>
-        </View>
+
+          <View style={{ flex: 1 }}>
+            <View style={s.rowTop}>
+              <Text style={[s.name, { color: colors.foreground }]} numberOfLines={1}>
+                {celebrity.name ?? 'Unknown'}
+              </Text>
+              {hasChat && (
+                <Text style={[s.time, { color: colors.mutedForeground }]}>
+                  {relativeTime(conversation?.last_message_at)}
+                </Text>
+              )}
+            </View>
+            <View style={s.rowBottom}>
+              <Text
+                style={[
+                  s.lastMsg,
+                  { color: hasChat || isClosed ? colors.mutedForeground : neon.cyan, flex: 1 },
+                  isClosed && { fontStyle: 'italic' },
+                ]}
+                numberOfLines={1}
+              >
+                {isClosed ? '🔒 Conversation closed' : hasChat ? preview : item.subscribed ? 'Say hello 👋' : 'No messages yet'}
+              </Text>
+              {unread > 0 && !isClosed && (
+                <View style={[s.badge, { backgroundColor: colors.primary }]}>
+                  <Text style={s.badgeText}>{unread > 99 ? '99+' : unread}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+
+          {starting ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : !hasChat && !isClosed ? (
+            <View style={[s.startBtn, { backgroundColor: colors.primary }]}>
+              <Icon name="send" size={14} color="#fff" />
+            </View>
+          ) : null}
+        </NeonCard>
       </TouchableOpacity>
     );
   };
@@ -248,8 +374,8 @@ export default function MessagesScreen() {
       ) : (
         <FlatList
           data={filtered}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: insets.bottom + 20, flexGrow: 1 }}
+          keyExtractor={(item) => item.key}
+          contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 20, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
@@ -258,17 +384,17 @@ export default function MessagesScreen() {
             <View style={s.emptyWrap}>
               <Icon name="message-circle" size={52} color={colors.mutedForeground} />
               <Text style={[s.emptyTitle, { color: colors.foreground }]}>
-                {search ? 'No conversations found' : 'No conversations yet'}
+                {search ? 'No celebrities found' : 'No subscribed celebrities yet'}
               </Text>
               <Text style={[s.emptyText, { color: colors.mutedForeground }]}>
                 {search
                   ? 'Try a different celebrity name'
-                  : 'Follow a celebrity and start chatting!'}
+                  : 'Subscribe to a celebrity to start messaging them.'}
               </Text>
               {!search && (
                 <TouchableOpacity
                   style={[s.emptyBtn, { backgroundColor: '#7B5CFA15', borderColor: '#7B5CFA40' }]}
-                  onPress={() => router.push('/favorites')}
+                  onPress={() => router.push('/(tabs)/celebrities')}
                   activeOpacity={0.8}
                 >
                   <Icon name="heart" size={15} color="#7B5CFA" />
@@ -313,9 +439,10 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
+    marginHorizontal: 14,
+    marginVertical: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
   rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 3 },
   rowBottom: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -334,6 +461,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 5,
   },
   badgeText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold' },
+  startBtn: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 12 },
   emptyTitle: { fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   emptyText: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', paddingHorizontal: 40 },
