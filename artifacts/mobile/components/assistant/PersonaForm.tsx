@@ -10,7 +10,7 @@ import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -41,15 +41,28 @@ const TAP = 44;
 
 // ─── Voice sample playback ───────────────────────────────────────────────────
 
-/** Plays one voice sample at a time; starting another stops the first. */
+/**
+ * Plays one voice sample at a time.
+ *
+ * A sample takes a moment to load, so the card it was tapped on reports `loadingId` and shows a
+ * spinner. Tapping another card during that wait abandons the first load: each attempt carries a
+ * request number, and a sample that finishes loading after its number is stale is thrown away
+ * unheard instead of starting. Without this, tapping several cards gave no feedback at all and
+ * then played every sample at once.
+ */
 export function useVoiceSamples() {
   const soundRef = useRef<Audio.Sound | null>(null);
+  const requestRef = useRef(0);
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
 
+  /** Stops what is playing and abandons whatever is still loading. */
   const stop = useCallback(async () => {
+    requestRef.current += 1;
     const sound = soundRef.current;
     soundRef.current = null;
     setPlayingId(null);
+    setLoadingId(null);
     if (sound) {
       try {
         await sound.stopAsync();
@@ -66,16 +79,22 @@ export function useVoiceSamples() {
 
   const toggle = useCallback(
     async (voice: VoiceOption) => {
-      if (playingId === voice.id) {
-        await stop();
-        return;
-      }
+      // Tapping the card that is playing, or the one being waited on, means "stop".
+      const sameCard = playingId === voice.id || loadingId === voice.id;
       await stop();
+      if (sameCard) return;
+
+      const request = requestRef.current;
+      setLoadingId(voice.id);
       try {
         await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true });
-        const { sound } = await Audio.Sound.createAsync(voice.sample, { shouldPlay: true });
+        // Loaded paused, so a sample that lost the race never makes a sound.
+        const { sound } = await Audio.Sound.createAsync(voice.sample, { shouldPlay: false });
+        if (requestRef.current !== request) {
+          void sound.unloadAsync().catch(() => {});
+          return;
+        }
         soundRef.current = sound;
-        setPlayingId(voice.id);
         sound.setOnPlaybackStatusUpdate((status) => {
           if (status.isLoaded && status.didJustFinish) {
             if (soundRef.current === sound) {
@@ -85,17 +104,23 @@ export function useVoiceSamples() {
             sound.unloadAsync().catch(() => {});
           }
         });
+        setLoadingId(null);
+        setPlayingId(voice.id);
+        await sound.playAsync();
       } catch {
-        setPlayingId(null);
+        if (requestRef.current === request) {
+          setLoadingId(null);
+          setPlayingId(null);
+        }
       }
     },
-    [playingId, stop],
+    [playingId, loadingId, stop],
   );
 
   // Never keep playing after the screen goes away.
   useEffect(() => () => void stop(), [stop]);
 
-  return { playingId, toggle, stop };
+  return { playingId, loadingId, toggle, stop };
 }
 
 // ─── Shared card chrome ─────────────────────────────────────────────────────
@@ -138,6 +163,7 @@ function VoiceCard({
   index,
   selected,
   playing,
+  loading,
   onSelect,
   onToggleSample,
 }: {
@@ -145,6 +171,7 @@ function VoiceCard({
   index: number;
   selected: boolean;
   playing: boolean;
+  loading: boolean;
   onSelect: () => void;
   onToggleSample: () => void;
 }) {
@@ -201,19 +228,30 @@ function VoiceCard({
         onPress={onToggleSample}
         hitSlop={6}
         accessibilityRole="button"
-        accessibilityLabel={playing ? `Stop the ${voice.id} sample` : `Play the ${voice.id} sample`}
+        accessibilityLabel={
+          loading
+            ? `Loading the ${voice.id} sample`
+            : playing
+              ? `Stop the ${voice.id} sample`
+              : `Play the ${voice.id} sample`
+        }
+        accessibilityState={{ busy: loading }}
         style={({ pressed }) => [
           s.listenBtn,
           {
-            backgroundColor: playing ? accent : isDark ? colors.muted : accent + '14',
-            borderColor: playing ? accent : accent + '55',
+            backgroundColor: playing || loading ? accent : isDark ? colors.muted : accent + '14',
+            borderColor: playing || loading ? accent : accent + '55',
             opacity: pressed ? 0.85 : 1,
           },
         ]}
       >
-        <Icon name={playing ? 'pause' : 'play'} size={13} color={playing ? '#fff' : accent} />
-        <Text style={[s.listenText, { color: playing ? '#fff' : accent }]}>
-          {playing ? 'Playing' : 'Listen'}
+        {loading ? (
+          <ActivityIndicator size="small" color="#fff" style={s.listenSpinner} />
+        ) : (
+          <Icon name={playing ? 'pause' : 'play'} size={13} color={playing ? '#fff' : accent} />
+        )}
+        <Text style={[s.listenText, { color: playing || loading ? '#fff' : accent }]}>
+          {loading ? 'Loading…' : playing ? 'Playing' : 'Listen'}
         </Text>
       </Pressable>
     </Pressable>
@@ -222,7 +260,7 @@ function VoiceCard({
 
 export function VoiceList({ value, onChange }: { value: string; onChange: (id: string) => void }) {
   const { colors } = useTheme();
-  const { playingId, toggle } = useVoiceSamples();
+  const { playingId, loadingId, toggle } = useVoiceSamples();
 
   const group = (gender: VoiceOption['gender'], title: string) => (
     <View key={gender} style={{ marginBottom: 4 }}>
@@ -237,6 +275,7 @@ export function VoiceList({ value, onChange }: { value: string; onChange: (id: s
               index={index}
               selected={value === voice.id}
               playing={playingId === voice.id}
+              loading={loadingId === voice.id}
               onSelect={() => {
                 buzz();
                 onChange(voice.id);
@@ -575,6 +614,8 @@ const s = StyleSheet.create({
     gap: 6,
   },
   listenText: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  // Sized to the play icon it replaces, so the row does not jump while a sample loads.
+  listenSpinner: { width: 13, height: 13 },
   hint: { fontSize: 12.5, lineHeight: 18, fontFamily: 'Inter_400Regular', marginTop: 8 },
 
   nameShell: {
