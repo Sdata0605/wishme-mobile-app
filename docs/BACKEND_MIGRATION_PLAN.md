@@ -4,6 +4,11 @@ Status: proposal, 16 Oct 2026. Nothing here has been built yet. Effort figures a
 full-stack TypeScript developer and are ranges, not commitments; they get firmer after phase A, because the
 edge-function source and the database schema are not in this repository yet.
 
+**Update after the phase A audit (16 Oct 2026):** the export ran. The findings are kept privately with the export,
+outside git, because this repository is public. Their effect on this plan: a short "phase 0" of hardening on Supabase
+comes before phase C, and phases E and F grow by about two weeks. The project has 73 backend functions (webhooks,
+pollers, admin and messaging jobs) and eleven vendors beyond what the app calls directly.
+
 Companion documents:
 
 - [BACKEND_CONTRACT_INVENTORY.md](BACKEND_CONTRACT_INVENTORY.md) lists every endpoint the app calls today

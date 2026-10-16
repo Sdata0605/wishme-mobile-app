@@ -88,8 +88,13 @@ if [ $SKIP_FUNCTIONS -eq 0 ]; then
   LIST="$OUT/functions-list.txt"
   run_step "Edge functions: list" "$LIST" -- functions list --project-ref "$EXPECTED_REF" || true
 
-  # Deployed slugs: table rows look like  <uuid> | NAME | SLUG | STATUS | VERSION | UPDATED_AT
-  DEPLOYED="$(awk -F'|' '/\|/ { gsub(/^[ \t]+|[ \t]+$/, "", $1); gsub(/^[ \t]+|[ \t]+$/, "", $3); if ($1 ~ /^[0-9a-f-]{36}$/) print $3 }' "$LIST" 2>/dev/null | sort -u)"
+  # Deployed slugs. Recent CLIs print JSON ({"functions":[{"slug":...}]}) when not attached to a terminal;
+  # older ones print a table: <uuid> | NAME | SLUG | STATUS | VERSION | UPDATED_AT. Handle both.
+  if grep -q '"slug"' "$LIST" 2>/dev/null; then
+    DEPLOYED="$(grep -o '"slug":"[^"]*"' "$LIST" | sed 's/"slug":"//; s/"$//' | sort -u)"
+  else
+    DEPLOYED="$(awk -F'|' '/\|/ { gsub(/^[ \t]+|[ \t]+$/, "", $1); gsub(/^[ \t]+|[ \t]+$/, "", $3); if ($1 ~ /^[0-9a-f-]{36}$/) print $3 }' "$LIST" 2>/dev/null | sort -u)"
+  fi
   EXPECTED="$(grep -v '^[[:space:]]*#' functions.txt | sed 's/[[:space:]]//g' | grep -v '^$' | sort -u)"
   ALL="$(printf '%s\n%s\n' "$DEPLOYED" "$EXPECTED" | grep -v '^$' | sort -u)"
   log "Deployed: $(printf '%s\n' "$DEPLOYED" | grep -c .); referenced by app: $(printf '%s\n' "$EXPECTED" | grep -c .); union: $(printf '%s\n' "$ALL" | grep -c .)"
@@ -115,11 +120,17 @@ if [ $SKIP_STORAGE -eq 0 ]; then
   BUCKETS="$OUT/storage/buckets.txt"
   run_step "Storage: buckets" "$BUCKETS" -- storage ls ss:/// --experimental --linked || true
   if [ -f "$BUCKETS" ]; then
+    # JSON ({"paths":["bucket/",...]}) from recent CLIs, one name per line from older ones.
+    if grep -q '"paths"' "$BUCKETS"; then
+      sed 's/.*"paths":\[//; s/\].*//' "$BUCKETS" | tr ',' '\n' | tr -d '"' >"$BUCKETS.names"
+    else
+      cp "$BUCKETS" "$BUCKETS.names"
+    fi
     while IFS= read -r raw; do
       b="$(printf '%s' "$raw" | sed -e 's#^ss:///##' -e 's#/*$##' -e 's/^[[:space:]]*//')"
       [ -z "$b" ] && continue
       run_step "Storage: list $b" "$OUT/storage/$b.txt" -- storage ls -r "ss:///$b/" --experimental --linked || true
-    done <"$BUCKETS"
+    done <"$BUCKETS.names"
   fi
 else log "== Storage skipped (--skip-storage)"; fi
 

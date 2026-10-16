@@ -100,9 +100,25 @@ const storagePolicies = [...authStorageSchema.matchAll(/CREATE POLICY "([^"]+)" 
   name: m[1],
   body: m[2].replace(/\s+/g, ' ').trim(),
 }));
-const bucketListing = existsSync(join(outDir, 'storage', 'buckets.txt'))
-  ? read(join('storage', 'buckets.txt')).split(/\r?\n/).map((l) => l.trim().replace(/^ss:\/\/\//, '').replace(/\/+$/, '')).filter(Boolean)
-  : [];
+// Recent CLIs print JSON when not attached to a terminal; older ones print plain lines or tables.
+const tryJson = (text) => {
+  try {
+    return JSON.parse(text.replace(/^﻿/, ''));
+  } catch {
+    return null;
+  }
+};
+const bucketsRaw = read(join('storage', 'buckets.txt'));
+const bucketListing = (tryJson(bucketsRaw)?.paths ?? bucketsRaw.split(/\r?\n/))
+  .map((l) => String(l).trim().replace(/^﻿/, '').replace(/^ss:\/\/\//, '').replace(/\/+$/, ''))
+  .filter(Boolean);
+// Object count per bucket from storage/<bucket>.txt (JSON {"paths":[...]} or one path per line).
+const objectCount = (bucket) => {
+  const text = read(join('storage', `${bucket}.txt`));
+  if (!text) return undefined;
+  const paths = tryJson(text)?.paths ?? text.split(/\r?\n/);
+  return paths.filter((p) => p && !String(p).endsWith('/')).length;
+};
 
 // ------------------------------------------------------------------ edge functions
 const fnDir = join(outDir, 'functions');
@@ -122,10 +138,14 @@ const fnInfo = downloaded.map((slug) => {
   return { slug, files: files.length, lines, env, hosts, tablesTouched, rpcs, usesServiceRole };
 });
 const allEnv = [...new Set(fnInfo.flatMap((f) => f.env))].sort();
-const secretsNames = read('secrets-names.txt')
-  .split(/\r?\n/)
-  .map((l) => l.split('|')[0]?.trim())
-  .filter((n) => n && n !== 'NAME' && /^[A-Z][A-Z0-9_]+$/.test(n));
+// Names only. The JSON form carries a "value" field that is the sha256 digest, never the secret; it is not used.
+const secretsRaw = read('secrets-names.txt');
+const secretsJson = tryJson(secretsRaw);
+const secretsNames = (
+  secretsJson
+    ? (secretsJson.secrets ?? secretsJson).map((s) => s.name)
+    : secretsRaw.split(/\r?\n/).map((l) => l.split('|')[0]?.trim())
+).filter((n) => n && n !== 'NAME' && /^[A-Z][A-Z0-9_]+$/.test(n));
 
 // ------------------------------------------------------------------ cross-checks
 const dumpedTables = [...tables.keys()];
@@ -214,7 +234,7 @@ table(['Job', 'Schedule', 'Command (truncated)'], cronJobs.map((c) => [c.name, c
 md.push('', `Realtime publication (tables the app can subscribe to): ${publication.join(', ') || '_none found in dump_'}`);
 
 h(2, 'Storage');
-table(['Bucket', 'Public', 'Size limit', 'Allowed MIME', 'Used by app'], (buckets.length ? buckets : bucketListing.map((id) => ({ id }))).map((b) => [b.id, b.public === undefined ? '?' : b.public ? 'yes' : 'no', b.fileSizeLimit ?? '', b.allowed ?? '', appBuckets.includes(b.id) ? 'yes' : '']));
+table(['Bucket', 'Public', 'Objects', 'Size limit', 'Allowed MIME', 'Used by app'], (buckets.length ? buckets : bucketListing.map((id) => ({ id }))).map((b) => [b.id, b.public === undefined ? '?' : b.public ? 'yes' : 'no', objectCount(b.id) ?? '?', b.fileSizeLimit === '\\N' ? '' : b.fileSizeLimit ?? '', b.allowed === '\\N' ? '' : b.allowed ?? '', appBuckets.includes(b.id) ? 'yes' : '']));
 md.push('', 'Policies on storage.objects:', '');
 list(storagePolicies.map((p) => `**${p.name}**: \`${p.body.slice(0, 220)}\``));
 

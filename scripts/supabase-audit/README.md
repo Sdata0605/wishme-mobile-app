@@ -25,7 +25,10 @@ token, password or service-role key into a chat window.
 
 ## 1. Install the Supabase CLI on Windows
 
-Pick one. The CLI is a single Go binary; no Docker is needed for anything in this folder.
+Pick one. The CLI is a single Go binary. Keep Docker Desktop running while the export runs: depending on the CLI
+version, `db dump` and `functions download` run their tools in containers. (The 16 Oct run used CLI 2.121.0 with
+Docker Desktop running.) If `supabase login` sits at "Press Enter" without reacting, use
+`supabase login --no-browser`: it prints a link and asks for the code shown on that page.
 
 **Scoop** (recommended if you have or want scoop):
 
@@ -153,7 +156,9 @@ production endpoints), HeyGen, the email provider behind `send-email-otp`, and t
 
 ## Safety notes
 
-- The CLI never prints secret values; `supabase secrets list` shows digests.
+- The CLI never prints secret values; `supabase secrets list` shows digests (in JSON output, the `value` field is the
+  SHA-256 digest, not the secret).
+- Recent CLIs print JSON instead of tables when output is captured. The scripts and `summarize.mjs` read both forms.
 - `out/` and `supabase/` are git-ignored. Before sharing a run with anyone, delete `data.sql` and `data-auth.sql`
   or share only `SUMMARY.md`.
 - The scripts only *read* from the project (`db dump`, `functions download`, `storage ls`, `secrets list`,

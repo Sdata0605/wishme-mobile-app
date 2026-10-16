@@ -131,10 +131,17 @@ if (-not $SkipFunctions) {
   $listFile = Join-Path $out 'functions-list.txt'
   Run-Step 'Edge functions: list' @('functions','list','--project-ref',$ExpectedRef) $listFile | Out-Null
 
-  # Names from the deployed list (table output: ID | NAME | SLUG | STATUS | VERSION | UPDATED_AT).
+  # Names from the deployed list. Recent CLIs print JSON ({"functions":[{"slug":...}]}) when not attached to a
+  # console; older ones print a table (ID | NAME | SLUG | STATUS | VERSION | UPDATED_AT). Handle both.
   $deployed = @()
-  if (Test-Path $listFile) {
-    foreach ($line in Get-Content $listFile) {
+  $raw = if (Test-Path $listFile) { (Get-Content $listFile -Raw) } else { '' }
+  $json = $null
+  try { $json = $raw.TrimStart([char]0xFEFF) | ConvertFrom-Json } catch { $json = $null }
+  if ($json) {
+    $items = if ($json.functions) { $json.functions } else { $json }
+    $deployed = @($items | ForEach-Object { $_.slug } | Where-Object { $_ })
+  } elseif ($raw) {
+    foreach ($line in ($raw -split "`r?`n")) {
       if ($line -notmatch '\|') { continue }
       $cells = $line.Split('|') | ForEach-Object { $_.Trim() }
       if ($cells.Count -ge 3 -and $cells[0] -match '^[0-9a-f-]{36}$') { $deployed += $cells[2] }
@@ -172,8 +179,12 @@ if (-not $SkipStorage) {
   $bucketsFile = Join-Path $out 'storage\buckets.txt'
   Run-Step 'Storage: buckets' @('storage','ls','ss:///','--experimental','--linked') $bucketsFile | Out-Null
   if (Test-Path $bucketsFile) {
-    foreach ($raw in Get-Content $bucketsFile) {
-      $b = ($raw.Trim() -replace '^ss:///', '').TrimEnd('/')
+    # JSON ({"paths":["bucket/",...]}) from recent CLIs, one name per line from older ones.
+    $rawList = (Get-Content $bucketsFile -Raw).TrimStart([char]0xFEFF)
+    $names = @()
+    try { $names = @(($rawList | ConvertFrom-Json).paths) } catch { $names = @($rawList -split "`r?`n") }
+    foreach ($raw in $names) {
+      $b = ("$raw".Trim() -replace '^ss:///', '').TrimEnd('/')
       if (-not $b) { continue }
       Run-Step "Storage: list $b" @('storage','ls','-r',"ss:///$b/",'--experimental','--linked') (Join-Path $out "storage\$b.txt") | Out-Null
     }
