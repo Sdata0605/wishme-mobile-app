@@ -9,6 +9,8 @@ interface UseCelebrityFavoritesOptions {
 interface UseCelebrityFavoritesResult {
   favoriteIds: Set<string>;
   loading: boolean;
+  /** True once the first lookup has finished (or there is nobody signed in), so "no subscriptions" is never shown while still loading. */
+  loaded: boolean;
   hasFavorite: (celebrityId: string) => boolean;
   refetch: () => Promise<void>;
 }
@@ -19,10 +21,12 @@ export function useCelebrityFavorites({
 }: UseCelebrityFavoritesOptions): UseCelebrityFavoritesResult {
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   const fetchFavorites = useCallback(async () => {
     if (!profileId || !accessToken) {
       setFavoriteIds(new Set());
+      setLoaded(true);
       return;
     }
     setLoading(true);
@@ -36,6 +40,7 @@ export function useCelebrityFavorites({
       setFavoriteIds(new Set());
     } finally {
       setLoading(false);
+      setLoaded(true);
     }
   }, [profileId, accessToken]);
 
@@ -51,6 +56,7 @@ export function useCelebrityFavorites({
   return {
     favoriteIds,
     loading,
+    loaded,
     hasFavorite,
     refetch: fetchFavorites,
   };

@@ -21,6 +21,7 @@ import { useOrderConfirm } from '@/context/OrderConfirmContext';
 import { useAgentPrefill } from '@/context/AgentStateContext';
 import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 import { useVoiceCallCelebrities, type VoiceCallCelebrity } from '@/hooks/useVoiceCallCelebrities';
+import { SubscribedCelebrityChips } from '@/components/celebrity/SubscribedCelebrityChips';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 
@@ -185,123 +186,6 @@ function TextField({
   );
 }
 
-function CelebrityPickerModal({
-  visible,
-  onClose,
-  celebrities,
-  loading,
-  error,
-  onRetry,
-  search,
-  setSearch,
-  favoriteIds,
-  onSelect,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  celebrities: VoiceCallCelebrity[];
-  loading: boolean;
-  error: string | null;
-  onRetry: () => void;
-  search: string;
-  setSearch: (s: string) => void;
-  favoriteIds: Set<string>;
-  onSelect: (c: VoiceCallCelebrity) => void;
-}) {
-  const insets = useSafeAreaInsets();
-  const filtered = celebrities
-    .filter(
-      (c) =>
-        c.name.toLowerCase().includes(search.toLowerCase()) ||
-        c.category.toLowerCase().includes(search.toLowerCase()),
-    )
-    .sort((a, b) => {
-      const aS = favoriteIds.has(a.id) ? 0 : 1;
-      const bS = favoriteIds.has(b.id) ? 0 : 1;
-      return aS - bS;
-    });
-
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={[styles.modalRoot, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 8 }]}>
-        <View style={styles.modalHeader}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.modalTitle}>Select Celebrity</Text>
-            <Text style={styles.modalSub}>Choose a subscribed celebrity to send a voice call</Text>
-          </View>
-          <TouchableOpacity onPress={onClose} style={styles.modalClose}>
-            <Icon name="x" size={18} color="#fff" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.searchWrap}>
-          <Icon name="search" size={16} color={MUTED} />
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search by name or category..."
-            placeholderTextColor="rgba(255,255,255,0.25)"
-            style={styles.searchInput}
-          />
-        </View>
-
-        {loading ? (
-          <View style={styles.centered}>
-            <ActivityIndicator color="#F472B6" />
-            <Text style={styles.helper}>Loading celebrities...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.centered}>
-            <Text style={styles.errorTitle}>Could not load celebrities</Text>
-            <Text style={styles.helper}>{error}</Text>
-            <TouchableOpacity onPress={onRetry} style={styles.retryBtn}>
-              <Text style={styles.retryText}>Try Again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.pickerList} keyboardShouldPersistTaps="handled">
-            {filtered.length === 0 ? (
-              <Text style={[styles.helper, { textAlign: 'center', marginTop: 32 }]}>
-                No celebrities with voice calling are available yet.
-              </Text>
-            ) : filtered.map((celeb) => {
-              const subscribed = favoriteIds.has(celeb.id);
-              return (
-                <TouchableOpacity
-                  key={celeb.id}
-                  activeOpacity={0.85}
-                  onPress={() => onSelect(celeb)}
-                  style={[styles.pickerRow, !subscribed && { opacity: 0.7 }]}
-                >
-                  <Image source={{ uri: celeb.imageUrl }} style={styles.pickerAvatar} />
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.nameRow}>
-                      <Text style={styles.pickerName} numberOfLines={1}>{celeb.name}</Text>
-                      {celeb.isVerified ? (
-                        <View style={styles.verified}><Icon name="check" size={8} color="#fff" /></View>
-                      ) : null}
-                    </View>
-                    <Text style={styles.pickerCat}>{celeb.category}</Text>
-                    <Text style={styles.pickerPrice}>₹{celeb.pricePerCall || 500} per call</Text>
-                  </View>
-                  {subscribed ? (
-                    <View style={styles.subBadge}><Text style={styles.subBadgeText}>Subscribed</Text></View>
-                  ) : (
-                    <View style={styles.lockWrap}>
-                      <Icon name="lock" size={12} color="#fff" />
-                      <Text style={styles.lockText}>Subscribe</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        )}
-      </View>
-    </Modal>
-  );
-}
-
 export default function VoiceCallScreen() {
   const insets = useSafeAreaInsets();
   const { celebrity: celebrityParam } = useLocalSearchParams<{ celebrity?: string | string[] }>();
@@ -320,8 +204,6 @@ export default function VoiceCallScreen() {
     accessToken: session?.access_token,
   });
 
-  const [showPicker, setShowPicker] = useState(false);
-  const [search, setSearch] = useState('');
   const [selectedCeleb, setSelectedCeleb] = useState<VoiceCallCelebrity | null>(null);
 
   const [senderName, setSenderName] = useState(user ? `${user.firstName} ${user.lastName}`.trim() : '');
@@ -361,10 +243,7 @@ export default function VoiceCallScreen() {
   useEffect(() => {
     if (!celebrityId || loading || favLoading || celebrities.length === 0) return;
     const found = celebrities.find((c) => c.id === celebrityId);
-    if (!found?.vapiVoiceId) {
-      setShowPicker(true);
-      return;
-    }
+    if (!found?.vapiVoiceId) return;
     if (!favoriteIds.has(found.id)) {
       router.push(`/celebrity/${found.id}` as never);
       return;
@@ -372,11 +251,6 @@ export default function VoiceCallScreen() {
     setSelectedCeleb(found);
   }, [celebrityId, celebrities, favoriteIds, loading, favLoading]);
 
-  useEffect(() => {
-    if (!celebrityId && !selectedCeleb && !loading && !favLoading) {
-      setShowPicker(true);
-    }
-  }, [celebrityId, selectedCeleb, loading, favLoading]);
 
   const basePrice = selectedCeleb?.pricePerCall || 500;
   const finalPrice = selectedCeleb ? getDiscountedPrice(basePrice) : 0;
@@ -389,14 +263,11 @@ export default function VoiceCallScreen() {
     (callTiming === 'now' || selectedDate),
   );
 
-  const handleSelectCeleb = (c: VoiceCallCelebrity) => {
-    if (!favoriteIds.has(c.id)) {
-      setShowPicker(false);
-      router.push(`/celebrity/${c.id}` as never);
-      return;
-    }
+  // Only celebrities the user is subscribed to, and who have a voice to call with, can be chosen.
+  const callable = celebrities.filter((c) => favoriteIds.has(c.id) && !!c.vapiVoiceId);
+
+  const handleSelectCeleb = (c: VoiceCallCelebrity | null) => {
     setSelectedCeleb(c);
-    setShowPicker(false);
     setCallError(null);
   };
 
@@ -414,13 +285,11 @@ export default function VoiceCallScreen() {
     setSelectedDate(DATES[0]);
     setSelectedTime('10:00');
     setSuccess(null);
-    setShowPicker(true);
   };
 
   async function handleMakeCall() {
     if (!selectedCeleb) {
       setCallError('Please select a celebrity first.');
-      setShowPicker(true);
       return;
     }
     if (!senderName.trim() || !recipientName.trim() || !recipientPhone.trim() || !occasion) {
@@ -572,30 +441,29 @@ export default function VoiceCallScreen() {
             <Icon name="star" size={14} color="#F472B6" />
             <Text style={styles.sectionTitle}>Select a Celebrity</Text>
           </View>
+          <SubscribedCelebrityChips
+            celebrities={callable}
+            loading={loading || favLoading}
+            hasNone={!favLoading && favoriteIds.size === 0}
+            selectedId={selectedCeleb?.id}
+            onSelect={handleSelectCeleb}
+            priceFor={(c) => getDiscountedPrice(c.pricePerCall || 500)}
+            accent="#F472B6"
+          />
           {selectedCeleb ? (
-            <>
-              <View style={styles.selectedRow}>
-                <Image source={{ uri: selectedCeleb.imageUrl }} style={styles.selectedAvatar} />
-                <View style={{ flex: 1 }}>
-                  <View style={styles.nameRow}>
-                    <Text style={styles.selectedName}>{selectedCeleb.name}</Text>
-                    {selectedCeleb.isVerified ? (
-                      <View style={styles.verified}><Icon name="check" size={8} color="#fff" /></View>
-                    ) : null}
-                  </View>
-                  <Text style={styles.pickerPrice}>₹{basePrice} per call</Text>
+            <View style={[styles.selectedRow, { marginTop: 12 }]}>
+              <Image source={{ uri: selectedCeleb.imageUrl }} style={styles.selectedAvatar} />
+              <View style={{ flex: 1 }}>
+                <View style={styles.nameRow}>
+                  <Text style={styles.selectedName}>{selectedCeleb.name}</Text>
+                  {selectedCeleb.isVerified ? (
+                    <View style={styles.verified}><Icon name="check" size={8} color="#fff" /></View>
+                  ) : null}
                 </View>
+                <Text style={styles.pickerPrice}>₹{basePrice} per call</Text>
               </View>
-              <TouchableOpacity onPress={() => setShowPicker(true)}>
-                <Text style={styles.changeLink}>View all artists →</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <TouchableOpacity style={styles.dashedPick} onPress={() => setShowPicker(true)}>
-              <Icon name="phone" size={22} color={MUTED} />
-              <Text style={styles.helper}>Tap to select a celebrity</Text>
-            </TouchableOpacity>
-          )}
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.premiumCard}>
@@ -781,18 +649,6 @@ export default function VoiceCallScreen() {
         </View>
       </ScrollView>
 
-      <CelebrityPickerModal
-        visible={showPicker}
-        onClose={() => setShowPicker(false)}
-        celebrities={celebrities}
-        loading={loading}
-        error={error}
-        onRetry={refetch}
-        search={search}
-        setSearch={setSearch}
-        favoriteIds={favoriteIds}
-        onSelect={handleSelectCeleb}
-      />
     </View>
   );
 }

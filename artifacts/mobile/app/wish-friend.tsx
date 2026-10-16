@@ -22,6 +22,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useOrderConfirm } from '@/context/OrderConfirmContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useCelebrityById } from '@/hooks/useCelebrityById';
+import { useSubscribedCelebrities } from '@/hooks/useSubscribedCelebrities';
+import { SubscribedCelebrityChips } from '@/components/celebrity/SubscribedCelebrityChips';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
@@ -35,7 +37,7 @@ function imgUri(url: string | null | undefined): string | null {
 }
 
 type VideoType = 'video_wish' | 'ugc_video';
-type Step = 'type' | 'celebrity' | 'details' | 'review' | 'done';
+type Step = 'type' | 'details' | 'review' | 'done';
 
 interface Celebrity {
   id: string;
@@ -74,9 +76,8 @@ export default function WishFriendScreen() {
 
   const [step, setStep] = useState<Step>('type');
   const [videoType, setVideoType] = useState<VideoType>('video_wish');
-  const [celebrities, setCelebrities] = useState<Celebrity[]>([]);
-  const [loadingCelebs, setLoadingCelebs] = useState(false);
-  const [search, setSearch] = useState('');
+  // Only celebrities the user has subscribed to can be chosen, as chips on the details screen.
+  const subscribed = useSubscribedCelebrities<Celebrity>(CELEBRITY_SELECT);
   const [celebrity, setCelebrity] = useState<Celebrity | null>(null);
   const [ugcFallbackPrice, setUgcFallbackPrice] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -126,28 +127,6 @@ export default function WishFriendScreen() {
       .catch(() => {});
   }, [token]);
 
-  useEffect(() => {
-    if (step !== 'celebrity' || !token) return;
-    const timer = setTimeout(async () => {
-      setLoadingCelebs(true);
-      try {
-        const term = search.trim().replace(/[%,()*]/g, ' ');
-        const nameFilter = term ? `&name=ilike.*${encodeURIComponent(term)}*` : '';
-        const res = await supabaseFetch(
-          `/rest/v1/celebrities?select=id,name,category,image_url,delivery_time,service_prices&is_active=eq.true&or=(consent_status.neq.rejected,consent_status.is.null)${nameFilter}&order=name.asc&limit=48`,
-          {},
-          token,
-        );
-        if (res.ok) setCelebrities(await res.json() as Celebrity[]);
-      } catch {
-        // list stays as-is; the user can retry by editing the search
-      } finally {
-        setLoadingCelebs(false);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [step, search, token]);
-
   const basePriceFor = (c: Celebrity | null, type: VideoType = videoType): number => {
     if (!c) return 0;
     if (type === 'video_wish') return c.service_prices?.general_wish ?? 0;
@@ -158,8 +137,8 @@ export default function WishFriendScreen() {
   const price = getDiscountedPrice(basePrice);
   const typeLabel = videoType === 'video_wish' ? 'Video Wish' : 'UGC Video';
   const detailsValid = useMemo(
-    () => recipientName.trim().length > 0 && occasion.length > 0 && prompt.trim().length >= 10,
-    [recipientName, occasion, prompt],
+    () => !!celebrity && basePrice > 0 && recipientName.trim().length > 0 && occasion.length > 0 && prompt.trim().length >= 10,
+    [celebrity, basePrice, recipientName, occasion, prompt],
   );
 
   const pickType = (key: 'greeting_card' | VideoType) => {
@@ -168,21 +147,15 @@ export default function WishFriendScreen() {
       return;
     }
     setVideoType(key);
+    // Opened from a celebrity's profile: start with them chosen, if the user is subscribed and they offer this.
     const chosen = preset.celebrity;
-    if (chosen) {
-      if (basePriceFor(chosen, key) > 0) {
-        setCelebrity(chosen);
-        setStep('details');
-        return;
-      }
-      Alert.alert('Not available', `${chosen.name} does not offer this yet. Please pick another celebrity.`);
-    }
-    setStep('celebrity');
+    const usable = chosen && basePriceFor(chosen, key) > 0 && subscribed.celebrities.some(c => c.id === chosen.id);
+    setCelebrity(usable ? chosen : null);
+    setStep('details');
   };
 
   const goBack = () => {
-    if (step === 'celebrity') setStep('type');
-    else if (step === 'details') setStep(celebrity && celebrity.id === preset.celebrity?.id ? 'type' : 'celebrity');
+    if (step === 'details') setStep('type');
     else if (step === 'review') setStep('details');
     else router.back();
   };
@@ -321,67 +294,25 @@ export default function WishFriendScreen() {
         </KeyboardAwareScrollViewCompat>
       ))}
 
-      {step === 'celebrity' && (
-        <View style={{ flex: 1 }}>
-          <Text style={[s.lead, { color: colors.mutedForeground, paddingHorizontal: 16, paddingTop: 16 }]}>
-            Choose a celebrity for your {typeLabel.toLowerCase()}
-          </Text>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search celebrities"
-              placeholderTextColor={colors.mutedForeground}
-              style={inputStyle}
-            />
-          </View>
-          {loadingCelebs ? (
-            <ActivityIndicator style={{ marginTop: 32 }} color={colors.primary} />
-          ) : (
-            <FlatList
-              data={celebrities}
-              keyExtractor={c => c.id}
-              numColumns={2}
-              columnWrapperStyle={{ gap: 12 }}
-              contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 32 }}
-              keyboardShouldPersistTaps="handled"
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: colors.mutedForeground, marginTop: 32 }}>No celebrities found</Text>}
-              renderItem={({ item }) => {
-                const p = basePriceFor(item);
-                const unavailable = p <= 0;
-                const uri = imgUri(item.image_url);
-                return (
-                  <TouchableOpacity
-                    disabled={unavailable}
-                    activeOpacity={0.85}
-                    onPress={() => { setCelebrity(item); setStep('details'); }}
-                    style={[s.celebCard, { backgroundColor: colors.card, borderColor: colors.border, opacity: unavailable ? 0.5 : 1 }]}
-                  >
-                    {uri ? (
-                      <Image source={{ uri }} style={s.celebImg} contentFit="cover" />
-                    ) : (
-                      <View style={[s.celebImg, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
-                        <Icon name="star" size={28} color={colors.mutedForeground} />
-                      </View>
-                    )}
-                    <View style={{ padding: 10 }}>
-                      <Text style={[s.celebName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
-                      <Text style={{ color: colors.mutedForeground, fontSize: 12 }} numberOfLines={1}>{item.category}</Text>
-                      <Text style={{ color: colors.primary, fontFamily: 'Inter_700Bold', marginTop: 4 }}>
-                        {unavailable ? 'Not available' : `₹${getDiscountedPrice(p).toLocaleString('en-IN')}`}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          )}
-        </View>
-      )}
-
-      {step === 'details' && celebrity && (
+      {step === 'details' && (
         <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }}>
-          <Text style={[s.lead, { color: colors.mutedForeground }]}>{typeLabel} with {celebrity.name}</Text>
+          <Text style={[s.lead, { color: colors.mutedForeground }]}>
+            {typeLabel}{celebrity ? ` with ${celebrity.name}` : ''}
+          </Text>
+
+          <Text style={[s.label, { color: colors.foreground }]}>Select Celebrity *</Text>
+          <SubscribedCelebrityChips
+            celebrities={subscribed.celebrities}
+            loading={subscribed.loading}
+            hasNone={subscribed.hasNone}
+            selectedId={celebrity?.id}
+            onSelect={c => setCelebrity(c)}
+            priceFor={c => {
+              const base = basePriceFor(c);
+              return base > 0 ? getDiscountedPrice(base) : null;
+            }}
+            accent={colors.primary}
+          />
 
           <Text style={[s.label, { color: colors.foreground }]}>Friend's name *</Text>
           <TextInput value={recipientName} onChangeText={setRecipientName} placeholder="e.g. Priya" placeholderTextColor={colors.mutedForeground} style={inputStyle} />

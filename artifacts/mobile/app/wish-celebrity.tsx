@@ -19,6 +19,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useAgentPrefill } from '@/context/AgentStateContext';
 import { supabaseFetch } from '@/constants/supabase';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
+import { SubscribedCelebrityChips } from '@/components/celebrity/SubscribedCelebrityChips';
 
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
 function imgUrl(url: string | null): string {
@@ -48,6 +49,7 @@ export default function WishCelebrityScreen() {
   const [allCelebrities, setAllCelebrities] = useState<Celebrity[]>([]);
   const [subscribedIds, setSubscribedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+  const [selectedId, setSelectedId] = useState('');
 
   // Auto-fill search from agent prefill
   useEffect(() => {
@@ -97,8 +99,16 @@ export default function WishCelebrityScreen() {
     c.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const subscribedList = filtered.filter(c => isSubscribed(c.id));
-  const unsubscribedList = filtered.filter(c => !isSubscribed(c.id));
+  // Only celebrities the user has subscribed to can be wished.
+  const subscribedList = allCelebrities.filter(c => isSubscribed(c.id));
+  const selected = subscribedList.find(c => c.id === selectedId) ?? null;
+
+  // The assistant can name a celebrity ("wish Hari"): pick them if they are one of the user's.
+  useEffect(() => {
+    if (!search.trim() || selectedId) return;
+    const match = subscribedList.filter(c => c.name.toLowerCase().includes(search.trim().toLowerCase()));
+    if (match.length === 1) setSelectedId(match[0].id);
+  }, [search, subscribedList, selectedId]);
 
   if (!session) {
     return (
@@ -132,22 +142,6 @@ export default function WishCelebrityScreen() {
         </TouchableOpacity>
         <Text style={[s.headerTitle, { color: colors.foreground }]}>Wish a Celebrity</Text>
         <View style={{ width: 22 }} />
-      </View>
-
-      <View style={[s.searchWrap, { backgroundColor: colors.input, borderColor: colors.border }]}>
-        <Icon name="search" size={16} color={colors.mutedForeground} />
-        <TextInput
-          style={[s.searchInput, { color: colors.foreground }]}
-          placeholder="Search celebrities..."
-          placeholderTextColor={colors.mutedForeground}
-          value={search}
-          onChangeText={setSearch}
-        />
-        {search.length > 0 && (
-          <TouchableOpacity onPress={() => setSearch('')}>
-            <Icon name="x" size={14} color={colors.mutedForeground} />
-          </TouchableOpacity>
-        )}
       </View>
 
       {loading ? (
@@ -186,45 +180,29 @@ export default function WishCelebrityScreen() {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {subscribedList.length > 0 && (
-            <>
-              <Text style={[s.sectionHeading, { color: colors.foreground }]}>Your Subscribed Celebrities</Text>
-              {subscribedList.map(celeb => (
-                <CelebrityCard
-                  key={celeb.id}
-                  celeb={celeb}
-                  subscribed
-                  colors={colors}
-                  onPress={() => router.push(('/wish-booking/' + celeb.id) as never)}
-                />
-              ))}
-            </>
-          )}
+          <Text style={[s.sectionHeading, { color: colors.foreground }]}>Select Celebrity</Text>
+          <View style={{ paddingHorizontal: 16 }}>
+            <SubscribedCelebrityChips
+              celebrities={subscribedList}
+              loading={false}
+              hasNone={subscribedList.length === 0}
+              selectedId={selectedId}
+              onSelect={c => setSelectedId(c?.id ?? '')}
+              priceFor={c => c.service_prices?.general_wish ?? null}
+              emptyText="Subscribe to a celebrity to send them a wish."
+            />
+          </View>
 
-          {unsubscribedList.length > 0 && (
-            <>
-              <Text style={[s.sectionHeading, { color: colors.foreground }]}>
-                {subscribedList.length > 0 ? 'Other Celebrities' : 'All Celebrities'}
-              </Text>
-              {unsubscribedList.map(celeb => (
-                <CelebrityCard
-                  key={celeb.id}
-                  celeb={celeb}
-                  subscribed={false}
-                  colors={colors}
-                  onPress={() => router.push(('/celebrity/' + celeb.id) as never)}
-                />
-              ))}
-            </>
-          )}
-
-          {filtered.length === 0 && search.length > 0 && (
-            <View style={s.centerState}>
-              <Icon name="search" size={36} color={colors.mutedForeground} />
-              <Text style={[s.stateTitle, { color: colors.foreground }]}>No results</Text>
-              <Text style={[s.stateBody, { color: colors.mutedForeground }]}>No celebrities match "{search}"</Text>
+          {selected ? (
+            <View style={{ marginTop: 16 }}>
+              <CelebrityCard
+                celeb={selected}
+                subscribed
+                colors={colors}
+                onPress={() => router.push(('/wish-booking/' + selected.id) as never)}
+              />
             </View>
-          )}
+          ) : null}
         </ScrollView>
       )}
     </View></AmbientBackground>

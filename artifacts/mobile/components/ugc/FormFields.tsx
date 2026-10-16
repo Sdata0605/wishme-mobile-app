@@ -18,6 +18,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { parseApiError, supabaseFetch, SUPABASE_URL } from '@/constants/supabase';
 import { useTheme } from '@/context/ThemeContext';
+import { useSubscribedCelebrities } from '@/hooks/useSubscribedCelebrities';
+import { SubscribedCelebrityChips } from '@/components/celebrity/SubscribedCelebrityChips';
 import type { CelebrityLite, FieldDef, Option, Values } from './types';
 
 interface FieldProps {
@@ -144,106 +146,25 @@ function ImageTiles({
   );
 }
 
+const CELEBRITY_COLUMNS = 'id,name,category,image_url,service_prices';
+
+/** Choice chips of the celebrities the user has subscribed to, the same control Image Promotions uses. */
 function CelebrityPicker({
-  value, onChange, accent, token, invalid, priceFor,
+  value, onChange, accent, invalid, priceFor,
 }: { value: CelebrityLite | null; onChange: (c: CelebrityLite) => void; accent: string; token: string | null; invalid: boolean; priceFor?: (c: CelebrityLite) => number | null }) {
-  const { colors } = useTheme();
-  const insets = useSafeAreaInsets();
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const [list, setList] = useState<CelebrityLite[]>([]);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (!open || !token) return;
-    const timer = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const term = search.trim().replace(/[%,()*]/g, ' ');
-        const nameFilter = term ? `&name=ilike.*${encodeURIComponent(term)}*` : '';
-        const res = await supabaseFetch(
-          `/rest/v1/celebrities?select=id,name,category,image_url,service_prices&is_active=eq.true&or=(consent_status.neq.rejected,consent_status.is.null)${nameFilter}&order=name.asc&limit=48`,
-          {},
-          token,
-        );
-        if (res.ok) setList(await res.json() as CelebrityLite[]);
-      } catch {
-        // keep the previous list
-      } finally {
-        setLoading(false);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [open, search, token]);
-
+  const subscribed = useSubscribedCelebrities<CelebrityLite>(CELEBRITY_COLUMNS);
   return (
-    <>
-      <TouchableOpacity
-        onPress={() => setOpen(true)}
-        activeOpacity={0.85}
-        style={[s.input, s.celebRow, { borderColor: invalid ? '#EF4444' : colors.border, backgroundColor: colors.card }]}
-      >
-        {value?.image_url ? (
-          <Image source={{ uri: value.image_url }} style={s.celebAvatar} contentFit="cover" />
-        ) : (
-          <View style={[s.celebAvatar, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
-            <Icon name="star" size={16} color={colors.mutedForeground} />
-          </View>
-        )}
-        <Text style={{ flex: 1, color: value ? colors.foreground : colors.mutedForeground, fontFamily: 'Inter_500Medium' }} numberOfLines={1}>
-          {value ? value.name : 'Choose a celebrity'}
-        </Text>
-        <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
-      </TouchableOpacity>
-
-      <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={{ flex: 1, backgroundColor: colors.background, paddingTop: Platform.OS === 'web' ? 24 : insets.top }}>
-          <View style={s.pickHead}>
-            <Text style={[s.pickTitle, { color: colors.foreground }]}>Choose a celebrity</Text>
-            <TouchableOpacity onPress={() => setOpen(false)} hitSlop={12}><Icon name="x" size={22} color={colors.foreground} /></TouchableOpacity>
-          </View>
-          <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search celebrities"
-              placeholderTextColor={colors.mutedForeground}
-              style={[s.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }]}
-            />
-          </View>
-          {loading ? <ActivityIndicator style={{ marginTop: 28 }} color={accent} /> : (
-            <FlatList
-              data={list}
-              keyExtractor={c => c.id}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: insets.bottom + 24, gap: 8 }}
-              ListEmptyComponent={<Text style={{ color: colors.mutedForeground, textAlign: 'center', marginTop: 28 }}>No celebrities found</Text>}
-              renderItem={({ item }) => {
-                const p = priceFor?.(item) ?? null;
-                return (
-                  <TouchableOpacity
-                    onPress={() => { onChange(item); setOpen(false); }}
-                    activeOpacity={0.85}
-                    style={[s.pickRow, { backgroundColor: colors.card, borderColor: value?.id === item.id ? accent : colors.border }]}
-                  >
-                    {item.image_url ? (
-                      <Image source={{ uri: item.image_url }} style={s.pickAvatar} contentFit="cover" cachePolicy="memory-disk" />
-                    ) : (
-                      <View style={[s.pickAvatar, { backgroundColor: colors.border }]} />
-                    )}
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }} numberOfLines={1}>{item.name}</Text>
-                      <Text style={{ color: colors.mutedForeground, fontSize: 12 }} numberOfLines={1}>{item.category}</Text>
-                    </View>
-                    {p != null && <Text style={{ color: accent, fontFamily: 'Inter_700Bold' }}>₹{p.toLocaleString('en-IN')}</Text>}
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          )}
-        </View>
-      </Modal>
-    </>
+    <SubscribedCelebrityChips
+      celebrities={subscribed.celebrities}
+      loading={subscribed.loading}
+      hasNone={subscribed.hasNone}
+      selectedId={value?.id}
+      // The form needs a value, so tapping the chosen chip again keeps it rather than clearing it.
+      onSelect={c => { if (c) onChange(c); }}
+      priceFor={priceFor}
+      accent={accent}
+      invalid={invalid}
+    />
   );
 }
 
