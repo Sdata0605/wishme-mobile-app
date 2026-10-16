@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, Text, TouchableOpacity, View } from 'react-native';
-import { fmtDate, fmtRupee, StatusBadge, SectionEmpty, LoadingBox, Card, SectionTitle, styles } from './shared';
+import { fmtDate, fmtRupee, FilterChips, StatusBadge, SectionEmpty, LoadingBox, Card, styles } from './shared';
 import type { TabProps } from './shared';
 import { Icon } from '@/components/Icon';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
@@ -42,10 +42,15 @@ function pushField(fields: Array<[string, string]>, label: string, value: unknow
   if (v) fields.push([label, v]);
 }
 
+const IN_PROGRESS = ['pending', 'pending_approval', 'confirmed', 'processing', 'in_progress', 'accepted'];
+const DONE_STATUS = ['completed', 'video_sent', 'delivered'];
+const REJECTED = ['rejected', 'declined', 'failed', 'cancelled'];
+
 export function OrdersTab({ celebrity, colors, session }: TabProps) {
   const [orders, setOrders] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
+  const [filter, setFilter] = useState('all');
 
   const fetchOrders = useCallback(async () => {
     const token = session?.access_token;
@@ -188,24 +193,43 @@ export function OrdersTab({ celebrity, colors, session }: TabProps) {
     return () => { if (heartbeat) clearInterval(heartbeat); ws?.close(); };
   }, [celebrity.id, session?.access_token, fetchOrders]);
 
-  const totals = useMemo(() => ({
-    count: orders.length,
-    done: orders.filter(o => ['completed', 'video_sent', 'delivered'].includes(o.status)).length,
+  const counts = useMemo(() => ({
+    all: orders.length,
+    progress: orders.filter(o => IN_PROGRESS.includes(o.status)).length,
+    done: orders.filter(o => DONE_STATUS.includes(o.status)).length,
+    rejected: orders.filter(o => REJECTED.includes(o.status)).length,
   }), [orders]);
+
+  const shown = useMemo(() => orders.filter(o =>
+    filter === 'all' ? true
+      : filter === 'progress' ? IN_PROGRESS.includes(o.status)
+      : filter === 'done' ? DONE_STATUS.includes(o.status)
+      : REJECTED.includes(o.status)), [orders, filter]);
 
   if (loading) return <LoadingBox />;
 
   return (
     <View style={styles.tabPad}>
-      <SectionTitle text={`Orders (${totals.count})`} colors={colors} />
-      {totals.count > 0 && (
-        <Text style={[styles.cardSub, { color: colors.mutedForeground, marginBottom: 8 }]}>
-          {totals.done} completed · {totals.count - totals.done} in progress or waiting
-        </Text>
+      <Text style={[styles.cardSub, { color: colors.mutedForeground, marginBottom: 10, marginTop: 0 }]}>
+        {counts.all} {counts.all === 1 ? 'order' : 'orders'} · {counts.done} completed / {counts.progress} in progress
+      </Text>
+      {counts.all > 0 && (
+        <FilterChips
+          colors={colors}
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { key: 'all', label: 'All', count: counts.all },
+            { key: 'progress', label: 'In progress', count: counts.progress },
+            { key: 'done', label: 'Completed', count: counts.done },
+            ...(counts.rejected > 0 ? [{ key: 'rejected', label: 'Rejected', count: counts.rejected }] : []),
+          ]}
+        />
       )}
-      {orders.length === 0 && <SectionEmpty icon="credit-card" text="No orders yet" colors={colors} />}
+      {counts.all === 0 && <SectionEmpty icon="credit-card" text="No orders yet" colors={colors} />}
+      {counts.all > 0 && shown.length === 0 && <SectionEmpty icon="credit-card" text="No orders in this filter" colors={colors} />}
 
-      {orders.map(o => {
+      {shown.map(o => {
         const isOpen = open === o.key;
         return (
           <Card key={o.key} colors={colors}>

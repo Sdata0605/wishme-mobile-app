@@ -71,6 +71,38 @@ export const STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
+/** A row of choice chips: the filter above a list, or a two-way switch. The chosen chip is filled with the brand colour. */
+export function FilterChips({ options, value, onChange, colors }: {
+  options: Array<{ key: string; label: string; count?: number }>;
+  value: string;
+  onChange: (key: string) => void;
+  colors: ColorsType;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+      {options.map(o => {
+        const on = o.key === value;
+        return (
+          <TouchableOpacity
+            key={o.key}
+            onPress={() => onChange(o.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            style={{
+              minHeight: 38, paddingHorizontal: 14, borderRadius: 99, borderWidth: 1.5, justifyContent: 'center',
+              backgroundColor: on ? '#7B5CFA' : 'transparent', borderColor: on ? '#7B5CFA' : colors.border,
+            }}
+          >
+            <Text style={{ color: on ? '#fff' : colors.foreground, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+              {o.label}{o.count != null ? ` · ${o.count}` : ''}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
 export function StatusBadge({ status, label }: { status: string; label?: string }) {
   const color = STATUS_COLORS[status] ?? '#6B7280';
   return (

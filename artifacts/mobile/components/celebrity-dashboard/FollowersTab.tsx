@@ -69,7 +69,7 @@ export function FollowersTab({ celebrity, colors, session }: TabProps) {
           </View>
           <Text style={{ color: colors.foreground, fontSize: 40, fontFamily: 'Inter_700Bold', marginTop: 8 }}>{count}</Text>
           <Text style={{ color: colors.mutedForeground, fontFamily: 'Inter_400Regular', fontSize: 14 }}>
-            {count === 1 ? 'user has subscribed to you' : 'users have subscribed to you'}
+            {count === 1 ? 'subscribed fan' : 'subscribed fans'}
           </Text>
         </View>
       </Card>

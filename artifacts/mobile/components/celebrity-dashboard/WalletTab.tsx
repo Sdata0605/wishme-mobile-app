@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { fmtDate, fmtRupee, StatusBadge, SectionEmpty, LoadingBox, Card, SectionTitle, PrimaryBtn, InputRow, styles } from './shared';
+import { FilterChips, fmtDate, fmtRupee, StatusBadge, SectionEmpty, LoadingBox, Card, SectionTitle, PrimaryBtn, InputRow, styles } from './shared';
 import type { ImagePromotion, TabPropsWithUserAndRefresh, WalletTx } from './shared';
 import { supabaseFetch } from '@/constants/supabase';
 
@@ -47,6 +47,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
   const [showAddBank, setShowAddBank] = useState(false);
   const [bankForm, setBankForm] = useState({ bank_name: '', account_number: '', ifsc_code: '', account_holder_name: '' });
   const [confirmAccount, setConfirmAccount] = useState('');
+  const [view, setView] = useState('payouts');
   const [addingBank, setAddingBank] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -160,6 +161,9 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
       <LinearGradient colors={['#7B5CFA', '#1F7BFF']} style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
         <Text style={styles.balanceAmt}>{fmtRupee(celebrity.available_balance ?? 0)}</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4 }}>
+          Total earned so far {fmtRupee(celebrity.total_earnings ?? 0)} · withdrawals are sent instantly by IMPS
+        </Text>
         {pendingClearance > 0 && (
           <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.3)' }}>
             <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular' }}>Pending Clearance</Text>
@@ -206,9 +210,15 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
         )}
       </Card>
 
-      <SectionTitle text="Payout History" colors={colors} />
-      {payouts.length === 0 ? (
-        <SectionEmpty icon="credit-card" text="No payout requests yet" colors={colors} />
+      <FilterChips
+        colors={colors}
+        value={view}
+        onChange={setView}
+        options={[{ key: 'payouts', label: 'Payouts', count: payouts.length }, { key: 'earnings', label: 'Earnings', count: txns.length }]}
+      />
+
+      {view === 'payouts' && (payouts.length === 0 ? (
+        <SectionEmpty icon="credit-card" text="No withdrawals yet" colors={colors} />
       ) : (
         payouts.map(p => (
           <Card key={p.id} colors={colors}>
@@ -224,10 +234,9 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
             </View>
           </Card>
         ))
-      )}
+      ))}
 
-      <SectionTitle text="Transaction History" colors={colors} />
-      {txns.length === 0 ? (
+      {view === 'earnings' && (txns.length === 0 ? (
         <SectionEmpty icon="trending-up" text="No transactions yet" colors={colors} />
       ) : (
         txns.map(tx => {
@@ -248,7 +257,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
             </Card>
           );
         })
-      )}
+      ))}
     </View>
   );
 }
