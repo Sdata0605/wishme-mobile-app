@@ -2,7 +2,6 @@ import * as Clipboard from 'expo-clipboard';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Alert,
-  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -12,34 +11,22 @@ import type { TabProps, WalletTx } from './shared';
 import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 
-const FY_OPTIONS = ['FY 2022-23', 'FY 2023-24', 'FY 2024-25', 'FY 2025-26'] as const;
-
-function fyDateRange(fy: string): { start: string; end: string } {
-  const m = fy.match(/FY (\d{4})-(\d{2})/);
-  if (!m) return { start: '', end: '' };
-  const startYear = parseInt(m[1], 10);
-  const endYear = startYear + 1;
-  return { start: `${startYear}-04-01`, end: `${endYear}-03-31` };
-}
-
 export function TdsTab({ celebrity, colors, session }: TabProps) {
-  const [selectedFY, setSelectedFY] = useState<string>('FY 2024-25');
   const [txns, setTxns] = useState<WalletTx[]>([]);
   const [loading, setLoading] = useState(false);
 
   const fetchTxns = useCallback(async () => {
     setLoading(true);
-    const { start, end } = fyDateRange(selectedFY);
     try {
       const res = await supabaseFetch(
-        `/rest/v1/celebrity_wallet_transactions?celebrity_id=eq.${celebrity.id}&tds_amount=not.is.null&created_at=gte.${start}&created_at=lte.${end}T23:59:59&order=created_at.desc`,
+        `/rest/v1/celebrity_wallet_transactions?celebrity_id=eq.${celebrity.id}&tds_amount=not.is.null&order=created_at.desc&limit=1000`,
         {},
         session?.access_token,
       );
       if (res.ok) { const r = await res.json() as WalletTx[]; setTxns(r ?? []); }
     } catch {}
     setLoading(false);
-  }, [celebrity.id, selectedFY, session?.access_token]);
+  }, [celebrity.id, session?.access_token]);
 
   useEffect(() => { fetchTxns(); }, [fetchTxns]);
 
@@ -50,18 +37,6 @@ export function TdsTab({ celebrity, colors, session }: TabProps) {
   return (
     <View style={styles.tabPad}>
       <SectionTitle text="TDS Summary" colors={colors} />
-
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
-        {FY_OPTIONS.map(fy => (
-          <TouchableOpacity
-            key={fy}
-            onPress={() => setSelectedFY(fy)}
-            style={[styles.chipBtn, { borderColor: selectedFY === fy ? '#7B5CFA' : colors.border, backgroundColor: selectedFY === fy ? '#7B5CFA18' : 'transparent' }]}
-          >
-            <Text style={{ color: selectedFY === fy ? '#7B5CFA' : colors.mutedForeground, fontFamily: 'Inter_500Medium', fontSize: 13 }}>{fy}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
 
       {loading ? <LoadingBox /> : (
         <>
@@ -77,11 +52,11 @@ export function TdsTab({ celebrity, colors, session }: TabProps) {
               </View>
             ))}
             <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 12 }}>
-              Showing actual TDS deducted on transactions for {selectedFY}. Consult a CA for exact tax filing.
+              Showing the TDS actually deducted on all your earnings so far. Consult a CA for exact tax filing.
             </Text>
             <TouchableOpacity
               onPress={() => {
-                const summary = `WishMe TDS Summary — ${selectedFY}\nGross Earnings: ${fmtRupee(totalGross)}\nTDS Deducted: ${fmtRupee(totalTds)}\nNet Amount: ${fmtRupee(totalNet)}\nTransactions: ${txns.length}`;
+                const summary = `WishMe TDS Summary\nGross Earnings: ${fmtRupee(totalGross)}\nTDS Deducted: ${fmtRupee(totalTds)}\nNet Amount: ${fmtRupee(totalNet)}\nTransactions: ${txns.length}`;
                 Clipboard.setStringAsync(summary).then(() => Alert.alert('Copied', 'TDS summary copied to clipboard!'));
               }}
               style={[styles.copyBtn, { borderColor: colors.border }]}
@@ -93,7 +68,7 @@ export function TdsTab({ celebrity, colors, session }: TabProps) {
 
           <SectionTitle text={`TDS Transactions (${txns.length})`} colors={colors} />
           {txns.length === 0 ? (
-            <SectionEmpty icon="trending-up" text={`No TDS transactions in ${selectedFY}`} colors={colors} />
+            <SectionEmpty icon="trending-up" text="No TDS has been deducted yet" colors={colors} />
           ) : (
             txns.map(t => (
               <Card key={t.id} colors={colors}>

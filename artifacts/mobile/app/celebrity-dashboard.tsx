@@ -173,6 +173,18 @@ export default function CelebrityDashboardScreen() {
     ]);
   };
 
+  const sectionHead = (
+    <View style={bar.sectionHead}>
+              <View style={[bar.sectionIcon, { backgroundColor: section.accent + '29' }]}>
+                <Icon name={section.icon} size={20} color={section.accent} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[bar.sectionTitle, { color: colors.foreground }]}>{section.label}</Text>
+                <Text style={[bar.sectionPurpose, { color: colors.mutedForeground }]}>{section.purpose}</Text>
+              </View>
+            </View>
+  );
+
   return (
     <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       {/* Top bar: menu, where you are, refresh */}
@@ -187,6 +199,11 @@ export default function CelebrityDashboardScreen() {
         </TouchableOpacity>
       </View>
 
+      {section.key === 'messages' ? (
+        <View style={{ flex: 1 }}>
+          <MessagesTab celebrity={celebrity} colors={colors} session={session} user={user} header={sectionHead} />
+        </View>
+      ) : (
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -196,19 +213,10 @@ export default function CelebrityDashboardScreen() {
           <OverviewScreen celebrity={celebrity} colors={colors} data={data} onOpen={open} userFirstName={user?.firstName ?? ''} />
         ) : (
           <>
-            <View style={bar.sectionHead}>
-              <View style={[bar.sectionIcon, { backgroundColor: section.accent + '29' }]}>
-                <Icon name={section.icon} size={20} color={section.accent} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[bar.sectionTitle, { color: colors.foreground }]}>{section.label}</Text>
-                <Text style={[bar.sectionPurpose, { color: colors.mutedForeground }]}>{section.purpose}</Text>
-              </View>
-            </View>
+            {sectionHead}
             <View style={{ paddingBottom: bottomPad + 24 }}>
               {activeTab === 'orders' && <OrdersTab celebrity={celebrity} colors={colors} session={session} />}
               {activeTab === 'wallet' && <WalletTab celebrity={celebrity} colors={colors} session={session} user={user} onRefreshCeleb={fetchCelebrity} />}
-              {activeTab === 'messages' && <MessagesTab celebrity={celebrity} colors={colors} session={session} user={user} />}
               {activeTab === 'reviews' && <ReviewsTab celebrity={celebrity} colors={colors} session={session} />}
               {activeTab === 'followers' && <FollowersTab celebrity={celebrity} colors={colors} session={session} />}
               {activeTab === 'content' && <ContentTab celebrity={celebrity} colors={colors} session={session} onRefresh={fetchCelebrity} />}
@@ -219,6 +227,7 @@ export default function CelebrityDashboardScreen() {
         )}
         {section.key === 'overview' ? <View style={{ height: bottomPad + 24 }} /> : null}
       </ScrollView>
+      )}
 
       <DashboardDrawer
         open={menuOpen}

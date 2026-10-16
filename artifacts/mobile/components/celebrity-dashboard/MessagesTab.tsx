@@ -2,12 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { KeyboardAvoidingView, useKeyboardState } from 'react-native-keyboard-controller';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fmtDate, SectionEmpty, LoadingBox, Card, SectionTitle, styles } from './shared';
 import type { TabPropsWithUser } from './shared';
 import { Icon } from '@/components/Icon';
@@ -38,7 +41,15 @@ interface CelebSettings {
   ai_auto_reply_enabled: boolean;
 }
 
-export function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUser) {
+/**
+ * Conversations with fans. This tab owns its scrolling: the list scrolls by itself, and an open chat is a full-height
+ * column whose message list scrolls while the reply box stays pinned at the bottom and rides up with the keyboard
+ * (it used to sit at the end of one long page, so it scrolled away and the keyboard covered it).
+ */
+export function MessagesTab({ celebrity, colors, session, user, header }: TabPropsWithUser & { header?: React.ReactNode }) {
+  const insets = useSafeAreaInsets();
+  const keyboardOpen = useKeyboardState(st => st.isVisible);
+  const listRef = useRef<ScrollView>(null);
   const [convos, setConvos] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeConvo, setActiveConvo] = useState<Conversation | null>(null);
@@ -49,6 +60,13 @@ export function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUs
   const [aiSettings, setAiSettings] = useState<CelebSettings | null>(null);
   const [togglingAI, setTogglingAI] = useState(false);
   const [generatingAI, setGeneratingAI] = useState(false);
+
+  // Hardware Back closes an open chat before it leaves Messages.
+  useEffect(() => {
+    if (!activeConvo) return;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => { setActiveConvo(null); return true; });
+    return () => sub.remove();
+  }, [activeConvo]);
 
   const fetchConvos = useCallback(async () => {
     setLoading(true);
@@ -266,7 +284,7 @@ export function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUs
     const fanName = activeConvo.profiles ? `${activeConvo.profiles.first_name ?? ''} ${activeConvo.profiles.last_name ?? ''}`.trim() : 'Fan';
     const fanMessages = messages.filter(m => m.sender_id !== user?.profileId);
     return (
-      <View style={{ flex: 1 }}>
+      <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
         <View style={[styles.msgHeader, { borderBottomColor: colors.border }]}>
           <TouchableOpacity onPress={() => setActiveConvo(null)}>
             <Icon name="arrow-left" size={20} color={colors.foreground} />
@@ -288,7 +306,14 @@ export function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUs
         {msgLoading ? (
           <LoadingBox />
         ) : (
-          <ScrollView style={{ flex: 1, padding: 16 }}>
+          <ScrollView
+            ref={listRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ padding: 16 }}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: false })}
+          >
             {messages.map(m => {
               const isMine = m.sender_id === user?.profileId;
               return (
@@ -307,7 +332,7 @@ export function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUs
             })}
           </ScrollView>
         )}
-        <View style={[styles.replyRow, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
+        <View style={[styles.replyRow, { borderTopColor: colors.border, backgroundColor: colors.background, paddingBottom: 12 + (keyboardOpen ? 0 : insets.bottom) }]}>
           <TextInput
             value={reply}
             onChangeText={setReply}
@@ -320,13 +345,15 @@ export function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUs
             {sending ? <ActivityIndicator size="small" color="#fff" /> : <Icon name="send" size={18} color="#fff" />}
           </TouchableOpacity>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 
-  if (loading) return <LoadingBox />;
+  if (loading) return <ScrollView>{header}<LoadingBox /></ScrollView>;
 
   return (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+    {header}
     <View style={styles.tabPad}>
       <Card colors={colors}>
         <View style={styles.rowBetween}>
@@ -383,5 +410,6 @@ export function MessagesTab({ celebrity, colors, session, user }: TabPropsWithUs
         );
       })}
     </View>
+    </ScrollView>
   );
 }
