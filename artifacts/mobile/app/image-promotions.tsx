@@ -54,6 +54,8 @@ interface SubscribedCeleb {
   name: string;
   category: string;
   image_url: string | null;
+  /** Prices the admin set for this celebrity; `image_promotion` is what this screen charges. */
+  service_prices?: { image_promotion?: number } | null;
 }
 
 type RefImgSource = 'none' | 'upload';
@@ -105,7 +107,11 @@ export default function ImagePromotionsScreen() {
   const [refImgBase64, setRefImgBase64] = useState<string | null>(null);
   const [refImgUri, setRefImgUri] = useState<string | null>(null);
 
-  const [basePrice, setBasePrice] = useState(25);
+  // The platform-wide price is only the fallback: the price the admin set on the chosen celebrity wins,
+  // the same rule the server charges by.
+  const [platformPrice, setPlatformPrice] = useState(25);
+  const celebPrice = Number(celebrities.find(c => c.id === selectedCelebId)?.service_prices?.image_promotion);
+  const basePrice = celebPrice > 0 ? celebPrice : platformPrice;
   const finalPrice = getDiscountedPrice(basePrice);
   const discountPct = discountPercentage;
 
@@ -132,7 +138,7 @@ export default function ImagePromotionsScreen() {
     try {
       const ids = Array.from(favoriteIds).join(',');
       const celebRes = await supabaseFetch(
-        `/rest/v1/celebrities?select=id,name,category,image_url&id=in.(${ids})`,
+        `/rest/v1/celebrities?select=id,name,category,image_url,service_prices&id=in.(${ids})`,
         {},
         session.access_token,
       );
@@ -157,7 +163,7 @@ export default function ImagePromotionsScreen() {
         const rows = await settingsRes.json() as Array<{ setting_value: string }>;
         if (rows?.length) {
           const v = parseFloat(rows[0].setting_value);
-          if (!isNaN(v)) setBasePrice(v);
+          if (!isNaN(v)) setPlatformPrice(v);
         }
       }
     } catch {}
@@ -348,7 +354,8 @@ export default function ImagePromotionsScreen() {
               body: JSON.stringify({
                 wishme_payment_id: wishmePaymentId,
                 user_id: user?.profileId,
-                amount: finalPrice,
+                // What the server actually charged, not the screen's own estimate.
+                amount: gen.price_paid ?? finalPrice,
                 payment_method: 'wallet',
                 service_type: 'image_promotion',
                 image_promotion_id: gen.id,
