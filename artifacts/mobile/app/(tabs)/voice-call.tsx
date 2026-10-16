@@ -156,6 +156,10 @@ export default function VoiceCallScreen() {
   const { discountPercentage, getDiscountedPrice, plan } = usePlan();
   const agentPrefill = useAgentPrefill();
   const topPad = Platform.OS === 'web' ? 24 : insets.top;
+  // This screen lives inside the tab bar: the bar is drawn over the page's bottom edge, and the raised assistant button
+  // rises about 30 above it. The action bar sits on top of the tab bar, with room under it for that button.
+  const tabBarH = 66 + insets.bottom;
+  const MIC_ROOM = 32;
 
   const { celebrities, loading, error, refetch } = useVoiceCallCelebrities();
   const { favoriteIds, loading: favLoading } = useCelebrityFavorites({
@@ -428,7 +432,7 @@ export default function VoiceCallScreen() {
         ref={scrollRef}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: success ? insets.bottom + 32 : insets.bottom + 150 }}
+        contentContainerStyle={{ paddingBottom: success ? tabBarH + 40 : tabBarH + MIC_ROOM + 160 }}
       >
         <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.hero, { paddingTop: topPad + 10 }]}>
           <View style={[s.deco, { width: 150, height: 150, top: -40, right: -40, opacity: isDark ? 0.08 : 0.12 }]} />
@@ -719,7 +723,7 @@ export default function VoiceCallScreen() {
       </ScrollView>
 
       {!success && (
-        <View style={[s.bar, { backgroundColor: colors.background, borderTopColor: colors.border, paddingBottom: insets.bottom + 10 }]}>
+        <View style={[s.bar, { backgroundColor: colors.background, borderTopColor: colors.border, bottom: tabBarH, paddingBottom: MIC_ROOM }]}>
           {callError ? (
             <View
               accessibilityLiveRegion="polite"
