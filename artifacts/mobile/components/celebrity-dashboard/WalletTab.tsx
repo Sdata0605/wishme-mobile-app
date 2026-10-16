@@ -42,25 +42,16 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
     if (!session?.access_token) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [bkRes, prRes, txRes, ipRes] = await Promise.all([
+      const [bkRes, prRes, txRes] = await Promise.all([
         supabaseFetch(`/rest/v1/bank_details?user_id=eq.${user?.profileId}&order=created_at.desc`, {}, session.access_token),
         supabaseFetch(`/rest/v1/payout_requests?celebrity_id=eq.${celebrity.id}&order=requested_at.desc&limit=20`, {}, session.access_token),
         supabaseFetch(`/rest/v1/celebrity_wallet_transactions?celebrity_id=eq.${celebrity.id}&order=created_at.desc&limit=50`, {}, session.access_token),
-        supabaseFetch(`/rest/v1/image_promotions?celebrity_id=eq.${celebrity.id}&status=eq.completed&order=created_at.desc&limit=50`, {}, session.access_token),
       ]);
       if (bkRes.ok) { const r = await bkRes.json() as BankDetail[]; setBanks(r ?? []); if (r?.length > 0) setSelectedBank(r[0]); }
       if (prRes.ok) { const r = await prRes.json() as PayoutRequest[]; setPayouts(r ?? []); }
       const walletTxns: WalletTx[] = txRes.ok ? ((await txRes.json() as WalletTx[]) ?? []) : [];
-      const ipRows: ImagePromotion[] = ipRes.ok ? ((await ipRes.json() as ImagePromotion[]) ?? []) : [];
-      const virtualTxns: WalletTx[] = ipRows.map(ip => ({
-        id: `ip-${ip.id}`,
-        transaction_type: 'earning',
-        amount: Math.round((ip.price_paid ?? 0) * 0.7),
-        status: 'completed',
-        description: 'Image promotion commission',
-        created_at: ip.created_at,
-      }));
-      const merged = [...walletTxns, ...virtualTxns].sort(
+      // The earnings ledger is the single source of truth: it already holds every credited order.
+      const merged = [...walletTxns].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
       setTxns(merged);

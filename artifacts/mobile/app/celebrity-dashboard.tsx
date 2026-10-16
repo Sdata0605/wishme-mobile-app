@@ -69,17 +69,25 @@ export default function CelebrityDashboardScreen() {
       const celeb = rows[0];
       setCelebrity(celeb);
 
+      // Earnings come from the celebrity's own balance (every credited order moves it). The order count
+      // covers bookings plus Wish a Friend, UGC and image promotion orders.
+      const countOf = async (table: string): Promise<number> => {
+        const r = await supabaseFetch(`/rest/v1/${table}?celebrity_id=eq.${celeb.id}&select=id&limit=1000`, {}, session.access_token);
+        return r.ok ? ((await r.json()) as unknown[]).length : 0;
+      };
       const bkRes = await supabaseFetch(
         `/rest/v1/bookings?celebrity_id=eq.${celeb.id}&select=status,celebrity_commission`,
         {},
         session.access_token,
       );
-      if (bkRes.ok) {
-        const bks = await bkRes.json() as Array<{ status: string; celebrity_commission: number }>;
-        const totalEarnings = bks.filter(b => b.status === 'completed').reduce((s, b) => s + (b.celebrity_commission ?? 0), 0);
-        const pendingEarnings = bks.filter(b => ['pending', 'in_progress', 'accepted'].includes(b.status)).reduce((s, b) => s + (b.celebrity_commission ?? 0), 0);
-        setStats({ totalEarnings, pendingEarnings, totalBookings: bks.length });
-      }
+      const bks = bkRes.ok ? await bkRes.json() as Array<{ status: string; celebrity_commission: number }> : [];
+      const [wf, ua, ip] = await Promise.all([countOf('wish_friend_orders'), countOf('ugc_ads'), countOf('image_promotions')]);
+      const pendingEarnings = bks.filter(b => ['pending', 'in_progress', 'accepted'].includes(b.status)).reduce((s, b) => s + (b.celebrity_commission ?? 0), 0);
+      setStats({
+        totalEarnings: Number(celeb.total_earnings ?? 0),
+        pendingEarnings,
+        totalBookings: bks.length + wf + ua + ip,
+      });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Network error';
       setFetchError(`${msg}. Please pull to refresh.`);

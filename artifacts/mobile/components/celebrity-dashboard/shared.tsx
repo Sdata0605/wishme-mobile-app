@@ -66,6 +66,7 @@ export interface Celebrity {
   bio: string;
   image_url: string;
   available_balance: number;
+  total_earnings?: number;
   rating: number;
   review_count: number;
   consent_status: string;
@@ -101,6 +102,22 @@ export interface ImagePromotion {
   status: string;
   created_at: string;
   profiles?: { first_name: string; last_name: string };
+}
+
+/** A Wish a Friend / UGC video / UGC ad order made with this celebrity (the admin team fulfils these). */
+export interface CelebrityOrder {
+  id: string;
+  kind: 'wish_friend' | 'ugc_ad';
+  /** What to call it on screen, e.g. "Video wish" or "UGC ad". */
+  label: string;
+  title: string;
+  price_paid: number;
+  status: string;
+  created_at: string;
+  customer: string;
+  video_url?: string | null;
+  /** What the celebrity was paid for this order, once it is completed. */
+  earned?: number;
 }
 
 export const TABS: Array<{ key: string; label: string; icon: IconName }> = [

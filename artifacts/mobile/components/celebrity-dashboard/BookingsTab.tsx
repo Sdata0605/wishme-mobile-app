@@ -7,13 +7,14 @@ import {
   View,
 } from 'react-native';
 import { fmtDate, fmtRupee, StatusBadge, SectionEmpty, LoadingBox, Card, SectionTitle, styles } from './shared';
-import type { Booking, ImagePromotion, TabProps } from './shared';
+import type { Booking, CelebrityOrder, ImagePromotion, TabProps } from './shared';
 import { Icon } from '@/components/Icon';
 import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
 
 export function BookingsTab({ celebrity, colors, session }: TabProps) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [imagePromos, setImagePromos] = useState<ImagePromotion[]>([]);
+  const [orders, setOrders] = useState<CelebrityOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [acting, setActing] = useState<string | null>(null);
   const [expandedBookings, setExpandedBookings] = useState<Set<string>>(new Set());
@@ -21,7 +22,7 @@ export function BookingsTab({ celebrity, colors, session }: TabProps) {
   const fetchBookings = useCallback(async () => {
     setLoading(true);
     try {
-      const [bRes, ipRes] = await Promise.all([
+      const [bRes, ipRes, wfRes, uaRes] = await Promise.all([
         supabaseFetch(
           `/rest/v1/bookings?celebrity_id=eq.${celebrity.id}&select=*,profiles(first_name,last_name)&order=created_at.desc&limit=50`,
           {},
@@ -32,9 +33,60 @@ export function BookingsTab({ celebrity, colors, session }: TabProps) {
           {},
           session?.access_token,
         ),
+        supabaseFetch(
+          `/rest/v1/wish_friend_orders?celebrity_id=eq.${celebrity.id}&select=id,order_type,recipient_name,occasion,price_paid,status,created_at,video_url,profiles(first_name,last_name)&order=created_at.desc&limit=50`,
+          {},
+          session?.access_token,
+        ),
+        supabaseFetch(
+          `/rest/v1/ugc_ads?celebrity_id=eq.${celebrity.id}&select=id,product_name,price_paid,status,created_at,video_url&order=created_at.desc&limit=50`,
+          {},
+          session?.access_token,
+        ),
       ]);
       if (bRes.ok) { const rows = await bRes.json() as Booking[]; setBookings(rows ?? []); }
       if (ipRes.ok) { const rows = await ipRes.json() as ImagePromotion[]; setImagePromos(rows ?? []); }
+
+      // Wish a Friend, UGC videos and UGC ads: the admin makes the video, and the celebrity is paid when it is completed.
+      const merged: CelebrityOrder[] = [];
+      if (wfRes.ok) {
+        const rows = await wfRes.json() as Array<{ id: string; order_type: string; recipient_name: string | null; occasion: string | null; price_paid: number; status: string; created_at: string; video_url: string | null; profiles?: { first_name?: string; last_name?: string } | null }>;
+        for (const r of rows ?? []) {
+          merged.push({
+            id: r.id,
+            kind: 'wish_friend',
+            label: r.order_type === 'ugc_video' ? 'UGC video' : 'Video wish',
+            title: `${r.recipient_name ?? 'Friend'}${r.occasion ? ` · ${r.occasion}` : ''}`,
+            price_paid: r.price_paid,
+            status: r.status,
+            created_at: r.created_at,
+            customer: r.profiles ? `${r.profiles.first_name ?? ''} ${r.profiles.last_name ?? ''}`.trim() || 'Customer' : 'Customer',
+            video_url: r.video_url,
+          });
+        }
+      }
+      if (uaRes.ok) {
+        const rows = await uaRes.json() as Array<{ id: string; product_name: string | null; price_paid: number; status: string; created_at: string; video_url: string | null }>;
+        for (const r of rows ?? []) {
+          merged.push({ id: r.id, kind: 'ugc_ad', label: 'UGC ad', title: r.product_name ?? 'UGC ad', price_paid: r.price_paid, status: r.status, created_at: r.created_at, customer: 'Customer', video_url: r.video_url });
+        }
+      }
+      if (merged.length > 0) {
+        // What the celebrity was actually paid for each order comes from the earnings ledger.
+        const ids = merged.map(o => o.id).join(',');
+        const ledgerRes = await supabaseFetch(
+          `/rest/v1/celebrity_wallet_transactions?celebrity_id=eq.${celebrity.id}&transaction_type=eq.earning&booking_id=in.(${ids})&select=booking_id,amount`,
+          {},
+          session?.access_token,
+        );
+        if (ledgerRes.ok) {
+          const ledger = await ledgerRes.json() as Array<{ booking_id: string; amount: number }>;
+          const earned = new Map((ledger ?? []).map(l => [l.booking_id, Number(l.amount)]));
+          for (const o of merged) if (earned.has(o.id)) o.earned = earned.get(o.id);
+        }
+      }
+      merged.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      setOrders(merged);
     } catch {}
     setLoading(false);
   }, [celebrity.id, session?.access_token]);
@@ -76,6 +128,8 @@ export function BookingsTab({ celebrity, colors, session }: TabProps) {
       ws.onopen = () => {
         join('bookings');
         join('image_promotions');
+        join('wish_friend_orders');
+        join('ugc_ads');
         heartbeat = setInterval(() => { send({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++ref) }); }, 30000);
       };
       ws.onmessage = (evt) => {
@@ -169,6 +223,30 @@ export function BookingsTab({ celebrity, colors, session }: TabProps) {
           </Card>
         );
       })}
+
+      <SectionTitle text={`Wish a Friend & UGC Orders (${orders.length})`} colors={colors} />
+      {orders.length === 0 ? (
+        <SectionEmpty icon="video" text="No Wish a Friend or UGC orders yet" colors={colors} />
+      ) : (
+        orders.map(o => (
+          <Card key={`${o.kind}-${o.id}`} colors={colors}>
+            <View style={styles.rowBetween}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.cardTitle, { color: colors.foreground }]} numberOfLines={2}>{o.title}</Text>
+                <Text style={[styles.cardSub, { color: colors.mutedForeground }]}>{o.label} · {o.customer}</Text>
+              </View>
+              <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
+                <Text style={[styles.priceText, { color: '#7B5CFA' }]}>{fmtRupee(o.price_paid)}</Text>
+                <StatusBadge status={o.status} />
+              </View>
+            </View>
+            <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{fmtDate(o.created_at)}</Text>
+            <Text style={{ marginTop: 6, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: o.earned != null ? '#22C55E' : colors.mutedForeground }}>
+              {o.earned != null ? `You earned ${fmtRupee(o.earned)}` : o.status === 'completed' ? 'Earning is being added' : 'You are paid when the order is completed'}
+            </Text>
+          </Card>
+        ))
+      )}
 
       <SectionTitle text="Image Promotions" colors={colors} />
       {imagePromos.length === 0 ? (
