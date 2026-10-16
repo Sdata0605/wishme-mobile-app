@@ -16,6 +16,7 @@ export function SubscribedCelebrityChips<T extends { id: string; name: string }>
   onSelect,
   priceFor,
   accent = '#7B5CFA',
+  onAccentText = '#fff',
   invalid = false,
   emptyText = 'Subscribe to a celebrity to use this service.',
 }: {
@@ -28,6 +29,8 @@ export function SubscribedCelebrityChips<T extends { id: string; name: string }>
   /** Shown on each chip. Return null/0 to mark a celebrity as not offering this service (the chip is hidden). */
   priceFor?: (celebrity: T) => number | null;
   accent?: string;
+  /** Colour of the text and tick on a selected chip (dark ink on a bright accent). */
+  onAccentText?: string;
   invalid?: boolean;
   emptyText?: string;
 }) {
@@ -75,9 +78,9 @@ export function SubscribedCelebrityChips<T extends { id: string; name: string }>
               },
             ]}
           >
-            <Text style={[s.chipText, { color: on ? '#fff' : colors.foreground }]}>{c.name}</Text>
-            {price ? <Text style={[s.chipPrice, { color: on ? '#fff' : colors.mutedForeground }]}>₹{price.toLocaleString('en-IN')}</Text> : null}
-            {on ? <Icon name="check" size={13} color="#fff" /> : null}
+            <Text style={[s.chipText, { color: on ? onAccentText : colors.foreground }]}>{c.name}</Text>
+            {price ? <Text style={[s.chipPrice, { color: on ? onAccentText : colors.mutedForeground }]}>₹{price.toLocaleString('en-IN')}</Text> : null}
+            {on ? <Icon name="check" size={13} color={onAccentText} /> : null}
           </TouchableOpacity>
         );
       })}
