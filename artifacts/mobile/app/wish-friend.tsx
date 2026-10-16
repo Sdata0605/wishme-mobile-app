@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { WishFriendLanding } from '@/components/wish-friend/WishFriendLanding';
 import { placeOrder } from '@/services/placeOrder';
+import { uploadPhoto } from '@/services/uploadPhoto';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { parseApiError, supabaseFetch, SUPABASE_URL } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -101,15 +102,7 @@ export default function WishFriendScreen() {
     if (result.canceled || !result.assets[0]) return;
     setUploadingImage(true);
     try {
-      const blob = await (await fetch(result.assets[0].uri)).blob();
-      const path = `${user.id}/wish-friend-${Date.now()}.jpg`;
-      const res = await supabaseFetch(
-        `/storage/v1/object/promotional-content/${path}`,
-        { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob },
-        token,
-      );
-      if (!res.ok) throw new Error(await parseApiError(res));
-      setReferenceImageUrl(`${SUPABASE_URL}/storage/v1/object/public/promotional-content/${path}`);
+      setReferenceImageUrl(await uploadPhoto({ uri: result.assets[0].uri, bucket: 'promotional-content', folder: user.id, token }));
     } catch (e) {
       console.warn('[wish-friend] photo upload failed', e);
       Alert.alert('Photo upload failed', e instanceof Error ? e.message : 'Please try again.');

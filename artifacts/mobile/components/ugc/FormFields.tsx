@@ -21,6 +21,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useSubscribedCelebrities } from '@/hooks/useSubscribedCelebrities';
 import { SubscribedCelebrityChips } from '@/components/celebrity/SubscribedCelebrityChips';
 import type { CelebrityLite, FieldDef, Option, Values } from './types';
+import { uploadPhoto } from '@/services/uploadPhoto';
 
 interface FieldProps {
   field: FieldDef;
@@ -102,15 +103,7 @@ function ImageTiles({
     const added: string[] = [];
     for (const asset of res.assets.slice(0, remaining)) {
       try {
-        const blob = await (await fetch(asset.uri)).blob();
-        const path = `${authUid}/ugc-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.jpg`;
-        const up = await supabaseFetch(
-          `/storage/v1/object/promotional-content/${path}`,
-          { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob },
-          token,
-        );
-        if (!up.ok) throw new Error(await parseApiError(up));
-        added.push(`${SUPABASE_URL}/storage/v1/object/public/promotional-content/${path}`);
+        added.push(await uploadPhoto({ uri: asset.uri, bucket: 'promotional-content', folder: authUid, token }));
       } catch (e) {
         console.warn('[ugc] photo upload failed', e);
         Alert.alert('Photo upload failed', e instanceof Error ? e.message : 'Please try again.');
