@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 import { parseApiError, supabaseFetch } from '@/constants/supabase';
 
 /** How the user wants to be addressed: 'male' is sir, 'female' is ma'am, 'other' is no title. Unknown until they say. */
@@ -330,6 +331,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     restore();
   }, [doRefresh]);
+
+  // Keep `session.access_token` fresh while the app is open. The token lives about an hour, and
+  // most screens read it straight from state; renewing only at launch meant any screen opened after
+  // that sent an expired token and the server answered "Unauthorized" (Image Promotions, the voice
+  // service, ...). Checked every minute and whenever the app comes back to the foreground.
+  useEffect(() => {
+    if (!session?.access_token) return;
+    const renewIfStale = () => {
+      const current = sessionRef.current;
+      if (current?.access_token && isTokenStale(current.access_token)) void refreshSession(current);
+    };
+    renewIfStale();
+    const timer = setInterval(renewIfStale, 60_000);
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active') renewIfStale(); });
+    return () => { clearInterval(timer); sub.remove(); };
+  }, [session?.access_token, refreshSession]);
 
   const getValidSession = useCallback(async (): Promise<Session | null> => {
     const current = sessionRef.current;

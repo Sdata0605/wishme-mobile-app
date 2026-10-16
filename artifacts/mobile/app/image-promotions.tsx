@@ -29,6 +29,11 @@ import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
+/** Tries per order. The AI service is occasionally busy or drops a request; a repeat almost always works. */
+const MAX_ATTEMPTS = 3;
+/** Generating an image takes well over the app's usual 20 s request limit. */
+const GENERATE_TIMEOUT_MS = 170_000;
+
 interface ImagePromotion {
   id: string;
   user_id: string;
@@ -75,7 +80,7 @@ function isToday(iso: string) {
 export default function ImagePromotionsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, session } = useAuth();
+  const { user, session, getValidSession } = useAuth();
   const { confirmOrder } = useOrderConfirm();
   const wallet = useWallet();
   const { discountPercentage, getDiscountedPrice } = usePlan();
@@ -206,6 +211,23 @@ export default function ImagePromotionsScreen() {
     setRefImgBase64(null);
   }, []);
 
+  /** An image the server finished for this celebrity since `since`, or null. Used after a dropped connection. */
+  const findFinishedGeneration = useCallback(async (token: string, since: string): Promise<ImagePromotion | null> => {
+    if (!user?.profileId || !selectedCelebId) return null;
+    try {
+      const res = await supabaseFetch(
+        `/rest/v1/image_promotions?user_id=eq.${user.profileId}&celebrity_id=eq.${selectedCelebId}&status=eq.completed&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=1`,
+        {},
+        token,
+      );
+      if (!res.ok) return null;
+      const rows = await res.json() as ImagePromotion[];
+      return rows?.[0]?.generated_image_url ? rows[0] : null;
+    } catch {
+      return null;
+    }
+  }, [user?.profileId, selectedCelebId]);
+
   const generate = useCallback(async () => {
     if (!selectedCelebId || !concept.trim()) return;
     if (wallet.balance < finalPrice) {
@@ -233,22 +255,56 @@ export default function ImagePromotionsScreen() {
         referenceImageUrl: refImgBase64 ? `data:image/jpeg;base64,${refImgBase64}` : null,
       };
 
-      const res = await supabaseFetch(
-        '/functions/v1/generate-image-promotion',
-        {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        },
-        session.access_token,
-      );
+      const startedAt = new Date(Date.now() - 5_000).toISOString();
+      let gen: ImagePromotion | null = null;
+      let lastError = '';
 
-      if (!res.ok) {
+      // Up to 3 tries, so a hiccup (a busy AI model, a dropped connection, an expired token) never
+      // reaches the user. A try is only repeated when nothing was charged: the server bills only
+      // after an image exists, and before retrying a dropped connection we look for an image the
+      // server already finished, so the same order is never paid for twice.
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS && !gen; attempt++) {
+        if (attempt > 1) await new Promise<void>(r => setTimeout(r, 1500 * (attempt - 1)));
+
+        // The token in state can be an hour old; ask for one that is guaranteed valid right now.
+        const fresh = await getValidSession();
+        if (!fresh?.access_token) {
+          Alert.alert('Session expired', 'Please sign in again to generate images.');
+          setGenerating(false);
+          return;
+        }
+
+        let res: Response;
+        try {
+          res = await supabaseFetch(
+            '/functions/v1/generate-image-promotion',
+            { method: 'POST', body: JSON.stringify(payload) },
+            fresh.access_token,
+            GENERATE_TIMEOUT_MS,
+          );
+        } catch {
+          // Connection dropped or timed out: the image may still have been made and paid for.
+          lastError = 'The connection dropped.';
+          const done = await findFinishedGeneration(fresh.access_token, startedAt);
+          if (done) gen = done;
+          continue;
+        }
+
+        if (res.ok) {
+          const data = await res.json().catch(() => null) as { generation?: ImagePromotion; error?: string } | null;
+          if (data?.generation) { gen = data.generation; break; }
+          lastError = data?.error ?? 'No image came back.';
+          continue;
+        }
+
         let errMsg = `Request failed (${res.status})`;
         try {
           const errData = await res.json() as Record<string, unknown>;
           const msg = (errData.error as string) || (errData.message as string) || '';
           if (msg) errMsg = msg;
         } catch {}
+        lastError = errMsg;
+
         if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
           Alert.alert(
             'Insufficient Balance',
@@ -258,22 +314,25 @@ export default function ImagePromotionsScreen() {
               { text: 'Add Funds', onPress: () => router.push('/wallet' as never) },
             ],
           );
-        } else {
-          Alert.alert('Generation Failed', errMsg);
+          setGenerating(false);
+          return;
         }
+        // Worth another try: the AI service was busy or failed (5xx / 429), or the token was refused.
+        const transient = res.status >= 500 || res.status === 429 || res.status === 401;
+        if (!transient) {
+          Alert.alert('Generation Failed', errMsg);
+          setGenerating(false);
+          return;
+        }
+      }
+
+      if (!gen) {
+        Alert.alert('Could not create the image', `${lastError} We tried ${MAX_ATTEMPTS} times. You are only charged when an image is created, so please try again in a moment.`);
         setGenerating(false);
         return;
       }
 
-      const data = await res.json() as { generation?: ImagePromotion; error?: string };
-      if (data.error) {
-        Alert.alert('Generation Failed', data.error);
-        setGenerating(false);
-        return;
-      }
-
-      if (data.generation) {
-        const gen = data.generation;
+      {
 
         const now = new Date();
         const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -329,7 +388,7 @@ export default function ImagePromotionsScreen() {
     }
 
     setGenerating(false);
-  }, [selectedCelebId, concept, branding, refImgBase64, wallet, finalPrice, session, user, fetchHistory]);
+  }, [selectedCelebId, concept, branding, refImgBase64, wallet, finalPrice, session, user, fetchHistory, getValidSession, findFinishedGeneration]);
 
   const downloadPromo = useCallback(async (imgUrl: string, promoId: string) => {
     if (Platform.OS === 'web') {
