@@ -1,0 +1,5 @@
+# Audit output: schema and data dumps (personal data, password hashes), downloaded function sources.
+# Review before sharing; never commit.
+out/
+# Created by `supabase init` / `supabase link` / `supabase functions download` in this folder.
+supabase/

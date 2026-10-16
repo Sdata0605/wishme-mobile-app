@@ -1,0 +1,2 @@
+# bash refuses CRLF scripts; everything else in the repo is CRLF.
+*.sh text eol=lf

@@ -1,0 +1,65 @@
+# Edge functions the mobile app calls (derived from a grep over artifacts/mobile for /functions/v1/).
+# One slug per line. Lines starting with # are ignored. The audit downloads these AND every function
+# `supabase functions list` reports, so cron/webhook functions the app never calls are captured too.
+
+# Auth and messaging
+send-email-otp
+verify-email-otp
+send-whatsapp-welcome
+trigger-message-event
+
+# Payments (Razorpay)
+create-razorpay-order
+verify-razorpay-payment
+
+# Travel (TBO)
+tbo-flights
+tbo-hotels
+
+# Celebrity services, chat and occasions
+celebrity-conversation-auto-reply
+celebrity-ai-message
+generate-occasion-auto-reply
+send-celebrity-subscription-email
+heygen-get-languages
+generate-script
+generate-occasion-video
+generate-greeting-card
+
+# Wish a Celebrity
+generate-message-suggestions
+suggest-greeting-card-prompts
+generate-wish-celebrity-card
+send-wish-to-celebrity
+send-wish-thankyou-dm
+
+# AI content
+generate-greeting-card-ai
+generate-photo-wish
+generate-image-promotion
+generate-document
+generate-lyrics
+generate-music
+check-music-status
+elevenlabs-image-music-video
+elevenlabs-sound-effects
+elevenlabs-speech-to-speech
+elevenlabs-clone-voice
+elevenlabs-text-to-speech
+elevenlabs-audio-isolation
+get-user-voices
+elevenlabs-get-user-voices
+
+# Voice assistant, AI calls, Vapi
+voice-token
+sarvam-voice
+ai-call-start
+ai-call-recording
+vapi-celebrity-call
+vapi-get-voices
+vapi-upload-voice
+vapi-make-call
+web-search
+
+# Media
+b2-get-signed-url
