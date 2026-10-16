@@ -250,13 +250,14 @@ export default function WishBookingScreen() {
     setPaying(true);
     setPayError('');
     try {
-      const orderId = await createWishOrder('wallet', 'completed');
+      const orderId = await createWishOrder('wallet', 'pending');
+      // Created unpaid; it becomes 'completed' only after the wallet has been charged, and that change is what pays the celebrity.
       const txRes = await supabaseFetch('/rest/v1/wallet_transactions', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({
           user_id: profileId,
-          amount: -finalPrice,
+          amount: finalPrice,
           transaction_type: 'booking',
           status: 'completed',
           description: `Wish order #${orderId} for ${celeb?.name} - ${occasion}`,

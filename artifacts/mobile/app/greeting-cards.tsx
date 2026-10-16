@@ -129,7 +129,7 @@ export default function GreetingCardsScreen() {
       const [settingsRes, profileRes] = await Promise.all([
         supabaseFetch('/rest/v1/platform_settings?setting_key=eq.greeting_card_price&select=setting_value', {}, session?.access_token),
         user?.id
-          ? supabaseFetch(`/rest/v1/profiles?select=plan_name&user_id=eq.${user.id}&limit=1`, {}, session?.access_token)
+          ? supabaseFetch(`/rest/v1/profiles?select=plan&user_id=eq.${user.id}&limit=1`, {}, session?.access_token)
           : Promise.resolve(null),
       ]);
 
@@ -142,8 +142,8 @@ export default function GreetingCardsScreen() {
       }
 
       if (profileRes && profileRes.ok) {
-        const profRows = await profileRes.json() as Array<{ plan_name?: string }>;
-        const planName = profRows?.[0]?.plan_name;
+        const profRows = await profileRes.json() as Array<{ plan?: string }>;
+        const planName = profRows?.[0]?.plan;
         if (planName) {
           const plansRes = await supabaseFetch(
             `/rest/v1/plans?name=eq.${encodeURIComponent(planName)}&select=service_discount_percentage`,

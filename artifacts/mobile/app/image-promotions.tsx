@@ -369,19 +369,6 @@ export default function ImagePromotionsScreen() {
           if (txRes.ok) paymentRecorded = true;
         } catch {}
 
-        if (paymentRecorded) {
-          try {
-            await supabaseFetch(
-              `/rest/v1/image_promotions?id=eq.${gen.id}`,
-              {
-                method: 'PATCH',
-                body: JSON.stringify({ wishme_payment_id: wishmePaymentId }),
-              },
-              session.access_token,
-            );
-          } catch {}
-        }
-
         setCurrentGeneration({ ...gen, wishme_payment_id: paymentRecorded ? wishmePaymentId : undefined });
         wallet.refetch();
         void fetchHistory();

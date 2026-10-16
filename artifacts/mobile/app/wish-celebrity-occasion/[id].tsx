@@ -429,17 +429,18 @@ export default function WishCelebrityOccasionScreen() {
     setPayError('');
     let orderId: string | undefined;
     try {
-      orderId = await createOrGetOrder('wallet', 'completed');
+      orderId = await createOrGetOrder('wallet', 'pending');
+      // Created unpaid; it becomes 'completed' only after the wallet has been charged, and that change is what pays the celebrity.
 
       const txRes = await supabaseFetch('/rest/v1/wallet_transactions', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({
           user_id: profileId,
-          amount: -finalPrice,
-          type: 'debit',
-          transaction_type: 'greeting_card_generation',
-          reference_id: orderId,
+          amount: finalPrice,
+          // The wallet table has no 'type' or 'reference_id' column (sending them made every wallet payment here fail).
+          transaction_type: 'booking',
+          payment_method: 'wallet',
           status: 'completed',
           description: `Wish order #${orderId} for ${celeb?.name} - ${occasionType}`,
           transaction_details: {

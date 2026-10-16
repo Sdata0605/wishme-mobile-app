@@ -44,7 +44,7 @@ export function VoiceConversionTab({ ctx }: { ctx: MusicCtx }) {
       await supabaseFetch('/rest/v1/voice_conversion_generations', {
         method: 'POST',
         headers: { Prefer: 'return=minimal' } as Record<string, string>,
-        body: JSON.stringify({ user_id: ctx.profileId, voice_id: targetVoice.voice_id, voice_name: targetVoice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.voiceConversion }),
+        body: JSON.stringify({ user_id: ctx.profileId, target_voice_id: targetVoice.voice_id, target_voice_name: targetVoice.name, audio_url: data.audioUrl, status: 'completed', credits_used: COSTS.voiceConversion }),
       }, ctx.session?.access_token);
       setAudioUri(data.audioUrl);
       ctx.refreshWallet();
