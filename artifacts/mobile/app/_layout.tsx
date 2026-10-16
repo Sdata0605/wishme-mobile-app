@@ -26,7 +26,8 @@ import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { DrawerProvider } from '@/context/DrawerContext';
 import { OrderConfirmProvider } from '@/context/OrderConfirmContext';
 import { OccasionInApp } from '@/components/OccasionInApp';
-import { ThemeProvider } from '@/context/ThemeContext';
+import { ThemeProvider, useTheme } from '@/context/ThemeContext';
+import * as SystemUI from 'expo-system-ui';
 import { AgentStateProvider } from '@/context/AgentStateContext';
 import { VoiceAssistantProvider } from '@/context/VoiceAssistantContext';
 import { reminderIdFrom, syncScheduledReminders } from '@/services/hub/notifications';
@@ -122,12 +123,40 @@ function ReminderNotifications() {
   return null;
 }
 
-function RootLayoutNav() {
+/**
+ * Paints the app's page colour behind everything: the phone's window and the navigator's cards. Without it the
+ * navigator's default near-white background showed for a moment between the animated splash and the next screen.
+ */
+function useAppBackground() {
+  const { neon } = useTheme();
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(neon.bg).catch(() => {});
+  }, [neon.bg]);
+  return neon.bg;
+}
+
+/** The screens the splash hands over to: they fade in over the same page colour instead of sliding in. */
+const AFTER_SPLASH = { animation: 'fade' as const, animationDuration: 320 };
+
+/** The root view under the navigator, in the same page colour, so nothing lighter is ever behind a screen. */
+function AppRoot({ children }: { children: React.ReactNode }) {
+  const background = useAppBackground();
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <View style={{ flex: 1, backgroundColor: background }} ref={adoptRootFromInstance}>
+      {children}
+    </View>
+  );
+}
+
+function RootLayoutNav() {
+  const { neon } = useTheme();
+  const background = neon.bg;
+  return (
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: background } }}>
       <Stack.Screen name="index" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(auth)" options={AFTER_SPLASH} />
+      <Stack.Screen name="(tabs)" options={AFTER_SPLASH} />
+      <Stack.Screen name="onboarding" options={AFTER_SPLASH} />
       <Stack.Screen name="celebrity/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="booking/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="booking-summary" options={{ presentation: 'card' }} />
@@ -172,7 +201,7 @@ function RootLayoutNav() {
       <Stack.Screen name="document/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="assistant-setup" options={{ presentation: 'card' }} />
       <Stack.Screen name="celebrity-signup" />
-      <Stack.Screen name="celebrity-dashboard" />
+      <Stack.Screen name="celebrity-dashboard" options={AFTER_SPLASH} />
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="select-plan" />
       <Stack.Screen name="edit-profile" />
@@ -229,13 +258,13 @@ export default function RootLayout() {
                     <VoiceAssistantProvider>
                       <DrawerProvider>
                       <OrderConfirmProvider>
-                        <View style={{ flex: 1 }} ref={adoptRootFromInstance}>
+                        <AppRoot>
                           <RootLayoutNav />
                           <FloatingButtons />
                           <AssistantSetupGate />
                           <ReminderNotifications />
                           <OccasionInApp />
-                        </View>
+                        </AppRoot>
                       </OrderConfirmProvider>
                       </DrawerProvider>
                     </VoiceAssistantProvider>

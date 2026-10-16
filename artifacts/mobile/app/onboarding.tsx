@@ -1,8 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
-import { VideoView, useVideoPlayer } from 'expo-video';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dimensions,
   Image,
@@ -23,8 +22,6 @@ import { useTheme } from '@/context/ThemeContext';
 const STORAGE_ONBOARDING = '@wishme/onboarding_seen';
 
 const { height: H } = Dimensions.get('window');
-
-const INTRO_VIDEO = require('@/assets/videos/intro.mp4');
 
 const SLIDES = [
   {
@@ -52,56 +49,6 @@ const SLIDES = [
     image: require('@/assets/images/splash4.jpeg'),
   },
 ];
-
-function VideoIntroScreen({ onDone }: { onDone: () => void }) {
-  const insets = useSafeAreaInsets();
-  const doneCalledRef = useRef(false);
-
-  const done = useCallback(() => {
-    if (doneCalledRef.current) return;
-    doneCalledRef.current = true;
-    onDone();
-  }, [onDone]);
-
-  const player = useVideoPlayer(INTRO_VIDEO);
-
-  useEffect(() => {
-    player.loop = false;
-    player.play();
-  }, [player]);
-
-  useEffect(() => {
-    const sub = player.addListener('playToEnd', () => {
-      done();
-    });
-    return () => sub.remove();
-  }, [player, done]);
-
-  return (
-    <View style={StyleSheet.absoluteFillObject}>
-      <VideoView
-        player={player}
-        style={StyleSheet.absoluteFillObject}
-        contentFit="cover"
-        nativeControls={false}
-      />
-      <LinearGradient
-        pointerEvents="none"
-        colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0)']}
-        style={styles.videoScrim}
-      />
-      <Pressable
-        onPress={done}
-        style={[styles.videoSkip, { top: insets.top + 12 }]}
-        accessibilityRole="button"
-        accessibilityLabel="Skip the intro video"
-      >
-        <Text style={styles.skipText}>Skip</Text>
-        <Icon name="chevron-right" size={15} color="#fff" />
-      </Pressable>
-    </View>
-  );
-}
 
 /** A page dot: 8px, stretching to 22px for the live one, which carries the brand gradient. */
 function Dot({ active }: { active: boolean }) {
@@ -194,8 +141,12 @@ function SlideScreen({
   );
 }
 
+/**
+ * First-run onboarding: four slides, then the permissions screen. The brand intro that used to play here as a video
+ * is now the logo reveal at the end of the animated splash (components/splash/AnimatedSplash.tsx), which runs just
+ * before this screen.
+ */
 export default function OnboardingScreen() {
-  const [phase, setPhase] = useState<'video' | 'slides'>('video');
   const [current, setCurrent] = useState(0);
 
   // The permissions screen explains itself and hands over to sign-in, so it sits between the
@@ -216,18 +167,14 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: phase === 'video' ? '#000' : 'transparent' }]}>
-      {phase === 'video' ? (
-        <VideoIntroScreen onDone={() => setPhase('slides')} />
-      ) : (
-        <SlideScreen
-          slide={SLIDES[current]}
-          index={current}
-          total={SLIDES.length}
-          onNext={next}
-          onSkip={finish}
-        />
-      )}
+    <View style={styles.container}>
+      <SlideScreen
+        slide={SLIDES[current]}
+        index={current}
+        total={SLIDES.length}
+        onNext={next}
+        onSkip={finish}
+      />
     </View>
   );
 }
@@ -249,20 +196,4 @@ const styles = StyleSheet.create({
   bottom: { paddingHorizontal: 20, paddingTop: 8 },
   dots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   dot: { height: 8, borderRadius: 4, overflow: 'hidden' },
-  videoScrim: { position: 'absolute', top: 0, left: 0, right: 0, height: 120 },
-  videoSkip: {
-    position: 'absolute',
-    right: 16,
-    height: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingLeft: 16,
-    paddingRight: 10,
-    borderRadius: 17,
-    backgroundColor: 'rgba(10,21,86,0.55)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  skipText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
 });
