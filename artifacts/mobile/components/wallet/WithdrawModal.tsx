@@ -112,40 +112,30 @@ export function useWithdraw({ user, session }: { user: AuthUser; session: AuthSe
     setWithdrawError('');
 
     try {
-      const profileId = user?.profileId ?? '';
-
-      const payoutRes = await fetch(`${SUPABASE_URL}/rest/v1/payout_requests`, {
+      // One server call checks the amount against the real balance, files the request and lowers the
+      // balance together, so the same money can never be requested twice.
+      const payoutRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/request_celebrity_payout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'apikey': SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${session?.access_token}`,
-          'Prefer': 'return=minimal',
         },
         body: JSON.stringify({
-          celebrity_id: celebId,
-          profile_id: profileId,
-          requested_amount: amount,
-          bank_account_number: bankDetails.account_number,
-          bank_name: bankDetails.bank_name,
-          ifsc_code: bankDetails.ifsc_code,
-          account_holder_name: bankDetails.account_holder_name,
-          status: 'pending',
+          p_bank_name: bankDetails.bank_name,
+          p_account_number: bankDetails.account_number,
+          p_ifsc_code: bankDetails.ifsc_code,
+          p_account_holder_name: bankDetails.account_holder_name,
+          p_amount: amount,
         }),
       });
 
-      if (!payoutRes.ok) throw new Error('Failed to submit withdrawal request. Please try again.');
-
-      await fetch(`${SUPABASE_URL}/rest/v1/celebrities?id=eq.${celebId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Prefer': 'return=minimal',
-        },
-        body: JSON.stringify({ available_balance: celebAvailableBalance - amount }),
-      });
+      if (!payoutRes.ok) {
+        const err = await payoutRes.json().catch(() => ({})) as { message?: string };
+        throw new Error(err.message || 'Failed to submit withdrawal request. Please try again.');
+      }
+      const result = await payoutRes.json().catch(() => null) as { available_balance?: number } | null;
+      if (result && typeof result.available_balance === 'number') setCelebAvailableBalance(result.available_balance);
 
       setWithdrawSuccess(true);
     } catch (err: unknown) {

@@ -43,13 +43,37 @@ export const STATUS_COLORS: Record<string, string> = {
   active: '#22C55E',
   paid: '#22C55E',
   failed: '#EF4444',
+  confirmed: '#3B82F6',
+  processing: '#3B82F6',
+  pending_approval: '#F59E0B',
+  video_sent: '#22C55E',
+  delivered: '#22C55E',
+  processed: '#22C55E',
+};
+
+/** What a status means to a celebrity, in plain words (the raw values are internal). */
+export const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  pending_approval: 'Pending',
+  confirmed: 'Being made',
+  processing: 'Being made',
+  in_progress: 'Being made',
+  accepted: 'Being made',
+  video_sent: 'Delivered',
+  delivered: 'Delivered',
+  completed: 'Completed',
+  processed: 'Paid out',
+  rejected: 'Rejected',
+  declined: 'Declined',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
 };
 
 export function StatusBadge({ status }: { status: string }) {
   const color = STATUS_COLORS[status] ?? '#6B7280';
   return (
     <View style={[sBadge.wrap, { backgroundColor: color + '22' }]}>
-      <Text style={[sBadge.text, { color }]}>{status}</Text>
+      <Text style={[sBadge.text, { color }]}>{STATUS_LABELS[status] ?? status.replace(/_/g, ' ')}</Text>
     </View>
   );
 }
@@ -121,11 +145,9 @@ export interface CelebrityOrder {
 }
 
 export const TABS: Array<{ key: string; label: string; icon: IconName }> = [
-  { key: 'bookings', label: 'Bookings', icon: 'credit-card' },
+  { key: 'orders', label: 'Orders', icon: 'credit-card' },
   { key: 'wallet', label: 'Wallet', icon: 'credit-card' },
   { key: 'messages', label: 'Messages', icon: 'message-circle' },
-  { key: 'events', label: 'Events', icon: 'calendar' },
-  { key: 'consent', label: 'Consent', icon: 'shield' },
   { key: 'reviews', label: 'Reviews', icon: 'star' },
   { key: 'followers', label: 'Followers', icon: 'heart' },
   { key: 'content', label: 'Content', icon: 'image' },

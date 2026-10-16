@@ -20,11 +20,9 @@ import { supabaseFetch } from '@/constants/supabase';
 import type { User } from '@/context/AuthContext';
 import { fmtRupee, TABS, styles } from '@/components/celebrity-dashboard/shared';
 import type { Celebrity } from '@/components/celebrity-dashboard/shared';
-import { BookingsTab } from '@/components/celebrity-dashboard/BookingsTab';
+import { OrdersTab } from '@/components/celebrity-dashboard/OrdersTab';
 import { WalletTab } from '@/components/celebrity-dashboard/WalletTab';
 import { MessagesTab } from '@/components/celebrity-dashboard/MessagesTab';
-import { EventsTab } from '@/components/celebrity-dashboard/EventsTab';
-import { ConsentTab } from '@/components/celebrity-dashboard/ConsentTab';
 import { ReviewsTab } from '@/components/celebrity-dashboard/ReviewsTab';
 import { FollowersTab } from '@/components/celebrity-dashboard/FollowersTab';
 import { ContentTab } from '@/components/celebrity-dashboard/ContentTab';
@@ -42,7 +40,7 @@ export default function CelebrityDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [notCeleb, setNotCeleb] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState('bookings');
+  const [activeTab, setActiveTab] = useState('orders');
   const [stats, setStats] = useState({ totalEarnings: 0, pendingEarnings: 0, totalBookings: 0 });
   const [refreshing, setRefreshing] = useState(false);
 
@@ -192,7 +190,7 @@ export default function CelebrityDashboardScreen() {
           {[
             { label: 'Total Earnings', value: fmtRupee(stats.totalEarnings), icon: 'trending-up' as IconName, color: '#22C55E' },
             { label: 'Pending', value: fmtRupee(stats.pendingEarnings), icon: 'clock' as IconName, color: '#F59E0B' },
-            { label: 'Bookings', value: String(stats.totalBookings), icon: 'credit-card' as IconName, color: '#3B82F6' },
+            { label: 'Orders', value: String(stats.totalBookings), icon: 'credit-card' as IconName, color: '#3B82F6' },
             { label: 'Rating', value: (celebrity.rating ?? 0).toFixed(1), icon: 'star' as IconName, color: '#EAB308' },
             { label: 'Reviews', value: String(celebrity.review_count ?? 0), icon: 'message-circle' as IconName, color: '#7B5CFA' },
           ].map((s) => (
@@ -224,11 +222,9 @@ export default function CelebrityDashboardScreen() {
         </View>
 
         <View style={{ paddingBottom: bottomPad + 24 }}>
-          {activeTab === 'bookings' && <BookingsTab celebrity={celebrity} colors={colors} session={session} />}
+          {activeTab === 'orders' && <OrdersTab celebrity={celebrity} colors={colors} session={session} />}
           {activeTab === 'wallet' && <WalletTab celebrity={celebrity} colors={colors} session={session} user={user} onRefreshCeleb={fetchCelebrity} />}
           {activeTab === 'messages' && <MessagesTab celebrity={celebrity} colors={colors} session={session} user={user} />}
-          {activeTab === 'events' && <EventsTab celebrity={celebrity} colors={colors} session={session} />}
-          {activeTab === 'consent' && <ConsentTab celebrity={celebrity} colors={colors} session={session} onRefresh={fetchCelebrity} />}
           {activeTab === 'reviews' && <ReviewsTab celebrity={celebrity} colors={colors} session={session} />}
           {activeTab === 'followers' && <FollowersTab celebrity={celebrity} colors={colors} session={session} />}
           {activeTab === 'content' && <ContentTab celebrity={celebrity} colors={colors} session={session} onRefresh={fetchCelebrity} />}

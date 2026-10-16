@@ -13,7 +13,7 @@ import { supabaseFetch } from '@/constants/supabase';
 interface BankDetail {
   id: string;
   bank_name: string;
-  bank_account_number: string;
+  account_number: string;
   ifsc_code: string;
   account_holder_name: string;
 }
@@ -35,7 +35,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
   const [amount, setAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showAddBank, setShowAddBank] = useState(false);
-  const [bankForm, setBankForm] = useState({ bank_name: '', bank_account_number: '', ifsc_code: '', account_holder_name: '' });
+  const [bankForm, setBankForm] = useState({ bank_name: '', account_number: '', ifsc_code: '', account_holder_name: '' });
   const [addingBank, setAddingBank] = useState(false);
 
   const fetchAll = useCallback(async () => {
@@ -69,28 +69,27 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
     if (!session?.access_token) { Alert.alert('Not logged in'); return; }
     setSubmitting(true);
     try {
+      // One server call checks the amount against the real balance, files the request and lowers the
+      // balance together, so the same money can never be requested twice.
       const res = await supabaseFetch(
-        '/rest/v1/payout_requests',
+        '/rest/v1/rpc/request_celebrity_payout',
         {
           method: 'POST',
-          headers: { Prefer: 'return=minimal' } as Record<string, string>,
           body: JSON.stringify({
-            celebrity_id: celebrity.id,
-            profile_id: user?.profileId,
-            requested_amount: amt,
-            bank_name: selectedBank.bank_name,
-            bank_account_number: selectedBank.bank_account_number,
-            ifsc_code: selectedBank.ifsc_code,
-            account_holder_name: selectedBank.account_holder_name,
+            p_bank_name: selectedBank.bank_name,
+            p_account_number: selectedBank.account_number,
+            p_ifsc_code: selectedBank.ifsc_code,
+            p_account_holder_name: selectedBank.account_holder_name,
+            p_amount: Math.round(amt),
           }),
         },
         session.access_token,
       );
       if (!res.ok) {
         const err = await res.json().catch(() => ({})) as Record<string, string>;
-        Alert.alert('Error', err.message ?? `Failed to submit payout (${res.status})`);
+        Alert.alert('Could not withdraw', err.message ?? `Failed to submit payout (${res.status})`);
       } else {
-        Alert.alert('Success', 'Payout request submitted!');
+        Alert.alert('Success', 'Payout request submitted! The amount is set aside from your balance while the admin processes it.');
         setAmount('');
         fetchAll();
         onRefreshCeleb();
@@ -102,7 +101,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
   };
 
   const addBank = async () => {
-    if (!bankForm.bank_name || !bankForm.bank_account_number || !bankForm.ifsc_code || !bankForm.account_holder_name) {
+    if (!bankForm.bank_name || !bankForm.account_number || !bankForm.ifsc_code || !bankForm.account_holder_name) {
       Alert.alert('Fill all bank details'); return;
     }
     if (!session?.access_token) { Alert.alert('Not logged in'); return; }
@@ -123,7 +122,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
       } else {
         Alert.alert('Bank account added!');
         setShowAddBank(false);
-        setBankForm({ bank_name: '', bank_account_number: '', ifsc_code: '', account_holder_name: '' });
+        setBankForm({ bank_name: '', account_number: '', ifsc_code: '', account_holder_name: '' });
         fetchAll();
       }
     } catch (err) {
@@ -162,7 +161,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
               style={[styles.bankOption, { borderColor: selectedBank?.id === bk.id ? '#7B5CFA' : colors.border, backgroundColor: selectedBank?.id === bk.id ? '#7B5CFA10' : 'transparent' }]}
             >
               <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>{bk.bank_name}</Text>
-              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>****{bk.bank_account_number.slice(-4)} · {bk.account_holder_name}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>****{bk.account_number.slice(-4)} · {bk.account_holder_name}</Text>
             </TouchableOpacity>
           ))
         )}
@@ -178,7 +177,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
         {showAddBank && (
           <View style={{ marginTop: 12 }}>
             <InputRow label="Bank Name" value={bankForm.bank_name} onChangeText={(v) => setBankForm(p => ({ ...p, bank_name: v }))} colors={colors} />
-            <InputRow label="Account Number" value={bankForm.bank_account_number} onChangeText={(v) => setBankForm(p => ({ ...p, bank_account_number: v }))} keyboardType="number-pad" colors={colors} />
+            <InputRow label="Account Number" value={bankForm.account_number} onChangeText={(v) => setBankForm(p => ({ ...p, account_number: v }))} keyboardType="number-pad" colors={colors} />
             <InputRow label="IFSC Code" value={bankForm.ifsc_code} onChangeText={(v) => setBankForm(p => ({ ...p, ifsc_code: v.toUpperCase() }))} colors={colors} />
             <InputRow label="Account Holder Name" value={bankForm.account_holder_name} onChangeText={(v) => setBankForm(p => ({ ...p, account_holder_name: v }))} colors={colors} />
             <PrimaryBtn label="Save Bank Account" onPress={addBank} loading={addingBank} colors={colors} />
