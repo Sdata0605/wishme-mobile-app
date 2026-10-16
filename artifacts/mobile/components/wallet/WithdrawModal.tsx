@@ -112,9 +112,9 @@ export function useWithdraw({ user, session }: { user: AuthUser; session: AuthSe
     setWithdrawError('');
 
     try {
-      // One server call checks the amount against the real balance, files the request and lowers the
-      // balance together, so the same money can never be requested twice.
-      const payoutRes = await fetch(`${SUPABASE_URL}/rest/v1/rpc/request_celebrity_payout`, {
+      // One server call reserves the money and sends it to the bank account. It checks the amount against the
+      // real balance, so the same money can never be sent twice.
+      const payoutRes = await fetch(`${SUPABASE_URL}/functions/v1/celebrity-payout`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -122,20 +122,19 @@ export function useWithdraw({ user, session }: { user: AuthUser; session: AuthSe
           'Authorization': `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({
-          p_bank_name: bankDetails.bank_name,
-          p_account_number: bankDetails.account_number,
-          p_ifsc_code: bankDetails.ifsc_code,
-          p_account_holder_name: bankDetails.account_holder_name,
-          p_amount: amount,
+          amount,
+          bank_name: bankDetails.bank_name,
+          account_number: bankDetails.account_number,
+          ifsc_code: bankDetails.ifsc_code,
+          account_holder_name: bankDetails.account_holder_name,
         }),
       });
 
+      const out = await payoutRes.json().catch(() => ({})) as { error?: string; message?: string; available_balance?: number };
       if (!payoutRes.ok) {
-        const err = await payoutRes.json().catch(() => ({})) as { message?: string };
-        throw new Error(err.message || 'Failed to submit withdrawal request. Please try again.');
+        throw new Error(out.error || out.message || 'Failed to send the withdrawal. Please try again.');
       }
-      const result = await payoutRes.json().catch(() => null) as { available_balance?: number } | null;
-      if (result && typeof result.available_balance === 'number') setCelebAvailableBalance(result.available_balance);
+      if (typeof out.available_balance === 'number') setCelebAvailableBalance(out.available_balance);
 
       setWithdrawSuccess(true);
     } catch (err: unknown) {
@@ -202,9 +201,9 @@ export function WithdrawModal({ withdraw, user, colors }: { withdraw: WithdrawSt
               <View style={styles.successIconCircle}>
                 <Icon name="check" size={36} color="#fff" />
               </View>
-              <Text style={[styles.successTitle, { color: colors.foreground }]}>Request Submitted!</Text>
+              <Text style={[styles.successTitle, { color: colors.foreground }]}>Money is on its way!</Text>
               <Text style={[styles.infoText, { color: colors.mutedForeground, textAlign: 'center' }]}>
-                Withdrawal request submitted! Admin will process it within 3-5 business days.
+                Your withdrawal is being sent to your bank account. It usually arrives within minutes. You can follow it under Payout History in your dashboard.
               </Text>
               <TouchableOpacity
                 onPress={closeWithdrawModal}

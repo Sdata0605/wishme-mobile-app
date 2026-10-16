@@ -49,6 +49,7 @@ export const STATUS_COLORS: Record<string, string> = {
   video_sent: '#22C55E',
   delivered: '#22C55E',
   processed: '#22C55E',
+  reversed: '#EF4444',
 };
 
 /** What a status means to a celebrity, in plain words (the raw values are internal). */
@@ -62,18 +63,19 @@ export const STATUS_LABELS: Record<string, string> = {
   video_sent: 'Delivered',
   delivered: 'Delivered',
   completed: 'Completed',
-  processed: 'Paid out',
+  processed: 'Paid',
+  reversed: 'Returned',
   rejected: 'Rejected',
   declined: 'Declined',
   failed: 'Failed',
   cancelled: 'Cancelled',
 };
 
-export function StatusBadge({ status }: { status: string }) {
+export function StatusBadge({ status, label }: { status: string; label?: string }) {
   const color = STATUS_COLORS[status] ?? '#6B7280';
   return (
     <View style={[sBadge.wrap, { backgroundColor: color + '22' }]}>
-      <Text style={[sBadge.text, { color }]}>{STATUS_LABELS[status] ?? status.replace(/_/g, ' ')}</Text>
+      <Text style={[sBadge.text, { color }]}>{label ?? STATUS_LABELS[status] ?? status.replace(/_/g, ' ')}</Text>
     </View>
   );
 }
