@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { WishFriendLanding } from '@/components/wish-friend/WishFriendLanding';
+import { placeOrder } from '@/services/placeOrder';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { parseApiError, supabaseFetch, SUPABASE_URL } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
@@ -63,7 +64,7 @@ const ASPECT_RATIOS = ['9:16', '1:1', '16:9'];
 
 export default function WishFriendScreen() {
   const { colors } = useTheme();
-  const { user, session } = useAuth();
+  const { user, session, getValidSession } = useAuth();
   const wallet = useWallet();
   const { confirmOrder } = useOrderConfirm();
   const { getDiscountedPrice } = usePlan();
@@ -146,6 +147,10 @@ export default function WishFriendScreen() {
       router.push('/greeting-cards' as never);
       return;
     }
+    if (key === 'ugc_video') {
+      router.push((preset.celebrity ? `/ugc-videos?celebrity=${preset.celebrity.id}` : '/ugc-videos') as never);
+      return;
+    }
     setVideoType(key);
     // Opened from a celebrity's profile: start with them chosen, if the user is subscribed and they offer this.
     const chosen = preset.celebrity;
@@ -171,9 +176,18 @@ export default function WishFriendScreen() {
     }
     setSubmitting(true);
     try {
-      const res = await supabaseFetch('/rest/v1/rpc/create_wish_friend_order', {
-        method: 'POST',
-        body: JSON.stringify({
+      const order = await placeOrder<{ id?: string; price_paid?: number }>({
+        rpc: 'create_wish_friend_order',
+        getToken: async () => (await getValidSession())?.access_token ?? null,
+        findCreated: async (t, since) => {
+          const r = await supabaseFetch(
+            `/rest/v1/wish_friend_orders?user_id=eq.${user?.profileId}&order_type=eq.${videoType}&celebrity_id=eq.${celebrity.id}&created_at=gte.${encodeURIComponent(since)}&select=id,price_paid&order=created_at.desc&limit=1`,
+            {}, t,
+          );
+          const rows = r.ok ? await r.json() as Array<{ id: string; price_paid: number }> : [];
+          return rows[0] ?? null;
+        },
+        body: {
           p_order_type: videoType,
           p_celebrity_id: celebrity.id,
           p_recipient_name: recipientName,
@@ -187,10 +201,8 @@ export default function WishFriendScreen() {
             p_call_to_action: callToAction,
             p_reference_image_url: referenceImageUrl,
           }),
-        }),
-      }, token);
-      if (!res.ok) throw new Error(await parseApiError(res));
-      const order = await res.json() as { id?: string; price_paid?: number };
+        },
+      });
       setPaid(order.price_paid ?? price);
       wallet.refetch();
       setStep('done');
