@@ -10,7 +10,11 @@ For what the app is and how the code is laid out, see `PROJECT_REPORT.md`.
 
 ## Working rules
 
-- Commit or push only when the owner asks. Branch work goes on a feature branch, never straight on `master`.
+- **This repo is not the owner's.** It belongs to `Sdata0605`, and another developer (Prashnat) works on `master`.
+  The owner's own work lives on **`dhanush/mobile-app`** (or branches cut from it). Never push to `master`, to
+  anyone else's branch, or to a branch that has already been merged. Never force-push someone else's work.
+  Open a pull request only when the owner asks for one.
+- Commit or push only when the owner asks.
 - End commit messages with `Co-Authored-By: Claude <noreply@anthropic.com>` (or the model line your harness gives).
   PR descriptions end with "🤖 Generated with [Claude Code](https://claude.com/claude-code)".
 - **The GitHub repo is public.** Never commit secrets, `.env` files, Supabase service-role keys, or the Supabase
