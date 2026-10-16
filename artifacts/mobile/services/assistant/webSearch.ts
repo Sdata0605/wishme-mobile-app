@@ -68,6 +68,8 @@ const OFFLINE: Result = {
 
 export interface WebToolContext {
   getAccessToken?: () => Promise<string | null | undefined>;
+  /** The server refused the login (401). */
+  onAuthRejected?: () => void;
   onAction?: (label: string) => void;
 }
 
@@ -177,7 +179,19 @@ export async function runWebTool(name: string, a: Record<string, unknown>, ctx: 
     if (res.status === 429) {
       return { ok: false, instruction: 'You have searched a lot just now: answer from what you know and what you already found, and say what you could not confirm.' };
     }
-    if (!res.ok) return OFFLINE;
+    if (res.status === 401) {
+      log('refused: your login was not accepted (401)');
+      ctx.onAuthRejected?.();
+      return {
+        ok: false,
+        error: 'The login was not accepted.',
+        instruction: "Say in one sentence that you couldn't search because the user's login has ended and they need to sign in again. Do NOT say the internet is down.",
+      };
+    }
+    if (!res.ok) {
+      log(`search service answered ${res.status}`);
+      return OFFLINE;
+    }
     const data = (await res.json()) as Result;
     // The model reads the text and the instruction, nothing else (no addresses, no accounting).
     const result: Result = { ok: data.ok !== false, results: data.results, ...(data.instruction ? { instruction: data.instruction } : {}) };
@@ -186,7 +200,8 @@ export async function runWebTool(name: string, a: Record<string, unknown>, ctx: 
     if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value as string);
     cache.set(key, { at: Date.now(), result });
     return result;
-  } catch {
+  } catch (e) {
+    log('search request failed:', e instanceof Error ? e.message : e);
     return OFFLINE;
   } finally {
     clearTimeout(timer);

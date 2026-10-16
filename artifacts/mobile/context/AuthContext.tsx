@@ -109,6 +109,13 @@ interface AuthContextValue {
     otp: string,
   ) => Promise<{ error: string | null }>;
   getValidSession: () => Promise<Session | null>;
+  /**
+   * Asks the server whether this login still stands (its functions check it more strictly than the data API does).
+   * If it was ended, e.g. by signing in on another device, and a new token cannot be had, signs out. Returns false then.
+   */
+  verifySession: () => Promise<boolean>;
+  /** Set (to the time) when the app signed the user out because the server ended their login. */
+  sessionEndedAt: number | null;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -206,6 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [pendingSignup, setPendingSignup] = useState<PendingSignup | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [sessionEndedAt, setSessionEndedAt] = useState<number | null>(null);
 
   const pendingRef = useRef<PendingSignup | null>(pendingSignup);
   const internalSignupRef = useRef<InternalSignupData | null>(null);
@@ -347,6 +355,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const sub = AppState.addEventListener('change', (st) => { if (st === 'active') renewIfStale(); });
     return () => { clearInterval(timer); sub.remove(); };
   }, [session?.access_token, refreshSession]);
+
+  const verifySession = useCallback(async (): Promise<boolean> => {
+    const current = sessionRef.current;
+    if (!current?.access_token) return false;
+    try {
+      const res = await supabaseFetch('/auth/v1/user', {}, current.access_token);
+      if (res.ok) return true;
+      // Anything but a refusal of the login itself (a busy server, say) is not a reason to sign anyone out.
+      if (res.status !== 401 && res.status !== 403) return true;
+    } catch {
+      return true; // offline
+    }
+    // The server refused this token: try for a new one, and only if that is refused too is the login over.
+    const renewed = refreshInFlight.current ? await refreshInFlight.current : await doRefresh(current);
+    if (renewed === 'offline' || renewed) return true;
+    setUser(null);
+    setSession(null);
+    sessionRef.current = null;
+    await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
+    setSessionEndedAt(Date.now());
+    return false;
+  }, [doRefresh]);
 
   const getValidSession = useCallback(async (): Promise<Session | null> => {
     const current = sessionRef.current;
@@ -887,6 +917,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         sendCelebOtp,
         applyCelebrityWithAuth,
         getValidSession,
+        verifySession,
+        sessionEndedAt,
       }}
     >
       {children}

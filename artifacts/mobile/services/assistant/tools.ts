@@ -38,6 +38,8 @@ export interface ToolContext extends HubToolContext, DocToolContext {
   onLeaveApp?: () => void;
   /** The logged-in user's access token (refreshed if stale). */
   getAccessToken?: () => Promise<string | null | undefined>;
+  /** The server refused the login (401): the app checks it and signs the user out if it has really ended. */
+  onAuthRejected?: () => void;
   /** Follow an AI call until it ends, then report the result to the user. */
   watchAiCall?: (id: string, scheduled?: boolean) => void;
   /** Switch the spoken language. Returns ok:false when the current voice cannot speak it. */
