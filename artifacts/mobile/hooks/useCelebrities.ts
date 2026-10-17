@@ -142,6 +142,8 @@ interface Store {
   celebrities: Celebrity[];
   loading: boolean;
   error: string | null;
+  /** A fetch has completed successfully (the catalogue may legitimately be empty). */
+  loaded: boolean;
   /** In-flight promise; used to deduplicate concurrent mount calls. */
   inflight: Promise<void> | null;
   listeners: Set<() => void>;
@@ -151,6 +153,7 @@ const store: Store = {
   celebrities: [],
   loading: false,
   error: null,
+  loaded: false,
   inflight: null,
   listeners: new Set(),
 };
@@ -161,7 +164,7 @@ function notify() {
 
 async function fetchOnce() {
   if (store.inflight) return store.inflight;
-  if (store.celebrities.length > 0) return;
+  if (store.loaded) return;
 
   store.loading = true;
   store.error = null;
@@ -199,6 +202,7 @@ async function fetchOnce() {
         });
 
       store.error = null;
+      store.loaded = true;
     } catch (err: unknown) {
       store.error = err instanceof Error ? err.message : 'Failed to load celebrities';
     } finally {
@@ -215,6 +219,7 @@ async function fetchOnce() {
 async function refetchAll() {
   store.celebrities = [];
   store.error = null;
+  store.loaded = false;
   await fetchOnce();
 }
 
@@ -255,11 +260,10 @@ export function useCelebrities({ limit = 20, category }: UseCelebritiesOptions =
     .slice(0, limit);
 
   /**
-   * Treat the store as "loading" if no data and no error yet — this prevents
-   * a brief "not found" or empty flash on the first render before fetchOnce()
-   * has had a chance to flip store.loading to true.
+   * Treat the store as "loading" until a fetch has finished — this prevents a brief "not found" flash on the first
+   * render before fetchOnce() has flipped store.loading to true, and still lets an empty catalogue show its empty state.
    */
-  const loading = store.loading || (store.celebrities.length === 0 && store.error === null);
+  const loading = store.loading || (!store.loaded && store.error === null);
 
   return {
     celebrities,
