@@ -1,7 +1,6 @@
 /**
- * MYASSISTANT "Daylight" design system, ported 1:1 from lib/design/neon_tokens.dart.
- * Same names, same values, same derivations: light is paper-white with deep accents; dark is a violet-cast
- * near-black with bright accents. A user-chosen accent re-derives the whole family exactly as the Flutter app does.
+ * WishMe's design tokens: colours, radii, spacing and motion for light and dark. Every screen reads them through
+ * useTheme() (`neon` directly, or `colors` / `gradients` derived from it in constants/colors.ts).
  */
 
 // ─── colour maths ────────────────────────────────────────────────────────────
@@ -105,9 +104,9 @@ export interface Neon {
   spacing: typeof spacing;
   /** A tile gradient from ONE accent: the colour lifted, and the colour deepened. */
   tile: (c: string) => readonly [string, string];
-  /** The royal blue of the aurora palette (buttons, the left of the gradient). */
+  /** The secondary brand colour (purple): buttons and gradient partners. */
   blue: string;
-  /** A glass card's fill: translucent, so the aurora shows through. */
+  /** A card's fill. */
   glass: string;
   /** A glass card's outline. */
   cardBorder: string;
@@ -119,151 +118,119 @@ export interface Neon {
   navIdle: string;
   /** The three wash stops of the page, top to bottom. */
   wash: readonly [string, string, string];
-  /** The aurora's pools: blue, violet, magenta. Null in light, where the page stays calm. */
+  /** Optional coloured pools behind the page (unused: WishMe keeps the page calm). */
   aurora: { blue: string; violet: string; magenta: string } | null;
 }
 
-/**
- * The tokens for one theme and one (optional) user accent.
- *
- * DARK is the aurora look of the installed MyAssistant app, sampled from its screenshots: a deep royal-navy page with
- * a blue pool top-left and a magenta swoosh lower-right, glass cards outlined in blue-violet, a cyan highlight, and a
- * blue-to-magenta brand gradient. LIGHT keeps the Daylight values from the Flutter source. Choosing any accent other
- * than the default re-derives the violet / partner / brand gradient from it exactly as the Flutter app does; the navy
- * page stays.
- */
-export function buildNeon(isDark: boolean, accent: string | null = DEFAULT_ACCENT): Neon {
-  const custom = !!accent && accent.toLowerCase() !== DEFAULT_ACCENT.toLowerCase();
-  let accentPartner: string | null = null;
-  let accentInk: string | null = null;
-  if (custom) {
-    const h = hexToHsl(accent!);
-    // 22 degrees: a short analogous step keeps every gradient in the same family.
-    accentPartner = hslToHex({
-      h: (h.h + 22) % 360,
-      s: clamp(h.s * 1.02, 0.35, 1),
-      l: clamp(h.l + 0.04, 0.35, 0.8),
-    });
-    accentInk = hslToHex({ h: h.h, s: clamp(h.s * 1.05, 0.45, 1), l: clamp(h.l * 0.52, 0.24, 0.48) });
-  }
+/** WishMe's brand colours: the orange, pink and purple of the logo gradient, and the gold of a star. */
+export const BRAND = {
+  orange: '#FF6B33',
+  pink: '#E8527A',
+  purple: '#B44CFF',
+  gold: '#FFC14D',
+} as const;
 
+/** The palette has one fixed seed (WishMe has no accent picker); kept for code that keys caches on it. */
+export const BRAND_ACCENT = BRAND.orange;
+
+const tile = (c: string) => {
+  const h = hexToHsl(c);
+  const deep = hslToHex({ h: h.h, s: clamp(h.s * 1.05, 0.3, 1), l: clamp(h.l * 0.62, 0.18, 0.55) });
+  return [mix(c, '#FFFFFF', 0.16), deep] as const;
+};
+
+/**
+ * The tokens for one theme: WishMe's own look.
+ *
+ * DARK is a warm night: a deep plum page with a quiet wash (no aurora), solid plum cards, the WishMe orange as the
+ * primary, the brand gradient orange to purple, and star gold as the highlight. LIGHT is warm cream with the same
+ * accents deepened for contrast on white. The token names are historical (`violet` is the primary, `cyan` the
+ * highlight); their values are WishMe's.
+ */
+export function buildNeon(isDark: boolean): Neon {
   if (isDark) {
-    const violet = custom ? accent! : '#9473F5';
-    const pink = custom ? accentPartner! : '#E555FF';
-    const blue = custom ? mix(accent!, '#2A6BFF', 0.5) : '#2A6BFF';
-    const cyan = '#25DFFF';
-    const bg = '#0A1556';
-    const surface = '#0A1B50';
-    const brand: readonly [string, string] = custom ? [violet, pink] : ['#0264FF', '#CA00EF'];
+    const primary = '#FF7F4D';
+    const pink = '#F06A8F';
+    const purple = '#C27BFF';
+    const gold = BRAND.gold;
+    const bg = '#120A1E';
     return {
       isDark,
-      violet, cyan, pink, lime: '#BDF64B', bg, surface, surfaceHigh: '#10215E',
-      success: '#4DF0A6',
-      warning: '#FFB347',
-      error: '#FF8585',
+      violet: primary, cyan: gold, pink, lime: '#9BE15D', bg, surface: '#1C1230', surfaceHigh: '#261A3D',
+      success: '#34D399',
+      warning: '#FBBF24',
+      error: '#F87171',
       textHi: '#FFFFFF',
-      textLo: '#C9DBFB',
-      textDim: '#9EAFE2',
+      textLo: '#E4D9F2',
+      textDim: '#A898BF',
       onInk: bg,
-      line: 'rgba(120,150,255,0.20)',
-      lineBright: 'rgba(130,160,255,0.38)',
-      accentA: '#2B7BFF',
-      accentB: '#D83BE0',
-      accentC: '#12D3D9',
-      accentD: '#F5A00F',
-      accentE: '#0AF0A0',
-      accentF: '#3B82FF',
-      gBrand: brand,
-      gVioletCyan: [violet, cyan],
-      gPinkViolet: [pink, violet],
-      gCyanLime: [cyan, '#BDF64B'],
-      gOrb: [violet, cyan, pink, violet],
+      line: 'rgba(255,214,235,0.12)',
+      lineBright: 'rgba(255,214,235,0.22)',
+      accentA: primary,
+      accentB: pink,
+      accentC: purple,
+      accentD: gold,
+      accentE: '#2FD58A',
+      accentF: '#8E8CFF',
+      gBrand: [BRAND.orange, BRAND.purple],
+      gVioletCyan: [primary, gold],
+      gPinkViolet: [pink, purple],
+      gCyanLime: [gold, primary],
+      gOrb: [BRAND.orange, BRAND.pink, BRAND.purple, BRAND.orange],
       radius,
       spacing,
-      tile: (c: string) => {
-        const h = hexToHsl(c);
-        const deep = hslToHex({ h: h.h, s: clamp(h.s * 1.05, 0.3, 1), l: clamp(h.l * 0.62, 0.18, 0.55) });
-        return [mix(c, '#FFFFFF', 0.16), deep] as const;
-      },
-      blue,
-      glass: 'rgba(9,24,84,0.72)',
-      cardBorder: '#2F3F9A',
-      dock: '#0B1E53',
-      orbDisc: '#14195C',
-      navIdle: '#9EAFE2',
-      wash: ['#18165B', '#0B1759', '#071048'],
-      aurora: { blue: '#2A4BFF', violet: '#7B3CF0', magenta: '#FF2BD6' },
+      tile,
+      blue: purple,
+      glass: '#1C1230',
+      cardBorder: '#33244D',
+      dock: '#170E27',
+      orbDisc: '#1C1230',
+      navIdle: '#A898BF',
+      wash: ['#1D1030', '#150C24', '#100819'],
+      aurora: null,
     };
   }
 
-  const violet = custom ? accentInk! : '#A855F7';
-  const cyan = '#0891B2';
-  const pink = custom
-    ? (() => {
-        const p = hexToHsl(accentPartner!);
-        return hslToHex({ ...p, l: clamp(p.l * 0.55, 0.26, 0.5) });
-      })()
-    : '#DB2777';
-  const bg = '#F7F7FB';
+  const primary = '#EA580C';
+  const pink = '#DB2777';
+  const purple = '#9333EA';
+  const bg = '#FFF9F5';
   return {
     isDark,
-    violet, cyan, pink, lime: '#65A30D', bg, surface: '#FFFFFF', surfaceHigh: '#EEEFF6',
+    violet: primary, cyan: '#B45309', pink, lime: '#4D7C0F', bg, surface: '#FFFFFF', surfaceHigh: '#F8EEE7',
     success: '#16A34A',
     warning: '#D97706',
-    error: '#EF4444',
-    textHi: '#1B1D28',
-    textLo: '#585E70',
-    textDim: '#9BA0B0',
+    error: '#DC2626',
+    textHi: '#1F1724',
+    textLo: '#5E5468',
+    textDim: '#A096A8',
     onInk: bg,
-    line: 'rgba(20,22,39,0.08)',
-    lineBright: 'rgba(20,22,39,0.14)',
-    accentA: violet,
+    line: 'rgba(31,23,36,0.08)',
+    lineBright: 'rgba(31,23,36,0.14)',
+    accentA: primary,
     accentB: pink,
-    accentC: cyan,
-    accentD: '#D97706',
+    accentC: purple,
+    accentD: '#B45309',
     accentE: '#0F9D58',
-    accentF: '#3B5BDB',
-    gBrand: [violet, pink],
-    gVioletCyan: [violet, cyan],
-    gPinkViolet: [pink, violet],
-    gCyanLime: [cyan, '#65A30D'],
-    gOrb: [violet, cyan, pink, violet],
+    accentF: '#4F46E5',
+    gBrand: [BRAND.orange, BRAND.purple],
+    gVioletCyan: [primary, pink],
+    gPinkViolet: [pink, purple],
+    gCyanLime: ['#B45309', primary],
+    gOrb: [BRAND.orange, BRAND.pink, BRAND.purple, BRAND.orange],
     radius,
     spacing,
-    tile: (c: string) => {
-      const h = hexToHsl(c);
-      const deep = hslToHex({ h: h.h, s: clamp(h.s * 1.05, 0.3, 1), l: clamp(h.l * 0.62, 0.18, 0.55) });
-      return [mix(c, '#FFFFFF', 0.16), deep] as const;
-    },
-    blue: '#2563EB',
-    glass: 'rgba(255,255,255,0.92)',
-    cardBorder: 'rgba(20,22,39,0.10)',
+    tile,
+    blue: purple,
+    glass: '#FFFFFF',
+    cardBorder: 'rgba(31,23,36,0.10)',
     dock: '#FFFFFF',
     orbDisc: '#FFFFFF',
-    navIdle: '#9BA0B0',
-    wash: [mix(bg, violet, 0.07), mix(bg, violet, 0.03), bg],
+    navIdle: '#A096A8',
+    wash: [mix(bg, BRAND.orange, 0.06), mix(bg, BRAND.pink, 0.03), bg],
     aurora: null,
   };
 }
-
-/** What everyone gets until they choose (Flutter: AccentController.defaultSeed). */
-export const DEFAULT_ACCENT = '#C77DFF';
-
-/** The swatches in Settings → Theme colour (Flutter: AccentController.swatches). */
-export const ACCENT_CHOICES: { name: string; color: string }[] = [
-  { name: 'Violet', color: '#C77DFF' },
-  { name: 'Indigo', color: '#8B9CFF' },
-  { name: 'Ocean', color: '#4FC3F7' },
-  { name: 'Teal', color: '#3FE0C8' },
-  { name: 'Mint', color: '#6EE7A8' },
-  { name: 'Lime', color: '#BDF64B' },
-  { name: 'Amber', color: '#FFC24B' },
-  { name: 'Coral', color: '#FF8A65' },
-  { name: 'Rose', color: '#FF7BA3' },
-  { name: 'Magenta', color: '#FF6FD8' },
-  { name: 'Crimson', color: '#FF6B6B' },
-  { name: 'Slate', color: '#9FB3C8' },
-];
 
 /** A soft tinted elevation, the light-theme "glow". */
 export function glow(color: string, alpha = 0.22, blur = 24) {

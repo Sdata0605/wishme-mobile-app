@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 
-/** MyAssistant's screen bar: a back arrow, a Space Grotesk title, an optional action on the right. No divider. */
+/** The screen bar: a back arrow, a Playfair Display title, an optional action on the right. No divider. */
 export function NeonHeader({ title, right, onBack, hideBack }: { title: string; right?: React.ReactNode; onBack?: () => void; hideBack?: boolean }) {
   const { neon } = useTheme();
   const insets = useSafeAreaInsets();

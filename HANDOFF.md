@@ -34,6 +34,13 @@ branch is **`dhanush/mobile-app`**: all new work goes there.
 - **Realtime and the Sarvam relay work against any backend URL**: `SUPABASE_WS_URL` in `constants/supabase.ts`
   (http→ws, https→wss) replaces six copies of `SUPABASE_URL.replace('https://', 'wss://')`, which left an
   `http://` URL for a local backend, so live updates never connected.
+- **WishMe is not MyAssistant** (owner's decision, 17 Oct): the centre mic used to open the "AI home", a copy
+  of the separate MyAssistant app's home (Prashnat's `1ecee2c`), and the app opened there. On this branch the mic
+  now starts/stops the voice assistant in place, the app opens on WishMe Home, the AI home and its
+  `components/home` + `services/home/{dailyQuote,dayStreak,weather}` are removed, and the mic is a flat WishMe
+  pink→purple disc. **Talk to Prashnat before proposing this branch for `master`**: it removes his AI home. The rest
+  of the MyAssistant look (aurora theme, glass cards, Manrope/Space Grotesk, Hub tools) is still in the app; ask the
+  owner before rebranding it.
 - **Celebrity list empty state**: `hooks/useCelebrities.ts` treated "no celebrities yet" as loading, so an empty
   catalogue spun forever; it now tracks whether the fetch finished and shows "No celebrities found".
 - **Open: one intermittent native crash on launch** (17 Oct, WishMe Local on the Samsung, once in about 10 cold

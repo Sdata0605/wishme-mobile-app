@@ -215,7 +215,7 @@ export function AuthButton({
           styles.button,
           { backgroundColor: neon.violet, opacity: disabled && !loading ? 0.45 : 1 },
           Platform.OS === 'ios' && {
-            shadowColor: isDark ? '#CA00EF' : neon.violet,
+            shadowColor: neon.violet,
             shadowOpacity: isDark ? 0.35 : 0.18,
             shadowRadius: 14,
             shadowOffset: { width: 0, height: 6 },

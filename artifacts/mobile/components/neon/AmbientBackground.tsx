@@ -7,10 +7,9 @@ import { useTheme } from '@/context/ThemeContext';
 /**
  * THE ROOM THE APP SITS IN. Every screen floats on this.
  *
- * Dark is the aurora of the MyAssistant app: a royal-navy page with a blue pool at the top-left, a faint magenta glow
- * at the top-right, and a swoosh of blue-to-magenta light sweeping up the lower right with a magenta haze under it.
- * Light stays calm: a wash and two soft pools of the accent. Everything is a gradient (no blur filter), so it costs
- * almost nothing to paint.
+ * WishMe keeps the page calm in both themes: a vertical wash and two soft pools of the brand colour. (The `aurora`
+ * branch only draws when a theme defines pools; WishMe's do not.) Everything is a gradient (no blur filter), so it
+ * costs almost nothing to paint.
  */
 export function AmbientBackground({ children }: { children?: React.ReactNode }) {
   const { neon } = useTheme();

@@ -1,7 +1,7 @@
 import { buildNeon, type Neon } from '@/constants/neon';
 
 /**
- * The app's colours now come from the MyAssistant "Daylight" design system (constants/neon.ts).
+ * The app's colours come from WishMe's design tokens (constants/neon.ts).
  * The names below are the app's existing ones, remapped, so every screen that already reads
  * `colors.primary`, `colors.card` and the rest follows the new palette without being touched.
  * New code should prefer `neon` (from useTheme) for the full token set.

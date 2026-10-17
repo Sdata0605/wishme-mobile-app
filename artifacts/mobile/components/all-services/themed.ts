@@ -4,7 +4,7 @@ import { useTheme } from '@/context/ThemeContext';
 /**
  * The All Services screens were drawn light-only with fixed hex colours. Rather than rewrite 16k lines, every
  * colour that sits on a surface goes through T(colour, role): in light mode it is returned untouched, in dark mode
- * it becomes the matching MyAssistant dark colour. The role says what the colour is used for:
+ * it becomes the matching WishMe dark colour. The role says what the colour is used for:
  *   bg      a fill: white cards, the page, grey chips, pastel tints (strong brand fills are left alone)
  *   border  a hairline or an outline
  *   fg      text, icons

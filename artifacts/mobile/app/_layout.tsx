@@ -1,11 +1,11 @@
 import {
-  Manrope_400Regular,
-  Manrope_500Medium,
-  Manrope_600SemiBold,
-  Manrope_700Bold,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
   useFonts,
-} from '@expo-google-fonts/manrope';
-import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
+} from '@expo-google-fonts/inter';
+import { PlayfairDisplay_700Bold } from '@expo-google-fonts/playfair-display';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router, Stack, useSegments } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
@@ -183,18 +183,12 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    // MyAssistant's type: Manrope for text, Space Grotesk for headlines. They are registered under the family
-    // names the app already uses (Inter_* and PlayfairDisplay_*), so every screen switches without edits.
-    Inter_400Regular: Manrope_400Regular,
-    Inter_500Medium: Manrope_500Medium,
-    Inter_600SemiBold: Manrope_600SemiBold,
-    Inter_700Bold: Manrope_700Bold,
-    PlayfairDisplay_700Bold: SpaceGrotesk_700Bold,
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_600SemiBold,
-    Manrope_700Bold,
-    SpaceGrotesk_700Bold,
+    // WishMe's type: Inter for text, Playfair Display for headlines.
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    PlayfairDisplay_700Bold,
   });
 
   useEffect(() => {
