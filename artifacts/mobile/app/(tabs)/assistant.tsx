@@ -12,6 +12,7 @@ import { AmbientBackground } from '@/components/neon/AmbientBackground';
 import { GradientText } from '@/components/neon/GradientText';
 import { Reveal } from '@/components/neon/Motion';
 import { useAuth } from '@/context/AuthContext';
+import { useDrawer } from '@/context/DrawerContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useVoiceAssistant } from '@/context/VoiceAssistantContext';
 import { listAiCalls, whoLabel, type AiCall } from '@/services/assistant/aiCalls';
@@ -57,6 +58,7 @@ export default function AssistantHome() {
   const { user, getValidSession, setGender } = useAuth();
   const insets = useSafeAreaInsets();
   const { ask, toggle } = useVoiceAssistant();
+  const drawer = useDrawer();
 
   const [now, setNow] = useState(() => new Date());
   const [weather, setWeather] = useState<Weather | null>(null);
@@ -138,6 +140,15 @@ export default function AssistantHome() {
         {/* Greeting, date and the day's line */}
         <View style={styles.header}>
           <Reveal>
+            <Pressable
+              onPress={drawer.toggle}
+              accessibilityRole="button"
+              accessibilityLabel="Open menu"
+              hitSlop={8}
+              style={[styles.menu, { backgroundColor: neon.glass, borderColor: neon.cardBorder }]}
+            >
+              <Icon name="menu" size={22} color={neon.textHi} />
+            </Pressable>
             <View style={styles.greetRow}>
               <View style={styles.sun}>
                 <Icon name={night ? 'moon' : 'sun'} size={38} color={night ? neon.cyan : '#FFC93C'} />
@@ -224,6 +235,7 @@ export default function AssistantHome() {
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 22 },
+  menu: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.4, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   greetRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   sun: { width: 50, height: 50, marginTop: 2, alignItems: 'center', justifyContent: 'center' },
   greeting: { fontSize: 31, lineHeight: 40, fontFamily: 'PlayfairDisplay_700Bold', letterSpacing: -0.4 },
