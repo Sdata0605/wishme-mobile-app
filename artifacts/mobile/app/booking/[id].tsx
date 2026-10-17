@@ -217,7 +217,7 @@ export default function BookingWizardScreen() {
     ? service === 'wish'
       ? celebrity.service_prices?.general_wish ?? celebrity.pricePerWish
       : service === 'ad'
-        ? celebrity.service_prices?.ugc_ad ?? 25000
+        ? celebrity.service_prices?.image_promotion ?? 25000
         : celebrity.service_prices?.video_promotion ?? 50000
     : 0;
 

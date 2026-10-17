@@ -43,13 +43,71 @@ export const STATUS_COLORS: Record<string, string> = {
   active: '#22C55E',
   paid: '#22C55E',
   failed: '#EF4444',
+  confirmed: '#3B82F6',
+  processing: '#3B82F6',
+  pending_approval: '#F59E0B',
+  video_sent: '#22C55E',
+  delivered: '#22C55E',
+  processed: '#22C55E',
+  reversed: '#EF4444',
 };
 
-export function StatusBadge({ status }: { status: string }) {
+/** What a status means to a celebrity, in plain words (the raw values are internal). */
+export const STATUS_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  pending_approval: 'Pending',
+  confirmed: 'Being made',
+  processing: 'Being made',
+  in_progress: 'Being made',
+  accepted: 'Being made',
+  video_sent: 'Delivered',
+  delivered: 'Delivered',
+  completed: 'Completed',
+  processed: 'Paid',
+  reversed: 'Returned',
+  rejected: 'Rejected',
+  declined: 'Declined',
+  failed: 'Failed',
+  cancelled: 'Cancelled',
+};
+
+/** A row of choice chips: the filter above a list, or a two-way switch. The chosen chip is filled with the brand colour. */
+export function FilterChips({ options, value, onChange, colors }: {
+  options: Array<{ key: string; label: string; count?: number }>;
+  value: string;
+  onChange: (key: string) => void;
+  colors: ColorsType;
+}) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+      {options.map(o => {
+        const on = o.key === value;
+        return (
+          <TouchableOpacity
+            key={o.key}
+            onPress={() => onChange(o.key)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+            style={{
+              minHeight: 38, paddingHorizontal: 14, borderRadius: 99, borderWidth: 1.5, justifyContent: 'center',
+              backgroundColor: on ? '#7B5CFA' : 'transparent', borderColor: on ? '#7B5CFA' : colors.border,
+            }}
+          >
+            <Text style={{ color: on ? '#fff' : colors.foreground, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
+              {o.label}{o.count != null ? ` · ${o.count}` : ''}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+}
+
+export function StatusBadge({ status, label }: { status: string; label?: string }) {
   const color = STATUS_COLORS[status] ?? '#6B7280';
   return (
     <View style={[sBadge.wrap, { backgroundColor: color + '22' }]}>
-      <Text style={[sBadge.text, { color }]}>{status}</Text>
+      <Text style={[sBadge.text, { color }]}>{label ?? STATUS_LABELS[status] ?? status.replace(/_/g, ' ')}</Text>
     </View>
   );
 }
@@ -66,6 +124,7 @@ export interface Celebrity {
   bio: string;
   image_url: string;
   available_balance: number;
+  total_earnings?: number;
   rating: number;
   review_count: number;
   consent_status: string;
@@ -103,12 +162,26 @@ export interface ImagePromotion {
   profiles?: { first_name: string; last_name: string };
 }
 
+/** A Wish a Friend / UGC video / UGC ad order made with this celebrity (the admin team fulfils these). */
+export interface CelebrityOrder {
+  id: string;
+  kind: 'wish_friend' | 'ugc_ad';
+  /** What to call it on screen, e.g. "Video wish" or "UGC ad". */
+  label: string;
+  title: string;
+  price_paid: number;
+  status: string;
+  created_at: string;
+  customer: string;
+  video_url?: string | null;
+  /** What the celebrity was paid for this order, once it is completed. */
+  earned?: number;
+}
+
 export const TABS: Array<{ key: string; label: string; icon: IconName }> = [
-  { key: 'bookings', label: 'Bookings', icon: 'credit-card' },
+  { key: 'orders', label: 'Orders', icon: 'credit-card' },
   { key: 'wallet', label: 'Wallet', icon: 'credit-card' },
   { key: 'messages', label: 'Messages', icon: 'message-circle' },
-  { key: 'events', label: 'Events', icon: 'calendar' },
-  { key: 'consent', label: 'Consent', icon: 'shield' },
   { key: 'reviews', label: 'Reviews', icon: 'star' },
   { key: 'followers', label: 'Followers', icon: 'heart' },
   { key: 'content', label: 'Content', icon: 'image' },

@@ -84,7 +84,7 @@ export function CelebHeroCard({ celebrity, subscribed }: { celebrity: Celebrity;
   );
 }
 
-export function CelebGridCard({ celebrity, subscribed, width }: { celebrity: Celebrity; subscribed: boolean; width: number }) {
+export function CelebGridCard({ celebrity, subscribed, width, children }: { celebrity: Celebrity; subscribed: boolean; width: number; /** Extra row under the footer, e.g. service buttons. */ children?: React.ReactNode }) {
   const { colors } = useTheme();
   const price = celebrity.subscription?.price ?? 0;
   const photoH = Math.round((width * 4) / 3);
@@ -124,6 +124,7 @@ export function CelebGridCard({ celebrity, subscribed, width }: { celebrity: Cel
           </>
         )}
       </View>
+      {children}
     </Press>
   );
 }

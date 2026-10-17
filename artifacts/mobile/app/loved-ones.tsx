@@ -490,7 +490,8 @@ export default function LovedOnesScreen() {
       </TouchableOpacity>
 
       {/* Add / Edit Modal */}
-      <Modal visible={editModal} animationType="slide" transparent>
+      {/* onRequestClose: hardware Back closes the sheet instead of being swallowed (QA audit H-09). */}
+      <Modal visible={editModal} animationType="slide" transparent onRequestClose={() => { if (!saving) setEditModal(false); }}>
         <View style={s.modalOverlay}>
           <View style={[s.modalSheet, { backgroundColor: colors.background }]}>
             <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>
@@ -604,7 +605,7 @@ export default function LovedOnesScreen() {
       </Modal>
 
       {/* Delete Confirmation Modal */}
-      <Modal visible={deleteConfirmModal} animationType="fade" transparent>
+      <Modal visible={deleteConfirmModal} animationType="fade" transparent onRequestClose={() => { setDeleteConfirmModal(false); setDeleteConfirmTarget(null); }}>
         <View style={s.modalOverlay}>
           <View style={[s.confirmSheet, { backgroundColor: colors.background }]}>
             <Icon name="trash-2" size={32} color="#EF4444" />
@@ -637,7 +638,7 @@ export default function LovedOnesScreen() {
       </Modal>
 
       {/* Occasions Modal */}
-      <Modal visible={occasionModal} animationType="slide" transparent>
+      <Modal visible={occasionModal} animationType="slide" transparent onRequestClose={() => { if (!occSaving) setOccasionModal(false); }}>
         <View style={s.modalOverlay}>
           <View style={[s.modalSheet, { backgroundColor: colors.background }]}>
             <View style={[s.modalHeader, { borderBottomColor: colors.border }]}>

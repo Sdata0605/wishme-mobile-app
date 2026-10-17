@@ -369,7 +369,7 @@ export default function CommissionScreen() {
           />
         )}
         {Platform.OS === 'ios' && (
-          <Modal visible={showStartPicker} transparent animationType="slide">
+          <Modal visible={showStartPicker} transparent animationType="slide" onRequestClose={() => setShowStartPicker(false)}>
             <Pressable style={s.iosPickerOverlay} onPress={() => setShowStartPicker(false)}>
               <Pressable style={[s.iosPickerContainer, { backgroundColor: colors.card }]}>
                 <View style={[s.iosPickerHeader, { borderBottomColor: colors.border }]}>
@@ -403,7 +403,7 @@ export default function CommissionScreen() {
           </Modal>
         )}
         {Platform.OS === 'ios' && (
-          <Modal visible={showEndPicker} transparent animationType="slide">
+          <Modal visible={showEndPicker} transparent animationType="slide" onRequestClose={() => setShowEndPicker(false)}>
             <Pressable style={s.iosPickerOverlay} onPress={() => setShowEndPicker(false)}>
               <Pressable style={[s.iosPickerContainer, { backgroundColor: colors.card }]}>
                 <View style={[s.iosPickerHeader, { borderBottomColor: colors.border }]}>

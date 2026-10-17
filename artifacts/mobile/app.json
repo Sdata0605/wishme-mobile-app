@@ -28,6 +28,7 @@
     },
     "android": {
       "package": "com.prashantuser1.wishme",
+      "allowBackup": false,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",

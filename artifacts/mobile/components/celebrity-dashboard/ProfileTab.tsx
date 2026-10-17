@@ -34,9 +34,6 @@ export function ProfileTab({ celebrity, colors, session, onRefresh }: TabPropsWi
   });
   const [saving, setSaving] = useState(false);
   const [profileInfo, setProfileInfo] = useState<ProfileInfo | null>(null);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [changingPwd, setChangingPwd] = useState(false);
 
   useEffect(() => {
     if (!celebrity.profile_id || !session?.access_token) return;
@@ -78,35 +75,6 @@ export function ProfileTab({ celebrity, colors, session, onRefresh }: TabPropsWi
       Alert.alert('Error', err instanceof Error ? err.message : 'Failed to save prices');
     }
     setSaving(false);
-  };
-
-  const changePassword = async () => {
-    if (!newPassword || newPassword.length < 6) { Alert.alert('Password must be at least 6 characters'); return; }
-    if (newPassword !== confirmPassword) { Alert.alert('Passwords do not match'); return; }
-    if (!session?.access_token) { Alert.alert('Not logged in'); return; }
-    setChangingPwd(true);
-    try {
-      const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_ANON_KEY,
-        },
-        body: JSON.stringify({ password: newPassword }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as Record<string, string>;
-        Alert.alert('Error', err.message ?? `Failed to change password (${res.status})`);
-      } else {
-        Alert.alert('Success', 'Password changed successfully!');
-        setNewPassword('');
-        setConfirmPassword('');
-      }
-    } catch (err) {
-      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to change password');
-    }
-    setChangingPwd(false);
   };
 
   const social = celebrity.social_media ?? {};
@@ -183,33 +151,6 @@ export function ProfileTab({ celebrity, colors, session, onRefresh }: TabPropsWi
           </View>
         ))}
         <PrimaryBtn label="Save Pricing" onPress={savePrices} loading={saving} colors={colors} />
-      </Card>
-
-      <SectionTitle text="Change Password" colors={colors} />
-      <Card colors={colors}>
-        <View style={{ marginBottom: 12 }}>
-          <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>New Password</Text>
-          <TextInput
-            value={newPassword}
-            onChangeText={setNewPassword}
-            placeholder="Min 6 characters"
-            placeholderTextColor={colors.mutedForeground}
-            secureTextEntry
-            style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-          />
-        </View>
-        <View style={{ marginBottom: 12 }}>
-          <Text style={[styles.inputLabel, { color: colors.mutedForeground }]}>Confirm Password</Text>
-          <TextInput
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            placeholder="Repeat new password"
-            placeholderTextColor={colors.mutedForeground}
-            secureTextEntry
-            style={[styles.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.background }]}
-          />
-        </View>
-        <PrimaryBtn label="Change Password" onPress={changePassword} loading={changingPwd} colors={colors} />
       </Card>
     </View>
   );

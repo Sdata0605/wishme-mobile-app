@@ -35,7 +35,7 @@ const FIRST_CONNECT_DEADLINE_MS = 7000;
 
 type Shared = Pick<
   GeminiLiveOptions,
-  'getAccessToken' | 'getSystemInstruction' | 'functionDeclarations' | 'onToolCall' | 'onState' | 'onTranscript' | 'onLevels' | 'onError'
+  'getAccessToken' | 'onAuthRejected' | 'getSystemInstruction' | 'functionDeclarations' | 'onToolCall' | 'onState' | 'onTranscript' | 'onLevels' | 'onError'
 >;
 
 export interface EngineOptions extends Shared {
@@ -92,6 +92,7 @@ export class AssistantEngine {
 
     this.gemini = new GeminiLiveClient({
       getAccessToken: opts.getAccessToken,
+      onAuthRejected: opts.onAuthRejected,
       getSystemInstruction: opts.getSystemInstruction,
       getVoiceName: opts.getVoiceName,
       getGreetingPrompt: opts.getGreetingPrompt,

@@ -5,9 +5,11 @@ interface IconProps {
   name: IconName;
   size?: number;
   color?: string;
+  /** Solid fill; only the heart supports it. */
+  filled?: boolean;
 }
 
-type RenderFn = (c: string, sz: number) => React.ReactElement;
+type RenderFn = (c: string, sz: number, filled?: boolean) => React.ReactElement;
 
 const sw = 2;
 const lc = 'round' as const;
@@ -43,9 +45,9 @@ const ICONS = {
       <Line x1={3} y1={10} x2={21} y2={10} {...p(c)} />
     </Svg>
   ),
-  heart: (c, sz) => (
+  heart: (c, sz, filled) => (
     <Svg width={sz} height={sz} viewBox="0 0 24 24" fill="none">
-      <Path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" {...p(c)} />
+      <Path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" {...p(c)} fill={filled ? c : 'none'} />
     </Svg>
   ),
   'shopping-bag': (c, sz) => (
@@ -661,11 +663,11 @@ const ALIASES = {
 
 export type IconName = keyof typeof ICONS | keyof typeof ALIASES;
 
-export function Icon({ name, size = 20, color = '#000' }: IconProps) {
+export function Icon({ name, size = 20, color = '#000', filled }: IconProps) {
   const resolved: keyof typeof ICONS =
     (ALIASES as Record<string, keyof typeof ICONS>)[name as string] ??
     (name as keyof typeof ICONS);
-  const render = ICONS[resolved];
+  const render = ICONS[resolved] as RenderFn | undefined;
   if (!render) return null;
-  return render(color, size);
+  return render(color, size, filled);
 }

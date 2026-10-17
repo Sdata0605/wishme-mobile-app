@@ -3,7 +3,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { fmtDate, StatusBadge, SectionEmpty, LoadingBox, Card, SectionTitle, styles } from './shared';
+import { FilterChips, fmtDate, StatusBadge, SectionEmpty, LoadingBox, Card, styles } from './shared';
 import type { TabProps } from './shared';
 import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
@@ -21,6 +21,7 @@ interface Review {
 export function ReviewsTab({ celebrity, colors, session }: TabProps) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all');
 
   useEffect(() => {
     supabaseFetch(
@@ -61,8 +62,17 @@ export function ReviewsTab({ celebrity, colors, session }: TabProps) {
           </View>
         </View>
       </Card>
-      <SectionTitle text={`Reviews (${reviews.length})`} colors={colors} />
-      {reviews.map(r => {
+      <FilterChips
+        colors={colors}
+        value={filter}
+        onChange={setFilter}
+        options={[
+          { key: 'all', label: 'All', count: reviews.length },
+          { key: 'five', label: '5 stars', count: reviews.filter(r => Math.round(r.rating) === 5).length },
+          { key: 'low', label: '1 to 3 stars', count: reviews.filter(r => Math.round(r.rating) <= 3).length },
+        ]}
+      />
+      {reviews.filter(r => filter === 'all' ? true : filter === 'five' ? Math.round(r.rating) === 5 : Math.round(r.rating) <= 3).map(r => {
         const fan = r.profiles ? `${r.profiles.first_name ?? ''} ${r.profiles.last_name ?? ''}`.trim() : 'Fan';
         const serviceType = r.bookings?.service_type;
         return (

@@ -93,12 +93,15 @@ export function UgcOrderShell({
       if (!raw) return;
       try {
         const saved = JSON.parse(raw) as Values;
-        setValues(prev => ({ ...prev, ...saved }));
+        // A celebrity chosen on their profile beats whatever the old draft had.
+        setValues(prev => ({ ...prev, ...saved, ...initialValues }));
         setDraftRestored(true);
       } catch {
         // ignore a corrupt draft
       }
     });
+    // initialValues is fixed for the life of the screen; restoring again when its identity changes would undo the user's edits.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey, authUid]);
 
   useEffect(() => {

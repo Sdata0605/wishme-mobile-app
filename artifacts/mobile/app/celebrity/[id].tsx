@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,12 +16,14 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SubscribeSheet, type ServiceKey } from '@/components/celebrity/SubscribeSheet';
+import { openCelebrityService, SERVICE_KEYS, SERVICES } from '@/components/celebrity/services';
+import { SubscribeSheet } from '@/components/celebrity/SubscribeSheet';
 import { Icon } from '@/components/Icon';
 import { supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { Celebrity } from '@/hooks/useCelebrities';
+import { useLovedCelebrities } from '@/hooks/useLovedCelebrities';
 import { useWallet } from '@/hooks/useWallet';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
@@ -76,8 +79,7 @@ export default function CelebrityDetailScreen() {
   const [celebrity, setCelebrity] = useState<Celebrity | null>(null);
   const [loading, setCelebLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [ugcPrice, setUgcPrice] = useState<number>(25000);
-  const [promoPrice, setPromoPrice] = useState<number>(15000);
+  const [ugcPrice, setUgcPrice] = useState<number>(0);
 
   const fetchCelebrity = useCallback(async () => {
     if (!id) return;
@@ -94,8 +96,7 @@ export default function CelebrityDetailScreen() {
       } else {
         const raw = rows[0];
         const sp = raw.service_prices ?? {};
-        setUgcPrice(sp.ugc_ad ?? 25000);
-        setPromoPrice(sp.video_promotion ?? sp.image_promotion ?? 50000);
+        setUgcPrice(sp.ugc_ad ?? 0);
         setCelebrity({
           id: raw.id,
           name: raw.name,
@@ -133,7 +134,8 @@ export default function CelebrityDetailScreen() {
     fetchCelebrity();
   }, [fetchCelebrity]);
 
-  const [isFav, setIsFav] = useState(false);
+  const { isLoved, toggle: toggleLoved } = useLovedCelebrities();
+  const [lovedSaving, setLovedSaving] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subLoading, setSubLoading] = useState(false);
   const [pricingPrice, setPricingPrice] = useState<number | null>(null);
@@ -284,6 +286,22 @@ export default function CelebrityDetailScreen() {
     }
   };
 
+  const handleToggleLoved = async () => {
+    if (!user) {
+      router.push('/(auth)');
+      return;
+    }
+    if (!id || lovedSaving) return;
+    setLovedSaving(true);
+    try {
+      // Hold the spinner a moment so the save is visible even though it finishes fast.
+      const [result] = await Promise.all([toggleLoved(id), new Promise(r => setTimeout(r, 600))]);
+      if (result !== null) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
+    } finally {
+      setLovedSaving(false);
+    }
+  };
+
   // Back from the wallet with the sheet waiting: refresh the balance and reopen it on the payment step.
   useFocusEffect(
     useCallback(() => {
@@ -345,32 +363,14 @@ export default function CelebrityDetailScreen() {
   const showSubscribeBanner = isLoggedIn && !isSubscribed && !subLoading && hasPricing;
   const walletBalance = wallet.balance;
 
-  const serviceCards = [
-    {
-      key: 'wish',
-      emoji: '💜',
-      title: 'Wish a Friend',
-      price: celebrity.pricePerWish,
-      delivery: '3-5 days',
-      onPress: () => router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: 'wish' } }),
-    },
-    {
-      key: 'ugc',
-      emoji: '🎬',
-      title: 'Make an Ad (UGC)',
-      price: ugcPrice,
-      delivery: '3-5 days',
-      onPress: () => router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: 'ad' } }),
-    },
-    {
-      key: 'promo',
-      emoji: '🖼',
-      title: 'Video Promotion',
-      price: promoPrice,
-      delivery: '3-5 days',
-      onPress: () => router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: 'video' } }),
-    },
-  ];
+  // Each service opens its own sidebar screen with this celebrity already chosen. Prices are shown only where the screen charges the celebrity's own price.
+  const serviceCards = SERVICE_KEYS.map(key => ({
+    key,
+    ...SERVICES[key],
+    price: key === 'wish' ? celebrity.pricePerWish : key === 'ad' ? ugcPrice : 0,
+    onPress: () => openCelebrityService(key, celebrity.id),
+  }));
+  const loved = isLoved(celebrity.id);
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -520,12 +520,20 @@ export default function CelebrityDetailScreen() {
           >
             <Icon name="arrow-left" size={22} color="#fff" />
           </TouchableOpacity>
-          {/* Fav btn */}
+          {/* Heart: marks the celebrity as loved; the Favorites screen keeps only these */}
           <TouchableOpacity
-            onPress={() => setIsFav(!isFav)}
+            onPress={handleToggleLoved}
             style={[styles.favBtn, { top: insets.top + 12 }]}
+            accessibilityRole="button"
+            accessibilityLabel={loved ? 'Remove from favorites' : 'Add to favorites'}
+            accessibilityState={{ selected: loved, busy: lovedSaving }}
+            disabled={lovedSaving}
           >
-            <Icon name="heart" size={22} color={isFav ? '#EF4444' : '#fff'} />
+            {lovedSaving ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Icon name="heart" size={22} color={loved ? '#EF4444' : '#fff'} filled={loved} />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -609,10 +617,10 @@ export default function CelebrityDetailScreen() {
                   <Text style={styles.serviceEmoji}>{card.emoji}</Text>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.serviceTitle, { color: colors.foreground }]}>{card.title}</Text>
-                    <Text style={[styles.serviceDelivery, { color: colors.mutedForeground }]}>{card.delivery}</Text>
+                    <Text style={[styles.serviceDelivery, { color: colors.mutedForeground }]}>{card.subtitle}</Text>
                   </View>
                   <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                    <Text style={[styles.servicePrice, { color: colors.primary }]}>₹{card.price.toLocaleString('en-IN')}</Text>
+                    {card.price > 0 && <Text style={[styles.servicePrice, { color: colors.primary }]}>₹{card.price.toLocaleString('en-IN')}</Text>}
                     {isSubscribed ? (
                       <View style={[styles.bookNowPill, { backgroundColor: colors.primary }]}>
                         <Text style={styles.bookNowText}>Book Now</Text>
@@ -744,11 +752,11 @@ export default function CelebrityDetailScreen() {
           startAt={subscribeStart}
           onSubscribed={() => { setIsSubscribed(true); fetchSubscriptionData(); wallet.refetch(); }}
           onAddMoney={() => { reopenAfterWallet.current = true; setShowSubscribe(false); setTimeout(() => router.push('/wallet' as never), 80); }}
-          onBook={(service: ServiceKey) => {
+          onBook={(service) => {
             setShowSubscribe(false);
-            setTimeout(() => router.push({ pathname: '/booking/[id]', params: { id: celebrity.id, service } }), 80);
+            setTimeout(() => openCelebrityService(service, celebrity.id), 80);
           }}
-          servicePrices={{ wish: celebrity.pricePerWish ?? 0, ad: ugcPrice, video: promoPrice }}
+          servicePrices={{ wish: celebrity.pricePerWish ?? 0, ad: ugcPrice, video: 0 }}
         />
       )}
 
@@ -771,17 +779,13 @@ export default function CelebrityDetailScreen() {
             Select a service to book with {celebrity?.name}
           </Text>
 
-          {([
-            { key: 'wish' as const, emoji: '💜', title: 'Wish a Friend', subtitle: 'Personalised video wish', price: celebrity?.pricePerWish ?? 5000 },
-            { key: 'ad' as const, emoji: '🎬', title: 'Make an Ad (UGC)', subtitle: 'Brand promotion video', price: ugcPrice },
-            { key: 'video' as const, emoji: '🎥', title: 'Video Promo', subtitle: 'Video promotion campaign', price: promoPrice },
-          ]).map((svc) => (
+          {serviceCards.map((svc) => (
             <TouchableOpacity
               key={svc.key}
               activeOpacity={0.85}
               onPress={() => {
                 setShowServiceSheet(false);
-                router.push({ pathname: '/booking/[id]', params: { id: celebrity!.id, service: svc.key } });
+                svc.onPress();
               }}
               style={[styles.serviceCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.primary, borderWidth: 1, marginBottom: 10 }]}
             >
@@ -792,7 +796,7 @@ export default function CelebrityDetailScreen() {
                   <Text style={[styles.serviceDelivery, { color: colors.mutedForeground }]}>{svc.subtitle}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', gap: 6 }}>
-                  <Text style={[styles.servicePrice, { color: colors.primary }]}>₹{svc.price.toLocaleString('en-IN')}</Text>
+                  {svc.price > 0 && <Text style={[styles.servicePrice, { color: colors.primary }]}>₹{svc.price.toLocaleString('en-IN')}</Text>}
                   <View style={[styles.bookNowPill, { backgroundColor: colors.primary }]}>
                     <Text style={styles.bookNowText}>Book Now</Text>
                   </View>

@@ -9,15 +9,17 @@ import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router, Stack, useSegments } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
+import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
-import { AppState, Platform, View } from 'react-native';
+import { Alert, AppState, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { adoptRootFromInstance } from '@/assistant-hook';
+import '@/constants/cancelableAlerts';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AssistantOverlay } from '@/components/assistant/AssistantOverlay';
 
@@ -120,6 +122,30 @@ function ReminderNotifications() {
     return () => sub.remove();
   }, []);
 
+  return null;
+}
+
+/**
+ * Status-bar icons follow the theme: dark on light surfaces, light on dark ones. Without this the
+ * clock, battery and signal icons stayed white and vanished on every light screen (QA audit M-04).
+ */
+function ThemedStatusBar() {
+  const { isDark } = useTheme();
+  return <StatusBar style={isDark ? 'light' : 'dark'} />;
+}
+
+/**
+ * When the server ends a login (signing in on another device does it), the assistant and the app's functions are refused
+ * with "unauthorized" while ordinary pages still seem to work. The auth layer then signs the user out; this tells them why
+ * once and opens the sign-in screen, instead of leaving the assistant saying it cannot reach the internet.
+ */
+function SessionEndedGate() {
+  const { sessionEndedAt } = useAuth();
+  useEffect(() => {
+    if (!sessionEndedAt) return;
+    Alert.alert('Please sign in again', 'Your login has ended, for example because you signed in on another device.');
+    router.replace('/(auth)' as never);
+  }, [sessionEndedAt]);
   return null;
 }
 
@@ -259,9 +285,11 @@ export default function RootLayout() {
                       <DrawerProvider>
                       <OrderConfirmProvider>
                         <AppRoot>
+                          <ThemedStatusBar />
                           <RootLayoutNav />
                           <FloatingButtons />
                           <AssistantSetupGate />
+                          <SessionEndedGate />
                           <ReminderNotifications />
                           <OccasionInApp />
                         </AppRoot>

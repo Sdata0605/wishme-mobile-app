@@ -1,24 +1,31 @@
+import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { UGC_ADS_CONFIG } from '@/components/ugc/configs';
 import { UgcHistory } from '@/components/ugc/UgcHistory';
 import { UgcOrderShell } from '@/components/ugc/UgcOrderShell';
 import { buildDetails, displayValue, type CelebrityLite, type Values } from '@/components/ugc/types';
-import { parseApiError, supabaseFetch } from '@/constants/supabase';
+import { supabaseFetch } from '@/constants/supabase';
+import { placeOrder } from '@/services/placeOrder';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrityById } from '@/hooks/useCelebrityById';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 
 const DEFAULT_PRICE = 999;
+const CELEBRITY_SELECT = 'id,name,category,image_url,service_prices';
 
 export default function UgcAdsScreen() {
   const { colors } = useTheme();
-  const { user, session } = useAuth();
+  const { user, session, getValidSession } = useAuth();
   const wallet = useWallet();
   const { getDiscountedPrice } = usePlan();
   const token = session?.access_token ?? null;
   const [basePrice, setBasePrice] = useState(DEFAULT_PRICE);
+  // Opened from a celebrity's profile: start with them as the presenter.
+  const { celebrity: celebrityParam } = useLocalSearchParams<{ celebrity?: string }>();
+  const preset = useCelebrityById<CelebrityLite>(celebrityParam, CELEBRITY_SELECT);
 
   useEffect(() => { wallet.refetch(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -38,15 +45,23 @@ export default function UgcAdsScreen() {
   const getPrice = (v: Values) => getDiscountedPrice(baseFor(v.presenter === 'celebrity' ? v.celebrity : null));
 
   const onSubmit = async (v: Values) => {
-    if (!token) throw new Error('Please sign in again.');
     const images: string[] = v.images ?? [];
     const ctaField = UGC_ADS_CONFIG.sections[1].fields.find(f => f.key === 'cta')!;
     const cta = v.cta === 'custom' ? (v.cta_custom ?? '') : v.cta ? displayValue(ctaField, v.cta) : '';
     const celeb: CelebrityLite | null = v.presenter === 'celebrity' ? v.celebrity ?? null : null;
 
-    const res = await supabaseFetch('/rest/v1/rpc/create_ugc_ad_order', {
-      method: 'POST',
-      body: JSON.stringify({
+    const order = await placeOrder<{ id: string }>({
+      rpc: 'create_ugc_ad_order',
+      getToken: async () => (await getValidSession())?.access_token ?? null,
+      findCreated: async (t, since) => {
+        const r = await supabaseFetch(
+          `/rest/v1/ugc_ads?user_id=eq.${user?.id}&product_name=eq.${encodeURIComponent(String(v.product_name ?? '').trim())}&created_at=gte.${encodeURIComponent(since)}&select=id&order=created_at.desc&limit=1`,
+          {}, t,
+        );
+        const rows = r.ok ? await r.json() as Array<{ id: string }> : [];
+        return rows[0] ?? null;
+      },
+      body: {
         p_celebrity_id: celeb?.id ?? null,
         p_product_name: v.product_name ?? '',
         p_product_description: v.product_description ?? '',
@@ -56,17 +71,24 @@ export default function UgcAdsScreen() {
         p_call_to_action: cta,
         p_aspect_ratio: v.aspect_ratio ?? '9:16',
         p_details: buildDetails(UGC_ADS_CONFIG, v),
-      }),
-    }, token);
-    if (!res.ok) throw new Error(await parseApiError(res));
-    const order = await res.json() as { id: string };
+      },
+    });
     return { id: order.id };
   };
+
+  if (preset.loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <UgcOrderShell
         config={UGC_ADS_CONFIG}
+        initialValues={preset.celebrity ? { presenter: 'celebrity', celebrity: preset.celebrity } : undefined}
         title="UGC Ads"
         subtitle="Order a creator-style promo video for your product or brand."
         headerIcon="zap"

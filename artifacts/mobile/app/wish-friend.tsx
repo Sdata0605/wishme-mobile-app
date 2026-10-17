@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -16,15 +16,21 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import { WishFriendLanding } from '@/components/wish-friend/WishFriendLanding';
+import { placeOrder } from '@/services/placeOrder';
+import { uploadPhoto } from '@/services/uploadPhoto';
 import { KeyboardAwareScrollViewCompat } from '@/components/KeyboardAwareScrollViewCompat';
 import { parseApiError, supabaseFetch, SUPABASE_URL } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useOrderConfirm } from '@/context/OrderConfirmContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrityById } from '@/hooks/useCelebrityById';
+import { useSubscribedCelebrities } from '@/hooks/useSubscribedCelebrities';
+import { SubscribedCelebrityChips } from '@/components/celebrity/SubscribedCelebrityChips';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
+const CELEBRITY_SELECT = 'id,name,category,image_url,delivery_time,service_prices';
 const B2_BASE = 'https://f005.backblazeb2.com/file/wishmetoday/';
 
 function imgUri(url: string | null | undefined): string | null {
@@ -33,7 +39,7 @@ function imgUri(url: string | null | undefined): string | null {
 }
 
 type VideoType = 'video_wish' | 'ugc_video';
-type Step = 'type' | 'celebrity' | 'details' | 'review' | 'done';
+type Step = 'type' | 'details' | 'review' | 'done';
 
 interface Celebrity {
   id: string;
@@ -59,19 +65,21 @@ const ASPECT_RATIOS = ['9:16', '1:1', '16:9'];
 
 export default function WishFriendScreen() {
   const { colors } = useTheme();
-  const { user, session } = useAuth();
+  const { user, session, getValidSession } = useAuth();
   const wallet = useWallet();
   const { confirmOrder } = useOrderConfirm();
   const { getDiscountedPrice } = usePlan();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const token = session?.access_token ?? null;
+  // Opened from a celebrity's profile: the order goes to them without a pick-a-celebrity step.
+  const { celebrity: celebrityParam } = useLocalSearchParams<{ celebrity?: string }>();
+  const preset = useCelebrityById<Celebrity>(celebrityParam, CELEBRITY_SELECT);
 
   const [step, setStep] = useState<Step>('type');
   const [videoType, setVideoType] = useState<VideoType>('video_wish');
-  const [celebrities, setCelebrities] = useState<Celebrity[]>([]);
-  const [loadingCelebs, setLoadingCelebs] = useState(false);
-  const [search, setSearch] = useState('');
+  // Only celebrities the user has subscribed to can be chosen, as chips on the details screen.
+  const subscribed = useSubscribedCelebrities<Celebrity>(CELEBRITY_SELECT);
   const [celebrity, setCelebrity] = useState<Celebrity | null>(null);
   const [ugcFallbackPrice, setUgcFallbackPrice] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -94,15 +102,7 @@ export default function WishFriendScreen() {
     if (result.canceled || !result.assets[0]) return;
     setUploadingImage(true);
     try {
-      const blob = await (await fetch(result.assets[0].uri)).blob();
-      const path = `${user.id}/wish-friend-${Date.now()}.jpg`;
-      const res = await supabaseFetch(
-        `/storage/v1/object/promotional-content/${path}`,
-        { method: 'POST', headers: { 'Content-Type': 'image/jpeg' }, body: blob },
-        token,
-      );
-      if (!res.ok) throw new Error(await parseApiError(res));
-      setReferenceImageUrl(`${SUPABASE_URL}/storage/v1/object/public/promotional-content/${path}`);
+      setReferenceImageUrl(await uploadPhoto({ uri: result.assets[0].uri, bucket: 'promotional-content', folder: user.id, token }));
     } catch (e) {
       console.warn('[wish-friend] photo upload failed', e);
       Alert.alert('Photo upload failed', e instanceof Error ? e.message : 'Please try again.');
@@ -121,31 +121,9 @@ export default function WishFriendScreen() {
       .catch(() => {});
   }, [token]);
 
-  useEffect(() => {
-    if (step !== 'celebrity' || !token) return;
-    const timer = setTimeout(async () => {
-      setLoadingCelebs(true);
-      try {
-        const term = search.trim().replace(/[%,()*]/g, ' ');
-        const nameFilter = term ? `&name=ilike.*${encodeURIComponent(term)}*` : '';
-        const res = await supabaseFetch(
-          `/rest/v1/celebrities?select=id,name,category,image_url,delivery_time,service_prices&is_active=eq.true&or=(consent_status.neq.rejected,consent_status.is.null)${nameFilter}&order=name.asc&limit=48`,
-          {},
-          token,
-        );
-        if (res.ok) setCelebrities(await res.json() as Celebrity[]);
-      } catch {
-        // list stays as-is; the user can retry by editing the search
-      } finally {
-        setLoadingCelebs(false);
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [step, search, token]);
-
-  const basePriceFor = (c: Celebrity | null): number => {
+  const basePriceFor = (c: Celebrity | null, type: VideoType = videoType): number => {
     if (!c) return 0;
-    if (videoType === 'video_wish') return c.service_prices?.general_wish ?? 0;
+    if (type === 'video_wish') return c.service_prices?.general_wish ?? 0;
     return c.service_prices?.ugc_ad || ugcFallbackPrice;
   };
 
@@ -153,8 +131,8 @@ export default function WishFriendScreen() {
   const price = getDiscountedPrice(basePrice);
   const typeLabel = videoType === 'video_wish' ? 'Video Wish' : 'UGC Video';
   const detailsValid = useMemo(
-    () => recipientName.trim().length > 0 && occasion.length > 0 && prompt.trim().length >= 10,
-    [recipientName, occasion, prompt],
+    () => !!celebrity && basePrice > 0 && recipientName.trim().length > 0 && occasion.length > 0 && prompt.trim().length >= 10,
+    [celebrity, basePrice, recipientName, occasion, prompt],
   );
 
   const pickType = (key: 'greeting_card' | VideoType) => {
@@ -162,13 +140,20 @@ export default function WishFriendScreen() {
       router.push('/greeting-cards' as never);
       return;
     }
+    if (key === 'ugc_video') {
+      router.push((preset.celebrity ? `/ugc-videos?celebrity=${preset.celebrity.id}` : '/ugc-videos') as never);
+      return;
+    }
     setVideoType(key);
-    setStep('celebrity');
+    // Opened from a celebrity's profile: start with them chosen, if the user is subscribed and they offer this.
+    const chosen = preset.celebrity;
+    const usable = chosen && basePriceFor(chosen, key) > 0 && subscribed.celebrities.some(c => c.id === chosen.id);
+    setCelebrity(usable ? chosen : null);
+    setStep('details');
   };
 
   const goBack = () => {
-    if (step === 'celebrity') setStep('type');
-    else if (step === 'details') setStep('celebrity');
+    if (step === 'details') setStep('type');
     else if (step === 'review') setStep('details');
     else router.back();
   };
@@ -184,9 +169,18 @@ export default function WishFriendScreen() {
     }
     setSubmitting(true);
     try {
-      const res = await supabaseFetch('/rest/v1/rpc/create_wish_friend_order', {
-        method: 'POST',
-        body: JSON.stringify({
+      const order = await placeOrder<{ id?: string; price_paid?: number }>({
+        rpc: 'create_wish_friend_order',
+        getToken: async () => (await getValidSession())?.access_token ?? null,
+        findCreated: async (t, since) => {
+          const r = await supabaseFetch(
+            `/rest/v1/wish_friend_orders?user_id=eq.${user?.profileId}&order_type=eq.${videoType}&celebrity_id=eq.${celebrity.id}&created_at=gte.${encodeURIComponent(since)}&select=id,price_paid&order=created_at.desc&limit=1`,
+            {}, t,
+          );
+          const rows = r.ok ? await r.json() as Array<{ id: string; price_paid: number }> : [];
+          return rows[0] ?? null;
+        },
+        body: {
           p_order_type: videoType,
           p_celebrity_id: celebrity.id,
           p_recipient_name: recipientName,
@@ -200,10 +194,8 @@ export default function WishFriendScreen() {
             p_call_to_action: callToAction,
             p_reference_image_url: referenceImageUrl,
           }),
-        }),
-      }, token);
-      if (!res.ok) throw new Error(await parseApiError(res));
-      const order = await res.json() as { id?: string; price_paid?: number };
+        },
+      });
       setPaid(order.price_paid ?? price);
       wallet.refetch();
       setStep('done');
@@ -281,76 +273,51 @@ export default function WishFriendScreen() {
     <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       {header}
 
-      {step === 'type' && (
+      {step === 'type' && (preset.loading ? (
+        <ActivityIndicator style={{ marginTop: 48 }} color={colors.primary} />
+      ) : (
         <KeyboardAwareScrollViewCompat contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
+          {preset.celebrity ? (
+            <View style={[s.presetBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              {imgUri(preset.celebrity.image_url) ? (
+                <Image source={{ uri: imgUri(preset.celebrity.image_url)! }} style={s.presetAvatar} contentFit="cover" />
+              ) : (
+                <View style={[s.presetAvatar, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
+                  <Icon name="star" size={18} color={colors.mutedForeground} />
+                </View>
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Your order goes to</Text>
+                <Text style={[s.optionTitle, { color: colors.foreground }]} numberOfLines={1}>{preset.celebrity.name}</Text>
+              </View>
+            </View>
+          ) : null}
           <WishFriendLanding
             onPick={pickType}
             onOpenOrders={() => router.push({ pathname: '/bookings', params: { tab: 'Wish a Friend' } } as never)}
           />
         </KeyboardAwareScrollViewCompat>
-      )}
+      ))}
 
-      {step === 'celebrity' && (
-        <View style={{ flex: 1 }}>
-          <Text style={[s.lead, { color: colors.mutedForeground, paddingHorizontal: 16, paddingTop: 16 }]}>
-            Choose a celebrity for your {typeLabel.toLowerCase()}
-          </Text>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 10 }}>
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder="Search celebrities"
-              placeholderTextColor={colors.mutedForeground}
-              style={inputStyle}
-            />
-          </View>
-          {loadingCelebs ? (
-            <ActivityIndicator style={{ marginTop: 32 }} color={colors.primary} />
-          ) : (
-            <FlatList
-              data={celebrities}
-              keyExtractor={c => c.id}
-              numColumns={2}
-              columnWrapperStyle={{ gap: 12 }}
-              contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: insets.bottom + 32 }}
-              keyboardShouldPersistTaps="handled"
-              ListEmptyComponent={<Text style={{ textAlign: 'center', color: colors.mutedForeground, marginTop: 32 }}>No celebrities found</Text>}
-              renderItem={({ item }) => {
-                const p = basePriceFor(item);
-                const unavailable = p <= 0;
-                const uri = imgUri(item.image_url);
-                return (
-                  <TouchableOpacity
-                    disabled={unavailable}
-                    activeOpacity={0.85}
-                    onPress={() => { setCelebrity(item); setStep('details'); }}
-                    style={[s.celebCard, { backgroundColor: colors.card, borderColor: colors.border, opacity: unavailable ? 0.5 : 1 }]}
-                  >
-                    {uri ? (
-                      <Image source={{ uri }} style={s.celebImg} contentFit="cover" />
-                    ) : (
-                      <View style={[s.celebImg, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
-                        <Icon name="star" size={28} color={colors.mutedForeground} />
-                      </View>
-                    )}
-                    <View style={{ padding: 10 }}>
-                      <Text style={[s.celebName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
-                      <Text style={{ color: colors.mutedForeground, fontSize: 12 }} numberOfLines={1}>{item.category}</Text>
-                      <Text style={{ color: colors.primary, fontFamily: 'Inter_700Bold', marginTop: 4 }}>
-                        {unavailable ? 'Not available' : `₹${getDiscountedPrice(p).toLocaleString('en-IN')}`}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }}
-            />
-          )}
-        </View>
-      )}
-
-      {step === 'details' && celebrity && (
+      {step === 'details' && (
         <KeyboardAwareScrollViewCompat contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 40 }}>
-          <Text style={[s.lead, { color: colors.mutedForeground }]}>{typeLabel} with {celebrity.name}</Text>
+          <Text style={[s.lead, { color: colors.mutedForeground }]}>
+            {typeLabel}{celebrity ? ` with ${celebrity.name}` : ''}
+          </Text>
+
+          <Text style={[s.label, { color: colors.foreground }]}>Select Celebrity *</Text>
+          <SubscribedCelebrityChips
+            celebrities={subscribed.celebrities}
+            loading={subscribed.loading}
+            hasNone={subscribed.hasNone}
+            selectedId={celebrity?.id}
+            onSelect={c => setCelebrity(c)}
+            priceFor={c => {
+              const base = basePriceFor(c);
+              return base > 0 ? getDiscountedPrice(base) : null;
+            }}
+            accent={colors.primary}
+          />
 
           <Text style={[s.label, { color: colors.foreground }]}>Friend's name *</Text>
           <TextInput value={recipientName} onChangeText={setRecipientName} placeholder="e.g. Priya" placeholderTextColor={colors.mutedForeground} style={inputStyle} />
@@ -520,6 +487,8 @@ const s = StyleSheet.create({
   label: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginTop: 16, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7 },
+  presetBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginTop: 16, padding: 12, borderRadius: 14, borderWidth: 1 },
+  presetAvatar: { width: 44, height: 44, borderRadius: 22 },
   celebCard: { flex: 1, borderRadius: 14, borderWidth: 1, overflow: 'hidden' },
   celebImg: { width: '100%', height: 130 },
   celebName: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },

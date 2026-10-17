@@ -346,16 +346,7 @@ export default function PhotoWishScreen() {
               }),
             }, validSession.access_token);
 
-            if (txRes.ok) {
-              await supabaseFetch(
-                `/rest/v1/photo_wishes?id=eq.${data.photoWishId}`,
-                {
-                  method: 'PATCH',
-                  body: JSON.stringify({ wishme_payment_id: paymentId }),
-                },
-                validSession.access_token,
-              );
-            } else {
+            if (!txRes.ok) {
               console.warn('[PhotoWish] payment_transactions insert failed:', txRes.status);
             }
           } catch (payErr) {

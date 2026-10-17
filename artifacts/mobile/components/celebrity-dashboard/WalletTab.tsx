@@ -6,17 +6,27 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { fmtDate, fmtRupee, StatusBadge, SectionEmpty, LoadingBox, Card, SectionTitle, PrimaryBtn, InputRow, styles } from './shared';
+import { FilterChips, fmtDate, fmtRupee, StatusBadge, SectionEmpty, LoadingBox, Card, SectionTitle, PrimaryBtn, InputRow, styles } from './shared';
 import type { ImagePromotion, TabPropsWithUserAndRefresh, WalletTx } from './shared';
 import { supabaseFetch } from '@/constants/supabase';
 
 interface BankDetail {
   id: string;
   bank_name: string;
-  bank_account_number: string;
+  account_number: string;
   ifsc_code: string;
   account_holder_name: string;
 }
+
+/** What a payout request's status means to the celebrity. */
+const PAYOUT_LABELS: Record<string, string> = {
+  pending: 'Pending',
+  processing: 'On its way',
+  processed: 'Paid',
+  rejected: 'Rejected, money returned',
+  failed: 'Failed, money returned',
+  reversed: 'Returned by bank, money returned',
+};
 
 interface PayoutRequest {
   id: string;
@@ -35,32 +45,25 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
   const [amount, setAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [showAddBank, setShowAddBank] = useState(false);
-  const [bankForm, setBankForm] = useState({ bank_name: '', bank_account_number: '', ifsc_code: '', account_holder_name: '' });
+  const [bankForm, setBankForm] = useState({ bank_name: '', account_number: '', ifsc_code: '', account_holder_name: '' });
+  const [confirmAccount, setConfirmAccount] = useState('');
+  const [view, setView] = useState('payouts');
   const [addingBank, setAddingBank] = useState(false);
 
   const fetchAll = useCallback(async () => {
     if (!session?.access_token) { setLoading(false); return; }
     setLoading(true);
     try {
-      const [bkRes, prRes, txRes, ipRes] = await Promise.all([
+      const [bkRes, prRes, txRes] = await Promise.all([
         supabaseFetch(`/rest/v1/bank_details?user_id=eq.${user?.profileId}&order=created_at.desc`, {}, session.access_token),
         supabaseFetch(`/rest/v1/payout_requests?celebrity_id=eq.${celebrity.id}&order=requested_at.desc&limit=20`, {}, session.access_token),
         supabaseFetch(`/rest/v1/celebrity_wallet_transactions?celebrity_id=eq.${celebrity.id}&order=created_at.desc&limit=50`, {}, session.access_token),
-        supabaseFetch(`/rest/v1/image_promotions?celebrity_id=eq.${celebrity.id}&status=eq.completed&order=created_at.desc&limit=50`, {}, session.access_token),
       ]);
       if (bkRes.ok) { const r = await bkRes.json() as BankDetail[]; setBanks(r ?? []); if (r?.length > 0) setSelectedBank(r[0]); }
       if (prRes.ok) { const r = await prRes.json() as PayoutRequest[]; setPayouts(r ?? []); }
       const walletTxns: WalletTx[] = txRes.ok ? ((await txRes.json() as WalletTx[]) ?? []) : [];
-      const ipRows: ImagePromotion[] = ipRes.ok ? ((await ipRes.json() as ImagePromotion[]) ?? []) : [];
-      const virtualTxns: WalletTx[] = ipRows.map(ip => ({
-        id: `ip-${ip.id}`,
-        transaction_type: 'earning',
-        amount: Math.round((ip.price_paid ?? 0) * 0.7),
-        status: 'completed',
-        description: 'Image promotion commission',
-        created_at: ip.created_at,
-      }));
-      const merged = [...walletTxns, ...virtualTxns].sort(
+      // The earnings ledger is the single source of truth: it already holds every credited order.
+      const merged = [...walletTxns].sort(
         (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
       );
       setTxns(merged);
@@ -78,28 +81,31 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
     if (!session?.access_token) { Alert.alert('Not logged in'); return; }
     setSubmitting(true);
     try {
+      // One server call reserves the money, sends it to the bank account and reports back. It checks the
+      // amount against the real balance, so the same money can never be sent twice.
       const res = await supabaseFetch(
-        '/rest/v1/payout_requests',
+        '/functions/v1/celebrity-payout',
         {
           method: 'POST',
-          headers: { Prefer: 'return=minimal' } as Record<string, string>,
           body: JSON.stringify({
-            celebrity_id: celebrity.id,
-            profile_id: user?.profileId,
-            requested_amount: amt,
+            amount: Math.round(amt),
             bank_name: selectedBank.bank_name,
-            bank_account_number: selectedBank.bank_account_number,
+            account_number: selectedBank.account_number,
             ifsc_code: selectedBank.ifsc_code,
             account_holder_name: selectedBank.account_holder_name,
           }),
         },
         session.access_token,
+        60_000,
       );
+      const out = await res.json().catch(() => ({})) as { error?: string; message?: string; status?: string };
       if (!res.ok) {
-        const err = await res.json().catch(() => ({})) as Record<string, string>;
-        Alert.alert('Error', err.message ?? `Failed to submit payout (${res.status})`);
+        Alert.alert('Could not withdraw', out.error ?? out.message ?? `Failed to send the payout (${res.status})`);
       } else {
-        Alert.alert('Success', 'Payout request submitted!');
+        Alert.alert(
+          out.status === 'processed' ? 'Money sent' : 'On its way',
+          `${fmtRupee(Math.round(amt))} is being sent to your account ending ${selectedBank.account_number.slice(-4)}. It usually arrives within minutes; you can follow it under Payout History.`,
+        );
         setAmount('');
         fetchAll();
         onRefreshCeleb();
@@ -111,9 +117,13 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
   };
 
   const addBank = async () => {
-    if (!bankForm.bank_name || !bankForm.bank_account_number || !bankForm.ifsc_code || !bankForm.account_holder_name) {
+    if (!bankForm.bank_name || !bankForm.account_number || !bankForm.ifsc_code || !bankForm.account_holder_name) {
       Alert.alert('Fill all bank details'); return;
     }
+    if (!/^\d{6,18}$/.test(bankForm.account_number.trim())) { Alert.alert('Check the account number', 'Enter the digits only, 6 to 18 of them.'); return; }
+    if (bankForm.account_number.trim() !== confirmAccount.trim()) { Alert.alert('Account numbers do not match', 'Type the account number again exactly the same, so the money goes to the right place.'); return; }
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(bankForm.ifsc_code.trim())) { Alert.alert('Check the IFSC code', 'It is 11 characters, like HDFC0001234.'); return; }
+    if (bankForm.account_holder_name.trim().length < 3) { Alert.alert('Account holder name', 'Enter the name exactly as the bank has it.'); return; }
     if (!session?.access_token) { Alert.alert('Not logged in'); return; }
     setAddingBank(true);
     try {
@@ -122,7 +132,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
         {
           method: 'POST',
           headers: { Prefer: 'return=minimal' } as Record<string, string>,
-          body: JSON.stringify({ ...bankForm, user_id: user?.profileId }),
+          body: JSON.stringify({ ...bankForm, account_number: bankForm.account_number.trim(), ifsc_code: bankForm.ifsc_code.trim(), account_holder_name: bankForm.account_holder_name.trim(), user_id: user?.profileId }),
         },
         session.access_token,
       );
@@ -132,7 +142,8 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
       } else {
         Alert.alert('Bank account added!');
         setShowAddBank(false);
-        setBankForm({ bank_name: '', bank_account_number: '', ifsc_code: '', account_holder_name: '' });
+        setBankForm({ bank_name: '', account_number: '', ifsc_code: '', account_holder_name: '' });
+        setConfirmAccount('');
         fetchAll();
       }
     } catch (err) {
@@ -150,6 +161,9 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
       <LinearGradient colors={['#7B5CFA', '#1F7BFF']} style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
         <Text style={styles.balanceAmt}>{fmtRupee(celebrity.available_balance ?? 0)}</Text>
+        <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4 }}>
+          Total earned so far {fmtRupee(celebrity.total_earnings ?? 0)} · withdrawals are sent instantly by IMPS
+        </Text>
         {pendingClearance > 0 && (
           <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.3)' }}>
             <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular' }}>Pending Clearance</Text>
@@ -171,12 +185,12 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
               style={[styles.bankOption, { borderColor: selectedBank?.id === bk.id ? '#7B5CFA' : colors.border, backgroundColor: selectedBank?.id === bk.id ? '#7B5CFA10' : 'transparent' }]}
             >
               <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>{bk.bank_name}</Text>
-              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>****{bk.bank_account_number.slice(-4)} · {bk.account_holder_name}</Text>
+              <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>****{bk.account_number.slice(-4)} · {bk.account_holder_name}</Text>
             </TouchableOpacity>
           ))
         )}
         <InputRow label="Amount (₹)" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" colors={colors} />
-        <PrimaryBtn label="Submit Payout Request" onPress={submitPayout} loading={submitting} colors={colors} />
+        <PrimaryBtn label="Withdraw to Bank" onPress={submitPayout} loading={submitting} colors={colors} />
 
         <TouchableOpacity onPress={() => setShowAddBank(v => !v)} style={{ marginTop: 12, alignItems: 'center' }}>
           <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>
@@ -187,7 +201,8 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
         {showAddBank && (
           <View style={{ marginTop: 12 }}>
             <InputRow label="Bank Name" value={bankForm.bank_name} onChangeText={(v) => setBankForm(p => ({ ...p, bank_name: v }))} colors={colors} />
-            <InputRow label="Account Number" value={bankForm.bank_account_number} onChangeText={(v) => setBankForm(p => ({ ...p, bank_account_number: v }))} keyboardType="number-pad" colors={colors} />
+            <InputRow label="Account Number" value={bankForm.account_number} onChangeText={(v) => setBankForm(p => ({ ...p, account_number: v }))} keyboardType="number-pad" colors={colors} />
+            <InputRow label="Confirm Account Number" value={confirmAccount} onChangeText={setConfirmAccount} keyboardType="number-pad" colors={colors} />
             <InputRow label="IFSC Code" value={bankForm.ifsc_code} onChangeText={(v) => setBankForm(p => ({ ...p, ifsc_code: v.toUpperCase() }))} colors={colors} />
             <InputRow label="Account Holder Name" value={bankForm.account_holder_name} onChangeText={(v) => setBankForm(p => ({ ...p, account_holder_name: v }))} colors={colors} />
             <PrimaryBtn label="Save Bank Account" onPress={addBank} loading={addingBank} colors={colors} />
@@ -195,9 +210,15 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
         )}
       </Card>
 
-      <SectionTitle text="Payout History" colors={colors} />
-      {payouts.length === 0 ? (
-        <SectionEmpty icon="credit-card" text="No payout requests yet" colors={colors} />
+      <FilterChips
+        colors={colors}
+        value={view}
+        onChange={setView}
+        options={[{ key: 'payouts', label: 'Payouts', count: payouts.length }, { key: 'earnings', label: 'Earnings', count: txns.length }]}
+      />
+
+      {view === 'payouts' && (payouts.length === 0 ? (
+        <SectionEmpty icon="credit-card" text="No withdrawals yet" colors={colors} />
       ) : (
         payouts.map(p => (
           <Card key={p.id} colors={colors}>
@@ -208,15 +229,14 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={[styles.priceText, { color: '#7B5CFA' }]}>{fmtRupee(p.requested_amount)}</Text>
-                <StatusBadge status={p.status} />
+                <StatusBadge status={p.status} label={PAYOUT_LABELS[p.status]} />
               </View>
             </View>
           </Card>
         ))
-      )}
+      ))}
 
-      <SectionTitle text="Transaction History" colors={colors} />
-      {txns.length === 0 ? (
+      {view === 'earnings' && (txns.length === 0 ? (
         <SectionEmpty icon="trending-up" text="No transactions yet" colors={colors} />
       ) : (
         txns.map(tx => {
@@ -237,7 +257,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
             </Card>
           );
         })
-      )}
+      ))}
     </View>
   );
 }

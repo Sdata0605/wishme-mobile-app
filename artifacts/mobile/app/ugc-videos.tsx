@@ -1,24 +1,31 @@
+import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { UGC_VIDEOS_CONFIG } from '@/components/ugc/configs';
 import { UgcHistory } from '@/components/ugc/UgcHistory';
 import { UgcOrderShell } from '@/components/ugc/UgcOrderShell';
 import { buildDetails, displayValue, type CelebrityLite, type Values } from '@/components/ugc/types';
-import { parseApiError, supabaseFetch } from '@/constants/supabase';
+import { supabaseFetch } from '@/constants/supabase';
+import { placeOrder } from '@/services/placeOrder';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
+import { useCelebrityById } from '@/hooks/useCelebrityById';
 import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 
 const DEFAULT_PRICE = 500;
+const CELEBRITY_SELECT = 'id,name,category,image_url,service_prices';
 
 export default function UgcVideosScreen() {
   const { colors } = useTheme();
-  const { user, session } = useAuth();
+  const { user, session, getValidSession } = useAuth();
   const wallet = useWallet();
   const { getDiscountedPrice } = usePlan();
   const token = session?.access_token ?? null;
   const [fallbackPrice, setFallbackPrice] = useState(DEFAULT_PRICE);
+  // Opened with a celebrity chosen: start with them selected.
+  const { celebrity: celebrityParam } = useLocalSearchParams<{ celebrity?: string }>();
+  const preset = useCelebrityById<CelebrityLite>(celebrityParam, CELEBRITY_SELECT);
 
   useEffect(() => { wallet.refetch(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -40,14 +47,22 @@ export default function UgcVideosScreen() {
     UGC_VIDEOS_CONFIG.sections.find(s => s.key === sectionKey)!.fields.find(f => f.key === key)!;
 
   const onSubmit = async (v: Values) => {
-    if (!token) throw new Error('Please sign in again.');
     const celeb = v.celebrity as CelebrityLite;
     const forMe = v.for_whom === 'me';
     const photos: string[] = v.photos ?? [];
 
-    const res = await supabaseFetch('/rest/v1/rpc/create_wish_friend_order', {
-      method: 'POST',
-      body: JSON.stringify({
+    const order = await placeOrder<{ id: string }>({
+      rpc: 'create_wish_friend_order',
+      getToken: async () => (await getValidSession())?.access_token ?? null,
+      findCreated: async (t, since) => {
+        const r = await supabaseFetch(
+          `/rest/v1/wish_friend_orders?user_id=eq.${user?.profileId}&order_type=eq.ugc_video&celebrity_id=eq.${celeb.id}&created_at=gte.${encodeURIComponent(since)}&select=id&order=created_at.desc&limit=1`,
+          {}, t,
+        );
+        const rows = r.ok ? await r.json() as Array<{ id: string }> : [];
+        return rows[0] ?? null;
+      },
+      body: {
         p_order_type: 'ugc_video',
         p_celebrity_id: celeb.id,
         p_recipient_name: forMe ? (user?.firstName || 'Me') : (v.name ?? ''),
@@ -60,17 +75,24 @@ export default function UgcVideosScreen() {
         p_call_to_action: '',
         p_reference_image_url: photos[0] ?? '',
         p_details: buildDetails(UGC_VIDEOS_CONFIG, v),
-      }),
-    }, token);
-    if (!res.ok) throw new Error(await parseApiError(res));
-    const order = await res.json() as { id: string };
+      },
+    });
     return { id: order.id };
   };
+
+  if (preset.loading) {
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+        <ActivityIndicator color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <UgcOrderShell
         config={UGC_VIDEOS_CONFIG}
+        initialValues={preset.celebrity ? { celebrity: preset.celebrity } : undefined}
         title="UGC Videos"
         subtitle="A personal, creator-style video with a celebrity, made for someone you care about."
         headerIcon="video"

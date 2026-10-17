@@ -72,9 +72,17 @@ export interface LiveToolCall {
   args: Record<string, unknown>;
 }
 
+class AuthRejectedError extends Error {
+  constructor() {
+    super('Your login has ended. Please sign in again.');
+  }
+}
+
 export interface GeminiLiveOptions {
   /** Supabase user access token, refreshed if stale (the anon key is rejected by voice-token). */
   getAccessToken: () => Promise<string | null | undefined> | string | null | undefined;
+  /** The server refused the login (401): the app checks it and signs the user out if it really has ended. */
+  onAuthRejected?: () => void;
   /** Built fresh on every (re)connect so it can include today's date etc. */
   getSystemInstruction: () => string;
   /** The Gemini voice to speak with (read on every (re)connect, so a changed voice is picked up). */
@@ -382,6 +390,10 @@ export class GeminiLiveClient {
     } finally {
       clearTimeout(timer);
     }
+    if (res.status === 401) {
+      this.opts.onAuthRejected?.();
+      throw new AuthRejectedError();
+    }
     if (!res.ok) throw new Error(`Voice service unavailable (${res.status}).`);
     const data = await res.json();
     if (data.engine) {
@@ -404,6 +416,8 @@ export class GeminiLiveClient {
       token = await this.fetchToken();
     } catch (e) {
       log('token fetch failed:', e instanceof Error ? e.message : e);
+      // A refused login will not fix itself by retrying: stop here (the app signs the user out if it has really ended).
+      if (e instanceof AuthRejectedError) { this.wantWarm = false; this.setState('idle'); return; }
       this.scheduleReconnect(e instanceof Error ? e.message : undefined);
       return;
     }

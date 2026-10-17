@@ -3,7 +3,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -29,6 +29,11 @@ import { usePlan } from '@/hooks/usePlan';
 import { useWallet } from '@/hooks/useWallet';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
+/** Tries per order. The AI service is occasionally busy or drops a request; a repeat almost always works. */
+const MAX_ATTEMPTS = 3;
+/** Generating an image takes well over the app's usual 20 s request limit. */
+const GENERATE_TIMEOUT_MS = 170_000;
+
 interface ImagePromotion {
   id: string;
   user_id: string;
@@ -49,6 +54,8 @@ interface SubscribedCeleb {
   name: string;
   category: string;
   image_url: string | null;
+  /** Prices the admin set for this celebrity; `image_promotion` is what this screen charges. */
+  service_prices?: { image_promotion?: number } | null;
 }
 
 type RefImgSource = 'none' | 'upload';
@@ -75,7 +82,7 @@ function isToday(iso: string) {
 export default function ImagePromotionsScreen() {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const { user, session } = useAuth();
+  const { user, session, getValidSession } = useAuth();
   const { confirmOrder } = useOrderConfirm();
   const wallet = useWallet();
   const { discountPercentage, getDiscountedPrice } = usePlan();
@@ -90,6 +97,8 @@ export default function ImagePromotionsScreen() {
   const [celebsLoading, setCelebsLoading] = useState(false);
 
   const [selectedCelebId, setSelectedCelebId] = useState('');
+  // Opened from a celebrity's profile: start with them selected (they must be one of the user's subscriptions).
+  const { celebrity: presetCelebId } = useLocalSearchParams<{ celebrity?: string }>();
 
   const [concept, setConcept] = useState('');
   const [branding, setBranding] = useState('');
@@ -98,7 +107,11 @@ export default function ImagePromotionsScreen() {
   const [refImgBase64, setRefImgBase64] = useState<string | null>(null);
   const [refImgUri, setRefImgUri] = useState<string | null>(null);
 
-  const [basePrice, setBasePrice] = useState(25);
+  // The platform-wide price is only the fallback: the price the admin set on the chosen celebrity wins,
+  // the same rule the server charges by.
+  const [platformPrice, setPlatformPrice] = useState(25);
+  const celebPrice = Number(celebrities.find(c => c.id === selectedCelebId)?.service_prices?.image_promotion);
+  const basePrice = celebPrice > 0 ? celebPrice : platformPrice;
   const finalPrice = getDiscountedPrice(basePrice);
   const discountPct = discountPercentage;
 
@@ -125,7 +138,7 @@ export default function ImagePromotionsScreen() {
     try {
       const ids = Array.from(favoriteIds).join(',');
       const celebRes = await supabaseFetch(
-        `/rest/v1/celebrities?select=id,name,category,image_url&id=in.(${ids})`,
+        `/rest/v1/celebrities?select=id,name,category,image_url,service_prices&id=in.(${ids})`,
         {},
         session.access_token,
       );
@@ -133,10 +146,11 @@ export default function ImagePromotionsScreen() {
         const rows = await celebRes.json() as SubscribedCeleb[];
         setCelebrities(rows ?? []);
         if (rows.length === 1) setSelectedCelebId(rows[0].id);
+        else if (presetCelebId && rows.some(r => r.id === presetCelebId)) setSelectedCelebId(prev => prev || presetCelebId);
       }
     } catch {}
     setCelebsLoading(false);
-  }, [session, favoriteIds]);
+  }, [session, favoriteIds, presetCelebId]);
 
   const fetchPricing = useCallback(async () => {
     try {
@@ -149,7 +163,7 @@ export default function ImagePromotionsScreen() {
         const rows = await settingsRes.json() as Array<{ setting_value: string }>;
         if (rows?.length) {
           const v = parseFloat(rows[0].setting_value);
-          if (!isNaN(v)) setBasePrice(v);
+          if (!isNaN(v)) setPlatformPrice(v);
         }
       }
     } catch {}
@@ -203,6 +217,23 @@ export default function ImagePromotionsScreen() {
     setRefImgBase64(null);
   }, []);
 
+  /** An image the server finished for this celebrity since `since`, or null. Used after a dropped connection. */
+  const findFinishedGeneration = useCallback(async (token: string, since: string): Promise<ImagePromotion | null> => {
+    if (!user?.profileId || !selectedCelebId) return null;
+    try {
+      const res = await supabaseFetch(
+        `/rest/v1/image_promotions?user_id=eq.${user.profileId}&celebrity_id=eq.${selectedCelebId}&status=eq.completed&created_at=gte.${encodeURIComponent(since)}&order=created_at.desc&limit=1`,
+        {},
+        token,
+      );
+      if (!res.ok) return null;
+      const rows = await res.json() as ImagePromotion[];
+      return rows?.[0]?.generated_image_url ? rows[0] : null;
+    } catch {
+      return null;
+    }
+  }, [user?.profileId, selectedCelebId]);
+
   const generate = useCallback(async () => {
     if (!selectedCelebId || !concept.trim()) return;
     if (wallet.balance < finalPrice) {
@@ -230,22 +261,56 @@ export default function ImagePromotionsScreen() {
         referenceImageUrl: refImgBase64 ? `data:image/jpeg;base64,${refImgBase64}` : null,
       };
 
-      const res = await supabaseFetch(
-        '/functions/v1/generate-image-promotion',
-        {
-          method: 'POST',
-          body: JSON.stringify(payload),
-        },
-        session.access_token,
-      );
+      const startedAt = new Date(Date.now() - 5_000).toISOString();
+      let gen: ImagePromotion | null = null;
+      let lastError = '';
 
-      if (!res.ok) {
+      // Up to 3 tries, so a hiccup (a busy AI model, a dropped connection, an expired token) never
+      // reaches the user. A try is only repeated when nothing was charged: the server bills only
+      // after an image exists, and before retrying a dropped connection we look for an image the
+      // server already finished, so the same order is never paid for twice.
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS && !gen; attempt++) {
+        if (attempt > 1) await new Promise<void>(r => setTimeout(r, 1500 * (attempt - 1)));
+
+        // The token in state can be an hour old; ask for one that is guaranteed valid right now.
+        const fresh = await getValidSession();
+        if (!fresh?.access_token) {
+          Alert.alert('Session expired', 'Please sign in again to generate images.');
+          setGenerating(false);
+          return;
+        }
+
+        let res: Response;
+        try {
+          res = await supabaseFetch(
+            '/functions/v1/generate-image-promotion',
+            { method: 'POST', body: JSON.stringify(payload) },
+            fresh.access_token,
+            GENERATE_TIMEOUT_MS,
+          );
+        } catch {
+          // Connection dropped or timed out: the image may still have been made and paid for.
+          lastError = 'The connection dropped.';
+          const done = await findFinishedGeneration(fresh.access_token, startedAt);
+          if (done) gen = done;
+          continue;
+        }
+
+        if (res.ok) {
+          const data = await res.json().catch(() => null) as { generation?: ImagePromotion; error?: string } | null;
+          if (data?.generation) { gen = data.generation; break; }
+          lastError = data?.error ?? 'No image came back.';
+          continue;
+        }
+
         let errMsg = `Request failed (${res.status})`;
         try {
           const errData = await res.json() as Record<string, unknown>;
           const msg = (errData.error as string) || (errData.message as string) || '';
           if (msg) errMsg = msg;
         } catch {}
+        lastError = errMsg;
+
         if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
           Alert.alert(
             'Insufficient Balance',
@@ -255,22 +320,25 @@ export default function ImagePromotionsScreen() {
               { text: 'Add Funds', onPress: () => router.push('/wallet' as never) },
             ],
           );
-        } else {
-          Alert.alert('Generation Failed', errMsg);
+          setGenerating(false);
+          return;
         }
+        // Worth another try: the AI service was busy or failed (5xx / 429), or the token was refused.
+        const transient = res.status >= 500 || res.status === 429 || res.status === 401;
+        if (!transient) {
+          Alert.alert('Generation Failed', errMsg);
+          setGenerating(false);
+          return;
+        }
+      }
+
+      if (!gen) {
+        Alert.alert('Could not create the image', `${lastError} We tried ${MAX_ATTEMPTS} times. You are only charged when an image is created, so please try again in a moment.`);
         setGenerating(false);
         return;
       }
 
-      const data = await res.json() as { generation?: ImagePromotion; error?: string };
-      if (data.error) {
-        Alert.alert('Generation Failed', data.error);
-        setGenerating(false);
-        return;
-      }
-
-      if (data.generation) {
-        const gen = data.generation;
+      {
 
         const now = new Date();
         const datePart = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
@@ -286,7 +354,8 @@ export default function ImagePromotionsScreen() {
               body: JSON.stringify({
                 wishme_payment_id: wishmePaymentId,
                 user_id: user?.profileId,
-                amount: finalPrice,
+                // What the server actually charged, not the screen's own estimate.
+                amount: gen.price_paid ?? finalPrice,
                 payment_method: 'wallet',
                 service_type: 'image_promotion',
                 image_promotion_id: gen.id,
@@ -299,19 +368,6 @@ export default function ImagePromotionsScreen() {
           );
           if (txRes.ok) paymentRecorded = true;
         } catch {}
-
-        if (paymentRecorded) {
-          try {
-            await supabaseFetch(
-              `/rest/v1/image_promotions?id=eq.${gen.id}`,
-              {
-                method: 'PATCH',
-                body: JSON.stringify({ wishme_payment_id: wishmePaymentId }),
-              },
-              session.access_token,
-            );
-          } catch {}
-        }
 
         setCurrentGeneration({ ...gen, wishme_payment_id: paymentRecorded ? wishmePaymentId : undefined });
         wallet.refetch();
@@ -326,7 +382,7 @@ export default function ImagePromotionsScreen() {
     }
 
     setGenerating(false);
-  }, [selectedCelebId, concept, branding, refImgBase64, wallet, finalPrice, session, user, fetchHistory]);
+  }, [selectedCelebId, concept, branding, refImgBase64, wallet, finalPrice, session, user, fetchHistory, getValidSession, findFinishedGeneration]);
 
   const downloadPromo = useCallback(async (imgUrl: string, promoId: string) => {
     if (Platform.OS === 'web') {

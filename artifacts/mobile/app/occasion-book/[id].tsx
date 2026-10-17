@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
+import { SubscribedCelebrityChips } from '@/components/celebrity/SubscribedCelebrityChips';
 import { supabaseFetch, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useOrderConfirm } from '@/context/OrderConfirmContext';
@@ -371,42 +372,14 @@ export default function OccasionBookScreen() {
         {/* Celebrity Selection */}
         <View style={s.section}>
           <Text style={[s.sectionLabel, { color: colors.foreground }]}>Select Celebrity</Text>
-          <View style={s.celebGrid}>
-            {celebPairs.map((pair, ri) => (
-              <View key={ri} style={s.celebRow}>
-                {pair.map((celeb, ci) => {
-                  if (!celeb) return <View key={ci} style={{ flex: 1 }} />;
-                  const uri = imgUri(celeb.image_url);
-                  const isSelected = selectedCeleb === celeb.id;
-                  return (
-                    <TouchableOpacity
-                      key={celeb.id}
-                      style={[
-                        s.celebCard,
-                        { backgroundColor: colors.card, borderColor: isSelected ? colors.primary : colors.border },
-                        isSelected && { borderWidth: 2 },
-                      ]}
-                      onPress={() => setSelectedCeleb(celeb.id)}
-                      activeOpacity={0.8}
-                    >
-                      {uri ? (
-                        <Image source={{ uri }} style={s.celebAvatar} contentFit="cover" />
-                      ) : (
-                        <LinearGradient
-                          colors={gradientForName(celeb.name)}
-                          style={s.celebAvatar}
-                        >
-                          <Text style={s.celebInitial}>{celeb.name.charAt(0).toUpperCase()}</Text>
-                        </LinearGradient>
-                      )}
-                      <Text style={[s.celebName, { color: colors.foreground }]} numberOfLines={1}>{celeb.name}</Text>
-                      <Text style={[s.celebCategory, { color: colors.mutedForeground }]} numberOfLines={1}>{celeb.category}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            ))}
-          </View>
+          <SubscribedCelebrityChips
+            celebrities={celebrities}
+            loading={loading}
+            hasNone={celebrities.length === 0}
+            selectedId={selectedCeleb}
+            onSelect={c => setSelectedCeleb(c?.id ?? null)}
+            accent={colors.primary}
+          />
         </View>
 
         {/* Recipient Details */}

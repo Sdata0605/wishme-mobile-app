@@ -17,10 +17,12 @@ export async function supabaseFetch(
   path: string,
   options: RequestInit = {},
   accessToken?: string | null,
+  /** Slow calls (AI generation takes well over 20 s) pass their own limit. */
+  timeoutMs: number = FETCH_TIMEOUT_MS,
 ): Promise<Response> {
   const bearerToken = accessToken ?? SUPABASE_ANON_KEY;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${SUPABASE_URL}${path}`, {
       ...options,

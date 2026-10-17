@@ -398,25 +398,41 @@ const make_cat = () => StyleSheet.create({
 const use_cat = () => useThemedStyles(make_cat);
 
 // ─── Cashback Banner ──────────────────────────────────────────────────────────
+
+/**
+ * The offer this banner advertises, with the date it stops being true. The banner hides itself once
+ * that date passes, so an expired promotion is never shown again (QA audit M-02: it was still
+ * offering "Valid till 31 May 2025" in October 2026).
+ */
+const CASHBACK_OFFER = {
+  headline: 'Flat ₹100 Cashback',
+  sub: 'on Your First Bill Payment!',
+  code: 'WISH100',
+  /** Last day the offer is valid, inclusive. */
+  validTill: new Date('2026-12-31T23:59:59+05:30'),
+};
+
 function CashbackBanner() {
   const cb = use_cb();
+  if (Date.now() > CASHBACK_OFFER.validTill.getTime()) return null;
+  const validLabel = CASHBACK_OFFER.validTill.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
   return (
     <View style={cb.container}><BrandFill />
       <View style={cb.giftBox}>
         <Gift size={30} color={T('#FCD34D', 'fg')} />
       </View>
       <View style={cb.text}>
-        <Text style={cb.headline}>Flat ₹100 Cashback</Text>
-        <Text style={cb.sub}>on Your First Bill Payment!</Text>
+        <Text style={cb.headline}>{CASHBACK_OFFER.headline}</Text>
+        <Text style={cb.sub}>{CASHBACK_OFFER.sub}</Text>
         <View style={cb.codePill}>
-          <Text style={cb.codeText}>Use Code: WISH100</Text>
+          <Text style={cb.codeText}>Use Code: {CASHBACK_OFFER.code}</Text>
         </View>
       </View>
       <View style={cb.ctaBlock}>
         <TouchableOpacity style={cb.btn}><BrandFill />
           <Text style={cb.btnText}>Pay Bills Now</Text>
         </TouchableOpacity>
-        <Text style={cb.validity}>Valid till{'\n'}31 May 2025</Text>
+        <Text style={cb.validity}>Valid till{'\n'}{validLabel}</Text>
       </View>
     </View>
   );

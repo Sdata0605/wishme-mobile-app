@@ -59,12 +59,14 @@ interface VoiceAssistantValue {
 const Ctx = createContext<VoiceAssistantValue | null>(null);
 
 export function VoiceAssistantProvider({ children }: { children: React.ReactNode }) {
-  const { session, user, getValidSession } = useAuth();
+  const { session, user, getValidSession, verifySession } = useAuth();
   const { persona, status: personaStatus } = useAssistantPersona();
   const personaRef = useRef(persona);
   personaRef.current = persona;
   const getValidSessionRef = useRef(getValidSession);
   getValidSessionRef.current = getValidSession;
+  const verifySessionRef = useRef(verifySession);
+  verifySessionRef.current = verifySession;
 
   // Follows phone calls the assistant made for the user, and reports the result when they end.
   // While one is going on the assistant stays open, and when it ends the assistant speaks the result,
@@ -180,6 +182,7 @@ ${call.summary ?? 'The call has ended.'}`, [
     clientRef.current = new AssistantEngine({
       // Refreshes an expired login so reconnects after the first hour still work.
       getAccessToken: async () => (await getValidSessionRef.current())?.access_token ?? tokenRef.current,
+      onAuthRejected: () => { void verifySessionRef.current(); },
       getSystemInstruction: () => buildSystemInstruction(personaRef.current, nameRef.current, genderRef.current),
       functionDeclarations: FUNCTION_DECLARATIONS,
       getVoiceName: () => personaRef.current.voice,
@@ -239,6 +242,7 @@ ${call.summary ?? 'The call has ended.'}`, [
           },
           onAction: setActionLabel,
           getAccessToken: async () => (await getValidSessionRef.current())?.access_token ?? tokenRef.current,
+          onAuthRejected: () => { void verifySessionRef.current(); },
           getUserId: () => userIdRef.current,
           // Through the ref, not `client`: that is assigned below, and referring to it here would
           // make the engine's type depend on itself.
