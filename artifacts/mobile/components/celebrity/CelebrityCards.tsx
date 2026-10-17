@@ -1,4 +1,3 @@
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import React, { useRef } from 'react';
@@ -6,6 +5,7 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 import type { Celebrity } from '@/hooks/useCelebrities';
+import { CelebrityPhoto } from '@/components/celebrity/CelebrityPhoto';
 
 const inr = (n: number) => `₹${n.toLocaleString('en-IN')}`;
 
@@ -58,7 +58,7 @@ export function CelebHeroCard({ celebrity, subscribed }: { celebrity: Celebrity;
   const price = celebrity.subscription?.price ?? 0;
   return (
     <Press onPress={() => open(celebrity.id)} label={describe(celebrity, subscribed)} style={s.hero}>
-      <Image source={{ uri: celebrity.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={200} recyclingKey={celebrity.id} />
+      <CelebrityPhoto uri={celebrity.imageUrl} name={celebrity.name} style={StyleSheet.absoluteFill} recyclingKey={celebrity.id} />
       <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={s.heroScrim} />
       <View style={s.heroTop}><RatingChip celebrity={celebrity} /></View>
       <View style={s.heroBottom}>
@@ -95,7 +95,7 @@ export function CelebGridCard({ celebrity, subscribed, width, children }: { cele
       style={[s.card, { width, backgroundColor: colors.card, borderColor: colors.border }]}
     >
       <View style={{ height: photoH }}>
-        <Image source={{ uri: celebrity.imageUrl }} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" transition={200} recyclingKey={celebrity.id} />
+        <CelebrityPhoto uri={celebrity.imageUrl} name={celebrity.name} style={StyleSheet.absoluteFill} recyclingKey={celebrity.id} />
         <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={s.cardScrim} />
         <View style={s.cardTop}><RatingChip celebrity={celebrity} /></View>
         <View style={s.cardText}>

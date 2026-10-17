@@ -76,7 +76,7 @@ export default function FavoritesScreen() {
   const [search, setSearch] = useState('');
 
   // Same list as Browse Celebrities: only celebrities a user can actually subscribe to.
-  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
+  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 500 });
   const { hasFavorite, refetch: refetchSubscriptions } = useCelebrityFavorites({
     profileId: user?.profileId,
     accessToken: session?.access_token,

@@ -26,6 +26,7 @@ import { Celebrity } from '@/hooks/useCelebrities';
 import { useLovedCelebrities } from '@/hooks/useLovedCelebrities';
 import { useWallet } from '@/hooks/useWallet';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
+import { CelebrityPhoto } from '@/components/celebrity/CelebrityPhoto';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -483,7 +484,7 @@ export default function CelebrityDetailScreen() {
       >
         {/* Header image */}
         <View style={{ height: 300, position: 'relative' }}>
-          <Image source={{ uri: celebrity.imageUrl + '?w=800' }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          <CelebrityPhoto uri={celebrity.imageUrl} name={celebrity.name} style={StyleSheet.absoluteFill} />
           <LinearGradient
             colors={['transparent', 'rgba(0,0,0,0.7)']}
             style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', padding: 20 }]}

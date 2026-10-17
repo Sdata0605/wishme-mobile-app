@@ -1,9 +1,10 @@
 import { router } from 'expo-router';
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Icon } from '@/components/Icon';
 import type { Celebrity } from '@/constants/celebrities';
 import { useTheme } from '@/context/ThemeContext';
+import { CelebrityPhoto } from '@/components/celebrity/CelebrityPhoto';
 
 interface CelebCardProps {
   celebrity: Celebrity;
@@ -36,8 +37,9 @@ export function CelebCard({
       ]}
     >
       <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: celebrity.imageUrl }}
+        <CelebrityPhoto
+          uri={celebrity.imageUrl}
+          name={celebrity.name}
           style={[styles.image, { width: width - 0, height: compact ? 100 : 130 }]}
           blurRadius={showLock ? 12 : 0}
         />

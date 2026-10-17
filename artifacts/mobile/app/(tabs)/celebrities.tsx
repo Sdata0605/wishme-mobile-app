@@ -100,7 +100,7 @@ export default function CelebritiesScreen() {
   const [sortOpen, setSortOpen] = useState(false);
   const [visible, setVisible] = useState(PAGE);
 
-  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 50 });
+  const { celebrities, loading, error, refetch } = useCelebrities({ limit: 500 });
   const { hasFavorite, refetch: refetchFavorites } = useCelebrityFavorites({
     profileId: user?.profileId,
     accessToken: session?.access_token,

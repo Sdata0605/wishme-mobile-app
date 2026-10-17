@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
@@ -8,6 +7,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { parseApiError, supabaseFetch } from '@/constants/supabase';
 import { useTheme } from '@/context/ThemeContext';
 import { SERVICES, SERVICE_KEYS, type ServiceKey } from './services';
+import { CelebrityPhoto } from '@/components/celebrity/CelebrityPhoto';
 
 export type { ServiceKey };
 
@@ -124,7 +124,7 @@ export function SubscribeSheet({
                   <Icon name="chevron-left" size={24} color={colors.foreground} />
                 </TouchableOpacity>
               ) : null}
-              <Image source={{ uri: celebrity.imageUrl }} style={s.avatar} contentFit="cover" />
+              <CelebrityPhoto uri={celebrity.imageUrl} name={celebrity.name} style={s.avatar} />
               <View style={{ flex: 1 }}>
                 <View style={s.nameRow}>
                   <Text style={[s.name, { color: colors.foreground }]} numberOfLines={1}>{celebrity.name}</Text>

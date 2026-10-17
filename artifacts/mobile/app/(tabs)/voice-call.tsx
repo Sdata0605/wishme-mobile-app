@@ -1,5 +1,4 @@
 import * as Haptics from 'expo-haptics';
-import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -29,6 +28,7 @@ import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 import { usePlan } from '@/hooks/usePlan';
 import { useVoiceCallCelebrities, type VoiceCallCelebrity } from '@/hooks/useVoiceCallCelebrities';
 import { useWallet } from '@/hooks/useWallet';
+import { CelebrityPhoto } from '@/components/celebrity/CelebrityPhoto';
 
 // ─── What the user can pick ──────────────────────────────────────────────────
 
@@ -473,7 +473,7 @@ export default function VoiceCallScreen() {
             <Text style={[s.successSub, { color: colors.mutedForeground, textAlign: 'center' }]}>{success.message}</Text>
             {selectedCeleb ? (
               <View style={[s.successCeleb, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Image source={{ uri: selectedCeleb.imageUrl }} style={s.successAvatar} contentFit="cover" />
+                <CelebrityPhoto uri={selectedCeleb.imageUrl} name={selectedCeleb.name} style={s.successAvatar} />
                 <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold' }}>{selectedCeleb.name}</Text>
               </View>
             ) : null}
@@ -524,7 +524,7 @@ export default function VoiceCallScreen() {
               ) : null}
               {selectedCeleb ? (
                 <View style={[s.celebCard, { backgroundColor: accent + (isDark ? '1A' : '14'), borderColor: accent + '59' }]}>
-                  <Image source={{ uri: selectedCeleb.imageUrl }} style={s.celebAvatar} contentFit="cover" />
+                  <CelebrityPhoto uri={selectedCeleb.imageUrl} name={selectedCeleb.name} style={s.celebAvatar} />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Text style={{ color: colors.foreground, fontSize: 15, fontFamily: 'Inter_600SemiBold', flexShrink: 1 }} numberOfLines={1}>{selectedCeleb.name}</Text>

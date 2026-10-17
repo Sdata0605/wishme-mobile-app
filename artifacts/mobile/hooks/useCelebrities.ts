@@ -133,10 +133,10 @@ function normalizeCelebrity(raw: ApiCelebrity): Celebrity {
 
 /**
  * Module-level singleton store.
- * All screens share one fetch per session. The data is fetched once at limit=50
- * (the highest limit any screen requests) and every caller slices/filters locally.
+ * All screens share one fetch per session. The whole catalogue is fetched once (up to 500 rows, far more than any
+ * screen shows) and every caller slices/filters locally.
  */
-const SINGLETON_LIMIT = 50;
+const SINGLETON_LIMIT = 500;
 
 interface Store {
   celebrities: Celebrity[];
