@@ -34,13 +34,20 @@ branch is **`dhanush/mobile-app`**: all new work goes there.
 - **Realtime and the Sarvam relay work against any backend URL**: `SUPABASE_WS_URL` in `constants/supabase.ts`
   (http→ws, https→wss) replaces six copies of `SUPABASE_URL.replace('https://', 'wss://')`, which left an
   `http://` URL for a local backend, so live updates never connected.
-- **WishMe is not MyAssistant** (owner's decision, 17 Oct): the centre mic used to open the "AI home", a copy
-  of the separate MyAssistant app's home (Prashnat's `1ecee2c`), and the app opened there. On this branch the mic
-  now starts/stops the voice assistant in place, the app opens on WishMe Home, the AI home and its
-  `components/home` + `services/home/{dailyQuote,dayStreak,weather}` are removed, and the mic is a flat WishMe
-  pink→purple disc. **Talk to Prashnat before proposing this branch for `master`**: it removes his AI home. The rest
-  of the MyAssistant look (aurora theme, glass cards, Manrope/Space Grotesk, Hub tools) is still in the app; ask the
-  owner before rebranding it.
+- **WishMe is not MyAssistant** (owner's decision, 17 Oct): MyAssistant is a separate app, and the owner wants no
+  MyAssistant features or design duplicated in WishMe — only WishMe's own. Prashnat's `1ecee2c` ("MyAssistant look,
+  AI Home…") had copied a lot over. On this branch:
+  - the centre mic starts/stops the voice assistant in place (flat WishMe pink→purple disc); the app opens on
+    WishMe Home; the AI home is gone;
+  - the Hub tab and its screens (Calendar, Reminders, Call logs, AI calls list, Documents list, Finance) and the
+    News and Features screens are gone; the fourth tab is **Stars** (celebrities). The assistant keeps its general
+    powers (AI calls reported by voice, phone calls, opening apps, web search, writing documents);
+  - the look is WishMe's own (`constants/neon.ts`): orange/pink/purple brand with star gold, a warm plum dark theme
+    and cream light theme, Inter + Playfair Display, no accent picker.
+  **Talk to Prashnat before proposing this branch for `master`**: it removes and restyles much of his work.
+- **In-app updates** (`services/appUpdate.ts`, `components/AppUpdateGate.tsx`): the app checks this repo's GitHub
+  releases, downloads a newer APK in the background and offers "Install update" (Android asks once to confirm).
+  See "Releasing" below.
 - **Celebrity list empty state**: `hooks/useCelebrities.ts` treated "no celebrities yet" as loading, so an empty
   catalogue spun forever; it now tracks whether the fetch finished and shows "No celebrities found".
 - **Open: one intermittent native crash on launch** (17 Oct, WishMe Local on the Samsung, once in about 10 cold
@@ -69,8 +76,16 @@ hotfix also lives only on PC 1 and has not been applied; ask the owner before to
 **New backend:** separate repo https://github.com/dhanuvagman006/WishMeBackend (public), replacing Supabase on the
 owner's VPS. Work there happens in its own checkout; read that repo's own docs first.
 
-**Builds:** release APKs are attached to GitHub releases of this repo (pre-releases, tagged `app-<date>-<what>`).
-The latest is the splash-video build from 16 Oct 2026.
+**Builds:** release APKs are attached to GitHub releases of this repo. Older ones are tagged `app-<date>-<what>`;
+the in-app updater only looks at releases tagged `app-v<x.y.z>`.
+
+**Releasing (so installed apps update themselves):**
+1. Bump `"version"` in `artifacts/mobile/app.json` (e.g. 1.0.0 → 1.0.1). `app.config.js` derives
+   `android.versionCode` from it; never set it by hand.
+2. Build without the local `.env` (so it is the real app id and backend) and sign with **the same keystore as every
+   earlier release** — Android refuses an update signed with a different key.
+3. `gh release create app-v1.0.1 path/to/app-release.apk --repo Sdata0605/wishme-mobile-app --notes "What changed"`
+   (the notes are shown on the update card). Drafts are ignored until published.
 
 ## Next steps
 
