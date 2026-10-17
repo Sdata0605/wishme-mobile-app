@@ -19,6 +19,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { adoptRootFromInstance } from '@/assistant-hook';
 import '@/constants/cancelableAlerts';
+import { AppUpdateGate } from '@/components/AppUpdateGate';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AssistantOverlay } from '@/components/assistant/AssistantOverlay';
 
@@ -234,6 +235,7 @@ export default function RootLayout() {
                           <AssistantSetupGate />
                           <SessionEndedGate />
                           <OccasionInApp />
+                          <AppUpdateGate />
                         </AppRoot>
                       </OrderConfirmProvider>
                       </DrawerProvider>
