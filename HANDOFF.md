@@ -45,6 +45,20 @@ branch is **`dhanush/mobile-app`**: all new work goes there.
   - the look is WishMe's own (`constants/neon.ts`): orange/pink/purple brand with star gold, a warm plum dark theme
     and cream light theme, Inter + Playfair Display, no accent picker.
   **Talk to Prashnat before proposing this branch for `master`**: it removes and restyles much of his work.
+- **Voice and assistant (17 Oct)**: the assistant can now run on **OpenAI Realtime**
+  (`services/openaiRealtime/`): the backend's `voice-token` mints a short-lived key when `OPENAI_API_KEY` is set in
+  WishMeBackend's `.env`, and the app falls back to Gemini/Sarvam if OpenAI cannot connect. **Voice search** (mic in the
+  Stars search box; Home's search mic opens Stars listening) uses on-device speech recognition. Home has an
+  **Ask WishMe** card (Talk + suggestion chips).
+- **Celebrity data and photos (dev)**: WishMeBackend's local DB holds the migrated catalogue plus ~60 Indian
+  celebrities with public facts (`scripts/dev-seed-indian-celebrities.sql`, all `consent_pending`) and free-licensed
+  Wikimedia photos with credits (`scripts/dev-seed-celebrity-photos.sql`). The old AI-generated ("Made with Google
+  AI") and stock photos were removed; only the two signed-up clients (Navami Shetty, Hari Raj Shetty) keep their own.
+  Celebrities without a photo show initials (`components/celebrity/CelebrityPhoto.tsx`). Before production: show the
+  photo credits, and only list stars who have signed up.
+- **Design choice pending**: `~/Wishme/design/WishMe-Design-Directions.pdf` (on the Linux PC, not in git) shows three
+  directions — Celebration Night (today's look), Royal Gold, Festive Bright — each with its own mic orb. The client
+  picks one; then restyle `constants/neon.ts` and the orb in `components/neon/NeonTabBar.tsx` to match.
 - **In-app updates** (`services/appUpdate.ts`, `components/AppUpdateGate.tsx`): the app checks this repo's GitHub
   releases, downloads a newer APK in the background and offers "Install update" (Android asks once to confirm).
   See "Releasing" below.
