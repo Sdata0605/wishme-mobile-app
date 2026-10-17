@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -482,10 +483,17 @@ export default function CelebrityDetailScreen() {
         }}
       >
         {/* Header image */}
-        <View style={{ height: 300, position: 'relative' }}>
-          <Image source={{ uri: celebrity.imageUrl + '?w=800' }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <View style={{ height: 380, position: 'relative' }}>
+          {/* Anchored to the top: portraits cropped from the centre lost the forehead under the status bar. */}
+          <ExpoImage source={{ uri: celebrity.imageUrl + '?w=800' }} style={StyleSheet.absoluteFill} contentFit="cover" contentPosition="top" transition={150} />
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.7)']}
+            colors={['rgba(18,8,31,0.55)', 'rgba(18,8,31,0)']}
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top + 80 }}
+            pointerEvents="none"
+          />
+          <LinearGradient
+            colors={['transparent', 'rgba(18,8,31,0.35)', 'rgba(18,8,31,0.92)']}
+            locations={[0.35, 0.65, 1]}
             style={[StyleSheet.absoluteFill, { justifyContent: 'flex-end', padding: 20 }]}
           >
             <View style={styles.nameBadgeRow}>
@@ -504,7 +512,7 @@ export default function CelebrityDetailScreen() {
                     <Text style={styles.categoryText}>{celebrity.category}</Text>
                   </View>
                   {celebrity.isVerified && (
-                    <View style={[styles.verifiedBadge, { backgroundColor: '#22C55E' }]}>
+                    <View style={[styles.verifiedBadge, { backgroundColor: '#FF5F1F' }]}>
                       <Icon name="check" size={10} color="#fff" />
                       <Text style={styles.verifiedText}>Verified</Text>
                     </View>
@@ -539,15 +547,14 @@ export default function CelebrityDetailScreen() {
 
         {/* Subscribe banner for non-subscribers */}
         {showSubscribeBanner && (
-          <TouchableOpacity
-            onPress={openSubscriptionFlow}
-            style={styles.subscribeBanner}
-          >
-            <Icon name="lock" size={16} color="#fff" />
-            <Text style={styles.subscribeBannerText}>Subscribe to unlock all booking services</Text>
-            <View style={styles.subscribeBannerPill}>
-              <Text style={styles.subscribeBannerPillText}>Subscribe</Text>
-            </View>
+          <TouchableOpacity onPress={openSubscriptionFlow} activeOpacity={0.85} style={styles.subscribeBannerWrap}>
+            <LinearGradient colors={['#FF5F1F', '#FF2E88', '#B026FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.subscribeBanner}>
+              <Icon name="lock" size={16} color="#fff" />
+              <Text style={styles.subscribeBannerText}>Subscribe to unlock all booking services</Text>
+              <View style={styles.subscribeBannerPill}>
+                <Text style={styles.subscribeBannerPillText}>Subscribe</Text>
+              </View>
+            </LinearGradient>
           </TouchableOpacity>
         )}
 
@@ -614,7 +621,9 @@ export default function CelebrityDetailScreen() {
                 style={[styles.serviceCard, { backgroundColor: colors.backgroundSecondary, borderColor: colors.border }]}
               >
                 <View style={styles.serviceCardLeft}>
-                  <Text style={styles.serviceEmoji}>{card.emoji}</Text>
+                  <View style={styles.serviceIcon}>
+                    <Icon name={card.icon} size={22} color="#FF2E88" />
+                  </View>
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.serviceTitle, { color: colors.foreground }]}>{card.title}</Text>
                     <Text style={[styles.serviceDelivery, { color: colors.mutedForeground }]}>{card.subtitle}</Text>
@@ -720,19 +729,21 @@ export default function CelebrityDetailScreen() {
             <Text style={[styles.subscribeToBookText, { color: colors.mutedForeground }]}>{bookBtnLabel}</Text>
           </TouchableOpacity>
         ) : isLoggedIn && !isSubscribed ? (
-          <TouchableOpacity
+          <Pressable
             onPress={handleBookOrSubscribe}
-            style={styles.subscribeToBookBtn}
+            style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.85 : 1 }]}
           >
-            <Icon name="lock" size={16} color="#B026FF" />
-            <Text style={styles.subscribeToBookText}>{bookBtnLabel}</Text>
-          </TouchableOpacity>
+            <LinearGradient colors={['#FF5F1F', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={[styles.bookBtn, { flexDirection: 'row', gap: 8 }]}>
+              <Icon name="lock" size={16} color="#fff" />
+              <Text style={styles.bookBtnText}>{bookBtnLabel}</Text>
+            </LinearGradient>
+          </Pressable>
         ) : (
           <Pressable
             onPress={handleBookOrSubscribe}
             style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.85 : 1 }]}
           >
-            <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bookBtn}>
+            <LinearGradient colors={['#FF5F1F', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bookBtn}>
               <Text style={styles.bookBtnText}>{bookBtnLabel}</Text>
             </LinearGradient>
           </Pressable>
@@ -827,17 +838,17 @@ const styles = StyleSheet.create({
   categoryText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
   verifiedBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 9999 },
   verifiedText: { color: '#fff', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  subscribeBannerWrap: { marginHorizontal: 20, marginTop: 16, borderRadius: 16, overflow: 'hidden' },
   subscribeBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#B026FF',
+    gap: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
-  subscribeBannerText: { flex: 1, color: '#fff', fontSize: 13, fontFamily: 'Inter_500Medium' },
-  subscribeBannerPill: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 9999 },
-  subscribeBannerPillText: { color: '#B026FF', fontSize: 12, fontFamily: 'Inter_700Bold' },
+  subscribeBannerText: { flex: 1, color: '#fff', fontSize: 13.5, fontFamily: 'Inter_600SemiBold' },
+  subscribeBannerPill: { backgroundColor: '#fff', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 9999 },
+  subscribeBannerPillText: { color: '#FF2E88', fontSize: 12.5, fontFamily: 'Inter_700Bold' },
   infoSection: { padding: 20 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
   rating: { fontSize: 18, fontFamily: 'Inter_700Bold' },
@@ -855,6 +866,7 @@ const styles = StyleSheet.create({
   serviceCard: { borderRadius: 14, borderWidth: 1, padding: 14, overflow: 'hidden' },
   serviceCardLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   serviceEmoji: { fontSize: 28 },
+  serviceIcon: { width: 46, height: 46, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,46,136,0.14)' },
   serviceTitle: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   serviceDelivery: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   servicePrice: { fontSize: 15, fontFamily: 'Inter_700Bold' },
