@@ -54,6 +54,16 @@ const ORDER_LABELS: Record<string, string> = {
   ugc_video: 'UGC video',
   ugc_ad: 'UGC ad',
   wish_friend: 'Wish a Friend',
+  booking: 'Celebrity booking',
+  wish_celebrity_order: 'Wish a celebrity',
+  celebrity_favorite: 'Celebrity subscription',
+  photo_wish: 'Photo wish',
+  image_promotion: 'Image promotion',
+  music_generation: 'AI music',
+  greeting_card: 'Greeting card',
+  voice_call_wish: 'Celebrity call',
+  plan_premium: 'Premium plan',
+  plan_elite: 'Elite plan',
 };
 
 export default function ReferralsScreen() {
