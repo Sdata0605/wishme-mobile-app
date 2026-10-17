@@ -11,6 +11,9 @@ export const SUPABASE_ANON_KEY =
   process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxaWtldXF3YnBod29uZ3RmemhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzNDU3MjgsImV4cCI6MjA3MzkyMTcyOH0.OTmxqFKhXiHcEKoV0uuRCvhmkHkKGHNo-n7qpl_tW1Y';
 
+/** WebSocket base for realtime and voice relays: https → wss, and http → ws for a local backend. */
+export const SUPABASE_WS_URL = SUPABASE_URL.replace(/^http/, 'ws');
+
 const FETCH_TIMEOUT_MS = 20_000;
 
 export async function supabaseFetch(

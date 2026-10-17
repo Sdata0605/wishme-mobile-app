@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { LoadingBox, Card, styles } from './shared';
 import type { TabProps } from './shared';
 import { Icon } from '@/components/Icon';
-import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
+import { SUPABASE_ANON_KEY, SUPABASE_WS_URL, supabaseFetch } from '@/constants/supabase';
 
 /** How many users are subscribed to this celebrity. Only the number: who they are stays private. */
 export function FollowersTab({ celebrity, colors, session }: TabProps) {
@@ -27,7 +27,7 @@ export function FollowersTab({ celebrity, colors, session }: TabProps) {
   // Live: a new subscriber updates the number without a refresh.
   useEffect(() => {
     if (!session?.access_token) return;
-    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsBase = SUPABASE_WS_URL;
     const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
     let ws: WebSocket | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;

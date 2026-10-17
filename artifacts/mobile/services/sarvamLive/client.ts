@@ -22,7 +22,7 @@ import {
 } from '@speechmatics/expo-two-way-audio';
 import { requireOptionalNativeModule } from 'expo';
 import { Platform } from 'react-native';
-import { SUPABASE_URL } from '@/constants/supabase';
+import { SUPABASE_WS_URL } from '@/constants/supabase';
 import { parseOpenAppCommand } from '@/services/assistant/appCommand';
 import { getAppIndex } from '@/services/assistant/installedApps';
 import { base64ToBytes, bytesToBase64, downsample24kTo16k } from '@/services/geminiLive/pcm';
@@ -140,12 +140,12 @@ export class SarvamLiveClient {
   }
 
   private relayWsUrl() {
-    return this.relayUrl || `${SUPABASE_URL.replace('https://', 'wss://')}/functions/v1/sarvam-voice`;
+    return this.relayUrl || `${SUPABASE_WS_URL}/functions/v1/sarvam-voice`;
   }
 
   private wakeRelay() {
     // A plain request is answered "expected a WebSocket" straight away, but it boots the function.
-    fetch(this.relayWsUrl().replace('wss://', 'https://'), { method: 'GET' }).catch(() => {});
+    fetch(this.relayWsUrl().replace(/^ws/, 'http'), { method: 'GET' }).catch(() => {});
   }
 
   /** Opens and logs in a relay connection that waits for the user's tap. Quietly does nothing if it can't. */

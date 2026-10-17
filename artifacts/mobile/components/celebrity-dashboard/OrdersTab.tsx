@@ -4,7 +4,7 @@ import { Linking, Text, TouchableOpacity, View } from 'react-native';
 import { fmtDate, fmtRupee, FilterChips, StatusBadge, SectionEmpty, LoadingBox, Card, styles } from './shared';
 import type { TabProps } from './shared';
 import { Icon } from '@/components/Icon';
-import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
+import { SUPABASE_ANON_KEY, SUPABASE_WS_URL, supabaseFetch } from '@/constants/supabase';
 
 /**
  * Every order made with this celebrity, of every kind, in one list: video wishes and promotions
@@ -164,7 +164,7 @@ export function OrdersTab({ celebrity, colors, session }: TabProps) {
   // Live: an order made, delivered or paid shows up without a refresh.
   useEffect(() => {
     if (!session?.access_token) return;
-    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsBase = SUPABASE_WS_URL;
     const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
     let ws: WebSocket | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;

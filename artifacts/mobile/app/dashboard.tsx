@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/Icon';
 import type { IconName } from '@/components/Icon';
-import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, SUPABASE_WS_URL, supabaseFetch } from '@/constants/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 
@@ -126,7 +126,7 @@ function useRealtimeBalance(profileId: string | null, accessToken: string | null
 
   useEffect(() => {
     if (!profileId || !accessToken) return;
-    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsBase = SUPABASE_WS_URL;
     const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
     let ws: WebSocket | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;

@@ -1,6 +1,6 @@
 /** Subscribes to Supabase realtime UPDATEs on the user's bookings, music generations and Wish a Friend orders. */
 import { useEffect, useRef } from 'react';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
+import { SUPABASE_WS_URL, SUPABASE_ANON_KEY } from '@/constants/supabase';
 
 export function useRealtimeBookings(
   profileId: string | null,
@@ -12,7 +12,7 @@ export function useRealtimeBookings(
 
   useEffect(() => {
     if (!profileId || !accessToken) return;
-    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsBase = SUPABASE_WS_URL;
     const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
     let ws: WebSocket | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;

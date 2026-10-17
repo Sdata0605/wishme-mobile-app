@@ -14,7 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fmtDate, SectionEmpty, LoadingBox, Card, SectionTitle, styles } from './shared';
 import type { TabPropsWithUser } from './shared';
 import { Icon } from '@/components/Icon';
-import { SUPABASE_ANON_KEY, SUPABASE_URL, supabaseFetch } from '@/constants/supabase';
+import { SUPABASE_ANON_KEY, SUPABASE_URL, SUPABASE_WS_URL, supabaseFetch } from '@/constants/supabase';
 
 interface Conversation {
   id: string;
@@ -117,7 +117,7 @@ export function MessagesTab({ celebrity, colors, session, user, header }: TabPro
 
   useEffect(() => {
     if (!session?.access_token) return;
-    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsBase = SUPABASE_WS_URL;
     const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
     let ws: WebSocket | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -156,7 +156,7 @@ export function MessagesTab({ celebrity, colors, session, user, header }: TabPro
 
   useEffect(() => {
     if (!activeConvo?.id || !session?.access_token) return;
-    const wsBase = SUPABASE_URL.replace('https://', 'wss://');
+    const wsBase = SUPABASE_WS_URL;
     const wsUrl = `${wsBase}/realtime/v1/websocket?apikey=${SUPABASE_ANON_KEY}&vsn=1.0.0`;
     let ws: WebSocket | null = null;
     let heartbeat: ReturnType<typeof setInterval> | null = null;
