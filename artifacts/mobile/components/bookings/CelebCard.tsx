@@ -24,11 +24,11 @@ function getCelebStatus(row: CelebBooking): { label: string; color: string; puls
   if (row.status === 'video_sent' || row.status === 'sent')
     return { label: '📤 Delivered to You', color: '#22C55E', pulse: false };
   if (row.generation_status === 'completed' && row.video_status === 'ready')
-    return { label: '🎥 Video Ready — Pending Admin Review', color: '#8B5CF6', pulse: false };
+    return { label: '🎥 Video Ready — Pending Admin Review', color: '#B026FF', pulse: false };
   if (row.generation_status === 'uploading')
-    return { label: '⬆️ Uploading Video', color: '#3B82F6', pulse: true };
+    return { label: '⬆️ Uploading Video', color: '#FF5F1F', pulse: true };
   if (row.generation_status === 'downloading')
-    return { label: '⬇️ Processing Video', color: '#3B82F6', pulse: true };
+    return { label: '⬇️ Processing Video', color: '#FF5F1F', pulse: true };
   if (row.generation_status === 'video_generating')
     return { label: '🎬 Creating Video...', color: '#F59E0B', pulse: true };
   if (row.generation_status === 'script_generating')
@@ -181,7 +181,7 @@ export function CelebCard({ item, colors, accessToken }: { item: CelebBooking; c
           ) : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
           {item.final_price > 0 && (
-            <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.final_price.toLocaleString('en-IN')}</Text>
+            <Text style={[s.cardPrice, { color: '#B026FF' }]}>₹{item.final_price.toLocaleString('en-IN')}</Text>
           )}
           <Text style={[s.orderId, { color: colors.mutedForeground }]}>Order #{item.id.slice(0, 8).toUpperCase()}</Text>
         </View>
@@ -203,7 +203,7 @@ export function CelebCard({ item, colors, accessToken }: { item: CelebBooking; c
 
       {isVideoReady && loadingVideo && (
         <View style={s.videoLoadingRow}>
-          <ActivityIndicator size="small" color="#7B5CFA" />
+          <ActivityIndicator size="small" color="#B026FF" />
           <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>Loading video...</Text>
         </View>
       )}
@@ -232,10 +232,10 @@ export function CelebCard({ item, colors, accessToken }: { item: CelebBooking; c
 
       {item.status !== 'pending' && (
         <TouchableOpacity onPress={() => setShowTimeline(t => !t)} style={s.timelineToggle}>
-          <Text style={{ color: '#7B5CFA', fontSize: 12, fontFamily: 'Inter_500Medium' }}>
+          <Text style={{ color: '#B026FF', fontSize: 12, fontFamily: 'Inter_500Medium' }}>
             {showTimeline ? 'Hide Timeline' : 'Order Timeline'}
           </Text>
-          <Icon name={showTimeline ? 'chevron-up' : 'chevron-down'} size={14} color="#7B5CFA" />
+          <Icon name={showTimeline ? 'chevron-up' : 'chevron-down'} size={14} color="#B026FF" />
         </TouchableOpacity>
       )}
       {showTimeline && item.status !== 'pending' && <OrderTimeline row={item} colors={colors} />}

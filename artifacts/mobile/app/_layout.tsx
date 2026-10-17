@@ -153,6 +153,7 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
+      <Stack.Screen name="reset-password" />
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="celebrity/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="booking/[id]" options={{ presentation: 'card' }} />
@@ -217,11 +218,8 @@ export default function RootLayout() {
     Inter_600SemiBold: Manrope_600SemiBold,
     Inter_700Bold: Manrope_700Bold,
     PlayfairDisplay_700Bold: SpaceGrotesk_700Bold,
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_600SemiBold,
-    Manrope_700Bold,
-    SpaceGrotesk_700Bold,
+    // Each file is registered once: loading one file under two names in parallel let one load read a half-written
+    // cache file, which drew blank text.
   });
 
   useEffect(() => {

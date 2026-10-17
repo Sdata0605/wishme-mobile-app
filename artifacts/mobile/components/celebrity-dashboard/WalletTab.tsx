@@ -158,7 +158,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
 
   return (
     <View style={styles.tabPad}>
-      <LinearGradient colors={['#7B5CFA', '#1F7BFF']} style={styles.balanceCard}>
+      <LinearGradient colors={['#B026FF', '#FF5F1F']} style={styles.balanceCard}>
         <Text style={styles.balanceLabel}>Available Balance</Text>
         <Text style={styles.balanceAmt}>{fmtRupee(celebrity.available_balance ?? 0)}</Text>
         <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 4 }}>
@@ -182,7 +182,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
             <TouchableOpacity
               key={bk.id}
               onPress={() => setSelectedBank(bk)}
-              style={[styles.bankOption, { borderColor: selectedBank?.id === bk.id ? '#7B5CFA' : colors.border, backgroundColor: selectedBank?.id === bk.id ? '#7B5CFA10' : 'transparent' }]}
+              style={[styles.bankOption, { borderColor: selectedBank?.id === bk.id ? '#B026FF' : colors.border, backgroundColor: selectedBank?.id === bk.id ? '#B026FF10' : 'transparent' }]}
             >
               <Text style={{ color: colors.foreground, fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>{bk.bank_name}</Text>
               <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>****{bk.account_number.slice(-4)} · {bk.account_holder_name}</Text>
@@ -193,7 +193,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
         <PrimaryBtn label="Withdraw to Bank" onPress={submitPayout} loading={submitting} colors={colors} />
 
         <TouchableOpacity onPress={() => setShowAddBank(v => !v)} style={{ marginTop: 12, alignItems: 'center' }}>
-          <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>
+          <Text style={{ color: '#B026FF', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>
             {showAddBank ? 'Cancel' : '+ Add Bank Account'}
           </Text>
         </TouchableOpacity>
@@ -228,7 +228,7 @@ export function WalletTab({ celebrity, colors, session, user, onRefreshCeleb }: 
                 <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{fmtDate(p.requested_at)}</Text>
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[styles.priceText, { color: '#7B5CFA' }]}>{fmtRupee(p.requested_amount)}</Text>
+                <Text style={[styles.priceText, { color: '#B026FF' }]}>{fmtRupee(p.requested_amount)}</Text>
                 <StatusBadge status={p.status} label={PAYOUT_LABELS[p.status]} />
               </View>
             </View>

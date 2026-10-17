@@ -27,13 +27,13 @@ export function MusicCard({ item, colors }: { item: MusicGen; colors: Colors }) 
           </View>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.genre}{item.mood ? ` · ${item.mood}` : ''}</Text>
           {item.has_vocals && (
-            <View style={[s.vocBadge, { borderColor: '#8B5CF6' }]}>
-              <Text style={{ color: '#8B5CF6', fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>🎤 Vocals</Text>
+            <View style={[s.vocBadge, { borderColor: '#B026FF' }]}>
+              <Text style={{ color: '#B026FF', fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>🎤 Vocals</Text>
             </View>
           )}
           {item.lyrics ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.lyrics}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#B026FF' }]}>₹{item.credits_used}</Text>}
           {item.error_message ? <Text style={{ color: '#EF4444', fontSize: 11, fontFamily: 'Inter_400Regular' }}>{item.error_message}</Text> : null}
           {item.status === 'completed' && audioUrl ? (
             <>
@@ -42,7 +42,7 @@ export function MusicCard({ item, colors }: { item: MusicGen; colors: Colors }) 
             </>
           ) : item.status === 'processing' ? (
             <View style={s.processingRow}>
-              <ActivityIndicator size="small" color="#7B5CFA" />
+              <ActivityIndicator size="small" color="#B026FF" />
               <Text style={{ color: colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_400Regular' }}>Processing...</Text>
             </View>
           ) : null}
@@ -74,13 +74,13 @@ export function ImgMusicCard({ item, colors }: { item: ImgMusicGen; colors: Colo
               <SmallStatusBadge status={item.status} colors={colors} />
             </View>
             {item.has_vocals && (
-              <View style={[s.vocBadge, { borderColor: '#8B5CF6' }]}>
-                <Text style={{ color: '#8B5CF6', fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>🎤 Vocals</Text>
+              <View style={[s.vocBadge, { borderColor: '#B026FF' }]}>
+                <Text style={{ color: '#B026FF', fontSize: 10, fontFamily: 'Inter_600SemiBold' }}>🎤 Vocals</Text>
               </View>
             )}
             {item.description ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.description}</Text> : null}
             <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-            {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
+            {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#B026FF' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
             {item.status === 'completed' && item.audio_url ? (
               <>
                 <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
@@ -109,7 +109,7 @@ export function TtsCard({ item, colors }: { item: TtsGen; colors: Colors }) {
           </View>
           {item.text ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={3}>{item.text}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#B026FF' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -135,7 +135,7 @@ export function SfxCard({ item, colors }: { item: SfxGen; colors: Colors }) {
             <Text style={[s.cardSub, { color: colors.mutedForeground }]}>Duration: {item.duration_seconds}s</Text>
           )}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#B026FF' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -159,7 +159,7 @@ export function ConvertCard({ item, colors }: { item: VoiceConversion; colors: C
           </View>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>File: {item.original_file_name}</Text>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#B026FF' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}
@@ -182,7 +182,7 @@ export function IsolateCard({ item, colors }: { item: AudioIsolation; colors: Co
             <SmallStatusBadge status={item.status} colors={colors} />
           </View>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#B026FF' }]}>₹{item.credits_used}</Text>}
           {item.status === 'completed' && item.audio_url ? (
             <BookingAudioPlayer audioUrl={item.audio_url} colors={colors} />
           ) : null}

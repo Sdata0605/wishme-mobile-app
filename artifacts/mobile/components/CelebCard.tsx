@@ -52,7 +52,7 @@ export function CelebCard({
         {showLock && (
           <View style={styles.lockOverlay}>
             <View style={styles.lockCircle}>
-              <Icon name="lock" size={24} color="#7B5CFA" />
+              <Icon name="lock" size={24} color="#B026FF" />
             </View>
             <Text style={styles.lockText}>Subscription{'\n'}Required</Text>
             <TouchableOpacity onPress={handlePress} style={styles.unlockPill}>
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   unlockPillText: {
-    color: '#7B5CFA',
+    color: '#B026FF',
     fontSize: 11,
     fontFamily: 'Inter_700Bold',
   },

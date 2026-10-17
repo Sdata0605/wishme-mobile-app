@@ -17,7 +17,7 @@ import { DownloadLink, ImagePreviewModal, InlineCelebVideoPlayer } from './Media
 
 const WISH_FRIEND_STATUS: Record<WishFriendOrder['status'], { label: string; color: string }> = {
   pending: { label: 'Request received', color: '#F59E0B' },
-  processing: { label: 'Being made', color: '#3B82F6' },
+  processing: { label: 'Being made', color: '#FF5F1F' },
   completed: { label: 'Delivered', color: '#22C55E' },
   rejected: { label: 'Rejected', color: '#EF4444' },
 };
@@ -69,7 +69,7 @@ export function WishFriendCard({ item, colors, accessToken }: { item: WishFriend
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For {item.recipient_name} · {item.occasion}</Text>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.prompt}</Text>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
+          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#B026FF' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
           <Text style={[s.orderId, { color: colors.mutedForeground }]}>Order #{item.id.slice(0, 8).toUpperCase()}</Text>
         </View>
       </View>

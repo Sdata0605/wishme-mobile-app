@@ -119,7 +119,7 @@ function Wheel({
   );
 }
 
-export function DatePickerField({ label, value, onChange, kind = 'occasion', placeholder = 'Select a date', optional, accent = '#1F7BFF' }: Props) {
+export function DatePickerField({ label, value, onChange, kind = 'occasion', placeholder = 'Select a date', optional, accent = '#FF5F1F' }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);

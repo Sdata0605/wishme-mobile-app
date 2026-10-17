@@ -492,7 +492,7 @@ const use_sc = () => useThemedStyles(make_sc);
 
 // ─── Bus type chips ──────────────────────────────────────────────────────────
 const BUS_TYPES = [
-  { label: 'AC', Icon: Snowflake, color: '#2563EB', bg: '#EFF6FF' },
+  { label: 'AC', Icon: Snowflake, color: '#FF5F1F', bg: '#EFF6FF' },
   { label: 'Sleeper', Icon: Moon, color: T(C.purpleLight, 'fg'), bg: '#F5F3FF' },
   { label: 'Luxury', Icon: Sparkles, color: '#D97706', bg: '#FFFBEB' },
   { label: 'Seater', Icon: Bus, color: T(C.green, 'fg'), bg: '#ECFDF5' },
@@ -693,7 +693,7 @@ const use_ofr = () => useThemedStyles(make_ofr);
 const TRUST = [
   { Icon: ShieldCheck, color: T(C.green, 'fg'), title: 'Safe Travel', sub: 'Verified operators' },
   { Icon: Ticket, color: '#FBBF24', title: 'Instant Ticket', sub: 'M-ticket on phone' },
-  { Icon: Zap, color: '#60A5FA', title: 'Free Cancel', sub: 'On select buses' },
+  { Icon: Zap, color: '#FFD23F', title: 'Free Cancel', sub: 'On select buses' },
   { Icon: Headphones, color: T(C.green, 'fg'), title: '24x7 Help', sub: 'Trip support' },
 ];
 

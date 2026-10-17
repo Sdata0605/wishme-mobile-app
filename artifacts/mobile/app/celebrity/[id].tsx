@@ -724,7 +724,7 @@ export default function CelebrityDetailScreen() {
             onPress={handleBookOrSubscribe}
             style={styles.subscribeToBookBtn}
           >
-            <Icon name="lock" size={16} color="#7B5CFA" />
+            <Icon name="lock" size={16} color="#B026FF" />
             <Text style={styles.subscribeToBookText}>{bookBtnLabel}</Text>
           </TouchableOpacity>
         ) : (
@@ -732,7 +732,7 @@ export default function CelebrityDetailScreen() {
             onPress={handleBookOrSubscribe}
             style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.85 : 1 }]}
           >
-            <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bookBtn}>
+            <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.bookBtn}>
               <Text style={styles.bookBtnText}>{bookBtnLabel}</Text>
             </LinearGradient>
           </Pressable>
@@ -831,13 +831,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#7B5CFA',
+    backgroundColor: '#B026FF',
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
   subscribeBannerText: { flex: 1, color: '#fff', fontSize: 13, fontFamily: 'Inter_500Medium' },
   subscribeBannerPill: { backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 9999 },
-  subscribeBannerPillText: { color: '#7B5CFA', fontSize: 12, fontFamily: 'Inter_700Bold' },
+  subscribeBannerPillText: { color: '#B026FF', fontSize: 12, fontFamily: 'Inter_700Bold' },
   infoSection: { padding: 20 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 16 },
   rating: { fontSize: 18, fontFamily: 'Inter_700Bold' },
@@ -886,8 +886,8 @@ const styles = StyleSheet.create({
   bottomBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', gap: 12, paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1 },
   voiceCallBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 18, paddingVertical: 14, borderRadius: 12, borderWidth: 2 },
   voiceCallText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  subscribeToBookBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 12, borderWidth: 2, borderColor: '#7B5CFA' },
-  subscribeToBookText: { color: '#7B5CFA', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
+  subscribeToBookBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 52, borderRadius: 12, borderWidth: 2, borderColor: '#B026FF' },
+  subscribeToBookText: { color: '#B026FF', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   bookBtn: { height: 52, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   bookBtnText: { color: '#fff', fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   sheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },

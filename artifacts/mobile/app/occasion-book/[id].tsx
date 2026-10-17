@@ -41,12 +41,12 @@ function fmtDate(date: string): string {
 }
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#7B5CFA', '#D23FE0'],
-  ['#D23FE0', '#1F7BFF'],
-  ['#1F7BFF', '#7C3AED'],
-  ['#3B5BDB', '#7C3AED'],
-  ['#7B5CFA', '#1F7BFF'],
-  ['#7C3AED', '#3B5BDB'],
+  ['#B026FF', '#FF2E88'],
+  ['#FF2E88', '#FF5F1F'],
+  ['#FF5F1F', '#B026FF'],
+  ['#FF5F1F', '#B026FF'],
+  ['#B026FF', '#FF5F1F'],
+  ['#B026FF', '#FF5F1F'],
 ];
 
 function gradientForName(name: string): [string, string] {
@@ -127,7 +127,7 @@ export default function OccasionBookScreen() {
         const ids = (favRows ?? []).map(r => r.celebrity_id).filter(Boolean);
         if (ids.length > 0) {
           const celebRes = await supabaseFetch(
-            `/rest/v1/celebrities?is_active=eq.true&is_verified=eq.true&id=in.(${ids.join(',')})&select=id,name,image_url,category,service_prices`,
+            `/rest/v1/celebrities?is_active=eq.true&is_verified=eq.true&consent_status=eq.approved&id=in.(${ids.join(',')})&select=id,name,image_url,category,service_prices`,
             {},
             session?.access_token ?? null,
           );
@@ -444,7 +444,7 @@ export default function OccasionBookScreen() {
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={canSubmit ? ['#7B5CFA', '#1F7BFF'] : ['#aaa', '#888']}
+              colors={canSubmit ? ['#B026FF', '#FF5F1F'] : ['#aaa', '#888']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={s.submitBtn}

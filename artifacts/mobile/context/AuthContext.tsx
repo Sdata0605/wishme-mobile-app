@@ -100,6 +100,7 @@ interface AuthContextValue {
   setGender: (gender: Gender) => void;
   forgotPasswordByEmail: (email: string) => Promise<{ error: string | null }>;
   forgotPasswordByPhone: (phone: string) => Promise<{ error: string | null }>;
+  resetPasswordWithRecoveryToken: (recoveryAccessToken: string, newPassword: string) => Promise<{ error: string | null }>;
   applyCelebrity: (data: CelebrityApplyData) => Promise<{ error: string | null }>;
   checkCelebrityStatus: (email: string) => Promise<{ status: string | null; error: string | null }>;
   sendCelebOtp: (email: string) => Promise<{ error: string | null }>;
@@ -234,7 +235,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Single-flight: Supabase rotates refresh tokens, so two overlapping refreshes would make the
   // second one fail and (wrongly) look like a revoked session.
-  const refreshInFlight = useRef<Promise<Session | null> | null>(null);
+  const refreshInFlight = useRef<Promise<Session | null | 'offline'> | null>(null);
 
   /** Resolves to the new session, `null` if the server rejected the refresh token, or `'offline'`. */
   const doRefresh = useCallback(async (
@@ -261,14 +262,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const refreshSession = useCallback((currentSession: Session): Promise<Session | null> => {
+  /** Every refresh goes through here, including the one at launch, so the token is never spent twice. */
+  const refreshOnce = useCallback((currentSession: Session): Promise<Session | null | 'offline'> => {
     if (!refreshInFlight.current) {
       refreshInFlight.current = doRefresh(currentSession)
-        .then((r) => (r === 'offline' ? null : r))
         .finally(() => { refreshInFlight.current = null; });
     }
     return refreshInFlight.current;
   }, [doRefresh]);
+
+  const refreshSession = useCallback(
+    (currentSession: Session): Promise<Session | null> =>
+      refreshOnce(currentSession).then((r) => (r === 'offline' ? null : r)),
+    [refreshOnce],
+  );
 
   useEffect(() => {
     // The app opens straight from what is stored on the phone. A stale token is renewed in the
@@ -313,13 +320,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!toRefresh) return;
       const { session: stored, user: storedUser } = toRefresh;
-      const refreshed = await doRefresh(stored);
+      const refreshed = await refreshOnce(stored);
       if (refreshed === 'offline') return;
       if (!refreshed) {
         setUser(null);
         setSession(null);
         sessionRef.current = null;
         await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
+        setSessionEndedAt(Date.now());
         return;
       }
       // Pick up anything that changed while the app was closed (wallet balance, role...).
@@ -349,7 +357,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     };
     restore();
-  }, [doRefresh]);
+  }, [refreshOnce]);
 
   // Keep `session.access_token` fresh while the app is open. The token lives about an hour, and
   // most screens read it straight from state; renewing only at launch meant any screen opened after
@@ -379,7 +387,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return true; // offline
     }
     // The server refused this token: try for a new one, and only if that is refused too is the login over.
-    const renewed = refreshInFlight.current ? await refreshInFlight.current : await doRefresh(current);
+    const renewed = await refreshOnce(current);
     if (renewed === 'offline' || renewed) return true;
     setUser(null);
     setSession(null);
@@ -387,7 +395,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.multiRemove([STORAGE_SESSION, STORAGE_USER]);
     setSessionEndedAt(Date.now());
     return false;
-  }, [doRefresh]);
+  }, [refreshOnce]);
 
   const getValidSession = useCallback(async (): Promise<Session | null> => {
     const current = sessionRef.current;
@@ -773,7 +781,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const forgotPasswordByEmail = useCallback(async (email: string): Promise<{ error: string | null }> => {
     try {
-      const res = await supabaseFetch('/auth/v1/recover', {
+      const res = await supabaseFetch(`/auth/v1/recover?redirect_to=${encodeURIComponent('mobile://reset-password')}`, {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
@@ -809,12 +817,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       const email = foundEmail;
 
-      const recoverRes = await supabaseFetch('/auth/v1/recover', {
+      const recoverRes = await supabaseFetch(`/auth/v1/recover?redirect_to=${encodeURIComponent('mobile://reset-password')}`, {
         method: 'POST',
         body: JSON.stringify({ email }),
       });
       if (!recoverRes.ok) {
         const msg = await parseApiError(recoverRes);
+        return { error: msg };
+      }
+      return { error: null };
+    } catch {
+      return { error: 'Network error. Please check your connection.' };
+    }
+  }, []);
+
+  /** Sets a new password using the recovery access token from the reset-password email link. */
+  const resetPasswordWithRecoveryToken = useCallback(async (
+    recoveryAccessToken: string,
+    newPassword: string,
+  ): Promise<{ error: string | null }> => {
+    try {
+      const res = await supabaseFetch(
+        '/auth/v1/user',
+        { method: 'PUT', body: JSON.stringify({ password: newPassword }) },
+        recoveryAccessToken,
+      );
+      if (!res.ok) {
+        const msg = await parseApiError(res);
         return { error: msg };
       }
       return { error: null };
@@ -970,6 +999,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setGender,
         forgotPasswordByEmail,
         forgotPasswordByPhone,
+        resetPasswordWithRecoveryToken,
         applyCelebrity,
         checkCelebrityStatus,
         sendCelebOtp,

@@ -44,7 +44,7 @@ export function TdsTab({ celebrity, colors, session }: TabProps) {
             {[
               { label: 'Gross Earnings', value: fmtRupee(totalGross), color: '#22C55E' },
               { label: 'TDS Deducted', value: fmtRupee(totalTds), color: '#EF4444' },
-              { label: 'Net Amount', value: fmtRupee(totalNet), color: '#3B82F6' },
+              { label: 'Net Amount', value: fmtRupee(totalNet), color: '#FF5F1F' },
             ].map(row => (
               <View key={row.label} style={[styles.rowBetween, { paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border }]}>
                 <Text style={[styles.cardSub, { color: colors.foreground }]}>{row.label}</Text>
@@ -80,7 +80,7 @@ export function TdsTab({ celebrity, colors, session }: TabProps) {
                   <View style={{ alignItems: 'flex-end' }}>
                     <Text style={{ color: '#22C55E', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Gross: {fmtRupee(t.gross_amount ?? 0)}</Text>
                     <Text style={{ color: '#EF4444', fontFamily: 'Inter_400Regular', fontSize: 12 }}>TDS {t.tds_percentage ?? 0}%: -{fmtRupee(t.tds_amount ?? 0)}</Text>
-                    <Text style={{ color: '#3B82F6', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Net: {fmtRupee(t.amount)}</Text>
+                    <Text style={{ color: '#FF5F1F', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Net: {fmtRupee(t.amount)}</Text>
                   </View>
                 </View>
               </Card>

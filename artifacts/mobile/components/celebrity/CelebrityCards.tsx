@@ -65,7 +65,7 @@ export function CelebHeroCard({ celebrity, subscribed }: { celebrity: Celebrity;
         <View style={{ flex: 1 }}>
           <View style={s.nameRow}>
             <Text style={s.heroName} numberOfLines={1}>{celebrity.name}</Text>
-            {celebrity.isVerified && <Icon name="check-circle" size={16} color="#3B5BDB" />}
+            {celebrity.isVerified && <Icon name="check-circle" size={16} color="#FF5F1F" />}
           </View>
           <Text style={s.heroSub} numberOfLines={1}>{[celebrity.category, celebrity.location].filter(Boolean).join(' · ')}</Text>
         </View>
@@ -75,7 +75,7 @@ export function CelebHeroCard({ celebrity, subscribed }: { celebrity: Celebrity;
             <Text style={s.heroPillText}>Subscribed</Text>
           </View>
         ) : (
-          <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.heroPill}>
+          <LinearGradient colors={['#B026FF', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.heroPill}>
             <Text style={s.heroPillText}>Subscribe · {inr(price)}</Text>
           </LinearGradient>
         )}
@@ -101,7 +101,7 @@ export function CelebGridCard({ celebrity, subscribed, width, children }: { cele
         <View style={s.cardText}>
           <View style={s.nameRow}>
             <Text style={s.cardName} numberOfLines={1}>{celebrity.name}</Text>
-            {celebrity.isVerified && <Icon name="check-circle" size={13} color="#3B5BDB" />}
+            {celebrity.isVerified && <Icon name="check-circle" size={13} color="#FF5F1F" />}
           </View>
           <Text style={s.cardCategory} numberOfLines={1}>{celebrity.category}</Text>
         </View>

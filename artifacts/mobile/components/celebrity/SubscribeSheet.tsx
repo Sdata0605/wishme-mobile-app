@@ -103,7 +103,7 @@ export function SubscribeSheet({
 
   const Button = ({ label, onPress, busy, disabled }: { label: string; onPress: () => void; busy?: boolean; disabled?: boolean }) => (
     <TouchableOpacity onPress={onPress} disabled={disabled || busy} activeOpacity={0.9} style={{ opacity: disabled ? 0.5 : 1 }} accessibilityRole="button" accessibilityLabel={label}>
-      <LinearGradient colors={['#7B5CFA', '#D23FE0', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.mainBtn}>
+      <LinearGradient colors={['#B026FF', '#FF2E88', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.mainBtn}>
         {busy ? <ActivityIndicator color="#fff" /> : <Text style={s.mainBtnText}>{label}</Text>}
       </LinearGradient>
     </TouchableOpacity>
@@ -128,7 +128,7 @@ export function SubscribeSheet({
               <View style={{ flex: 1 }}>
                 <View style={s.nameRow}>
                   <Text style={[s.name, { color: colors.foreground }]} numberOfLines={1}>{celebrity.name}</Text>
-                  {celebrity.isVerified && <Icon name="check-circle" size={16} color="#3B5BDB" />}
+                  {celebrity.isVerified && <Icon name="check-circle" size={16} color="#FF5F1F" />}
                 </View>
                 <Text style={{ color: colors.mutedForeground, fontSize: 13 }} numberOfLines={1}>{celebrity.category}</Text>
               </View>

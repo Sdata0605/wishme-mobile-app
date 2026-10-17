@@ -46,7 +46,7 @@ export function useVoiceCallCelebrities() {
       const select =
         'id,name,category,image_url,vapi_voice_id,voice_call_price,rating,is_verified,vapi_phone_id';
       const res = await supabaseFetch(
-        `/rest/v1/celebrities?select=${encodeURIComponent(select)}&vapi_voice_id=not.is.null&is_active=eq.true&order=rating.desc`,
+        `/rest/v1/celebrities?select=${encodeURIComponent(select)}&vapi_voice_id=not.is.null&is_active=eq.true&consent_status=eq.approved&order=rating.desc`,
         {},
         token,
       );

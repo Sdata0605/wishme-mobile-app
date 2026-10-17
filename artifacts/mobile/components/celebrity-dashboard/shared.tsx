@@ -37,14 +37,14 @@ export const STATUS_COLORS: Record<string, string> = {
   completed: '#22C55E',
   rejected: '#EF4444',
   declined: '#EF4444',
-  in_progress: '#3B82F6',
+  in_progress: '#FF5F1F',
   approved: '#22C55E',
-  submitted: '#3B82F6',
+  submitted: '#FF5F1F',
   active: '#22C55E',
   paid: '#22C55E',
   failed: '#EF4444',
-  confirmed: '#3B82F6',
-  processing: '#3B82F6',
+  confirmed: '#FF5F1F',
+  processing: '#FF5F1F',
   pending_approval: '#F59E0B',
   video_sent: '#22C55E',
   delivered: '#22C55E',
@@ -90,7 +90,7 @@ export function FilterChips({ options, value, onChange, colors }: {
             accessibilityState={{ selected: on }}
             style={{
               minHeight: 38, paddingHorizontal: 14, borderRadius: 99, borderWidth: 1.5, justifyContent: 'center',
-              backgroundColor: on ? '#7B5CFA' : 'transparent', borderColor: on ? '#7B5CFA' : colors.border,
+              backgroundColor: on ? '#B026FF' : 'transparent', borderColor: on ? '#B026FF' : colors.border,
             }}
           >
             <Text style={{ color: on ? '#fff' : colors.foreground, fontSize: 13, fontFamily: 'Inter_600SemiBold' }}>
@@ -201,7 +201,7 @@ export function SectionEmpty({ icon, text, colors }: { icon: IconName; text: str
 export function LoadingBox() {
   return (
     <View style={{ alignItems: 'center', paddingTop: 60 }}>
-      <ActivityIndicator color="#7B5CFA" />
+      <ActivityIndicator color="#B026FF" />
     </View>
   );
 }
@@ -224,7 +224,7 @@ export function PrimaryBtn({ label, onPress, loading: ld, colors }: { label: str
       onPress={onPress}
       disabled={ld}
       activeOpacity={0.85}
-      style={[styles.primaryBtn, { backgroundColor: '#7B5CFA' }]}
+      style={[styles.primaryBtn, { backgroundColor: '#B026FF' }]}
     >
       {ld ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>{label}</Text>}
     </TouchableOpacity>
@@ -380,7 +380,7 @@ export const styles = StyleSheet.create({
   bubble: { maxWidth: '80%', borderRadius: 16, padding: 10, borderWidth: 1 },
   replyRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderTopWidth: 1, gap: 10 },
   replyInput: { flex: 1, borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, fontFamily: 'Inter_400Regular', fontSize: 14, maxHeight: 80 },
-  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#7B5CFA', alignItems: 'center', justifyContent: 'center' },
+  sendBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#B026FF', alignItems: 'center', justifyContent: 'center' },
   avatarLg: { width: 100, height: 100, borderRadius: 50, marginBottom: 12 },
   changePhotoBtn: { borderWidth: 1.5, borderRadius: 99, paddingHorizontal: 20, paddingVertical: 8 },
   uploadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderRadius: 10, padding: 10, borderStyle: 'dashed' },
@@ -393,12 +393,12 @@ export const styles = StyleSheet.create({
   rupeePrefix: { fontFamily: 'Inter_600SemiBold', fontSize: 15, marginRight: 4 },
   copyBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 10, padding: 10, marginTop: 12 },
   unreadBadge: { backgroundColor: '#EF4444', borderRadius: 99, minWidth: 18, height: 18, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center' },
-  aiBadge: { backgroundColor: '#7B5CFA22', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 2, alignSelf: 'flex-end' },
-  aiBtnSmall: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#7B5CFA', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
+  aiBadge: { backgroundColor: '#B026FF22', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2, marginBottom: 2, alignSelf: 'flex-end' },
+  aiBtnSmall: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderColor: '#B026FF', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
   aiBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#22C55E18', borderRadius: 8, padding: 8, marginTop: 10 },
   toggleBtn: { borderRadius: 99, paddingHorizontal: 14, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', minWidth: 52 },
   ratingBar: { height: 8, borderRadius: 4, overflow: 'hidden' },
   ratingBarFill: { height: 8, backgroundColor: '#F59E0B', borderRadius: 4 },
-  headerDashBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#7B5CFA', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 },
+  headerDashBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#B026FF', borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 },
   headerDashBtnText: { color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: 12 },
 });

@@ -38,8 +38,8 @@ export function OverviewScreen({
   userFirstName: string;
 }) {
   const attention: Array<{ key: string; text: string; section: string; icon: IconName; tint: string }> = [];
-  if (data.ordersToDo > 0) attention.push({ key: 'orders', text: `${data.ordersToDo} ${data.ordersToDo === 1 ? 'order is' : 'orders are'} waiting to be made`, section: 'orders', icon: 'shopping-bag', tint: '#D23FE0' });
-  if (data.unreadMessages > 0) attention.push({ key: 'msg', text: `${data.unreadMessages} unread ${data.unreadMessages === 1 ? 'message' : 'messages'}`, section: 'messages', icon: 'message-circle', tint: '#1F7BFF' });
+  if (data.ordersToDo > 0) attention.push({ key: 'orders', text: `${data.ordersToDo} ${data.ordersToDo === 1 ? 'order is' : 'orders are'} waiting to be made`, section: 'orders', icon: 'shopping-bag', tint: '#FF2E88' });
+  if (data.unreadMessages > 0) attention.push({ key: 'msg', text: `${data.unreadMessages} unread ${data.unreadMessages === 1 ? 'message' : 'messages'}`, section: 'messages', icon: 'message-circle', tint: '#FF5F1F' });
   if (data.loaded && !data.hasBank) attention.push({ key: 'bank', text: 'Add a bank account to withdraw your earnings', section: 'wallet', icon: 'wallet', tint: '#22C55E' });
 
   const stats: Array<{ key: string; label: string; value: string; section: string }> = [
@@ -49,9 +49,9 @@ export function OverviewScreen({
   ];
 
   const actions: Array<{ key: string; label: string; icon: IconName; tint: string; section: string }> = [
-    { key: 'a1', label: 'Orders', icon: 'shopping-bag', tint: '#D23FE0', section: 'orders' },
+    { key: 'a1', label: 'Orders', icon: 'shopping-bag', tint: '#FF2E88', section: 'orders' },
     { key: 'a2', label: 'Withdraw', icon: 'wallet', tint: '#22C55E', section: 'wallet' },
-    { key: 'a3', label: 'Messages', icon: 'message-circle', tint: '#1F7BFF', section: 'messages' },
+    { key: 'a3', label: 'Messages', icon: 'message-circle', tint: '#FF5F1F', section: 'messages' },
     { key: 'a4', label: 'Upload', icon: 'upload', tint: '#2EC4B6', section: 'content' },
   ];
 
@@ -138,7 +138,7 @@ const s = StyleSheet.create({
   heroLabel: { color: 'rgba(255,255,255,0.8)', fontSize: 12, fontFamily: 'Inter_400Regular' },
   heroAmount: { color: '#fff', fontSize: 28, fontFamily: 'Inter_700Bold', maxWidth: 150 },
   heroBtn: { backgroundColor: '#fff', borderRadius: 99, paddingHorizontal: 16, minHeight: 36, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  heroBtnText: { color: '#7B5CFA', fontSize: 13, fontFamily: 'Inter_700Bold' },
+  heroBtnText: { color: '#B026FF', fontSize: 13, fontFamily: 'Inter_700Bold' },
   statsRow: { flexDirection: 'row', gap: 10 },
   stat: { flex: 1, borderWidth: 1, borderRadius: 16, padding: 14, minHeight: 84, justifyContent: 'space-between' },
   statValue: { fontSize: 20, fontFamily: 'Inter_700Bold' },

@@ -52,17 +52,17 @@ export function VoiceSelect({ value, onChange, voices, voicesLoading }: {
   const renderVoiceItem = (v: VoiceItem) => (
     <TouchableOpacity
       key={v.voice_id}
-      style={[s.dropdownItem, value?.voice_id === v.voice_id && { backgroundColor: '#1F7BFF20' }]}
+      style={[s.dropdownItem, value?.voice_id === v.voice_id && { backgroundColor: '#FF5F1F20' }]}
       onPress={() => { onChange(v); setOpen(false); }}
     >
-      <Text style={[s.dropdownItemText, { color: value?.voice_id === v.voice_id ? '#1F7BFF' : colors.foreground, flex: 1 }]} numberOfLines={1}>{v.name}</Text>
+      <Text style={[s.dropdownItemText, { color: value?.voice_id === v.voice_id ? '#FF5F1F' : colors.foreground, flex: 1 }]} numberOfLines={1}>{v.name}</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
         {v.preview_url ? (
           <TouchableOpacity onPress={() => playPreview(v)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Icon name={playingId === v.voice_id ? 'pause' : 'play'} size={14} color="#1F7BFF" />
+            <Icon name={playingId === v.voice_id ? 'pause' : 'play'} size={14} color="#FF5F1F" />
           </TouchableOpacity>
         ) : null}
-        {value?.voice_id === v.voice_id && <Icon name="check" size={14} color="#1F7BFF" />}
+        {value?.voice_id === v.voice_id && <Icon name="check" size={14} color="#FF5F1F" />}
       </View>
     </TouchableOpacity>
   );
@@ -78,7 +78,7 @@ export function VoiceSelect({ value, onChange, voices, voicesLoading }: {
           {voices.clonedVoices.length > 0 && (
             <>
               <View style={[s.voiceGroupHeader, { borderBottomColor: colors.border }]}>
-                <Text style={[s.voiceGroupLabel, { color: '#1F7BFF' }]}>Your Cloned Voices</Text>
+                <Text style={[s.voiceGroupLabel, { color: '#FF5F1F' }]}>Your Cloned Voices</Text>
               </View>
               {voices.clonedVoices.map(renderVoiceItem)}
               <View style={[s.voiceGroupDivider, { backgroundColor: colors.border }]} />
@@ -103,7 +103,7 @@ export function VoiceSelect({ value, onChange, voices, voicesLoading }: {
   );
 }
 
-export function ChipSelect({ options, value, onChange, activeColor = '#1F7BFF' }: { options: string[]; value: string; onChange: (v: string) => void; activeColor?: string }) {
+export function ChipSelect({ options, value, onChange, activeColor = '#FF5F1F' }: { options: string[]; value: string; onChange: (v: string) => void; activeColor?: string }) {
   const { colors } = useTheme();
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chips}>
@@ -131,11 +131,11 @@ export function LanguageDropdown({ value, onChange }: { value: string; onChange:
           {SONG_LANGUAGES.map(lang => (
             <TouchableOpacity
               key={lang}
-              style={[s.dropdownItem, value === lang && { backgroundColor: '#7B5CFA20' }]}
+              style={[s.dropdownItem, value === lang && { backgroundColor: '#B026FF20' }]}
               onPress={() => { onChange(lang); setOpen(false); }}
             >
-              <Text style={[s.dropdownItemText, { color: value === lang ? '#7B5CFA' : colors.foreground, flex: 1 }]}>{lang}</Text>
-              {value === lang && <Icon name="check" size={14} color="#7B5CFA" />}
+              <Text style={[s.dropdownItemText, { color: value === lang ? '#B026FF' : colors.foreground, flex: 1 }]}>{lang}</Text>
+              {value === lang && <Icon name="check" size={14} color="#B026FF" />}
             </TouchableOpacity>
           ))}
         </View>
@@ -168,7 +168,7 @@ export function DurationSlider({ value, onChange, min = 1, max = 30, step = 1 }:
 export function GenBtn({ label, onPress, generating, disabled }: { label: string; onPress: () => void; generating: boolean; disabled?: boolean }) {
   return (
     <TouchableOpacity onPress={onPress} disabled={generating || disabled} style={{ marginTop: 16, opacity: (generating || disabled) ? 0.6 : 1 }} activeOpacity={0.85}>
-      <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.genBtn}>
+      <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.genBtn}>
         <Icon name="zap" size={18} color="#fff" />
         <Text style={s.genBtnText}>{generating ? 'Generating...' : label}</Text>
       </LinearGradient>
@@ -200,8 +200,8 @@ export function ErrBox({ msg }: { msg: string }) {
             accessibilityLabel="Add funds to your wallet"
             style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
           >
-            <Icon name="plus" size={12} color="#1F7BFF" />
-            <Text style={{ color: '#1F7BFF', fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>Add funds</Text>
+            <Icon name="plus" size={12} color="#FF5F1F" />
+            <Text style={{ color: '#FF5F1F', fontSize: 12, fontFamily: 'Inter_600SemiBold' }}>Add funds</Text>
           </TouchableOpacity>
         ) : null}
       </View>
@@ -209,7 +209,7 @@ export function ErrBox({ msg }: { msg: string }) {
   );
 }
 
-export function InfoBox({ msg, color = '#1F7BFF' }: { msg: string; color?: string }) {
+export function InfoBox({ msg, color = '#FF5F1F' }: { msg: string; color?: string }) {
   return (
     <View style={[s.infoBox, { backgroundColor: color + '15', borderColor: color + '40' }]}>
       <Icon name="info" size={14} color={color} />
@@ -233,7 +233,7 @@ export function WalletCard({ balance }: { balance: number }) {
   return (
     <View style={[s.walletCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
       <View style={s.walletRow}>
-        <Icon name="wallet" size={20} color="#1F7BFF" />
+        <Icon name="wallet" size={20} color="#FF5F1F" />
         <Text style={[s.walletLabel, { color: colors.mutedForeground }]}>Wallet Balance</Text>
         <Text style={s.walletBalance}>₹{balance.toLocaleString('en-IN')}</Text>
       </View>

@@ -176,10 +176,10 @@ export default function ReferralsScreen() {
   const level2Count = transactions.filter((t) => t.commission_level === 2).length;
 
   const stats: { label: string; value: string; icon: IconName; color: string }[] = [
-    { label: 'Total Referrals', value: String(totalReferrals), icon: 'users', color: '#7B5CFA' },
+    { label: 'Total Referrals', value: String(totalReferrals), icon: 'users', color: '#B026FF' },
     { label: 'Total Earnings', value: `₹${totalEarnings.toLocaleString('en-IN')}`, icon: 'trending-up', color: '#22C55E' },
     { label: 'Pending', value: `₹${pendingEarnings.toLocaleString('en-IN')}`, icon: 'clock', color: '#F59E0B' },
-    { label: 'Level 1 / 2 earnings', value: `${level1Count} / ${level2Count}`, icon: 'bar-chart-2', color: '#1F7BFF' },
+    { label: 'Level 1 / 2 earnings', value: `${level1Count} / ${level2Count}`, icon: 'bar-chart-2', color: '#FF5F1F' },
   ];
 
   if (!user || !session) {
@@ -229,19 +229,19 @@ export default function ReferralsScreen() {
               <Text style={s.retryText}>Could not load your referral data. Tap to retry.</Text>
             </TouchableOpacity>
           )}
-          <LinearGradient colors={['#7C3AED', '#1F7BFF']} style={s.topCard}>
+          <LinearGradient colors={['#B026FF', '#FF5F1F']} style={s.topCard}>
             <Text style={s.topTitle}>Invite & Earn</Text>
             <Text style={s.topSub}>Earn {commissionRates.l1}% when people you invite book{commissionRates.l2 > 0 ? `, and ${commissionRates.l2}% on their invites` : ''}</Text>
             <View style={s.codeBox}>
               <Text style={s.codeText}>{code || (loadFailed ? 'Unavailable' : '...')}</Text>
               <View style={s.codeActions}>
                 <TouchableOpacity onPress={copy} style={s.codeBtn}>
-                  <Icon name="copy" size={16} color="#7C3AED" />
+                  <Icon name="copy" size={16} color="#B026FF" />
                   <Text style={s.codeBtnText}>{copied ? 'Copied!' : 'Copy'}</Text>
                 </TouchableOpacity>
                 <View style={s.codeDivider} />
                 <TouchableOpacity onPress={share} style={s.codeBtn}>
-                  <Icon name="share-2" size={16} color="#7C3AED" />
+                  <Icon name="share-2" size={16} color="#B026FF" />
                   <Text style={s.codeBtnText}>Share</Text>
                 </TouchableOpacity>
               </View>
@@ -283,13 +283,13 @@ export default function ReferralsScreen() {
             <Text style={[s.commCardTitle, { color: colors.foreground }]}>Commission Rates</Text>
             <View style={s.commRates}>
               <View style={s.commRate}>
-                <Text style={[s.commLevel, { color: '#7B5CFA' }]}>L1</Text>
+                <Text style={[s.commLevel, { color: '#B026FF' }]}>L1</Text>
                 <Text style={[s.commPct, { color: colors.foreground }]}>{commissionRates.l1}%</Text>
                 <Text style={[s.commDesc, { color: colors.mutedForeground }]}>Direct referral commission</Text>
               </View>
               <View style={[s.commSep, { backgroundColor: colors.border }]} />
               <View style={s.commRate}>
-                <Text style={[s.commLevel, { color: '#1F7BFF' }]}>L2</Text>
+                <Text style={[s.commLevel, { color: '#FF5F1F' }]}>L2</Text>
                 <Text style={[s.commPct, { color: colors.foreground }]}>{commissionRates.l2}%</Text>
                 <Text style={[s.commDesc, { color: colors.mutedForeground }]}>{commissionRates.l2 > 0 ? '2nd-level commission' : 'Upgrade your plan to earn here'}</Text>
               </View>
@@ -334,8 +334,8 @@ export default function ReferralsScreen() {
                       {row.order_type && ORDER_LABELS[row.order_type] ? <Text style={[s.orderLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{ORDER_LABELS[row.order_type]}</Text> : null}
                     </View>
                     <View style={s.colLevel}>
-                      <View style={[s.levelBadge, { backgroundColor: level === 'L1' ? '#7B5CFA20' : '#1F7BFF20' }]}>
-                        <Text style={[s.levelText, { color: level === 'L1' ? '#7B5CFA' : '#1F7BFF' }]}>{level}</Text>
+                      <View style={[s.levelBadge, { backgroundColor: level === 'L1' ? '#B026FF20' : '#FF5F1F20' }]}>
+                        <Text style={[s.levelText, { color: level === 'L1' ? '#B026FF' : '#FF5F1F' }]}>{level}</Text>
                       </View>
                     </View>
                     <Text style={[s.tdCell, s.colAmt, { color: '#22C55E' }]}>₹{row.commission_amount.toLocaleString('en-IN')}</Text>
@@ -378,8 +378,8 @@ export default function ReferralsScreen() {
                     <Text style={[s.planCell, { flex: 1.4, color: colors.foreground, textAlign: 'left', fontFamily: 'Inter_600SemiBold' }]}>
                       {pl.name}{mine ? '  (yours)' : ''}
                     </Text>
-                    <Text style={[s.planCell, { color: '#7B5CFA', fontFamily: 'Inter_700Bold' }]}>{pl.l1}%</Text>
-                    <Text style={[s.planCell, { color: pl.l2 > 0 ? '#1F7BFF' : colors.mutedForeground, fontFamily: 'Inter_700Bold' }]}>{pl.l2}%</Text>
+                    <Text style={[s.planCell, { color: '#B026FF', fontFamily: 'Inter_700Bold' }]}>{pl.l1}%</Text>
+                    <Text style={[s.planCell, { color: pl.l2 > 0 ? '#FF5F1F' : colors.mutedForeground, fontFamily: 'Inter_700Bold' }]}>{pl.l2}%</Text>
                   </View>
                 );
               })}
@@ -415,11 +415,11 @@ const s = StyleSheet.create({
   topTitle: { color: '#fff', fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', marginBottom: 8 },
   topSub: { color: 'rgba(255,255,255,0.85)', fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center', marginBottom: 20, lineHeight: 20 },
   codeBox: { backgroundColor: '#fff', borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, width: '100%' },
-  codeText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#7C3AED', letterSpacing: 2 },
+  codeText: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#B026FF', letterSpacing: 2 },
   codeActions: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   codeBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6 },
-  codeBtnText: { color: '#7C3AED', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-  codeDivider: { width: 1, height: 18, backgroundColor: '#7C3AED40' },
+  codeBtnText: { color: '#B026FF', fontSize: 12, fontFamily: 'Inter_600SemiBold' },
+  codeDivider: { width: 1, height: 18, backgroundColor: '#B026FF40' },
   urlBox: { marginTop: 10, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 8, width: '100%' },
   urlText: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: 'rgba(255,255,255,0.9)', marginRight: 8 },
   urlBtnText: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontFamily: 'Inter_600SemiBold' },

@@ -139,7 +139,7 @@ function Stat({ icon, value, label, tint }: { icon: IconName; value: string; lab
 
 export function WeatherCard({ w }: { w: Weather }) {
   const { neon } = useTheme();
-  const colors = neon.isDark ? (['#5E6A8E', '#2A4D95', '#112A6C'] as const) : (['#8EC5FF', '#5B9BFF', '#3B6FE0'] as const);
+  const colors = neon.isDark ? (['#5B1F86', '#2B0D43', '#1F0A31'] as const) : (['#8EC5FF', '#5B9BFF', '#3B6FE0'] as const);
   return (
     <ExpoGradient colors={colors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.weather, { borderColor: withAlpha('#fff', 0.14) }]}>
       <View style={styles.wTop}>
@@ -156,9 +156,9 @@ export function WeatherCard({ w }: { w: Weather }) {
       <View style={styles.wStrip}>
         <Stat icon="thermometer" tint="#FF7A59" value={`${w.feelsC}°`} label="Feels" />
         <View style={styles.statSep} />
-        <Stat icon="droplet" tint="#2FD3FF" value={`${w.humidity}%`} label="Humidity" />
+        <Stat icon="droplet" tint="#FFD23F" value={`${w.humidity}%`} label="Humidity" />
         <View style={styles.statSep} />
-        <Stat icon="wind" tint="#B8C7FF" value={`${w.windKmh} km/h`} label="Wind" />
+        <Stat icon="wind" tint="#D9C9FB" value={`${w.windKmh} km/h`} label="Wind" />
         <View style={styles.statSep} />
         <Stat icon="sun" tint="#FFC93C" value={`${w.uv}`} label="UV" />
       </View>
@@ -189,7 +189,7 @@ export function NewsCard({ stories, onMore, onDismiss, onOpen }: { stories: Stor
         </PressScale>
       ))}
       <PressScale onPress={onMore} accessibilityRole="button" style={{ alignSelf: 'flex-end', marginTop: 22 }}>
-        <Text style={[styles.more, { color: neon.isDark ? '#2F8BFF' : neon.violet }]}>More news</Text>
+        <Text style={[styles.more, { color: neon.isDark ? '#FF2E88' : neon.violet }]}>More news</Text>
       </PressScale>
     </NeonCard>
   );

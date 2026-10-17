@@ -192,16 +192,16 @@ export function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
         </>
       )}
       <SL text="Genre" />
-      <ChipSelect options={GENERATE_SONG_GENRES} value={genre} onChange={setGenre} activeColor="#7B5CFA" />
+      <ChipSelect options={GENERATE_SONG_GENRES} value={genre} onChange={setGenre} activeColor="#B026FF" />
       <SL text="Mood" />
-      <ChipSelect options={GENERATE_SONG_MOODS} value={mood} onChange={setMood} activeColor="#1F7BFF" />
+      <ChipSelect options={GENERATE_SONG_MOODS} value={mood} onChange={setMood} activeColor="#FF5F1F" />
       {songType === 'full' ? (
         <>
           <View style={s.lyricHeader}>
             <SL text="Lyrics" />
-            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#7B5CFA' }]} onPress={generateLyrics} disabled={lyricsGen}>
-              <Icon name="sparkles" size={13} color="#7B5CFA" />
-              <Text style={[s.aiLyricsBtnText, { color: '#7B5CFA' }]}>{lyricsGen ? 'Generating...' : 'Generate Lyrics'}</Text>
+            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#B026FF' }]} onPress={generateLyrics} disabled={lyricsGen}>
+              <Icon name="sparkles" size={13} color="#B026FF" />
+              <Text style={[s.aiLyricsBtnText, { color: '#B026FF' }]}>{lyricsGen ? 'Generating...' : 'Generate Lyrics'}</Text>
             </TouchableOpacity>
           </View>
           <TextInput
@@ -232,15 +232,15 @@ export function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
       <GenBtn label={`Generate Song (₹${cost})`} onPress={generate} generating={gen} />
 
       {gen ? (
-        <View style={[s.resultPanel, s.resultPanelLoading, { backgroundColor: colors.card, borderColor: '#7B5CFA' }]}>
+        <View style={[s.resultPanel, s.resultPanelLoading, { backgroundColor: colors.card, borderColor: '#B026FF' }]}>
           <View style={s.waveRow}>
             {Array.from({ length: 16 }).map((_, i) => (
-              <WaveformBar key={i} delay={i * 60} color="#7B5CFA" active={true} />
+              <WaveformBar key={i} delay={i * 60} color="#B026FF" active={true} />
             ))}
           </View>
           <Text style={[s.generatingText, { color: colors.foreground }]}>{progressMsg || 'Starting generation...'}</Text>
           <Text style={[s.generatingHint, { color: colors.mutedForeground }]}>This may take up to 5 minutes</Text>
-          <View style={[s.genSpinner, { borderColor: '#7B5CFA' + '30', borderTopColor: '#7B5CFA' }]} />
+          <View style={[s.genSpinner, { borderColor: '#B026FF' + '30', borderTopColor: '#B026FF' }]} />
         </View>
       ) : audioUrl ? (
         <View style={[s.resultPanel, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -248,13 +248,13 @@ export function GenerateSongTab({ ctx }: { ctx: MusicCtx }) {
         </View>
       ) : (
         <View style={[s.resultPanel, s.resultPanelEmpty, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <LinearGradient colors={['#7C3AED20', '#7B5CFA20']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.resultEmptyGradient}>
-            <Icon name="music" size={32} color="#7B5CFA" />
+          <LinearGradient colors={['#B026FF20', '#B026FF20']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.resultEmptyGradient}>
+            <Icon name="music" size={32} color="#B026FF" />
             <Text style={[s.resultEmptyTitle, { color: colors.foreground }]}>Your song will appear here</Text>
             <Text style={[s.resultEmptyHint, { color: colors.mutedForeground }]}>Fill in the details above and tap Generate Song</Text>
             <View style={s.decorativeWaveRow}>
               {Array.from({ length: 20 }).map((_, i) => (
-                <WaveformBar key={i} delay={i * 50} color={'#7B5CFA'} active={false} />
+                <WaveformBar key={i} delay={i * 50} color={'#B026FF'} active={false} />
               ))}
             </View>
             <View style={s.resultControls}>

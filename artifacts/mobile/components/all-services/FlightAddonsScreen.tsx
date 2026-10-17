@@ -224,7 +224,7 @@ export function FlightAddonsScreen({
               {/* Legend */}
               <View style={st.legendCard}>
                 <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: T('#F3F4F6', 'bg') }]} /><Text style={st.legendText}>Occupied</Text></View>
-                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: T('#E0E7FF', 'bg'), borderColor: T('#6366F1', 'border'), borderWidth: 1 }]} /><Text style={st.legendText}>Free / ₹150</Text></View>
+                <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: T('#E0E7FF', 'bg'), borderColor: T('#B026FF', 'border'), borderWidth: 1 }]} /><Text style={st.legendText}>Free / ₹150</Text></View>
                 <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: T('#FEF3C7', 'bg'), borderColor: T('#F59E0B', 'border'), borderWidth: 1 }]} /><Text style={st.legendText}>₹350</Text></View>
                 <View style={st.legendItem}><View style={[st.legendBox, { backgroundColor: T('#FCE7F3', 'bg'), borderColor: T('#EC4899', 'border'), borderWidth: 1 }]} /><Text style={st.legendText}>₹600+</Text></View>
               </View>

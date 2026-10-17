@@ -156,7 +156,7 @@ export default function AssistantHome() {
               <View style={{ flex: 1 }}>
                 <Text style={[styles.greeting, { color: neon.textHi }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{greeting(now)}</Text>
                 {first ? (
-                  <GradientText colors={neon.isDark ? ['#25DFFF', '#8E7BFF', '#E555FF'] : [neon.violet, neon.pink]} fontSize={44} fontFamily="PlayfairDisplay_700Bold" letterSpacing={-0.5}>
+                  <GradientText colors={neon.isDark ? ['#FF5F1F', '#FF2E88', '#B026FF'] : [neon.violet, neon.pink]} fontSize={44} fontFamily="PlayfairDisplay_700Bold" letterSpacing={-0.5}>
                     {first}
                   </GradientText>
                 ) : null}

@@ -92,7 +92,7 @@ export default function WishCongratulationsScreen() {
     <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <LinearGradient
-          colors={['#7B5CFA', '#1F7BFF']}
+          colors={['#B026FF', '#FF5F1F']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[s.hero, { paddingTop: topPad + 32 }]}
@@ -111,9 +111,9 @@ export default function WishCongratulationsScreen() {
             </View>
           ) : order ? (
             <>
-              <View style={[s.celebBanner, { backgroundColor: '#7B5CFA10', borderColor: '#7B5CFA30' }]}>
-                <Icon name="star" size={18} color="#7B5CFA" />
-                <Text style={[s.celebBannerText, { color: '#7B5CFA' }]}>
+              <View style={[s.celebBanner, { backgroundColor: '#B026FF10', borderColor: '#B026FF30' }]}>
+                <Icon name="star" size={18} color="#B026FF" />
+                <Text style={[s.celebBannerText, { color: '#B026FF' }]}>
                   Wish delivered to {order.celebrities?.name}
                 </Text>
               </View>
@@ -155,9 +155,9 @@ export default function WishCongratulationsScreen() {
               </View>
             </>
           ) : (
-            <View style={[s.celebBanner, { backgroundColor: '#7B5CFA10', borderColor: '#7B5CFA30' }]}>
-              <Icon name="star" size={18} color="#7B5CFA" />
-              <Text style={[s.celebBannerText, { color: '#7B5CFA' }]}>Your wish has been sent!</Text>
+            <View style={[s.celebBanner, { backgroundColor: '#B026FF10', borderColor: '#B026FF30' }]}>
+              <Icon name="star" size={18} color="#B026FF" />
+              <Text style={[s.celebBannerText, { color: '#B026FF' }]}>Your wish has been sent!</Text>
             </View>
           )}
 
@@ -167,14 +167,14 @@ export default function WishCongratulationsScreen() {
 
           {convId && (
             <TouchableOpacity
-              style={[s.viewConvBtn, { borderColor: '#3B5BDB', backgroundColor: '#3B5BDB18' }]}
+              style={[s.viewConvBtn, { borderColor: '#FF5F1F', backgroundColor: '#FF5F1F18' }]}
               onPress={() => {
                 if (intervalRef.current) clearInterval(intervalRef.current);
                 router.push(('/chat/' + convId) as never);
               }}
             >
-              <Icon name="message-circle" size={16} color="#3B5BDB" />
-              <Text style={[s.viewConvText, { color: '#3B5BDB' }]}>View Conversation</Text>
+              <Icon name="message-circle" size={16} color="#FF5F1F" />
+              <Text style={[s.viewConvText, { color: '#FF5F1F' }]}>View Conversation</Text>
             </TouchableOpacity>
           )}
 

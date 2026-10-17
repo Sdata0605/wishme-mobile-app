@@ -67,6 +67,7 @@
       "expo-font",
       "expo-web-browser",
       "./plugins/withLauncherQueries",
+      "./plugins/withNoFontWeightAdjustment",
       "expo-media-library",
       [
         "expo-camera",

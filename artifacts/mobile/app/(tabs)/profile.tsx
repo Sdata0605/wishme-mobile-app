@@ -105,7 +105,7 @@ export default function ProfileScreen() {
     >
       {/* Header */}
       <LinearGradient
-        colors={['#7B5CFA', '#D23FE0', '#1F7BFF']}
+        colors={['#B026FF', '#FF2E88', '#FF5F1F']}
         style={[styles.header, { paddingTop: topPad + 20 }]}
       >
         <View style={styles.avatarCircle}>
@@ -126,7 +126,7 @@ export default function ProfileScreen() {
           </Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/wallet')}>
-          <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.addMoneyBtn}>
+          <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.addMoneyBtn}>
             <Icon name="plus" size={14} color="#fff" />
             <Text style={styles.addMoneyText}>Add Money</Text>
           </LinearGradient>
@@ -176,7 +176,7 @@ export default function ProfileScreen() {
             style={[styles.dashboardBtn]}
             onPress={() => router.push('/celebrity-dashboard')}
           >
-            <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.dashboardBtnGrad}>
+            <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.dashboardBtnGrad}>
               <Icon name="star" size={18} color="#fff" />
               <Text style={styles.dashboardBtnText}>Celebrity Dashboard</Text>
             </LinearGradient>

@@ -19,7 +19,7 @@ export const STATUS_COLORS: Record<string, string> = {
   rejected: '#EF4444',
 };
 
-export const LEVEL_COLORS: Record<number, string> = { 1: '#7B5CFA', 2: '#1F7BFF' };
+export const LEVEL_COLORS: Record<number, string> = { 1: '#B026FF', 2: '#FF5F1F' };
 
 export const QUICK_AMOUNTS = [100, 500, 1000, 2000, 5000];
 
@@ -80,18 +80,18 @@ export function txIconInfo(type: string): TxIconInfo {
     commission_earning: { name: 'trending-up', color: '#22C55E' },
     booking: { name: 'video', color: '#F97316' },
     ugc_video: { name: 'video', color: '#F97316' },
-    music_generation: { name: 'music', color: '#7B5CFA' },
-    music_download: { name: 'music', color: '#7B5CFA' },
+    music_generation: { name: 'music', color: '#B026FF' },
+    music_download: { name: 'music', color: '#B026FF' },
     greeting_card_generation: { name: 'gift', color: '#EC4899' },
     referral_commission: { name: 'users', color: '#EC4899' },
-    image_promotion: { name: 'image', color: '#3B82F6' },
-    photo_wish: { name: 'image', color: '#06B6D4' },
+    image_promotion: { name: 'image', color: '#FF5F1F' },
+    photo_wish: { name: 'image', color: '#FFD23F' },
     celebrity_call: { name: 'phone', color: '#EAB308' },
     voice_call: { name: 'phone', color: '#EAB308' },
     voice_call_wish: { name: 'mic', color: '#EAB308' },
     celebrity_subscription: { name: 'star', color: '#F59E0B' },
     plan_upgrade: { name: 'star', color: '#F59E0B' },
-    service_payment: { name: 'shopping-bag', color: '#6366F1' },
+    service_payment: { name: 'shopping-bag', color: '#B026FF' },
   };
   return map[type] ?? { name: 'credit-card', color: '#6B7280' };
 }

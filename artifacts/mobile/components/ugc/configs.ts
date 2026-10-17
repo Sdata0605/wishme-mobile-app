@@ -19,7 +19,7 @@ const SCRIPT_MODE: Option[] = [
 /** UGC Ads: a business orders a promo video for a product or brand. */
 export const UGC_ADS_CONFIG: FormConfig = {
   id: 'ugc-ads',
-  gradient: ['#7B5CFA', '#D23FE0'],
+  gradient: ['#B026FF', '#FF2E88'],
   accent: '#F2542D',
   defaults: {
     aspect_ratio: '9:16',
@@ -156,8 +156,8 @@ export const UGC_ADS_CONFIG: FormConfig = {
 /** UGC Videos: a personal creator-style video with a celebrity, for a person or occasion. */
 export const UGC_VIDEOS_CONFIG: FormConfig = {
   id: 'ugc-videos',
-  gradient: ['#D23FE0', '#1F7BFF'],
-  accent: '#1F7BFF',
+  gradient: ['#FF2E88', '#FF5F1F'],
+  accent: '#FF5F1F',
   defaults: {
     for_whom: 'other',
     language: '',

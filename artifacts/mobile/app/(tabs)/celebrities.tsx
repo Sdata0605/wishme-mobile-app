@@ -74,7 +74,7 @@ function StateView({ icon, title, body, button, onPress }: { icon: 'search' | 'a
   const { colors } = useTheme();
   return (
     <View style={s.state}>
-      <LinearGradient colors={['#7B5CFA', '#D23FE0', '#1F7BFF']} style={s.stateRing}>
+      <LinearGradient colors={['#B026FF', '#FF2E88', '#FF5F1F']} style={s.stateRing}>
         <View style={[s.stateInner, { backgroundColor: colors.background }]}>
           <Icon name={icon} size={30} color={colors.primary} />
         </View>

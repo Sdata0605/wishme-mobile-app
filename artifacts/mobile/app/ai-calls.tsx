@@ -10,7 +10,7 @@ import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
 const STATUS: Record<AiCallStatus, { label: string; color: string }> = {
   queued: { label: 'Starting', color: '#F59E0B' },
-  scheduled: { label: 'Scheduled', color: '#6366F1' },
+  scheduled: { label: 'Scheduled', color: '#B026FF' },
   ringing: { label: 'Ringing', color: '#F59E0B' },
   'in-progress': { label: 'On the call', color: '#22C55E' },
   completed: { label: 'Done', color: '#22C55E' },

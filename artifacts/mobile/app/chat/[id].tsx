@@ -345,7 +345,7 @@ const mb = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: 'rgba(31,123,255,0.2)',
   },
-  aiBadgeText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#1F7BFF' },
+  aiBadgeText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#FF5F1F' },
 });
 
 export default function ChatScreen() {

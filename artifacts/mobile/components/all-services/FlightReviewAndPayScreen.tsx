@@ -304,7 +304,7 @@ export function FlightReviewAndPayScreen({
             onPress={() => setPaymentMethod('card')}
           >
             <View style={st.payIconBox}>
-              <CreditCard size={20} color={paymentMethod === 'card' ? T(C.white, 'fg') : T('#3B82F6', 'fg')} />
+              <CreditCard size={20} color={paymentMethod === 'card' ? T(C.white, 'fg') : T('#FF5F1F', 'fg')} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={st.payTitle}>Credit / Debit Card</Text>

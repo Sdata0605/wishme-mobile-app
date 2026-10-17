@@ -163,7 +163,7 @@ function WishCard({ wish, colors }: WishCardProps) {
         <View style={s.replyBlock}>
           <View style={s.replyHeader}>
             <Text style={s.replyHeaderIcon}>✨</Text>
-            <Text style={[s.replyHeaderName, { color: '#1F7BFF' }]}>
+            <Text style={[s.replyHeaderName, { color: '#FF5F1F' }]}>
               {celeb?.name ?? 'Celebrity'}
             </Text>
             {wish.reply_sent_at && (
@@ -457,7 +457,7 @@ export default function OccasionWishesScreen() {
           contentContainerStyle={[s.scrollContent, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#B026FF" />
           }
         >
           <Text style={[s.sectionLabel, { color: colors.foreground }]}>Select Celebrity</Text>
@@ -599,7 +599,7 @@ export default function OccasionWishesScreen() {
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={['#7B5CFA', '#1F7BFF']}
+                  colors={['#B026FF', '#FF5F1F']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.sendBtnGrad}
@@ -619,7 +619,7 @@ export default function OccasionWishesScreen() {
           contentContainerStyle={[s.scrollContent, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#B026FF" />
           }
         >
           {wishes.length === 0 ? (
@@ -723,10 +723,10 @@ const s = StyleSheet.create({
   noOccasionText: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },
 
   autoReplyBanner: {
-    backgroundColor: '#6366F118',
+    backgroundColor: '#B026FF18',
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#6366F140',
+    borderColor: '#B026FF40',
     padding: 12,
   },
   autoReplyText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: '#818CF8', lineHeight: 20 },
@@ -787,10 +787,10 @@ const s = StyleSheet.create({
   expandHint: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 2 },
 
   replyBlock: {
-    backgroundColor: '#1F7BFF12',
+    backgroundColor: '#FF5F1F12',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#1F7BFF30',
+    borderColor: '#FF5F1F30',
     padding: 12,
     gap: 6,
   },

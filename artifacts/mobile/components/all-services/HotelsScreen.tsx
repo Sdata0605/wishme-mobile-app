@@ -529,7 +529,7 @@ const use_sc = () => useThemedStyles(make_sc);
 
 const POPULAR = [
   { city: 'Goa', tag: 'Beaches', color: T(C.orange, 'fg'), bg: '#F5F0FF' },
-  { city: 'Manali', tag: 'Hills', color: '#2563EB', bg: '#EFF6FF' },
+  { city: 'Manali', tag: 'Hills', color: '#FF5F1F', bg: '#EFF6FF' },
   { city: 'Jaipur', tag: 'Heritage', color: '#DC2626', bg: '#FEE2E2' },
   { city: 'Udaipur', tag: 'Lakes', color: T(C.green, 'fg'), bg: '#ECFDF5' },
   { city: 'Mumbai', tag: 'City', color: T(C.purpleLight, 'fg'), bg: '#F5F3FF' },
@@ -635,7 +635,7 @@ export function HotelsScreen({
           {[
             { Icon: ShieldCheck, color: T(C.green, 'fg'), title: 'Best Price', sub: 'Deal promise' },
             { Icon: Star, color: T('#FBBF24', 'fg'), title: 'Top Rated', sub: 'Verified stays' },
-            { Icon: Zap, color: T('#60A5FA', 'fg'), title: 'Instant Book', sub: 'Quick confirm' },
+            { Icon: Zap, color: T('#FFD23F', 'fg'), title: 'Instant Book', sub: 'Quick confirm' },
             { Icon: Headphones, color: T(C.green, 'fg'), title: '24x7 Help', sub: 'Trip support' },
           ].map((b, i, arr) => (
             <View key={b.title} style={[ts.item, i < arr.length - 1 && ts.itemBorder]}>

@@ -49,7 +49,7 @@ const CONTACT_CHANNELS = [
     title: 'Email Support',
     contact: 'support@wishme.today',
     responseTime: 'Within 24 hours',
-    color: '#7B5CFA',
+    color: '#B026FF',
     onPress: () => Linking.openURL('mailto:support@wishme.today'),
   },
   {
@@ -57,7 +57,7 @@ const CONTACT_CHANNELS = [
     title: 'Phone Support',
     contact: '+91 98765 43210',
     responseTime: 'Mon–Fri, 9 AM – 6 PM IST',
-    color: '#1F7BFF',
+    color: '#FF5F1F',
     onPress: () => Linking.openURL('tel:+919876543210'),
   },
   {
@@ -194,7 +194,7 @@ export default function SupportScreen() {
 
         {/* Gradient Sub-banner */}
         <LinearGradient
-          colors={['#7B5CFA', '#1F7BFF']}
+          colors={['#B026FF', '#FF5F1F']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.banner}
@@ -350,7 +350,7 @@ export default function SupportScreen() {
           )}
           <TouchableOpacity onPress={handleSubmit} activeOpacity={0.85} style={styles.submitBtnWrapper}>
             <LinearGradient
-              colors={['#7B5CFA', '#1F7BFF']}
+              colors={['#B026FF', '#FF5F1F']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={styles.submitBtn}

@@ -18,7 +18,7 @@ export default function NotFoundScreen() {
         The page you're looking for doesn't exist or has been moved.
       </Text>
       <Pressable onPress={() => router.replace('/(tabs)')} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
-        <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btn}>
+        <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.btn}>
           <Text style={styles.btnText}>Go Home</Text>
         </LinearGradient>
       </Pressable>
