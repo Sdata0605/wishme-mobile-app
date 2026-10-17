@@ -35,6 +35,8 @@ import type { FlightPassenger, FlightContactInfo } from './FlightPassengerScreen
 import type { SelectedFlightAddons } from './FlightAddonsScreen';
 import { T, useThemedStyles, glass, dockBar } from './themed';
 import { BrandFill } from './BrandFill';
+import { DemoFareNotice } from './DemoFareNotice';
+import { isDemoTrace } from '@/services/tboDemo';
 
 export function FlightReviewAndPayScreen({
   flight,
@@ -175,6 +177,7 @@ export function FlightReviewAndPayScreen({
         contentContainerStyle={{ padding: 14, paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
       >
+        {isDemoTrace(flight.traceId) && <DemoFareNotice />}
         {/* Flight summary card */}
         <View style={st.card}>
           <View style={st.airRow}>

@@ -36,6 +36,8 @@ import { tboSearchFlights } from '@/services/tboService';
 import { clearOptionSet, setOptionSet } from '@/services/assistant/bridge';
 import { T, useThemedStyles, glass } from './themed';
 import { BrandFill } from './BrandFill';
+import { DemoFareNotice } from './DemoFareNotice';
+import { isDemoTrace } from '@/services/tboDemo';
 
 export interface FlightSearchQuery {
   origin: string;
@@ -1493,6 +1495,7 @@ export function FlightResultsScreen({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={rs.list}
       >
+        {!loading && flights.some((f) => isDemoTrace(f.traceId)) && <DemoFareNotice />}
         <View style={rs.resultHead}>
           <Text style={rs.resultCount}>
             {loading ? 'Searching live fares…' : `${sortedFlights.length} flights found`}

@@ -10,6 +10,7 @@
  */
 
 import { parseApiError, supabaseFetch } from '@/constants/supabase';
+import { demoBooking, demoFareQuote, demoSearch, demoSeatMap, isDemoTrace } from '@/services/tboDemo';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -175,7 +176,14 @@ export async function tboSearchFlights(
   },
   accessToken?: string | null,
 ): Promise<TBOSearchResult> {
-  return callTbo<TBOSearchResult>('tbo-flights', 'search', params, accessToken);
+  try {
+    return await callTbo<TBOSearchResult>('tbo-flights', 'search', params, accessToken);
+  } catch (e) {
+    // The live service is down or refusing: show demo fares (marked as such by their DEMO- trace id) so the whole
+    // flow can still be used. Nothing booked from them is real.
+    console.warn('[flights] live search failed, showing demo fares:', e instanceof Error ? e.message : e);
+    return demoSearch(params);
+  }
 }
 
 export async function tboFareRule(
@@ -183,6 +191,11 @@ export async function tboFareRule(
   resultIndex: string,
   accessToken?: string | null,
 ): Promise<{ fareRules: Array<Record<string, unknown>> }> {
+  if (isDemoTrace(traceId)) {
+    return {
+      fareRules: [{ FareRuleDetail: 'Demo fare. Cancellation and date-change charges depend on the airline and fare type.' }],
+    };
+  }
   return callTbo('tbo-flights', 'farerule', { traceId, resultIndex }, accessToken);
 }
 
@@ -192,6 +205,7 @@ export async function tboFareQuote(
   resultIndex: string,
   accessToken?: string | null,
 ): Promise<TBOFareQuote> {
+  if (isDemoTrace(traceId)) return demoFareQuote({ traceId, resultIndex });
   return callTbo<TBOFareQuote>('tbo-flights', 'farequote', { traceId, resultIndex }, accessToken);
 }
 
@@ -200,6 +214,7 @@ export async function tboGetSSR(
   resultIndex: string,
   accessToken?: string | null,
 ): Promise<{ seats: unknown[]; meals: unknown[]; baggage: unknown[] }> {
+  if (isDemoTrace(traceId)) return { seats: [], meals: [], baggage: [] };
   return callTbo('tbo-flights', 'ssr', { traceId, resultIndex }, accessToken);
 }
 
@@ -303,6 +318,8 @@ export async function tboSeatMap(
   resultIndex: string,
   accessToken?: string | null,
 ): Promise<{ seats: TBOSeatItem[]; meals: TBOMealltem[] }> {
+  if (isDemoTrace(traceId)) return demoSeatMap(resultIndex);
+
   let raw: { seats: unknown[]; meals: unknown[] };
   try {
     raw = await tboGetSSR(traceId, resultIndex, accessToken);
@@ -382,6 +399,9 @@ export async function tboBookAndTicket(
   accessToken?: string | null,
 ): Promise<TBOBookingConfirmation> {
   const { traceId, resultIndex, isLCC, passengers, totalAmount } = params;
+
+  // A demo fare never reaches the airline: it gets a made-up, clearly marked confirmation.
+  if (isDemoTrace(traceId)) return demoBooking(totalAmount);
 
   let pnr = '';
   let bookingId = 0;

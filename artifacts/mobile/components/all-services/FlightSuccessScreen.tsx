@@ -30,6 +30,8 @@ import type { TBOBookingConfirmation } from '../../services/tboService';
 import { serviceColors as C } from './serviceColors';
 import { T, useThemedStyles, glass, dockBar } from './themed';
 import { BrandFill } from './BrandFill';
+import { DemoFareNotice } from './DemoFareNotice';
+import { isDemoTrace } from '@/services/tboDemo';
 
 interface FlightSuccessScreenProps {
   flight: FlightResult;
@@ -73,7 +75,7 @@ export function FlightSuccessScreen({
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `✈️ Flight Confirmed! PNR: ${pnr}\n${airlineName} (${flightNumber}): ${fromDisplay} ➔ ${toDisplay}\nDeparture: ${dateLabel} at ${flight.depart}\nTicket No: ${ticketNo}\nBooked with WishMe!`,
+        message: `✈️ ${isDemoTrace(flight.traceId) ? 'DEMO booking (not a real ticket)' : 'Flight Confirmed!'} PNR: ${pnr}\n${airlineName} (${flightNumber}): ${fromDisplay} ➔ ${toDisplay}\nDeparture: ${dateLabel} at ${flight.depart}\nTicket No: ${ticketNo}\nBooked with WishMe!`,
       });
     } catch {
       // ignore
@@ -105,7 +107,7 @@ export function FlightSuccessScreen({
         </View>
         <Text style={s.successHeading}>Flight Confirmed!</Text>
         <Text style={s.successSub}>
-          E-ticket has been sent to <Text style={{ color: T(C.blue, 'fg'), fontFamily: 'Inter_600SemiBold' }}>{contact.email}</Text>
+          {isDemoTrace(flight.traceId) ? 'Demo booking: no e-ticket was sent' : 'E-ticket has been sent to '}{isDemoTrace(flight.traceId) ? null : <Text style={{ color: T(C.blue, 'fg'), fontFamily: 'Inter_600SemiBold' }}>{contact.email}</Text>}
         </Text>
       </View>
 
@@ -114,6 +116,7 @@ export function FlightSuccessScreen({
         contentContainerStyle={{ padding: 14, paddingBottom: 110 }}
         showsVerticalScrollIndicator={false}
       >
+        {isDemoTrace(flight.traceId) && <DemoFareNotice booked />}
         {/* Boarding Pass Style Card */}
         <View style={s.ticketCard}>
           {/* Header */}
