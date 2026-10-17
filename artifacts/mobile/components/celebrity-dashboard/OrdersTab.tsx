@@ -118,11 +118,12 @@ export function OrdersTab({ celebrity, colors, session }: TabProps) {
         pushField(fields, 'Opening style', w.hook_style);
         pushField(fields, 'Closing line', w.call_to_action);
         items.push({
-          key: `friend-${w.id}`, id: w.id, label: w.order_type === 'ugc_video' ? 'UGC video' : 'video wish',
+          key: `friend-${w.id}`, id: w.id, label: w.order_type === 'ugc_video' ? 'UGC video' : 'video wish + card',
           title: `${clean(w.recipient_name) || 'Friend'}${w.occasion ? ` · ${w.occasion}` : ''}`,
           customer: nameOf(w.profiles), price: Number(w.price_paid ?? 0), status: w.status, created_at: w.created_at,
           fields, images: [asImage(w.reference_image_url)].filter(Boolean) as string[],
           videoUrl: isHttp(w.video_url) ? w.video_url : null,
+          cardUrl: isHttp(w.card_url) ? w.card_url : null,
         });
       }
 
@@ -272,8 +273,9 @@ export function OrdersTab({ celebrity, colors, session }: TabProps) {
                   </TouchableOpacity>
                 ) : null}
                 {o.cardUrl ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(o.cardUrl!)} style={[styles.smallBtn, { borderColor: '#7B5CFA', backgroundColor: '#7B5CFA20', alignSelf: 'flex-start' }]}>
-                    <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Open the card</Text>
+                  <TouchableOpacity onPress={() => Linking.openURL(o.cardUrl!)} accessibilityRole="imagebutton" accessibilityLabel="Open the card">
+                    <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_600SemiBold', marginBottom: 4 }}>THE CARD</Text>
+                    <Image source={{ uri: o.cardUrl }} style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 12 }} contentFit="cover" />
                   </TouchableOpacity>
                 ) : null}
                 {!o.videoUrl && !o.cardUrl && o.images.length === 0 && o.fields.length === 0 ? (

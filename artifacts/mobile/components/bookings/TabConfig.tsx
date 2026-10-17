@@ -90,7 +90,7 @@ export function SkeletonCards({ colors }: { colors: Colors }) {
 
 export const TAB_TO_TABLES: Record<BookingTab, { table: string; select: string; dataKey: TabDataKey }[]> = {
   Celebrity: [{ table: 'bookings', select: 'id,user_id,celebrity_id,service_type,status,generation_status,video_status,video_file_key,video_url,message,final_price,created_at,generation_error,celebrities:celebrity_id(name,image_url,category)', dataKey: 'celeb' }],
-  'Wish a Friend': [{ table: 'wish_friend_orders', select: 'id,order_type,status,recipient_name,occasion,prompt,price_paid,video_url,video_file_key,admin_notes,created_at,celebrities:celebrity_id(name,image_url)', dataKey: 'wishFriend' }],
+  'Wish a Friend': [{ table: 'wish_friend_orders', select: 'id,order_type,status,recipient_name,occasion,prompt,price_paid,video_url,video_file_key,card_url,card_text,admin_notes,created_at,celebrities:celebrity_id(name,image_url)', dataKey: 'wishFriend' }],
   Wishes: [{ table: 'wish_celebrity_orders', select: 'id,celebrity_id,occasion_type,recipient_name,message,amount_paid,status,generated_card_image_url,card_url,created_at,celebrities:celebrity_id(name,image_url)', dataKey: 'wishes' }],
   Cards: [{ table: 'greeting_card_generations', select: 'id,occasion_name,recipient_name,original_prompt,generated_image_url,amount_charged,status,created_at', dataKey: 'cards' }],
   Photo: [{ table: 'photo_wishes', select: 'id,occasion_type,recipient_name,message,output_url,credits_used,status,created_at', dataKey: 'photo' }],

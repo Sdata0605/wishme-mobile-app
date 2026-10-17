@@ -5,6 +5,7 @@ import {
   Image,
   Platform,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { Icon } from '@/components/Icon';
@@ -12,7 +13,7 @@ import { SaveToLibraryButton } from '@/components/SaveToLibraryButton';
 import { supabaseFetch } from '@/constants/supabase';
 import { fmtDate, s } from './shared';
 import type { Colors, WishFriendOrder } from './shared';
-import { DownloadLink, InlineCelebVideoPlayer } from './MediaBlocks';
+import { DownloadLink, ImagePreviewModal, InlineCelebVideoPlayer } from './MediaBlocks';
 
 const WISH_FRIEND_STATUS: Record<WishFriendOrder['status'], { label: string; color: string }> = {
   pending: { label: 'Request received', color: '#F59E0B' },
@@ -25,6 +26,9 @@ export function WishFriendCard({ item, colors, accessToken }: { item: WishFriend
   const status = WISH_FRIEND_STATUS[item.status] ?? WISH_FRIEND_STATUS.pending;
   const delivered = item.status === 'completed' && (item.video_file_key || item.video_url);
   const [videoUri, setVideoUri] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const typeLabel = item.order_type === 'ugc_video' ? 'UGC Video' : 'Video Wish + Card';
+  const card = item.status === 'completed' && item.card_url ? item.card_url : null;
 
   // Prefer a signed URL (works whether or not the bucket is public); fall back to the stored URL.
   useEffect(() => {
@@ -56,7 +60,7 @@ export function WishFriendCard({ item, colors, accessToken }: { item: WishFriend
         <View style={{ flex: 1 }}>
           <View style={s.cardTop}>
             <Text style={[s.cardTitle, { color: colors.foreground }]} numberOfLines={1}>
-              {item.order_type === 'ugc_video' ? 'UGC Video' : 'Video Wish'} · {item.celebrities?.name ?? 'Celebrity'}
+              {typeLabel} · {item.celebrities?.name ?? 'Celebrity'}
             </Text>
             <View style={[s.statusBadge, { backgroundColor: status.color + '22' }]}>
               <Text style={[s.statusText, { color: status.color }]}>{status.label}</Text>
@@ -73,7 +77,11 @@ export function WishFriendCard({ item, colors, accessToken }: { item: WishFriend
       {(item.status === 'pending' || item.status === 'processing') && (
         <View style={[s.infoBox, { backgroundColor: colors.border + '44', borderColor: colors.border }]}>
           <ActivityIndicator size="small" color="#F59E0B" />
-          <Text style={[s.infoBoxText, { color: colors.mutedForeground }]}>Our team is making your video. It will appear here when it is ready.</Text>
+          <Text style={[s.infoBoxText, { color: colors.mutedForeground }]}>
+            {item.order_type === 'ugc_video'
+              ? 'Our team is making your video. It will appear here when it is ready.'
+              : 'Our team is making your video and signed card. Both will appear here when they are ready.'}
+          </Text>
         </View>
       )}
       {item.status === 'rejected' && (
@@ -82,6 +90,18 @@ export function WishFriendCard({ item, colors, accessToken }: { item: WishFriend
           <Text style={[s.infoBoxText, { color: '#991B1B' }]}>{item.admin_notes || 'We could not make this video. Please contact support for a refund.'}</Text>
         </View>
       )}
+      {card ? (
+        <View style={{ marginTop: 10 }}>
+          <Text style={[s.cardSub, { color: colors.foreground, fontFamily: 'Inter_600SemiBold' }]}>Signed card from {item.celebrities?.name ?? 'the celebrity'}</Text>
+          <TouchableOpacity onPress={() => setPreview(card)} accessibilityRole="imagebutton" accessibilityLabel="Open the signed card">
+            <Image source={{ uri: card }} style={{ width: '100%', aspectRatio: 3 / 4, borderRadius: 12, marginTop: 6, backgroundColor: colors.border }} resizeMode="cover" />
+          </TouchableOpacity>
+          <DownloadLink url={card} colors={colors} />
+        </View>
+      ) : null}
+      {delivered && card ? (
+        <Text style={[s.cardSub, { color: colors.foreground, fontFamily: 'Inter_600SemiBold', marginTop: 10 }]}>Video message</Text>
+      ) : null}
       {delivered && videoUri && Platform.OS !== 'web' && <InlineCelebVideoPlayer videoUri={videoUri} colors={colors} />}
       {delivered && videoUri && Platform.OS === 'web' && (
         <View style={[s.videoWrapper, { borderColor: colors.border }]}>
@@ -94,14 +114,15 @@ export function WishFriendCard({ item, colors, accessToken }: { item: WishFriend
           video={{
             sourceType: 'wish_friend',
             sourceId: item.id,
-            title: `${item.order_type === 'ugc_video' ? 'UGC Video' : 'Video Wish'}${item.celebrities?.name ? ` · ${item.celebrities.name}` : ''}`,
+            title: `${typeLabel}${item.celebrities?.name ? ` · ${item.celebrities.name}` : ''}`,
             subtitle: `For ${item.recipient_name}`,
             mediaUrl: item.video_url,
             fileKey: item.video_file_key,
-            thumbnailUrl: item.celebrities?.image_url ?? null,
+            thumbnailUrl: card ?? item.celebrities?.image_url ?? null,
           }}
         />
       )}
+      {preview && <ImagePreviewModal url={preview} onClose={() => setPreview(null)} />}
     </View>
   );
 }

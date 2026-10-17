@@ -126,7 +126,7 @@ export function WishFriendLanding({ onPick, onOpenOrders }: Props) {
     { icon: 'users', label: 'Team-made' },
     { icon: 'layers', label: '9:16 · 1:1 · 16:9' },
   ];
-  const videoChips: Chip[] = [{ icon: 'star', label: 'Celebrity' }, { icon: 'clock', label: 'Delivered to Bookings' }];
+  const videoChips: Chip[] = [{ icon: 'star', label: 'Celebrity video' }, { icon: 'edit-2', label: 'Signed card' }];
 
   const shadow = (color: string) => ({
     shadowColor: color, shadowOpacity: glow, shadowRadius: 16, shadowOffset: { width: 0, height: 8 }, elevation: 6,
@@ -143,7 +143,7 @@ export function WishFriendLanding({ onPick, onOpenOrders }: Props) {
         <PressCard
           delay={0}
           onPress={() => onPick('video_wish')}
-          accessibilityLabel="Video Wish. Pick a celebrity"
+          accessibilityLabel="Video Wish with a signed card. Pick a celebrity"
           style={[s.featured, { backgroundColor: '#3B5BDB' }, shadow('#3B5BDB')]}
         >
           <LinearGradient colors={['#3B5BDB', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.featuredInner}>
@@ -151,8 +151,8 @@ export function WishFriendLanding({ onPick, onOpenOrders }: Props) {
               <Icon name="play-circle" size={120} color="rgba(255,255,255,0.15)" />
             </View>
             <View style={s.featuredPill}><Text style={s.featuredPillText}>Celebrity special</Text></View>
-            <Text style={s.featuredTitle}>Video Wish</Text>
-            <Text style={s.featuredDesc}>A personalised video message from a celebrity your friend loves.</Text>
+            <Text style={s.featuredTitle}>Video Wish + Card</Text>
+            <Text style={s.featuredDesc}>A personalised video from a celebrity your friend loves, with a greeting card signed by them.</Text>
             <Chips chips={videoChips} />
             <View style={s.featuredCta}>
               <Text style={s.featuredCtaText}>Pick a celebrity</Text>

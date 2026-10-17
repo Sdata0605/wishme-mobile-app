@@ -129,7 +129,7 @@ export default function WishFriendScreen() {
 
   const basePrice = basePriceFor(celebrity);
   const price = getDiscountedPrice(basePrice);
-  const typeLabel = videoType === 'video_wish' ? 'Video Wish' : 'UGC Video';
+  const typeLabel = videoType === 'video_wish' ? 'Video Wish + Card' : 'UGC Video';
   const detailsValid = useMemo(
     () => !!celebrity && basePrice > 0 && recipientName.trim().length > 0 && occasion.length > 0 && prompt.trim().length >= 10,
     [celebrity, basePrice, recipientName, occasion, prompt],
@@ -200,7 +200,7 @@ export default function WishFriendScreen() {
       wallet.refetch();
       setStep('done');
       confirmOrder({
-        item: `a ${videoType === 'video_wish' ? 'video wish' : 'UGC video'} for ${recipientName.trim()}`,
+        item: `a ${videoType === 'video_wish' ? 'video wish with a signed card' : 'UGC video'} for ${recipientName.trim()}`,
         orderId: order.id,
         viewRoute: { pathname: '/bookings', params: { tab: 'Wish a Friend' } },
       });
@@ -433,7 +433,9 @@ export default function WishFriendScreen() {
           )}
 
           <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>
-            Your request goes to our team. They make your video, check it, and deliver it to My Bookings.
+            {videoType === 'video_wish'
+              ? 'Your request goes to our team. They make the video and a greeting card signed with the celebrity\'s name, and deliver both to My Bookings.'
+              : 'Your request goes to our team. They make your video, check it, and deliver it to My Bookings.'}
           </Text>
 
           <TouchableOpacity

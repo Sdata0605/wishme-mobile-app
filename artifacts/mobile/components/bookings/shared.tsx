@@ -64,6 +64,8 @@ export interface WishFriendOrder {
   id: string; order_type: 'video_wish' | 'ugc_video'; status: 'pending' | 'processing' | 'completed' | 'rejected';
   recipient_name: string; occasion: string; prompt: string; price_paid: number;
   video_url: string | null; video_file_key: string | null; admin_notes: string | null; created_at: string;
+  /** The signature card delivered with a video wish. */
+  card_url?: string | null; card_text?: string | null;
   celebrities: { name: string; image_url: string } | null;
 }
 
