@@ -7,7 +7,7 @@ import { TourOverlay } from '@/components/tour/TourOverlay';
 import { TourProvider } from '@/context/TourContext';
 import { DrawerMenu } from '@/components/DrawerMenu';
 
-export const unstable_settings = { initialRouteName: 'assistant' };
+export const unstable_settings = { initialRouteName: 'index' };
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
@@ -18,15 +18,14 @@ export default function TabLayout() {
     <View style={styles.root}>
       <DrawerMenu>
         <Tabs
-          initialRouteName="assistant"
+          initialRouteName="index"
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           tabBar={(props: any) => <NeonTabBar {...props} />}
           screenOptions={{ headerShown: false }}
         >
-          {/* The app opens on the AI home (the centre mic); Home is the WishMe home. */}
+          {/* The app opens on WishMe Home. The centre mic is not a tab: it starts the assistant where you are. */}
           <Tabs.Screen name="index" options={{ title: 'Home' }} />
           <Tabs.Screen name="all-services" options={{ title: 'Services' }} />
-          <Tabs.Screen name="assistant" options={{ title: 'Assistant' }} />
           <Tabs.Screen name="hub" options={{ title: 'Hub' }} />
           <Tabs.Screen name="profile" options={{ title: 'You' }} />
 

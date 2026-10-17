@@ -96,7 +96,6 @@ const SCREENS: Record<string, ScreenTarget> = {
   documents: { route: '/documents', label: 'Documents' },
   my_finance: { route: '/finance', label: 'Finance' },
   features: { route: '/features', label: 'Features' },
-  ai_home: { route: '/(tabs)/assistant', label: 'AI home' },
 };
 
 const BILL_KINDS = [
@@ -159,7 +158,6 @@ const SCREEN_HELP: Record<string, string> = {
   call_logs: 'past AI calls with transcripts and recordings to play',
   my_finance: 'the user’s EMIs, incomes and recurring expenses, with totals',
   features: 'what the app can do: live, in progress and coming soon',
-  ai_home: 'the AI home: the day at a glance, agenda and month heat-map',
   documents: 'documents the assistant has written: reports, letters, notes, plans and spreadsheets, as files to share or save',
 };
 

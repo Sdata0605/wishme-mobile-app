@@ -18,7 +18,7 @@ async function resolveDestination(): Promise<string> {
       try {
         const user = JSON.parse(userStr) as { role?: string };
         if (user?.role === 'celebrity') return '/celebrity-dashboard';
-        if (user?.role === 'user') return '/(tabs)/assistant';
+        if (user?.role === 'user') return '/(tabs)';
       } catch {}
     }
 

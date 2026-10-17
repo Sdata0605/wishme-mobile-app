@@ -53,76 +53,46 @@ function NavItem({ item, selected, onPress }: { item: (typeof LEFT)[number]; sel
   );
 }
 
+/** WishMe's brand gradient for the mic: pink to purple. */
+const ORB_GRADIENT = ['#DB2777', '#7C3AED'] as const;
+
 /**
- * The docked mic: a dark disc inside a violet-to-cyan ring, a perfect circle, breathing gently and sending rings out
- * while the assistant is listening. It is drawn as an SVG circle so no square gradient can ever show behind it.
+ * The docked mic: a solid pink-to-purple disc with a white mic, flat on the bar (no ring, no glow). While the
+ * assistant is listening the mic turns into a white cross, so the same tap stops it. Drawn as an SVG circle so no
+ * square gradient can ever show behind it.
  */
-function Orb({ active, onPress, onLongPress }: { active: boolean; onPress: () => void; onLongPress: () => void }) {
-  const { neon } = useTheme();
-  const breath = useRef(new Animated.Value(0)).current;
-  const ring = useRef(new Animated.Value(0)).current;
+function Orb({ active, onPress }: { active: boolean; onPress: () => void }) {
   const swap = useRef(new Animated.Value(active ? 1 : 0)).current;
 
   useEffect(() => {
-    const b = Animated.loop(Animated.sequence([
-      Animated.timing(breath, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      Animated.timing(breath, { toValue: 0, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-    ]));
-    b.start();
-    return () => b.stop();
-  }, [breath]);
-
-  useEffect(() => {
-    Animated.timing(swap, { toValue: active ? 1 : 0, duration: 250, useNativeDriver: true }).start();
-    if (!active) { ring.setValue(0); return; }
-    const r = Animated.loop(Animated.timing(ring, { toValue: 1, duration: 2000, easing: Easing.linear, useNativeDriver: true }));
-    r.start();
-    return () => r.stop();
-  }, [active, ring, swap]);
-
-  const halo = (offset: number) => {
-    const p = Animated.modulo(Animated.add(ring, offset), 1);
-    return (
-      <Animated.View
-        pointerEvents="none"
-        style={[styles.halo, {
-          borderColor: neon.cyan,
-          opacity: Animated.multiply(swap, p.interpolate({ inputRange: [0, 1], outputRange: [0.4, 0] })),
-          transform: [{ scale: p.interpolate({ inputRange: [0, 1], outputRange: [1.15, 2.1] }) }],
-        }]}
-      />
-    );
-  };
-
-  const ink = neon.isDark ? '#fff' : neon.violet;
+    Animated.timing(swap, { toValue: active ? 1 : 0, duration: 200, useNativeDriver: true }).start();
+  }, [active, swap]);
 
   return (
     <View style={styles.orbWrap} pointerEvents="box-none">
-      {halo(0)}
-      {halo(0.5)}
-      <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={450} accessibilityRole="button" accessibilityLabel={active ? 'Stop the assistant' : 'Talk to the assistant'}>
-        <Animated.View style={{ transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1.03] }) }] }}>
-          {/* soft glow under the orb: a circle, so the shadow is round too */}
-          <View style={[styles.glow, { backgroundColor: withAlpha(neon.violet, 0.3), shadowColor: neon.violet }]} />
-          <Svg width={ORB} height={ORB}>
-            <Defs>
-              <LinearGradient id="orbRing" x1="0" y1="0" x2="1" y2="1">
-                <Stop offset="0" stopColor={neon.violet} />
-                <Stop offset="0.5" stopColor={neon.pink} />
-                <Stop offset="1" stopColor={neon.cyan} />
-              </LinearGradient>
-            </Defs>
-            <Circle cx={ORB / 2} cy={ORB / 2} r={ORB / 2 - 2.5} fill={neon.orbDisc} stroke="url(#orbRing)" strokeWidth={4} />
-          </Svg>
-          <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
-            <Animated.View style={[styles.center, { position: 'absolute', opacity: swap.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
-              <Icon name="mic" size={28} color={ink} />
-            </Animated.View>
-            <Animated.View style={[styles.center, { position: 'absolute', opacity: swap }]}>
-              <Icon name="x" size={28} color={neon.cyan} />
-            </Animated.View>
-          </View>
-        </Animated.View>
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="button"
+        accessibilityLabel={active ? 'Stop the assistant' : 'Talk to the assistant'}
+        style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.94 : 1 }] })}
+      >
+        <Svg width={ORB} height={ORB}>
+          <Defs>
+            <LinearGradient id="orbFill" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={ORB_GRADIENT[0]} />
+              <Stop offset="1" stopColor={ORB_GRADIENT[1]} />
+            </LinearGradient>
+          </Defs>
+          <Circle cx={ORB / 2} cy={ORB / 2} r={ORB / 2} fill="url(#orbFill)" />
+        </Svg>
+        <View style={[StyleSheet.absoluteFill, styles.center]} pointerEvents="none">
+          <Animated.View style={[styles.center, { position: 'absolute', opacity: swap.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]}>
+            <Icon name="mic" size={28} color="#fff" />
+          </Animated.View>
+          <Animated.View style={[styles.center, { position: 'absolute', opacity: swap }]}>
+            <Icon name="x" size={28} color="#fff" />
+          </Animated.View>
+        </View>
       </Pressable>
     </View>
   );
@@ -161,9 +131,8 @@ function DockShape({ width, height }: { width: number; height: number }) {
 }
 
 /**
- * MyAssistant's bottom bar: Home, Services, the mic, Hub, You. The selected tab sits in a cyan-outlined pill; the mic
- * is docked in a round notch. Tapping the mic from another tab takes you to the AI home (where the app opens); on the
- * AI home it starts and stops the assistant. A long press starts or stops it from anywhere.
+ * The bottom bar: Home, Services, the mic, Hub, You. The selected tab sits in an outlined pill; the mic is docked in a
+ * round notch and starts or stops the voice assistant right where you are, without leaving the screen.
  */
 export function NeonTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
@@ -185,12 +154,6 @@ export function NeonTabBar({ state, navigation }: TabBarProps) {
 
   const onOrb = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
-    if (active) { close(); return; }
-    if (current !== 'assistant') { go('assistant'); return; }
-    toggle();
-  };
-  const onOrbHold = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(() => {});
     if (active) close();
     else toggle();
   };
@@ -203,7 +166,7 @@ export function NeonTabBar({ state, navigation }: TabBarProps) {
         <View style={{ width: 84 }} />
         {RIGHT.map((i) => <NavItem key={i.route} item={i} selected={current === i.route} onPress={() => go(i.route)} />)}
       </View>
-      <Orb active={active} onPress={onOrb} onLongPress={onOrbHold} />
+      <Orb active={active} onPress={onOrb} />
     </View>
   );
 }
@@ -216,6 +179,4 @@ const styles = StyleSheet.create({
   label: { fontSize: 11 },
   orbWrap: { position: 'absolute', left: 0, right: 0, top: -ORB / 2, alignItems: 'center', height: ORB },
   center: { alignItems: 'center', justifyContent: 'center' },
-  glow: { position: 'absolute', left: 4, right: 4, top: 6, bottom: -4, borderRadius: ORB / 2, shadowOpacity: 0.7, shadowRadius: 16, shadowOffset: { width: 0, height: 4 } },
-  halo: { position: 'absolute', top: 0, width: ORB, height: ORB, borderRadius: ORB / 2, borderWidth: 1.6 },
 });

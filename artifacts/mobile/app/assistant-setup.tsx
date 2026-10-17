@@ -135,7 +135,7 @@ export default function AssistantSetupScreen() {
 
   const leave = () => {
     if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)/assistant' as never);
+    else router.replace('/(tabs)' as never);
   };
 
   const onSkip = async () => {

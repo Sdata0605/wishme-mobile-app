@@ -50,7 +50,7 @@ export default function FinanceScreen() {
   };
 
   const plan = () => {
-    router.replace('/(tabs)/assistant' as never);
+    router.replace('/(tabs)' as never);
     void ask(planPrompt(items ?? []));
   };
 

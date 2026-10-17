@@ -211,7 +211,7 @@ export default function PermissionsScreen() {
   const leave = useCallback(() => {
     if (next === 'auth') router.replace('/(auth)');
     else if (router.canGoBack()) router.back();
-    else router.replace('/(tabs)/assistant' as never);
+    else router.replace('/(tabs)' as never);
   }, [next]);
 
   const remaining = rows.filter((row) => {

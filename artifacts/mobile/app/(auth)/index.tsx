@@ -79,7 +79,7 @@ function SignInTab({ onSwitchToCelebrity, onSwitchToSignUp }: { onSwitchToCelebr
     if (role === 'celebrity') {
       router.replace('/celebrity-dashboard');
     } else {
-      router.replace('/(tabs)/assistant' as never);
+      router.replace('/(tabs)' as never);
     }
   };
 
