@@ -1,5 +1,5 @@
 /**
- * AssistantEngine — one voice engine for the app, backed by Gemini Live or Sarvam.
+ * AssistantEngine — one voice engine for the app, backed by OpenAI Realtime, Gemini Live or Sarvam.
  *
  * The admin chooses the engine in the admin panel. The server tells us which one is active
  * (and which to fall back to), and this class forwards everything to that engine. If the active
@@ -16,9 +16,11 @@ import {
   type LiveState,
 } from '@/services/geminiLive/client';
 import { SarvamLiveClient, type SarvamLiveOptions } from '@/services/sarvamLive/client';
+import { OpenAIRealtimeClient } from '@/services/openaiRealtime/client';
 import { warmWebSearch } from '@/services/assistant/webSearch';
 
-export type EngineKind = 'gemini' | 'sarvam';
+export type EngineKind = 'gemini' | 'sarvam' | 'openai';
+const isEngine = (e: unknown): e is EngineKind => e === 'gemini' || e === 'sarvam' || e === 'openai';
 
 const log: (...args: unknown[]) => void = __DEV__ ? (...args) => console.log('[engine]', ...args) : () => {};
 
@@ -51,6 +53,7 @@ export interface EngineOptions extends Shared {
 export class AssistantEngine {
   private gemini: GeminiLiveClient;
   private sarvam: SarvamLiveClient;
+  private openai: OpenAIRealtimeClient;
   private active: EngineKind = 'gemini';
   private fallback: EngineKind | null = null;
   private resolvedAt = 0;
@@ -68,7 +71,7 @@ export class AssistantEngine {
       .then((raw) => {
         if (!raw) return;
         const c = JSON.parse(raw) as { engine?: EngineKind; fallback?: EngineKind | null };
-        if (c.engine === 'gemini' || c.engine === 'sarvam') {
+        if (isEngine(c.engine)) {
           this.active = c.engine;
           this.fallback = c.fallback ?? null;
           this.haveChoice = true;
@@ -84,6 +87,11 @@ export class AssistantEngine {
       if (src === 'gemini' && state === 'error' && this.wantListening && this.fallback === 'sarvam') {
         log('Gemini failed, falling back to Sarvam');
         void this.switchTo('sarvam', true);
+      }
+      // OpenAI couldn't connect while the user is waiting: hand over to the classic engine the server named.
+      if (src === 'openai' && state === 'error' && this.wantListening && this.fallback && this.fallback !== 'openai') {
+        log('OpenAI failed, falling back to', this.fallback);
+        void this.switchTo(this.fallback, true);
       }
     };
     const forward = <T extends unknown[]>(src: EngineKind, fn?: (...args: T) => void) => (...args: T) => {
@@ -119,10 +127,24 @@ export class AssistantEngine {
       onError: forward('sarvam', opts.onError),
     };
     this.sarvam = new SarvamLiveClient(sarvamOpts);
+
+    this.openai = new OpenAIRealtimeClient({
+      getAccessToken: opts.getAccessToken,
+      onAuthRejected: opts.onAuthRejected,
+      getSystemInstruction: opts.getSystemInstruction,
+      getGreetingPrompt: opts.getGreetingPrompt,
+      functionDeclarations: opts.functionDeclarations,
+      onToolCall: opts.onToolCall,
+      onState: forwardState('openai'),
+      onTranscript: forward('openai', opts.onTranscript),
+      onLevels: forward('openai', opts.onLevels),
+      onError: forward('openai', opts.onError),
+      onServerConfig: (cfg) => void this.applyServerConfig({ engine: cfg.engine, fallback: cfg.fallback, relayUrl: cfg.relayUrl }),
+    });
   }
 
   private get current() {
-    return this.active === 'sarvam' ? this.sarvam : this.gemini;
+    return this.active === 'sarvam' ? this.sarvam : this.active === 'openai' ? this.openai : this.gemini;
   }
 
   getState(): LiveState {
@@ -130,7 +152,7 @@ export class AssistantEngine {
   }
 
   isRequestingPermission(): boolean {
-    return this.gemini.isRequestingPermission() || this.sarvam.isRequestingPermission();
+    return this.gemini.isRequestingPermission() || this.sarvam.isRequestingPermission() || this.openai.isRequestingPermission();
   }
 
   getActiveEngine(): EngineKind {
@@ -152,7 +174,7 @@ export class AssistantEngine {
         res = await fetch(`${SUPABASE_URL}/functions/v1/voice-token`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify({ probe: true, supports: ['gemini', 'sarvam'] }),
+          body: JSON.stringify({ probe: true, supports: ['openai', 'gemini', 'sarvam'] }),
           signal: abort.signal,
         });
       } finally {
@@ -173,7 +195,7 @@ export class AssistantEngine {
       this.resolvedAt = Date.now();
       this.fallback = cfg.fallback;
       if (cfg.relayUrl) this.sarvam.setRelayUrl(cfg.relayUrl);
-      const next: EngineKind = cfg.engine === 'sarvam' ? 'sarvam' : 'gemini';
+      const next: EngineKind = isEngine(cfg.engine) ? cfg.engine : 'gemini';
       this.haveChoice = true;
       void AsyncStorage.setItem(ENGINE_KEY, JSON.stringify({ engine: next, fallback: this.fallback })).catch(() => {});
       if (next !== this.active) {
@@ -199,6 +221,7 @@ export class AssistantEngine {
     if (this.wantWarm) this.current.warm();
     if (startNow && this.wantListening) {
       if (engine === 'sarvam') await this.sarvam.startListening();
+      else if (engine === 'openai') await this.openai.startListening();
       else await this.gemini.startListening();
     }
   }
@@ -235,8 +258,8 @@ export class AssistantEngine {
       if (!this.wantListening) return;
       const s = this.getState();
       if (s === 'listening' || s === 'speaking') return;
-      const other: EngineKind = this.active === 'gemini' ? 'sarvam' : 'gemini';
-      if (this.fallback !== other) return;
+      const other = this.fallback;
+      if (!other || other === this.active) return;
       log('not listening after the deadline, switching to', other);
       void this.switchTo(other, true);
     }, FIRST_CONNECT_DEADLINE_MS);
@@ -253,6 +276,10 @@ export class AssistantEngine {
     else void this.resolve();
     if (!this.wantListening) return;
     this.armDeadline();
+    if (this.active === 'openai') {
+      await this.openai.startListening();
+      return;
+    }
     if (this.active === 'sarvam') {
       // Sarvam just failed and Gemini is allowed as a fallback: go straight to Gemini for a while.
       if (this.fallback === 'gemini' && Date.now() - this.sarvamFailedAt < 90_000) {
@@ -293,6 +320,7 @@ export class AssistantEngine {
     this.resolvedAt = 0;
     this.gemini.shutdown();
     this.sarvam.shutdown();
+    this.openai.shutdown();
   }
 
   refresh() {
@@ -314,12 +342,14 @@ export class AssistantEngine {
   setIdleTimeout(ms: number) {
     this.gemini.setIdleTimeout(ms);
     this.sarvam.setIdleTimeout(ms);
+    this.openai.setIdleTimeout(ms);
   }
 
   /** Keeps the conversation open through silence, e.g. while an AI call is going on. */
   setHoldOpen(hold: boolean) {
     this.gemini.setHoldOpen(hold);
     this.sarvam.setHoldOpen(hold);
+    this.openai.setHoldOpen(hold);
   }
 
   /**
@@ -337,7 +367,8 @@ export class AssistantEngine {
       this.sarvam.setLanguage(language.sarvamCode);
       return { ok: true };
     }
-    this.gemini.setLanguage(language.label);
+    if (this.active === 'openai') this.openai.setLanguage(language.label);
+    else this.gemini.setLanguage(language.label);
     return { ok: true };
   }
 }

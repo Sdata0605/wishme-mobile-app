@@ -26,6 +26,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useTour, useTourTarget } from '@/context/TourContext';
 import { CATEGORIES } from '@/constants/celebrities';
 import { useCelebrities } from '@/hooks/useCelebrities';
+import { AskWishMeCard } from '@/components/home/AskWishMeCard';
 import { useCelebrityFavorites } from '@/hooks/useCelebrityFavorites';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
@@ -379,7 +380,14 @@ export default function HomeScreen() {
         >
           <Icon name="search" size={18} color="rgba(255,255,255,0.8)" />
           <Text style={styles.searchPlaceholder}>Search celebrities...</Text>
-          <Icon name="sliders" size={18} color="rgba(255,255,255,0.8)" />
+          <Pressable
+            onPress={() => router.push({ pathname: '/(tabs)/celebrities', params: { voice: String(Date.now()) } })}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Search celebrities by voice"
+          >
+            <Icon name="mic" size={19} color="#fff" />
+          </Pressable>
         </Pressable>
       </LinearGradient>
 
@@ -424,6 +432,9 @@ export default function HomeScreen() {
             ))}
           </View>
         </View>
+
+        {/* Ask WishMe: the visible way into the voice assistant */}
+        <AskWishMeCard />
 
         {/* All Services (from Wish-Me) — replaces Quick Actions */}
         <HomeAllServicesSection />

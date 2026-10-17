@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
@@ -18,6 +18,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CelebGridCard, CelebHeroCard } from '@/components/celebrity/CelebrityCards';
 import { Icon } from '@/components/Icon';
+import { VoiceSearchButton } from '@/components/VoiceSearchButton';
+import { useVoiceSearch } from '@/hooks/useVoiceSearch';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useCelebrities, type Celebrity } from '@/hooks/useCelebrities';
@@ -99,6 +101,19 @@ export default function CelebritiesScreen() {
   const [sort, setSort] = useState<SortKey>('top');
   const [sortOpen, setSortOpen] = useState(false);
   const [visible, setVisible] = useState(PAGE);
+  const voice = useVoiceSearch((text) => {
+    setSearch(text);
+    setVisible(PAGE);
+  });
+  // Home's search mic opens this screen already listening.
+  const { voice: voiceParam } = useLocalSearchParams<{ voice?: string }>();
+  const voiceStarted = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (voiceParam && voiceStarted.current !== voiceParam) {
+      voiceStarted.current = voiceParam;
+      void voice.start();
+    }
+  }, [voiceParam, voice]);
 
   const { celebrities, loading, error, refetch } = useCelebrities({ limit: 500 });
   const { hasFavorite, refetch: refetchFavorites } = useCelebrityFavorites({
@@ -162,12 +177,18 @@ export default function CelebritiesScreen() {
           onChangeText={t => { setSearch(t); setVisible(PAGE); }}
           returnKeyType="search"
         />
-        {search.length > 0 && (
+        {search.length > 0 && !voice.listening && (
           <TouchableOpacity onPress={() => setSearch('')} hitSlop={10} accessibilityLabel="Clear search">
             <Icon name="x" size={16} color={colors.mutedForeground} />
           </TouchableOpacity>
         )}
+        <VoiceSearchButton listening={voice.listening} onPress={() => void voice.toggle()} idleColor={colors.primary} />
       </View>
+      {voice.listening || voice.error ? (
+        <Text style={{ color: voice.error ? colors.destructive : colors.mutedForeground, fontSize: 12, fontFamily: 'Inter_500Medium', marginHorizontal: 22, marginTop: 6 }}>
+          {voice.error ?? 'Listening… say a name, like “Arijit Singh” or “cricketer”'}
+        </Text>
+      ) : null}
 
       <FlatList
         horizontal

@@ -382,7 +382,7 @@ export class GeminiLiveClient {
           Authorization: `Bearer ${accessToken}`,
         },
         // `want: 'gemini'`: mint the token whatever the admin chose, and report the admin's choice alongside it.
-        body: JSON.stringify({ want: 'gemini', supports: ['gemini', 'sarvam'] }),
+        body: JSON.stringify({ want: 'gemini', supports: ['openai', 'gemini', 'sarvam'] }),
         signal: abort.signal,
       });
     } catch {
