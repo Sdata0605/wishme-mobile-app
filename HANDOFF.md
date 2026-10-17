@@ -1,6 +1,6 @@
 # Hand-over — read this first
 
-Last updated: 16 Oct 2026, by Claude on the owner's first PC.
+Last updated: 17 Oct 2026, by Claude on the owner's Linux PC.
 
 ## Current state
 
@@ -10,9 +10,9 @@ branch is **`dhanush/mobile-app`**: all new work goes there.
 - `chore/structure-and-tooling` was the owner's earlier work (repo hygiene, CI, typed Supabase helper, the
   celebrity dashboard split, the music/wallet/bookings splits, the first animated splash). It was merged into
   `master` as pull request [#1](https://github.com/Sdata0605/wishme-mobile-app/pull/1). Leave it alone.
-- `dhanush/mobile-app` = that branch plus one commit (`140cfe9`), the work below. It is **behind `master`**: Prashnat
-  has pushed about 26 commits since (celebrity dashboard redesign, celebrity call, orders, wallet fixes and more).
-  Merge `origin/master` into it, and resolve any conflicts, before proposing it for `master`.
+- `dhanush/mobile-app` = that branch plus the splash work below, with **`master` merged in on 17 Oct 2026**
+  (one conflict, `app/_layout.tsx`: both sides kept — master's themed status bar and session-ended gate inside the
+  branch's navy `AppRoot`). Merge `origin/master` again before proposing it, if Prashnat has pushed since.
 
 **On `dhanush/mobile-app`:**
 
@@ -27,6 +27,32 @@ branch is **`dhanush/mobile-app`**: all new work goes there.
   - Waiting on the client's feedback on the recording `WishMe-splash-video-hd.mp4`.
 - No white flash between screens: the navigators paint the app's navy (`app/_layout.tsx`, `app/(auth)/_layout.tsx`,
   `expo-system-ui`), and the splash-to-app screens fade in.
+- **Release builds work from a clean `pnpm install`** (Linux, 17 Oct): `babel-preset-expo` is now a declared
+  devDependency of the app. It was used by `babel.config.js` but never declared, so pnpm's strict layout hid it
+  and the release bundle failed with "Cannot find module 'babel-preset-expo'". The Windows-only items under
+  "Known build problem" were not re-tested on Windows.
+- **Realtime and the Sarvam relay work against any backend URL**: `SUPABASE_WS_URL` in `constants/supabase.ts`
+  (http→ws, https→wss) replaces six copies of `SUPABASE_URL.replace('https://', 'wss://')`, which left an
+  `http://` URL for a local backend, so live updates never connected.
+- **Celebrity list empty state**: `hooks/useCelebrities.ts` treated "no celebrities yet" as loading, so an empty
+  catalogue spun forever; it now tracks whether the fetch finished and shows "No celebrities found".
+- **Open: one intermittent native crash on launch** (17 Oct, WishMe Local on the Samsung, once in about 10 cold
+  starts, not reproduced in 6 more): SIGBUS in `expo-font`'s `FontLoaderModule.loadAsync` →
+  `Typeface.createFromFile`, i.e. the cached font file changed while it was being read. Worth watching on the
+  store build; a durable fix is to embed the fonts at build time with the `expo-font` config plugin (no cache file),
+  but `_layout.tsx` registers Manrope/Space Grotesk under the Inter/Playfair names, which that would need reworking.
+
+**Running against the local WishMeBackend** (no Supabase, nothing in production touched):
+
+- Backend: in the WishMeBackend checkout, `./scripts/dev-local.sh` (Postgres + Redis in Docker, schema, API on
+  :3000, `adb reverse tcp:3000 tcp:3000`). Sign-up OTP codes are printed in its log.
+- App: `artifacts/mobile/.env` (git-ignored) with `EXPO_PUBLIC_SUPABASE_URL=http://localhost:3000` and
+  `EXPO_PUBLIC_SUPABASE_ANON_KEY=` the backend's `SUPABASE_ANON_KEY`. `app.config.js` sees the `http://` URL and
+  builds a separate **"WishMe Local"** app (`com.prashantuser1.wishme.local`, cleartext allowed) that installs next
+  to the store build. Without that `.env`, builds are exactly as before.
+- The phone reaches the PC over USB (`adb reverse`), so keep it plugged in while using WishMe Local.
+- Locally, features that need vendor keys answer "not configured": payments (Razorpay), file uploads (B2), AI
+  generation and voice (Gemini, ElevenLabs, Sarvam, Vapi, HeyGen, Suno), travel (TBO).
 
 **Branch `claude/backend-migration-plan-f28c94`** (the owner's; pushed, no PR; it sits on top of the merged PR #1):
 `docs/BACKEND_MIGRATION_PLAN.md`, `docs/BACKEND_CONTRACT_INVENTORY.md`, `scripts/supabase-audit/`. The audit
@@ -42,9 +68,10 @@ The latest is the splash-video build from 16 Oct 2026.
 ## Next steps
 
 1. Client feedback on the splash video, then any changes. Get the original video file if they have it.
-2. Bring `dhanush/mobile-app` up to date: merge `origin/master` into it and fix conflicts. Only when the owner says
-   so, open a pull request from it into `master` (and one for the backend plan branch).
-3. Make release builds work from a clean `pnpm install` (see "Known build problem" below). Proposed, not done.
+2. Only when the owner says so, open a pull request from `dhanush/mobile-app` into `master` (and one for the
+   backend plan branch). Merge `origin/master` in again first if it has moved.
+3. Check the Windows build after the `babel-preset-expo` fix; drop the "Known build problem" items that no longer
+   apply.
 4. Continue the backend migration in WishMeBackend, following `docs/BACKEND_MIGRATION_PLAN.md`.
 
 ## Setting up a PC (Windows)
