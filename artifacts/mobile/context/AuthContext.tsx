@@ -126,6 +126,12 @@ const STORAGE_PENDING = '@wishme/pending_signup';
 
 const PROFILE_COLUMNS = 'id,first_name,last_name,phone,role,wallet_balance,referral_code';
 
+/**
+ * Creating the account on the server takes 15 s and more (the password hashing and the account's first
+ * records), so sign-up and the sign-in right after it wait far longer than an ordinary request would.
+ */
+const SIGNUP_TIMEOUT_MS = 60_000;
+
 /** Pure-JS base64 character set used as fallback decoder. */
 const BASE64_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
 
@@ -217,6 +223,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const pendingRef = useRef<PendingSignup | null>(pendingSignup);
   const internalSignupRef = useRef<InternalSignupData | null>(null);
+  /**
+   * The code this email already passed. A code can only be redeemed once, so if creating the account
+   * fails after that, tapping Verify again must not spend the code a second time.
+   */
+  const otpVerifiedRef = useRef<{ email: string; at: number } | null>(null);
   const sessionRef = useRef(session);
   useEffect(() => { pendingRef.current = pendingSignup; }, [pendingSignup]);
   useEffect(() => { sessionRef.current = session; }, [session]);
@@ -470,6 +481,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPendingSignup(pending);
       pendingRef.current = pending;
       internalSignupRef.current = internal;
+      otpVerifiedRef.current = null;
       await AsyncStorage.setItem(STORAGE_PENDING, JSON.stringify(pending));
 
       const res = await supabaseFetch('/functions/v1/send-email-otp', {
@@ -509,62 +521,105 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!internal.password) {
       return { error: 'Registration session expired. Please start sign-up again.' };
     }
+    // The server keeps an email verified for an hour, so a second attempt picks up where this one left off.
+    const alreadyVerified =
+      otpVerifiedRef.current?.email === internal.email &&
+      Date.now() - otpVerifiedRef.current.at < 55 * 60 * 1000;
+
     try {
-      const verifyRes = await supabaseFetch('/functions/v1/verify-email-otp', {
-        method: 'POST',
-        body: JSON.stringify({ email: internal.email, otp: code }),
-      });
-      if (!verifyRes.ok) {
-        const msg = await parseApiError(verifyRes);
-        const lower = msg.toLowerCase();
-        if (lower.includes('expir')) return { error: 'This code has expired. Please request a new one.' };
-        if (lower.includes('invalid') || lower.includes('incorrect') || lower.includes('wrong'))
-          return { error: 'Invalid code. Please check your email and try again.' };
-        if (lower.includes('used') || lower.includes('already'))
-          return { error: 'This code has already been used. Please request a new one.' };
-        return { error: msg };
+      if (!alreadyVerified) {
+        const verifyRes = await supabaseFetch('/functions/v1/verify-email-otp', {
+          method: 'POST',
+          body: JSON.stringify({ email: internal.email, otp: code }),
+        });
+        if (!verifyRes.ok) {
+          const msg = await parseApiError(verifyRes);
+          const lower = msg.toLowerCase();
+          if (lower.includes('expir')) return { error: 'This code has expired. Please request a new one.' };
+          if (lower.includes('invalid') || lower.includes('incorrect') || lower.includes('wrong'))
+            return { error: 'Invalid code. Please check your email and try again.' };
+          if (lower.includes('used') || lower.includes('already'))
+            return { error: 'This code has already been used. Please request a new one.' };
+          return { error: msg };
+        }
+        otpVerifiedRef.current = { email: internal.email, at: Date.now() };
       }
 
-      const signupRes = await supabaseFetch('/auth/v1/signup', {
-        method: 'POST',
-        body: JSON.stringify({
-          email: internal.email,
-          password: internal.password,
-          data: {
-            first_name: internal.firstName,
-            last_name: internal.lastName,
-            phone: internal.phone,
-            referral_code: internal.referral ?? '',
-            gender: internal.gender ?? null,
-            role: 'user',
-            wallet_balance: 0,
-            member_since: new Date().toISOString().split('T')[0],
-          },
-        }),
-      });
-      if (!signupRes.ok) {
-        const msg = await parseApiError(signupRes);
-        if (msg.toLowerCase().includes('already registered') || msg.toLowerCase().includes('already exists'))
-          return { error: 'An account with this email already exists. Please sign in instead.' };
-        return { error: msg };
+      // Creating the account regularly takes 15 s or more, so it gets its own, longer limit:
+      // the usual 20 s cut the request off while the server went on and created the account anyway.
+      let signupData: Record<string, unknown> | null = null;
+      // The server said the email is taken: an earlier try of ours made the account, or someone else owns it.
+      let saidTaken = false;
+      // The request was cut off, so the account may or may not have been made. Signing in below settles it.
+      let cutOff = false;
+      try {
+        const signupRes = await supabaseFetch('/auth/v1/signup', {
+          method: 'POST',
+          body: JSON.stringify({
+            email: internal.email,
+            password: internal.password,
+            data: {
+              first_name: internal.firstName,
+              last_name: internal.lastName,
+              phone: internal.phone,
+              referral_code: internal.referral ?? '',
+              gender: internal.gender ?? null,
+              role: 'user',
+              wallet_balance: 0,
+              member_since: new Date().toISOString().split('T')[0],
+            },
+          }),
+        }, null, SIGNUP_TIMEOUT_MS);
+        if (signupRes.ok) {
+          signupData = await signupRes.json() as Record<string, unknown>;
+        } else {
+          const msg = await parseApiError(signupRes);
+          const lower = msg.toLowerCase();
+          if (lower.includes('already registered') || lower.includes('already exists')) {
+            saidTaken = true;
+          } else {
+            return { error: msg };
+          }
+        }
+      } catch {
+        cutOff = true;
       }
-      const signupData = await signupRes.json() as Record<string, unknown>;
 
       let newSession: Session = { access_token: '', refresh_token: '' };
-      if (signupData.access_token) {
+      let supaUser: Record<string, unknown> = {};
+      if (signupData?.access_token) {
         newSession = {
           access_token: signupData.access_token as string,
           refresh_token: (signupData.refresh_token as string) ?? '',
         };
+        supaUser = (signupData.user ?? signupData) as Record<string, unknown>;
       } else {
-        const loginRes = await supabaseFetch('/auth/v1/token?grant_type=password', {
-          method: 'POST',
-          body: JSON.stringify({ email: internal.email, password: internal.password }),
-        });
+        // Either the account was made without handing back a session, or an earlier try made it and
+        // this one was told the email is taken. Signing in with the password just entered covers both.
+        let loginRes: Response;
+        try {
+          loginRes = await supabaseFetch('/auth/v1/token?grant_type=password', {
+            method: 'POST',
+            body: JSON.stringify({ email: internal.email, password: internal.password }),
+          }, null, SIGNUP_TIMEOUT_MS);
+        } catch {
+          return { error: 'The connection dropped. Please check your internet and tap Verify again.' };
+        }
         if (!loginRes.ok) {
+          const loginMsg = (await parseApiError(loginRes)).toLowerCase();
+          const wrongCredentials = loginMsg.includes('invalid login') || loginMsg.includes('credentials');
+          if (saidTaken) {
+            return {
+              error: wrongCredentials
+                ? 'An account with this email already exists. Please sign in instead, or use another email.'
+                : 'Your account is ready, but signing in here did not work. Please go back and sign in with your email and password.',
+            };
+          }
+          if (cutOff && wrongCredentials) {
+            return { error: 'We could not finish creating your account. Please check your internet and tap Verify again.' };
+          }
           return {
-            error:
-              'Account created but sign-in failed. Please return to Sign In and use your credentials.',
+            error: 'Account created but sign-in failed. Please return to Sign In and use your credentials.',
           };
         }
         const ld = await loginRes.json() as Record<string, unknown>;
@@ -572,11 +627,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           access_token: ld.access_token as string,
           refresh_token: (ld.refresh_token as string) ?? '',
         };
+        supaUser = (ld.user ?? signupData?.user ?? {}) as Record<string, unknown>;
       }
 
       // The real code is created by the database; it is read from the profile just below.
       const referralCode = '';
-      const supaUser = (signupData.user ?? signupData) as Record<string, unknown>;
       const u = buildUserFromSupabase(supaUser, {
         firstName: internal.firstName,
         lastName: internal.lastName,
@@ -593,6 +648,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPendingSignup(null);
       pendingRef.current = null;
       internalSignupRef.current = null;
+      otpVerifiedRef.current = null;
 
       await AsyncStorage.multiSet([
         [STORAGE_SESSION, JSON.stringify(newSession)],
@@ -659,6 +715,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resendOtp = useCallback(async (): Promise<{ error: string | null }> => {
     const pending = pendingRef.current;
     if (!pending) return { error: 'Session expired. Please start registration again.' };
+    // A fresh code has to be typed and checked; the earlier one no longer stands in for it.
+    otpVerifiedRef.current = null;
     try {
       const res = await supabaseFetch('/functions/v1/send-email-otp', {
         method: 'POST',
