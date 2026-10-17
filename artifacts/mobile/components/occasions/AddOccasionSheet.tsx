@@ -18,7 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DatePickerField } from '@/components/DatePickerField';
 import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
-import { ensureNotificationPermission } from '@/services/hub/notifications';
+import { ensureNotificationPermission } from '@/services/notifications';
 import {
   createOccasion,
   DAYS_BEFORE,

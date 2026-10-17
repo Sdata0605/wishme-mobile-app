@@ -84,7 +84,6 @@ export default function SettingsScreen() {
           { id: 'favorites', icon: 'heart', label: 'Favorites', route: '/favorites', keywords: 'liked saved celebrities' },
           { id: 'following', icon: 'users', label: 'Following', route: '/following', keywords: 'celebrities follow' },
           { id: 'loved', icon: 'heart', label: 'Loved ones', route: '/loved-ones', keywords: 'family friends people' },
-          { id: 'aicalls', icon: 'phone', label: 'AI calls', subtitle: 'Calls your assistant made for you', route: '/ai-calls', keywords: 'phone call appointment doctor reminder transcript' },
           { id: 'alerts', icon: 'bell', label: 'Occasion alerts', route: '/occasion-alerts', keywords: 'birthday reminders notifications' },
         ],
       },

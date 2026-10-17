@@ -69,7 +69,7 @@ const ROWS: readonly Row[] = [
     kind: 'notifications',
     icon: 'bell',
     title: 'Notifications',
-    reason: 'Alert you when reminders are due.',
+    reason: 'Remind you of birthdays and occasions.',
     accent: choiceAccents.amber,
   },
 ];

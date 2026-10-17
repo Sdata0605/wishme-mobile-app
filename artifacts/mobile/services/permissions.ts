@@ -16,7 +16,7 @@ import * as MediaLibrary from 'expo-media-library';
 import * as Notifications from 'expo-notifications';
 import { ExpoSpeechRecognitionModule } from 'expo-speech-recognition';
 import { Linking, Platform } from 'react-native';
-import { ensureChannels } from '@/services/hub/notifications';
+import { ensureChannels } from '@/services/notifications';
 
 export type PermissionKind =
   | 'microphone'

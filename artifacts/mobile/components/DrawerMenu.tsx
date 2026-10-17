@@ -31,8 +31,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { icon: 'home', label: 'Dashboard', route: '/(tabs)' },
   { icon: 'layers', label: 'All Services', route: '/(tabs)/all-services', highlight: true },
-  { icon: 'calendar', label: 'Hub', route: '/hub', highlight: true },
-  { icon: 'copy', label: 'Documents', route: '/documents' },
   { icon: 'layers', label: 'Library', route: '/library', highlight: true },
   { icon: 'phone', label: 'Celebrity Call', route: '/(tabs)/voice-call' },
   { icon: 'credit-card', label: 'Wallet', route: '/wallet' },

@@ -14,8 +14,8 @@ interface Props {
   onBack?: () => void;
 }
 
-/** The top bar every Hub screen uses, matching Bookings and Occasions. */
-export function HubHeader({ title, right, onBack, hideBack }: Props) {
+/** The document screen's top bar, matching Bookings and Occasions. */
+export function DocumentHeader({ title, right, onBack, hideBack }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;

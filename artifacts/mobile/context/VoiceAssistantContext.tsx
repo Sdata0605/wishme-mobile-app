@@ -32,7 +32,6 @@ import { AssistantEngine } from '@/services/voice/engine';
 import { createAiCallWatcher, describeCall, spokenReport, whoLabel, type AiCall } from '@/services/assistant/aiCalls';
 import { isPermissionDialogOpen, warmContacts } from '@/services/assistant/phone';
 import { FUNCTION_DECLARATIONS, runAssistantTool } from '@/services/assistant/tools';
-import { syncScheduledReminders } from '@/services/hub/notifications';
 
 interface VoiceAssistantValue {
   state: LiveState;
@@ -106,10 +105,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         }
         Alert.alert('AI call finished', `${whoLabel(call)}
 
-${call.summary ?? 'The call has ended.'}`, [
-          { text: 'Close', style: 'cancel' },
-          { text: 'View details', onPress: () => router.push('/ai-calls' as never) },
-        ]);
+${call.summary ?? 'The call has ended.'}`);
       },
     });
   }
@@ -145,8 +141,6 @@ ${call.summary ?? 'The call has ended.'}`, [
   const genderRef = useRef<AddressAs>(user?.gender);
   genderRef.current = user?.gender;
   // Reminders and calendar rows belong to the auth user, not the profile.
-  const userIdRef = useRef(user?.id);
-  userIdRef.current = user?.id;
   const setError = useCallback((message: string | null) => {
     errorRef.current = message;
     setErrorState(message);
@@ -243,18 +237,9 @@ ${call.summary ?? 'The call has ended.'}`, [
           onAction: setActionLabel,
           getAccessToken: async () => (await getValidSessionRef.current())?.access_token ?? tokenRef.current,
           onAuthRejected: () => { void verifySessionRef.current(); },
-          getUserId: () => userIdRef.current,
           // Through the ref, not `client`: that is assigned below, and referring to it here would
           // make the engine's type depend on itself.
           setLanguage: (language) => clientRef.current!.setLanguage(language),
-          // A reminder created by voice has to reach the phone's own scheduler straight away,
-          // otherwise it would not fire until the next time the app was opened.
-          onRemindersChanged: () => {
-            void (async () => {
-              const token = (await getValidSessionRef.current())?.access_token ?? tokenRef.current;
-              if (token) await syncScheduledReminders(token, { ask: true });
-            })();
-          },
           watchAiCall: (id, scheduled) => void aiCallWatcher.watch(id, { scheduled }),
           // Release the audio engine before the phone/browser/another app takes over, so
           // coming back never has to re-grab audio focus from a stale engine.

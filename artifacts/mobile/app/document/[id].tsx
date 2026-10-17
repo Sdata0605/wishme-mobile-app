@@ -7,8 +7,8 @@ import { Icon } from '@/components/Icon';
 import { ActionButton } from '@/components/documents/ActionButton';
 import { KIND_LABELS, extentLabel } from '@/components/documents/DocumentCard';
 import { DocumentPreview } from '@/components/documents/DocumentPreview';
-import { ErrorState, LoadingState } from '@/components/hub/StateViews';
-import { HubHeader } from '@/components/hub/HubHeader';
+import { ErrorState, LoadingState } from '@/components/documents/StateViews';
+import { DocumentHeader } from '@/components/documents/DocumentHeader';
 import { useTheme } from '@/context/ThemeContext';
 import type { DocumentContent } from '@/services/documents/generate';
 import {
@@ -121,7 +121,7 @@ export default function DocumentDetailScreen() {
   if (loading) {
     return (
       <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
-        <HubHeader title="Document" />
+        <DocumentHeader title="Document" />
         <LoadingState label="Opening this document…" />
       </View></AmbientBackground>
     );
@@ -130,7 +130,7 @@ export default function DocumentDetailScreen() {
   if (error || !document) {
     return (
       <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
-        <HubHeader title="Document" />
+        <DocumentHeader title="Document" />
         <ErrorState message={error ?? 'That document could not be opened.'} onRetry={() => void load()} />
       </View></AmbientBackground>
     );
@@ -143,7 +143,7 @@ export default function DocumentDetailScreen() {
 
   return (
     <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
-      <HubHeader title={FORMAT_LABELS[document.format]} />
+      <DocumentHeader title={FORMAT_LABELS[document.format]} />
       <ScrollView
         contentContainerStyle={[s.body, { paddingBottom: insets.bottom + (Platform.OS === 'web' ? 40 : 100) }]}
         showsVerticalScrollIndicator={false}

@@ -24,12 +24,11 @@ import { findContacts, openApp, openAppSettings, openWebsite, placeCall } from '
 import { extractSpokenNumber } from './spokenNumber';
 import { checkPhoneNumber, describeCall, fetchAiCall, fetchLatestAiCall, isActive, startAiCall, whoLabel } from './aiCalls';
 import { UI_FUNCTION_DECLARATIONS, runUiTool } from './uiTools';
-import { HUB_FUNCTION_DECLARATIONS, runHubTool, type HubToolContext } from './hubTools';
 import { resolveLanguage, SARVAM_LANGUAGE_NAMES, type LanguageRequest } from './languages';
 import { DOC_FUNCTION_DECLARATIONS, runDocTool, type DocToolContext } from './docTools';
 import { WEB_FUNCTION_DECLARATIONS, runWebTool } from './webSearch';
 
-export interface ToolContext extends HubToolContext, DocToolContext {
+export interface ToolContext extends DocToolContext {
   router: Router;
   setPrefill: (data: Partial<AgentPrefill>) => void;
   /** Called when a tool changes what is on screen, so the UI can react. */
@@ -88,14 +87,6 @@ const SCREENS: Record<string, ScreenTarget> = {
   hotels: { route: '/services', params: { start: 'hotels' }, label: 'Hotels' },
   bus_tickets: { route: '/services', params: { start: 'busTickets' }, label: 'Bus tickets' },
   my_tickets: { route: '/services', params: { start: 'myTickets' }, label: 'My tickets' },
-  ai_calls: { route: '/ai-calls', label: 'AI calls' },
-  hub: { route: '/hub', label: 'Hub' },
-  calendar: { route: '/calendar', label: 'Calendar' },
-  reminders: { route: '/reminders', label: 'Reminders' },
-  call_logs: { route: '/call-logs', label: 'Call logs' },
-  documents: { route: '/documents', label: 'Documents' },
-  my_finance: { route: '/finance', label: 'Finance' },
-  features: { route: '/features', label: 'Features' },
 };
 
 const BILL_KINDS = [
@@ -151,14 +142,6 @@ const SCREEN_HELP: Record<string, string> = {
   hotels: 'hotel search form',
   bus_tickets: 'bus ticket search form',
   my_tickets: 'bus tickets the user has already booked',
-  ai_calls: 'calls the assistant made for the user, with what was said',
-  hub: 'Hub: calendar, reminders and call logs in one place',
-  calendar: 'month calendar of the user’s events',
-  reminders: 'the user’s reminders, including undated ones',
-  call_logs: 'past AI calls with transcripts and recordings to play',
-  my_finance: 'the user’s EMIs, incomes and recurring expenses, with totals',
-  features: 'what the app can do: live, in progress and coming soon',
-  documents: 'documents the assistant has written: reports, letters, notes, plans and spreadsheets, as files to share or save',
 };
 
 // ─── Declarations sent to Gemini ─────────────────────────────────────────────
@@ -410,7 +393,6 @@ const APP_FUNCTION_DECLARATIONS = [
 /** App-specific tools plus the generic hands-free screen tools (read, tap, fill, scroll). */
 export const FUNCTION_DECLARATIONS = [
   ...APP_FUNCTION_DECLARATIONS,
-  ...HUB_FUNCTION_DECLARATIONS,
   ...DOC_FUNCTION_DECLARATIONS,
   ...WEB_FUNCTION_DECLARATIONS,
   ...UI_FUNCTION_DECLARATIONS,
@@ -517,10 +499,6 @@ export async function runAssistantTool(
   }
 
   const a = call.args ?? {};
-
-  // Reminders and calendar entries created by voice.
-  const hubResult = await runHubTool(call.name, a, ctx);
-  if (hubResult) return hubResult;
 
   // Documents: written by the server, rendered and kept on the phone.
   const docResult = await runDocTool(call.name, a, {

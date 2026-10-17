@@ -12,7 +12,6 @@ import * as ScreenCapture from 'expo-screen-capture';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useRef } from 'react';
-import * as Notifications from 'expo-notifications';
 import { Alert, AppState, Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
@@ -32,8 +31,6 @@ import { ThemeProvider, useTheme } from '@/context/ThemeContext';
 import * as SystemUI from 'expo-system-ui';
 import { AgentStateProvider } from '@/context/AgentStateContext';
 import { VoiceAssistantProvider } from '@/context/VoiceAssistantContext';
-import { reminderIdFrom, syncScheduledReminders } from '@/services/hub/notifications';
-import { acknowledgeReminder } from '@/services/hub/reminders';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -67,60 +64,6 @@ function AssistantSetupGate() {
     asked.current = user.id;
     router.push('/assistant-setup' as never);
   }, [user?.id, status, segments]);
-
-  return null;
-}
-
-/**
- * Keeps the phone's own scheduled reminders in step with the server's.
- *
- * Android forgets scheduled notifications on reboot and when the app is force-stopped, so they are
- * rebuilt whenever the app starts or returns to the foreground. Tapping a reminder opens it.
- */
-function ReminderNotifications() {
-  const { session, getValidSession } = useAuth();
-  const loggedIn = !!session?.access_token;
-
-  useEffect(() => {
-    if (!loggedIn) return;
-    let cancelled = false;
-
-    const sync = async () => {
-      const token = (await getValidSession())?.access_token;
-      if (!token || cancelled) return;
-      // Never asks here: notification permission is requested on the Permissions screen.
-      await syncScheduledReminders(token);
-    };
-
-    void sync();
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') void sync();
-    });
-    return () => {
-      cancelled = true;
-      sub.remove();
-    };
-  }, [loggedIn, getValidSession]);
-
-  useEffect(() => {
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const id = reminderIdFrom(response);
-      if (!id) return;
-
-      // Swiping a reminder away is the user dealing with it, exactly as the editor promises
-      // ("if you have not dismissed the reminder in time..."). Without this it counted as ignored
-      // and the escalation rang them anyway.
-      const dismissed = response.actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER ? false : true;
-      if (!dismissed) router.push(`/reminder-edit?id=${id}` as never);
-
-      // Either way they have seen it, so nothing should ring about it later.
-      void (async () => {
-        const token = (await getValidSession())?.access_token;
-        if (token) await acknowledgeReminder(token, id);
-      })();
-    });
-    return () => sub.remove();
-  }, []);
 
   return null;
 }
@@ -290,7 +233,6 @@ export default function RootLayout() {
                           <FloatingButtons />
                           <AssistantSetupGate />
                           <SessionEndedGate />
-                          <ReminderNotifications />
                           <OccasionInApp />
                         </AppRoot>
                       </OrderConfirmProvider>

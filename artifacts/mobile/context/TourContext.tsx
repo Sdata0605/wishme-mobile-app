@@ -43,13 +43,13 @@ export const TOUR_STEPS: TourStep[] = [
   {
     id: 'assistant',
     title: 'Your AI assistant',
-    body: 'Tap and just speak. Ask it to call someone, set a reminder, book something or open any screen.',
+    body: 'Tap and just speak. Ask it to find a celebrity, book a wish, call someone or open any screen.',
     target: { kind: 'tab', index: 2 },
   },
   {
-    id: 'hub',
-    title: 'Hub',
-    body: 'Your calendar, reminders and call history, together.',
+    id: 'celebrities',
+    title: 'Stars',
+    body: 'Browse celebrities and book personalised wishes, calls and promotions.',
     target: { kind: 'tab', index: 3 },
   },
   {

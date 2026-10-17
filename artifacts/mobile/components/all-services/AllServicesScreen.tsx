@@ -516,7 +516,7 @@ const EXPLORE: ExploreItem[] = [
   },
   { label: 'My Bookings', Icon: CalendarCheck, color: T(C.orange, 'fg'), open: () => router.push('/bookings') },
   { label: 'Wish a Friend', Icon: Gift, color: '#EF4444', open: () => router.push('/wish-friend' as Href) },
-  { label: 'More Services', Icon: MoreHorizontal, color: T(C.textLight, 'fg'), open: () => router.navigate('/hub') },
+  { label: 'More Services', Icon: MoreHorizontal, color: T(C.textLight, 'fg'), open: () => router.push('/services') },
 ];
 
 function ExploreMore() {

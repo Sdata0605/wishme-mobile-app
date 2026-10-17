@@ -10,7 +10,7 @@
 import * as Notifications from 'expo-notifications';
 import { supabaseFetch } from '@/constants/supabase';
 import type { IconName } from '@/components/Icon';
-import { ensureNotificationPermission, REMINDER_CHANNEL, type NotificationPermission } from '@/services/hub/notifications';
+import { ensureNotificationPermission, REMINDER_CHANNEL, type NotificationPermission } from '@/services/notifications';
 
 export type OccasionType = 'birthday' | 'anniversary' | 'wedding' | 'festival' | 'other';
 

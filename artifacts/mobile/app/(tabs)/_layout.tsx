@@ -26,13 +26,12 @@ export default function TabLayout() {
           {/* The app opens on WishMe Home. The centre mic is not a tab: it starts the assistant where you are. */}
           <Tabs.Screen name="index" options={{ title: 'Home' }} />
           <Tabs.Screen name="all-services" options={{ title: 'Services' }} />
-          <Tabs.Screen name="hub" options={{ title: 'Hub' }} />
+          <Tabs.Screen name="celebrities" options={{ title: 'Celebrities' }} />
           <Tabs.Screen name="profile" options={{ title: 'You' }} />
 
           {/* Still reachable from Home, the menu and the assistant, just not in the tab bar */}
           <Tabs.Screen name="scan-pay" options={{ href: null }} />
           <Tabs.Screen name="wallet" options={{ href: null }} />
-          <Tabs.Screen name="celebrities" options={{ href: null }} />
           <Tabs.Screen name="music" options={{ href: null }} />
           <Tabs.Screen name="voice-call" options={{ href: null }} />
         </Tabs>

@@ -24,7 +24,7 @@ const LEFT: { route: string; label: string; icon: IconName }[] = [
   { route: 'all-services', label: 'Services', icon: 'layers' },
 ];
 const RIGHT: { route: string; label: string; icon: IconName }[] = [
-  { route: 'hub', label: 'Hub', icon: 'calendar' },
+  { route: 'celebrities', label: 'Stars', icon: 'star' },
   { route: 'profile', label: 'You', icon: 'user' },
 ];
 
@@ -131,7 +131,7 @@ function DockShape({ width, height }: { width: number; height: number }) {
 }
 
 /**
- * The bottom bar: Home, Services, the mic, Hub, You. The selected tab sits in an outlined pill; the mic is docked in a
+ * The bottom bar: Home, Services, the mic, Stars (celebrities), You. The selected tab sits in an outlined pill; the mic is docked in a
  * round notch and starts or stops the voice assistant right where you are, without leaving the screen.
  */
 export function NeonTabBar({ state, navigation }: TabBarProps) {
