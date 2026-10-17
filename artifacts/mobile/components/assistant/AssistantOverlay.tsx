@@ -117,10 +117,10 @@ function Orb({ speaking, busy }: { speaking: boolean; busy: boolean }) {
 
       <Animated.View style={[styles.orb, { transform: [{ scale: coreScale }], opacity: busy ? 0.7 : 1 }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: listenOpacity }]}>
-          <LinearGradient colors={['#2DD4FF', '#4F7CFF', '#8B5CF6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['#E8527A', '#C04CFF', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: speakMix }]}>
-          <LinearGradient colors={['#F59E0B', '#EC4899', '#8B5CF6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['#FFB347', '#FF6B33', '#E8527A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
 
         <Animated.View style={[styles.swirl, { transform: [{ rotate: spinADeg }] }]}>
@@ -228,10 +228,10 @@ function MiniOrb({ progress }: { progress: Animated.Value }) {
           <Animated.View style={[styles.miniRing, { transform: [{ scale: ringScale }], opacity: 0.22 }]} />
           <Animated.View style={[styles.miniOrb, { transform: [{ scale }] }]}>
             <Animated.View style={[StyleSheet.absoluteFill, { opacity: listenOpacity }]}>
-              <LinearGradient colors={['#2DD4FF', '#4F7CFF', '#8B5CF6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={['#E8527A', '#C04CFF', '#7C3AED']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
             </Animated.View>
             <Animated.View style={[StyleSheet.absoluteFill, { opacity: speakMix }]}>
-              <LinearGradient colors={['#F59E0B', '#EC4899', '#8B5CF6']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={['#FFB347', '#FF6B33', '#E8527A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
             </Animated.View>
             <Animated.View style={[styles.miniSwirl, { transform: [{ rotate: deg }] }]}>
               <LinearGradient colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']} start={{ x: 0.1, y: 0.1 }} end={{ x: 0.9, y: 0.7 }} style={StyleSheet.absoluteFill} />
@@ -392,7 +392,7 @@ export function AssistantOverlay() {
               <Pressable onPress={state === 'error' ? retry : undefined} disabled={state !== 'error'}>
                 <Orb speaking={speaking} busy={busy} />
               </Pressable>
-              <Bars color={speaking ? '#FF9A6B' : '#6FD3FF'} />
+              <Bars color={speaking ? '#FF9A6B' : '#F06A8F'} />
             </View>
 
             {/* Buttons live OUTSIDE the swipe area so a drag can never swallow a tap */}
@@ -466,13 +466,13 @@ const styles = StyleSheet.create({
   status: { color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 6, fontFamily: 'Inter_500Medium', letterSpacing: 0.4 },
   userEcho: { color: 'rgba(255,255,255,0.4)', fontSize: 12.5, marginTop: 4, fontFamily: 'Inter_400Regular' },
   orbWrap: { width: ORB * 1.9, height: ORB * 1.9, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
-  ring: { position: 'absolute', width: ORB, height: ORB, borderRadius: ORB / 2, backgroundColor: '#8B7CFF' },
+  ring: { position: 'absolute', width: ORB, height: ORB, borderRadius: ORB / 2, backgroundColor: '#C27BFF' },
   orb: {
     width: ORB,
     height: ORB,
     borderRadius: ORB / 2,
     overflow: 'hidden',
-    shadowColor: '#8B5CF6',
+    shadowColor: '#B44CFF',
     shadowOpacity: 0.7,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 0 },
@@ -504,13 +504,13 @@ const styles = StyleSheet.create({
     elevation: 30,
   },
   miniBox: { width: MINI * 1.5, height: MINI * 1.5, alignItems: 'center', justifyContent: 'center' },
-  miniRing: { position: 'absolute', width: MINI, height: MINI, borderRadius: MINI / 2, backgroundColor: '#8B7CFF' },
+  miniRing: { position: 'absolute', width: MINI, height: MINI, borderRadius: MINI / 2, backgroundColor: '#C27BFF' },
   miniOrb: {
     width: MINI,
     height: MINI,
     borderRadius: MINI / 2,
     overflow: 'hidden',
-    shadowColor: '#8B5CF6',
+    shadowColor: '#B44CFF',
     shadowOpacity: 0.7,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },
