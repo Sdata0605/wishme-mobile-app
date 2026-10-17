@@ -54,7 +54,7 @@ const PLAN_ICONS: Record<string, string> = {
   elite: 'award',
 };
 const PLAN_COLORS: Record<string, string> = {
-  basic: '#22C55E',
+  basic: '#FF2E88',
   premium: '#B026FF',
   elite: '#FF5F1F',
 };

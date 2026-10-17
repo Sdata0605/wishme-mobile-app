@@ -1,5 +1,5 @@
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -103,7 +103,8 @@ export default function MessagesScreen() {
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchConversations = useCallback(async () => {
+  // `quiet` is for the background poll: a failed poll keeps the current list instead of raising an alert.
+  const fetchConversations = useCallback(async (quiet = false) => {
     if (!profileId || !accessToken) {
       setConversations([]);
       setSubscribed([]);
@@ -123,7 +124,7 @@ export default function MessagesScreen() {
         ),
       ]);
       if (!res.ok) {
-        Alert.alert('Error', `Could not load conversations (${res.status}). Please try again.`);
+        if (!quiet) Alert.alert('Error', `Could not load conversations (${res.status}). Please try again.`);
         return;
       }
       const convs = await res.json() as Conversation[];
@@ -168,22 +169,26 @@ export default function MessagesScreen() {
         setLastMessages(map);
       }
     } catch {
-      Alert.alert('Error', 'Could not load conversations. Please check your connection.');
+      if (!quiet) Alert.alert('Error', 'Could not load conversations. Please check your connection.');
     }
   }, [profileId, accessToken]);
 
   useEffect(() => {
     setLoading(true);
     fetchConversations().finally(() => setLoading(false));
-
-    pollRef.current = setInterval(() => {
-      fetchConversations();
-    }, 8000);
-
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
   }, [fetchConversations]);
+
+  // Poll only while this screen is visible; it stays mounted under any screen opened on top of it.
+  useFocusEffect(
+    useCallback(() => {
+      pollRef.current = setInterval(() => {
+        void fetchConversations(true);
+      }, 8000);
+      return () => {
+        if (pollRef.current) clearInterval(pollRef.current);
+      };
+    }, [fetchConversations]),
+  );
 
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);

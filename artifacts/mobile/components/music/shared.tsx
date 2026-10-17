@@ -152,7 +152,8 @@ export function fmtMs(ms: number): string {
 export const s = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingBottom: 24 },
   headerTagline: { fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', color: '#fff', lineHeight: 34 },
-  headerTaglineItalic: { fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', fontStyle: 'italic', color: '#fff', lineHeight: 34 },
+  // No italic: only the upright face is loaded, and Android swaps in the system font for a missing italic.
+  headerTaglineItalic: { fontSize: 26, fontFamily: 'PlayfairDisplay_700Bold', color: '#fff', lineHeight: 34 },
   walletCard: { borderRadius: 16, borderWidth: 1, padding: 14, marginBottom: 4, gap: 10 },
   walletRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   walletLabel: { fontSize: 13, fontFamily: 'Inter_400Regular', flex: 1 },

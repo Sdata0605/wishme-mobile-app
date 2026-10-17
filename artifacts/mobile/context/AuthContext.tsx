@@ -294,10 +294,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (userStr && sessionStr) {
           const storedSession = JSON.parse(sessionStr) as Session;
           const storedUser    = JSON.parse(userStr) as User;
-          setSession(storedSession);
           sessionRef.current = storedSession;
           setUser(storedUser);
+          // An expired token is renewed before screens get it: handing it out first made every screen's first
+          // request fail with 401 after the app had been closed for an hour.
           if (isTokenStale(storedSession.access_token)) toRefresh = { session: storedSession, user: storedUser };
+          else setSession(storedSession);
         } else if (userStr && !sessionStr) {
           // Legacy: had user but no session — clear both
           await AsyncStorage.removeItem(STORAGE_USER);
@@ -321,7 +323,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!toRefresh) return;
       const { session: stored, user: storedUser } = toRefresh;
       const refreshed = await refreshOnce(stored);
-      if (refreshed === 'offline') return;
+      if (refreshed === 'offline') {
+        setSession(stored);
+        return;
+      }
       if (!refreshed) {
         setUser(null);
         setSession(null);

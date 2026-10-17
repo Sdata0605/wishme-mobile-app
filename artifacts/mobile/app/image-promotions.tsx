@@ -499,10 +499,10 @@ export default function ImagePromotionsScreen() {
         </View>
 
         {/* Free Period Banner */}
-        <View style={[s.freeBanner, { backgroundColor: '#22c55e15', borderColor: '#22c55e40' }]}>
-          <Icon name="zap" size={16} color="#22c55e" />
-          <Text style={[s.freeBannerText, { color: '#22c55e' }]}>
-            🎉 Free Period Active! Generate promotional images at no cost during our launch.
+        <View style={[s.freeBanner, { backgroundColor: 'rgba(255,210,63,0.10)', borderColor: 'rgba(255,210,63,0.35)' }]}>
+          <Icon name="zap" size={16} color="#FFD23F" />
+          <Text style={[s.freeBannerText, { color: '#FFD23F' }]}>
+            Free period active: generate promotional images at no cost during our launch.
           </Text>
         </View>
 
