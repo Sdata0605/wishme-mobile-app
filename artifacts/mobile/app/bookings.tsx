@@ -174,7 +174,7 @@ export default function BookingsScreen() {
         <Text style={[s.headerTitle, { color: colors.foreground }]}>My Bookings</Text>
         <TouchableOpacity onPress={handleRefreshButton} disabled={refreshing}>
           {refreshing ? (
-            <ActivityIndicator size="small" color="#7B5CFA" />
+            <ActivityIndicator size="small" color="#FF6B33" />
           ) : (
             <Icon name="refresh-cw" size={18} color={colors.foreground} />
           )}

@@ -76,16 +76,16 @@ const presets: ShortcutDef[] = [
   preset('bescom', 'BESCOM', 'electricity', 'bescom', '#F59E0B', '#F5F0FF'),
   preset('airtel', 'airtel', 'mobile', 'airtel', '#E4002B', '#FEE2E2'),
   preset('jio', 'Jio', 'mobile', 'jio', '#0A5CD6', '#DBEAFE'),
-  preset('tataplay', 'Tata Play', 'dth', 'tata', '#7B5CFA', '#F5F3FF'),
+  preset('tataplay', 'Tata Play', 'dth', 'tata', '#FF6B33', '#F5F3FF'),
   preset('hdfc', 'HDFC', 'creditCard', 'hdfc-cc', '#004B8D', '#DBEAFE'),
   preset('icici', 'ICICI', 'creditCard', 'icici-cc', '#B45309', '#FEF3C7'),
 ];
 
 const travelShortcuts: ShortcutDef[] = [
   { id: 'flights', sub: 'Flights', Icon: Plane, color: '#0B1F6B', bg: '#E0E7FF', category: 'travel', start: 'flights' },
-  { id: 'hotels', sub: 'Hotels', Icon: Hotel, color: '#1F7BFF', bg: '#EFF6FF', category: 'travel', start: 'hotels' },
+  { id: 'hotels', sub: 'Hotels', Icon: Hotel, color: '#B44CFF', bg: '#EFF6FF', category: 'travel', start: 'hotels' },
   { id: 'bus', sub: 'Bus Tickets', Icon: Bus, color: '#D97706', bg: '#FFFBEB', category: 'travel', start: 'busTickets' },
-  { id: 'mytickets', sub: 'My Tickets', Icon: Ticket, color: '#7B5CFA', bg: '#F5F3FF', category: 'travel', start: 'myTickets' },
+  { id: 'mytickets', sub: 'My Tickets', Icon: Ticket, color: '#FF6B33', bg: '#F5F3FF', category: 'travel', start: 'myTickets' },
 ];
 
 export const SHORTCUT_CATALOG: ShortcutDef[] = [...presets, ...billShortcuts, ...travelShortcuts];

@@ -163,7 +163,7 @@ function WishCard({ wish, colors }: WishCardProps) {
         <View style={s.replyBlock}>
           <View style={s.replyHeader}>
             <Text style={s.replyHeaderIcon}>✨</Text>
-            <Text style={[s.replyHeaderName, { color: '#1F7BFF' }]}>
+            <Text style={[s.replyHeaderName, { color: '#B44CFF' }]}>
               {celeb?.name ?? 'Celebrity'}
             </Text>
             {wish.reply_sent_at && (
@@ -457,7 +457,7 @@ export default function OccasionWishesScreen() {
           contentContainerStyle={[s.scrollContent, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FF6B33" />
           }
         >
           <Text style={[s.sectionLabel, { color: colors.foreground }]}>Select Celebrity</Text>
@@ -599,7 +599,7 @@ export default function OccasionWishesScreen() {
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={['#7B5CFA', '#1F7BFF']}
+                  colors={['#FF6B33', '#B44CFF']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={s.sendBtnGrad}
@@ -619,7 +619,7 @@ export default function OccasionWishesScreen() {
           contentContainerStyle={[s.scrollContent, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FF6B33" />
           }
         >
           {wishes.length === 0 ? (
@@ -787,10 +787,10 @@ const s = StyleSheet.create({
   expandHint: { fontSize: 12, fontFamily: 'Inter_500Medium', marginTop: 2 },
 
   replyBlock: {
-    backgroundColor: '#1F7BFF12',
+    backgroundColor: '#B44CFF12',
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#1F7BFF30',
+    borderColor: '#B44CFF30',
     padding: 12,
     gap: 6,
   },

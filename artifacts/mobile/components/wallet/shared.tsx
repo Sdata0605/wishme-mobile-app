@@ -19,7 +19,7 @@ export const STATUS_COLORS: Record<string, string> = {
   rejected: '#EF4444',
 };
 
-export const LEVEL_COLORS: Record<number, string> = { 1: '#7B5CFA', 2: '#1F7BFF' };
+export const LEVEL_COLORS: Record<number, string> = { 1: '#FF6B33', 2: '#B44CFF' };
 
 export const QUICK_AMOUNTS = [100, 500, 1000, 2000, 5000];
 
@@ -80,8 +80,8 @@ export function txIconInfo(type: string): TxIconInfo {
     commission_earning: { name: 'trending-up', color: '#22C55E' },
     booking: { name: 'video', color: '#F97316' },
     ugc_video: { name: 'video', color: '#F97316' },
-    music_generation: { name: 'music', color: '#7B5CFA' },
-    music_download: { name: 'music', color: '#7B5CFA' },
+    music_generation: { name: 'music', color: '#FF6B33' },
+    music_download: { name: 'music', color: '#FF6B33' },
     greeting_card_generation: { name: 'gift', color: '#EC4899' },
     referral_commission: { name: 'users', color: '#EC4899' },
     image_promotion: { name: 'image', color: '#3B82F6' },

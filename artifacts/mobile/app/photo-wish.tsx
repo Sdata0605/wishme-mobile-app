@@ -43,8 +43,8 @@ const TEXT_STYLES = [
 ];
 
 const GRAD_COLORS: [string, string][] = [
-  ['#7B5CFA', '#D23FE0'],
-  ['#D23FE0', '#1F7BFF'],
+  ['#FF6B33', '#E8527A'],
+  ['#E8527A', '#B44CFF'],
   ['#3B5BDB', '#7C3AED'],
   ['#22C55E', '#3B5BDB'],
 ];
@@ -398,8 +398,8 @@ export default function PhotoWishScreen() {
         <View style={s.statsRow}>
           {[
             { label: 'Wallet Balance', value: `₹${wallet.balance.toLocaleString('en-IN')}`, icon: 'credit-card' as const, color: '#3B5BDB' },
-            { label: "Today's", value: String(todayCount), icon: 'zap' as const, color: '#7B5CFA' },
-            { label: 'Total Created', value: String(completedCount), icon: 'image' as const, color: '#1F7BFF' },
+            { label: "Today's", value: String(todayCount), icon: 'zap' as const, color: '#FF6B33' },
+            { label: 'Total Created', value: String(completedCount), icon: 'image' as const, color: '#B44CFF' },
           ].map(st => (
             <View key={st.label} style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
               <View style={[s.statIcon, { backgroundColor: st.color + '20' }]}>
@@ -414,7 +414,7 @@ export default function PhotoWishScreen() {
         <View style={[s.tabRow, { borderBottomColor: colors.border }]}>
           {(['create', 'history'] as const).map(t => (
             <TouchableOpacity key={t} style={s.tabPill} onPress={() => setTab(t)}>
-              <Text style={[s.tabText, { color: tab === t ? '#7B5CFA' : colors.mutedForeground }]}>
+              <Text style={[s.tabText, { color: tab === t ? '#FF6B33' : colors.mutedForeground }]}>
                 {t === 'create' ? 'Create' : 'History'}
               </Text>
               {tab === t && <View style={s.tabUnderline} />}
@@ -425,7 +425,7 @@ export default function PhotoWishScreen() {
         {tab === 'create' ? (
           <View style={s.formWrap}>
             {pickedImageUri ? (
-              <View style={[s.uploadedPreview, { backgroundColor: '#7B5CFA15', borderColor: '#7B5CFA40' }]}>
+              <View style={[s.uploadedPreview, { backgroundColor: '#FF6B3315', borderColor: '#FF6B3340' }]}>
                 <Image source={{ uri: pickedImageUri }} style={s.uploadedThumb} resizeMode="cover" />
                 <Text style={[s.uploadedText, { color: colors.foreground }]} numberOfLines={1}>{pickedImageName}</Text>
                 <TouchableOpacity onPress={clearImage}>
@@ -434,10 +434,10 @@ export default function PhotoWishScreen() {
               </View>
             ) : (
               <TouchableOpacity style={[s.uploadZone, { borderColor: colors.border, backgroundColor: colors.muted }]} onPress={pickImage} activeOpacity={0.8}>
-                <Icon name="upload" size={32} color="#7B5CFA" />
+                <Icon name="upload" size={32} color="#FF6B33" />
                 <Text style={[s.uploadTitle, { color: colors.foreground }]}>Upload Your Photo</Text>
                 <Text style={[s.uploadSub, { color: colors.mutedForeground }]}>Tap to choose from gallery</Text>
-                <View style={[s.uploadBtn, { backgroundColor: '#7B5CFA' }]}>
+                <View style={[s.uploadBtn, { backgroundColor: '#FF6B33' }]}>
                   <Icon name="camera" size={15} color="#fff" />
                   <Text style={s.uploadBtnText}>Choose Photo</Text>
                 </View>
@@ -453,9 +453,9 @@ export default function PhotoWishScreen() {
               <View style={[s.dropdownList, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <ScrollView style={{ maxHeight: 200 }} nestedScrollEnabled>
                   {OCCASIONS.map(o => (
-                    <TouchableOpacity key={o} style={[s.dropdownItem, o === occasion && { backgroundColor: '#7B5CFA15' }]} onPress={() => { setOccasion(o); setShowOccasions(false); }}>
-                      <Text style={[s.dropdownItemText, { color: o === occasion ? '#7B5CFA' : colors.foreground }]}>{o}</Text>
-                      {o === occasion && <Icon name="check" size={14} color="#7B5CFA" />}
+                    <TouchableOpacity key={o} style={[s.dropdownItem, o === occasion && { backgroundColor: '#FF6B3315' }]} onPress={() => { setOccasion(o); setShowOccasions(false); }}>
+                      <Text style={[s.dropdownItemText, { color: o === occasion ? '#FF6B33' : colors.foreground }]}>{o}</Text>
+                      {o === occasion && <Icon name="check" size={14} color="#FF6B33" />}
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -474,8 +474,8 @@ export default function PhotoWishScreen() {
             <Text style={[s.label, { color: colors.foreground }]}>Text Style</Text>
             <View style={s.styleGrid}>
               {TEXT_STYLES.map(ts => (
-                <TouchableOpacity key={ts.id} style={[s.styleCard, { backgroundColor: colors.card, borderColor: textStyle === ts.id ? '#7B5CFA' : colors.border, borderWidth: textStyle === ts.id ? 2 : 1 }]} onPress={() => setTextStyle(ts.id)}>
-                  <Text style={[s.styleLabel, { color: textStyle === ts.id ? '#7B5CFA' : colors.foreground }]}>{ts.label}</Text>
+                <TouchableOpacity key={ts.id} style={[s.styleCard, { backgroundColor: colors.card, borderColor: textStyle === ts.id ? '#FF6B33' : colors.border, borderWidth: textStyle === ts.id ? 2 : 1 }]} onPress={() => setTextStyle(ts.id)}>
+                  <Text style={[s.styleLabel, { color: textStyle === ts.id ? '#FF6B33' : colors.foreground }]}>{ts.label}</Text>
                   <Text style={[s.styleDesc, { color: colors.mutedForeground }]}>{ts.desc}</Text>
                 </TouchableOpacity>
               ))}
@@ -511,7 +511,7 @@ export default function PhotoWishScreen() {
               <Text style={[s.previewTitle, { color: colors.foreground }]}>Preview</Text>
               {generating ? (
                 <View style={s.previewEmpty}>
-                  <ActivityIndicator size="large" color="#7B5CFA" />
+                  <ActivityIndicator size="large" color="#FF6B33" />
                   <Text style={[s.previewEmptyText, { color: colors.mutedForeground }]}>
                     Generating your photo wish...
                   </Text>
@@ -527,11 +527,11 @@ export default function PhotoWishScreen() {
                     resizeMode="contain"
                   />
                   <TouchableOpacity
-                    style={[s.previewBtn, { backgroundColor: '#7B5CFA20' }]}
+                    style={[s.previewBtn, { backgroundColor: '#FF6B3320' }]}
                     onPress={() => downloadImage(generatedUrl)}
                   >
-                    <Icon name="download" size={15} color="#7B5CFA" />
-                    <Text style={[s.previewBtnText, { color: '#7B5CFA' }]}>Download Photo Wish</Text>
+                    <Icon name="download" size={15} color="#FF6B33" />
+                    <Text style={[s.previewBtnText, { color: '#FF6B33' }]}>Download Photo Wish</Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -545,7 +545,7 @@ export default function PhotoWishScreen() {
             </View>
 
             <TouchableOpacity onPress={generate} disabled={generating} activeOpacity={0.85} style={{ opacity: generating ? 0.7 : 1 }}>
-              <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.genBtn}>
+              <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.genBtn}>
                 <Icon name="image" size={18} color="#fff" />
                 <Text style={s.genBtnText}>{generating ? 'Generating...' : `Generate Photo Wish  ₹${finalPrice}`}</Text>
               </LinearGradient>
@@ -581,8 +581,8 @@ export default function PhotoWishScreen() {
                         )}
                         <View style={s.histInfo}>
                           <View style={s.histBadgeRow}>
-                            <View style={[s.badge, { backgroundColor: '#7B5CFA20' }]}>
-                              <Text style={[s.badgeText, { color: '#7B5CFA' }]}>{item.occasion}</Text>
+                            <View style={[s.badge, { backgroundColor: '#FF6B3320' }]}>
+                              <Text style={[s.badgeText, { color: '#FF6B33' }]}>{item.occasion}</Text>
                             </View>
                             <View style={[s.badge, { backgroundColor: statusColor(item.status) + '20' }]}>
                               <Text style={[s.badgeText, { color: statusColor(item.status) }]}>{statusLabel(item.status)}</Text>
@@ -593,7 +593,7 @@ export default function PhotoWishScreen() {
                             <Text style={[s.histDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
                             {isValidUrl(item.edited_image_url) && (
                               <TouchableOpacity style={s.dlBtn} onPress={() => downloadImage(item.edited_image_url!)}>
-                                <Icon name="download" size={13} color="#7B5CFA" />
+                                <Icon name="download" size={13} color="#FF6B33" />
                                 <Text style={s.dlText}>Download</Text>
                               </TouchableOpacity>
                             )}
@@ -624,7 +624,7 @@ const s = StyleSheet.create({
   tabRow: { flexDirection: 'row', borderBottomWidth: 1, paddingHorizontal: 20, marginTop: 16 },
   tabPill: { paddingHorizontal: 4, paddingVertical: 10, marginRight: 24, position: 'relative' },
   tabText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
-  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#7B5CFA', borderRadius: 1 },
+  tabUnderline: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, backgroundColor: '#FF6B33', borderRadius: 1 },
   formWrap: { padding: 20, gap: 4 },
   uploadZone: { borderWidth: 2, borderStyle: 'dashed', borderRadius: 16, padding: 32, alignItems: 'center', gap: 10, marginBottom: 8 },
   uploadTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
@@ -656,7 +656,7 @@ const s = StyleSheet.create({
   pricingDiscount: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   pricingDivider: { height: 1 },
   pricingFinalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#7B5CFA' },
+  pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FF6B33' },
   previewCard: { borderRadius: 16, borderWidth: 1, padding: 16, marginTop: 16 },
   previewTitle: { fontSize: 14, fontFamily: 'Inter_700Bold', marginBottom: 12 },
   previewEmpty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 10 },
@@ -681,7 +681,7 @@ const s = StyleSheet.create({
   histFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   histDate: { fontSize: 12, fontFamily: 'Inter_400Regular' },
   dlBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  dlText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#7B5CFA' },
+  dlText: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: '#FF6B33' },
   emptyState: { borderRadius: 16, borderWidth: 1, padding: 32, alignItems: 'center', gap: 10 },
   emptyTitle: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   emptySub: { fontSize: 13, fontFamily: 'Inter_400Regular', textAlign: 'center' },

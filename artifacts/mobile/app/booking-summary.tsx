@@ -165,7 +165,7 @@ export default function BookingSummaryScreen() {
           </View>
 
           <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginTop: 20 }]} onPress={() => router.push('/bookings')}>
-            <LinearGradient colors={['#7B5CFA','#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryBtn}>
+            <LinearGradient colors={['#FF6B33','#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryBtn}>
               <Icon name="calendar" size={18} color="#fff" />
               <Text style={styles.primaryBtnText}>View My Bookings</Text>
             </LinearGradient>

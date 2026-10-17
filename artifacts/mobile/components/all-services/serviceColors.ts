@@ -3,11 +3,11 @@
  * (orange primary + purple secondary) instead of the old Wish-Me purple hub look.
  */
 export const serviceColors = {
-  purple: '#7B5CFA',
-  purpleLight: '#D23FE0',
+  purple: '#FF6B33',
+  purpleLight: '#E8527A',
   orange: '#F59E0B',
   green: '#22C55E',
-  navy: '#1F7BFF',
+  navy: '#B44CFF',
   darkBg: '#151921',
   white: '#FFFFFF',
   gray: '#6B7085',

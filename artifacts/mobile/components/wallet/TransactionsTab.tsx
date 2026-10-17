@@ -116,7 +116,7 @@ export function TransactionsTab({ colors, bottomPad, user, session }: TxTabProps
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 }}>
-        <ActivityIndicator color="#7B5CFA" />
+        <ActivityIndicator color="#FF6B33" />
       </View>
     );
   }

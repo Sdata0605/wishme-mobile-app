@@ -65,7 +65,7 @@ export function WishFriendCard({ item, colors, accessToken }: { item: WishFriend
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For {item.recipient_name} · {item.occasion}</Text>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.prompt}</Text>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
+          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
           <Text style={[s.orderId, { color: colors.mutedForeground }]}>Order #{item.id.slice(0, 8).toUpperCase()}</Text>
         </View>
       </View>

@@ -34,7 +34,7 @@ export function WishCard({ item, colors }: { item: WishOrder; colors: Colors }) 
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.occasion_type} for {item.recipient_name}</Text>
           {item.message ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.message}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.amount_paid > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.amount_paid.toLocaleString('en-IN')}</Text>}
+          {item.amount_paid > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.amount_paid.toLocaleString('en-IN')}</Text>}
           {imgUrl ? (
             <TouchableOpacity onPress={() => setPreview(imgUrl)}>
               <Image source={{ uri: imgUrl }} style={s.cardImg} resizeMode="cover" />
@@ -63,7 +63,7 @@ export function CardCard({ item, colors }: { item: GreetingCard; colors: Colors 
           </View>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For {item.recipient_name}</Text>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
+          {item.amount_charged > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.amount_charged.toLocaleString('en-IN')}</Text>}
           {item.generated_image_url ? (
             <TouchableOpacity onPress={() => setPreview(item.generated_image_url!)}>
               <Image source={{ uri: item.generated_image_url }} style={s.cardImg} resizeMode="cover" />
@@ -96,7 +96,7 @@ export function PhotoCard({ item, colors }: { item: PhotoWish; colors: Colors })
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>For {item.recipient_name}</Text>
           {item.message ? <Text style={[s.cardSub, { color: colors.mutedForeground }]} numberOfLines={2}>{item.message}</Text> : null}
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.credits_used}</Text>}
+          {item.credits_used > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.credits_used}</Text>}
           {item.output_url ? (
             <TouchableOpacity onPress={() => setPreview(item.output_url!)}>
               <Image source={{ uri: item.output_url }} style={s.cardImg} resizeMode="cover" />
@@ -130,7 +130,7 @@ export function CallCard({ item, colors }: { item: VoiceCall; colors: Colors }) 
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>{item.occasion} for {item.recipient_name}</Text>
           <Text style={[s.cardSub, { color: colors.mutedForeground }]}>From: {item.sender_name} → {item.recipient_phone}</Text>
           <Text style={[s.cardDate, { color: colors.mutedForeground }]}>{fmtDate(item.created_at)}</Text>
-          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#7B5CFA' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
+          {item.price_paid > 0 && <Text style={[s.cardPrice, { color: '#FF6B33' }]}>₹{item.price_paid.toLocaleString('en-IN')}</Text>}
         </View>
       </View>
       {item.scheduled_at && (

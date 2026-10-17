@@ -91,7 +91,7 @@ function Hero({ dim }: { dim: boolean }) {
   const driftB = drift.interpolate({ inputRange: [0, 1], outputRange: [4, -4] });
 
   return (
-    <LinearGradient colors={['#7B5CFA', '#D23FE0', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
+    <LinearGradient colors={['#FF6B33', '#E8527A', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
       <View style={[s.circle, { width: 160, height: 160, top: -40, right: -50, opacity: deco }]} />
       <View style={[s.circle, { width: 90, height: 90, bottom: -30, left: -20, opacity: deco }]} />
       <View style={[s.circle, { width: 14, height: 14, top: 34, right: 90, opacity: 0.3 }]} />
@@ -169,7 +169,7 @@ export function WishFriendLanding({ onPick, onOpenOrders }: Props) {
             accessibilityLabel="Greeting Card. Create a card"
             style={[s.tile, { backgroundColor: '#EC4899' }, shadow('#EC4899')]}
           >
-            <LinearGradient colors={['#EC4899', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tileInner}>
+            <LinearGradient colors={['#EC4899', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tileInner}>
               <View style={s.tileIcon}><Icon name="gift" size={20} color="#fff" /></View>
               <Text style={s.tileTitle}>Greeting Card</Text>
               <Text style={s.tileDesc} numberOfLines={2}>An AI-designed card, ready in seconds.</Text>
@@ -182,9 +182,9 @@ export function WishFriendLanding({ onPick, onOpenOrders }: Props) {
             delay={160}
             onPress={() => onPick('ugc_video')}
             accessibilityLabel="UGC Video. Request a video"
-            style={[s.tile, { backgroundColor: '#7B5CFA' }, shadow('#7B5CFA')]}
+            style={[s.tile, { backgroundColor: '#FF6B33' }, shadow('#FF6B33')]}
           >
-            <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tileInner}>
+            <LinearGradient colors={['#FF6B33', '#E8527A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tileInner}>
               <View style={s.tileIcon}><Icon name="video" size={20} color="#fff" /></View>
               <Text style={s.tileTitle}>UGC Video</Text>
               <Text style={s.tileDesc} numberOfLines={2}>A creator-style video for your friend.</Text>

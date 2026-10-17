@@ -41,11 +41,11 @@ function fmtDate(date: string): string {
 }
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#7B5CFA', '#D23FE0'],
-  ['#D23FE0', '#1F7BFF'],
-  ['#1F7BFF', '#7C3AED'],
+  ['#FF6B33', '#E8527A'],
+  ['#E8527A', '#B44CFF'],
+  ['#B44CFF', '#7C3AED'],
   ['#3B5BDB', '#7C3AED'],
-  ['#7B5CFA', '#1F7BFF'],
+  ['#FF6B33', '#B44CFF'],
   ['#7C3AED', '#3B5BDB'],
 ];
 
@@ -444,7 +444,7 @@ export default function OccasionBookScreen() {
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={canSubmit ? ['#7B5CFA', '#1F7BFF'] : ['#aaa', '#888']}
+              colors={canSubmit ? ['#FF6B33', '#B44CFF'] : ['#aaa', '#888']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={s.submitBtn}

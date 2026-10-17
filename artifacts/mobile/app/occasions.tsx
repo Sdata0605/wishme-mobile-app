@@ -43,11 +43,11 @@ function fmtDate(date: string, long?: boolean): string {
 }
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#7B5CFA', '#D23FE0'],
-  ['#D23FE0', '#1F7BFF'],
-  ['#1F7BFF', '#7C3AED'],
+  ['#FF6B33', '#E8527A'],
+  ['#E8527A', '#B44CFF'],
+  ['#B44CFF', '#7C3AED'],
   ['#3B5BDB', '#7C3AED'],
-  ['#7B5CFA', '#1F7BFF'],
+  ['#FF6B33', '#B44CFF'],
   ['#7C3AED', '#3B5BDB'],
 ];
 
@@ -127,7 +127,7 @@ export default function OccasionsScreen() {
         >
           {/* Hero */}
           <LinearGradient
-            colors={['#7B5CFA', '#1F7BFF']}
+            colors={['#FF6B33', '#B44CFF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.hero}
@@ -240,7 +240,7 @@ export default function OccasionsScreen() {
 
           {/* Info Banner */}
           <LinearGradient
-            colors={['#1F7BFF', '#D23FE0']}
+            colors={['#B44CFF', '#E8527A']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.banner}

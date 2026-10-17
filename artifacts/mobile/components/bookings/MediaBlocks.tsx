@@ -76,7 +76,7 @@ export function BookingAudioPlayer({ audioUrl, colors }: { audioUrl: string | nu
   const progress = duration > 0 ? position / duration : 0;
   return (
     <View style={[s.audioPlayer, { backgroundColor: colors.background, borderColor: colors.border }]}>
-      <TouchableOpacity onPress={toggle} style={[s.playBtn, { backgroundColor: '#7B5CFA' }]} disabled={!audioUrl}>
+      <TouchableOpacity onPress={toggle} style={[s.playBtn, { backgroundColor: '#FF6B33' }]} disabled={!audioUrl}>
         {loading ? (
           <ActivityIndicator size="small" color="#fff" />
         ) : (
@@ -84,7 +84,7 @@ export function BookingAudioPlayer({ audioUrl, colors }: { audioUrl: string | nu
         )}
       </TouchableOpacity>
       <View style={s.audioBar}>
-        <View style={[s.audioProgress, { backgroundColor: '#7B5CFA', width: `${progress * 100}%` }]} />
+        <View style={[s.audioProgress, { backgroundColor: '#FF6B33', width: `${progress * 100}%` }]} />
       </View>
       <Text style={[s.audioDuration, { color: colors.mutedForeground }]}>
         {duration > 0 ? `${fmtMs(position)} / ${fmtMs(duration)}` : audioUrl ? '--:--' : 'N/A'}

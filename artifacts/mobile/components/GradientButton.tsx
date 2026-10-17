@@ -17,7 +17,7 @@ interface GradientButtonProps {
 export function GradientButton({
   title,
   onPress,
-  colors = ['#7B5CFA', '#1F7BFF'],
+  colors = ['#FF6B33', '#B44CFF'],
   style,
   textStyle,
   disabled,

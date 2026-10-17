@@ -212,7 +212,7 @@ function TourLayer({
 
             <Pressable onPress={onNext} accessibilityRole="button">
               <LinearGradient
-                colors={['#7B5CFA', '#EC4899', '#1F7BFF']}
+                colors={['#FF6B33', '#EC4899', '#B44CFF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.nextBtn}

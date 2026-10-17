@@ -195,11 +195,11 @@ export function ImgMusicResult({ audioUrl, imgBase64, hasVocals, videoUrl }: {
         )}
       </View>
       <View style={s.imgMusicActions}>
-        <TouchableOpacity style={[s.actionBtn, { flex: 1, borderColor: '#1F7BFF', borderWidth: 1.5 }]} onPress={saveAudio}>
-          <Icon name={audioSaved ? 'check' : 'download'} size={15} color="#1F7BFF" />
-          <Text style={[s.actionBtnText, { color: '#1F7BFF' }]}>{audioSaved ? 'Audio Saved!' : 'Save Audio'}</Text>
+        <TouchableOpacity style={[s.actionBtn, { flex: 1, borderColor: '#B44CFF', borderWidth: 1.5 }]} onPress={saveAudio}>
+          <Icon name={audioSaved ? 'check' : 'download'} size={15} color="#B44CFF" />
+          <Text style={[s.actionBtnText, { color: '#B44CFF' }]}>{audioSaved ? 'Audio Saved!' : 'Save Audio'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[s.actionBtn, { flex: 1, backgroundColor: '#1F7BFF' }]} onPress={downloadMp4}>
+        <TouchableOpacity style={[s.actionBtn, { flex: 1, backgroundColor: '#B44CFF' }]} onPress={downloadMp4}>
           <Icon name={videoSaved ? 'check' : 'download'} size={15} color="#fff" />
           <Text style={[s.actionBtnText, { color: '#fff' }]}>{videoSaved ? 'Saved!' : 'Download MP4'}</Text>
         </TouchableOpacity>

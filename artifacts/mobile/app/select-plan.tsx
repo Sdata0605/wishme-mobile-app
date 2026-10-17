@@ -55,8 +55,8 @@ const PLAN_ICONS: Record<string, string> = {
 };
 const PLAN_COLORS: Record<string, string> = {
   basic: '#22C55E',
-  premium: '#7B5CFA',
-  elite: '#1F7BFF',
+  premium: '#FF6B33',
+  elite: '#B44CFF',
 };
 
 function getPlanTierIndex(planName: string): number {
@@ -278,7 +278,7 @@ export default function SelectPlanScreen() {
             email: user?.email ?? '',
             contact: user?.phone ?? '',
           },
-          theme: { color: '#7B5CFA' },
+          theme: { color: '#FF6B33' },
           handler: async (response: {
             razorpay_payment_id: string;
             razorpay_order_id: string;
@@ -332,7 +332,7 @@ export default function SelectPlanScreen() {
             email: user?.email ?? '',
             contact: user?.phone ?? '',
           },
-          theme: { color: '#7B5CFA' },
+          theme: { color: '#FF6B33' },
         });
 
         if (data?.razorpay_payment_id) {
@@ -370,7 +370,7 @@ export default function SelectPlanScreen() {
           <View style={{ width: 22 }} />
         </View>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator size="large" color="#7B5CFA" />
+          <ActivityIndicator size="large" color="#FF6B33" />
           <Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Loading plans...</Text>
         </View>
       </View></AmbientBackground>
@@ -409,8 +409,8 @@ export default function SelectPlanScreen() {
         )}
 
         {isEliteUser ? (
-          <View style={[styles.eliteBox, { backgroundColor: colors.card, borderColor: '#1F7BFF' }]}>
-            <Icon name="award" size={48} color="#1F7BFF" />
+          <View style={[styles.eliteBox, { backgroundColor: colors.card, borderColor: '#B44CFF' }]}>
+            <Icon name="award" size={48} color="#B44CFF" />
             <Text style={[styles.eliteTitle, { color: colors.foreground }]}>
               You're on the Elite Plan!
             </Text>
@@ -421,7 +421,7 @@ export default function SelectPlanScreen() {
         ) : (
           visiblePlans.map((plan) => {
             const planKey = plan.name.toLowerCase();
-            const color = PLAN_COLORS[planKey] ?? '#7B5CFA';
+            const color = PLAN_COLORS[planKey] ?? '#FF6B33';
             const iconName = PLAN_ICONS[planKey] ?? 'star';
             const features = parseFeatures(plan.features);
             const isCurrent = isCurrentPlan(plan);

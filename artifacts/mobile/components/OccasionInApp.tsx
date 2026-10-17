@@ -85,7 +85,7 @@ export function OccasionInApp() {
     <Modal visible={!!current} transparent animationType="fade" onRequestClose={() => dismiss(false)} statusBarTranslucent>
       <Pressable style={s.backdrop} onPress={() => dismiss(false)}>
         <Pressable onPress={() => {}} style={[s.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <LinearGradient colors={[current?.color ?? '#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.top}>
+          <LinearGradient colors={[current?.color ?? '#FF6B33', '#E8527A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.top}>
             <Text style={s.emoji}>{current?.emoji}</Text>
             <Text style={s.kind}>{current?.kind === 'today' ? 'HAPPENING TODAY' : 'COMING UP'}</Text>
           </LinearGradient>
@@ -93,7 +93,7 @@ export function OccasionInApp() {
             <Text style={[s.title, { color: colors.foreground }]}>{current?.title.replace(/^\S+\s/, '')}</Text>
             <Text style={[s.text, { color: colors.mutedForeground }]}>{current?.body}</Text>
             <TouchableOpacity onPress={() => dismiss(true)} activeOpacity={0.9}>
-              <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primary}>
+              <LinearGradient colors={['#FF6B33', '#E8527A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primary}>
                 <Text style={s.primaryText}>Send a wish</Text>
               </LinearGradient>
             </TouchableOpacity>

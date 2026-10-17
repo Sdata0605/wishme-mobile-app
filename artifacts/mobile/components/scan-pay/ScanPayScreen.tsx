@@ -103,7 +103,7 @@ export function ScanPayScreen({
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const { colors: themeColors } = useTheme();
-  const T = useMemo(() => ({ ...themeColors, orange: '#7B5CFA' }), [themeColors]);
+  const T = useMemo(() => ({ ...themeColors, orange: '#FF6B33' }), [themeColors]);
   const { user, getValidSession, updateUser } = useAuth();
 
   const [permission, requestPermission] = useCameraPermissions();
@@ -347,7 +347,7 @@ export function ScanPayScreen({
             onPress={() => void payFromWallet()}
           >
             <LinearGradient
-              colors={['#7B5CFA', '#1F7BFF']}
+              colors={['#FF6B33', '#B44CFF']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[st.payBtn, paying && { opacity: 0.7 }]}

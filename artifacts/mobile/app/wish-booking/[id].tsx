@@ -343,7 +343,7 @@ export default function WishBookingScreen() {
           name: 'WishMe',
           description: `Wish for ${celeb?.name}`,
           prefill: { name: prefillName, email: user?.email ?? '', contact: user?.phone ?? '' },
-          theme: { color: '#7B5CFA' },
+          theme: { color: '#FF6B33' },
           handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
             try {
               await onPaymentSuccess(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
@@ -390,7 +390,7 @@ export default function WishBookingScreen() {
           name: 'WishMe',
           description: `Wish for ${celeb?.name}`,
           prefill: { name: prefillName, email: user?.email ?? '', contact: user?.phone ?? '' },
-          theme: { color: '#7B5CFA' },
+          theme: { color: '#FF6B33' },
         });
 
         if (data?.razorpay_payment_id) {
@@ -635,12 +635,12 @@ export default function WishBookingScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[s.payBtn, { borderColor: '#7B5CFA' }]}
+                style={[s.payBtn, { borderColor: '#FF6B33' }]}
                 onPress={handleRazorpayPay}
                 disabled={paying}
               >
-                {paying ? <ActivityIndicator size="small" color="#7B5CFA" /> : <Icon name="credit-card" size={20} color="#7B5CFA" />}
-                <Text style={[s.payBtnLabel, { color: '#7B5CFA' }]}>Pay via Razorpay</Text>
+                {paying ? <ActivityIndicator size="small" color="#FF6B33" /> : <Icon name="credit-card" size={20} color="#FF6B33" />}
+                <Text style={[s.payBtnLabel, { color: '#FF6B33' }]}>Pay via Razorpay</Text>
               </TouchableOpacity>
             </View>
 
@@ -687,8 +687,8 @@ const s = StyleSheet.create({
   celebAvatarPlaceholder: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   celebName: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   celebCat: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  priceTag: { backgroundColor: '#7B5CFA18', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
-  priceTagText: { color: '#7B5CFA', fontSize: 14, fontFamily: 'Inter_700Bold' },
+  priceTag: { backgroundColor: '#FF6B3318', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
+  priceTagText: { color: '#FF6B33', fontSize: 14, fontFamily: 'Inter_700Bold' },
   sectionLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 8, marginTop: 4 },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 4 },
   suggestBtn: { borderWidth: 1, borderRadius: 20, paddingVertical: 4, paddingHorizontal: 12 },

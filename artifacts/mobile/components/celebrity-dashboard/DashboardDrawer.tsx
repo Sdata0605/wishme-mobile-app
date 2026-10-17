@@ -198,7 +198,7 @@ const s = StyleSheet.create({
   rowIcon: { width: 36, height: 36, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   rowLabel: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   rowDesc: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 1 },
-  badge: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: '#D23FE0', alignItems: 'center', justifyContent: 'center' },
+  badge: { minWidth: 22, height: 22, borderRadius: 11, paddingHorizontal: 6, backgroundColor: '#E8527A', alignItems: 'center', justifyContent: 'center' },
   badgeText: { color: '#fff', fontSize: 11, fontFamily: 'Inter_700Bold' },
   footer: { borderTopWidth: StyleSheet.hairlineWidth, paddingHorizontal: 12, paddingTop: 12, gap: 6 },
   footerBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: 1, borderRadius: 99, minHeight: 46 },

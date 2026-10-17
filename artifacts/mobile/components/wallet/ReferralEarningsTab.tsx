@@ -65,7 +65,7 @@ export function ReferralEarningsTab({ colors, bottomPad, user, session }: RefTab
   if (loading) {
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 40 }}>
-        <ActivityIndicator color="#1F7BFF" />
+        <ActivityIndicator color="#B44CFF" />
       </View>
     );
   }
@@ -76,7 +76,7 @@ export function ReferralEarningsTab({ colors, bottomPad, user, session }: RefTab
       showsVerticalScrollIndicator={false}
     >
       <LinearGradient
-        colors={['#7C3AED', '#1F7BFF']}
+        colors={['#7C3AED', '#B44CFF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.refEarningCard}
@@ -104,7 +104,7 @@ export function ReferralEarningsTab({ colors, bottomPad, user, session }: RefTab
         activeOpacity={0.85}
       >
         <LinearGradient
-          colors={['#7B5CFA', '#1F7BFF']}
+          colors={['#FF6B33', '#B44CFF']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 0 }}
           style={styles.inviteBtnGrad}
@@ -122,7 +122,7 @@ export function ReferralEarningsTab({ colors, bottomPad, user, session }: RefTab
       ) : (
         items.map((item) => {
           const lvl = item.commission_level ?? 1;
-          const lvlColor = LEVEL_COLORS[lvl] ?? '#7B5CFA';
+          const lvlColor = LEVEL_COLORS[lvl] ?? '#FF6B33';
           const statusColor = STATUS_COLORS[item.status] ?? '#F59E0B';
           return (
             <View key={item.id} style={[styles.refRow, { backgroundColor: colors.card, borderColor: colors.border }]}>

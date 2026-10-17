@@ -240,13 +240,13 @@ export function OrdersTab({ celebrity, colors, session }: TabProps) {
                   <Text style={[styles.cardSub, { color: colors.mutedForeground, textTransform: 'capitalize' }]}>{o.label} · {o.customer}</Text>
                 </View>
                 <View style={{ alignItems: 'flex-end', marginLeft: 8 }}>
-                  <Text style={[styles.priceText, { color: '#7B5CFA' }]}>{fmtRupee(o.price)}</Text>
+                  <Text style={[styles.priceText, { color: '#FF6B33' }]}>{fmtRupee(o.price)}</Text>
                   <StatusBadge status={o.status} />
                 </View>
               </View>
               <View style={[styles.rowBetween, { marginTop: 6 }]}>
                 <Text style={[styles.cardDate, { color: colors.mutedForeground }]}>{fmtDate(o.created_at)}</Text>
-                <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#7B5CFA" />
+                <Icon name={isOpen ? 'chevron-up' : 'chevron-down'} size={16} color="#FF6B33" />
               </View>
               <Text style={{ marginTop: 4, fontSize: 12, fontFamily: 'Inter_600SemiBold', color: o.earned ? '#22C55E' : colors.mutedForeground }}>
                 {o.earned ? `You earned ${fmtRupee(o.earned)}` : ['completed', 'video_sent', 'delivered'].includes(o.status) ? 'Earning is being added' : 'You are paid when the order is completed'}
@@ -267,13 +267,13 @@ export function OrdersTab({ celebrity, colors, session }: TabProps) {
                 ))}
 
                 {o.videoUrl ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(o.videoUrl!)} style={[styles.smallBtn, { borderColor: '#7B5CFA', backgroundColor: '#7B5CFA20', alignSelf: 'flex-start' }]}>
-                    <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Watch the video</Text>
+                  <TouchableOpacity onPress={() => Linking.openURL(o.videoUrl!)} style={[styles.smallBtn, { borderColor: '#FF6B33', backgroundColor: '#FF6B3320', alignSelf: 'flex-start' }]}>
+                    <Text style={{ color: '#FF6B33', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Watch the video</Text>
                   </TouchableOpacity>
                 ) : null}
                 {o.cardUrl ? (
-                  <TouchableOpacity onPress={() => Linking.openURL(o.cardUrl!)} style={[styles.smallBtn, { borderColor: '#7B5CFA', backgroundColor: '#7B5CFA20', alignSelf: 'flex-start' }]}>
-                    <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Open the card</Text>
+                  <TouchableOpacity onPress={() => Linking.openURL(o.cardUrl!)} style={[styles.smallBtn, { borderColor: '#FF6B33', backgroundColor: '#FF6B3320', alignSelf: 'flex-start' }]}>
+                    <Text style={{ color: '#FF6B33', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Open the card</Text>
                   </TouchableOpacity>
                 ) : null}
                 {!o.videoUrl && !o.cardUrl && o.images.length === 0 && o.fields.length === 0 ? (

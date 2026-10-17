@@ -176,10 +176,10 @@ export default function ReferralsScreen() {
   const level2Count = transactions.filter((t) => t.commission_level === 2).length;
 
   const stats: { label: string; value: string; icon: IconName; color: string }[] = [
-    { label: 'Total Referrals', value: String(totalReferrals), icon: 'users', color: '#7B5CFA' },
+    { label: 'Total Referrals', value: String(totalReferrals), icon: 'users', color: '#FF6B33' },
     { label: 'Total Earnings', value: `₹${totalEarnings.toLocaleString('en-IN')}`, icon: 'trending-up', color: '#22C55E' },
     { label: 'Pending', value: `₹${pendingEarnings.toLocaleString('en-IN')}`, icon: 'clock', color: '#F59E0B' },
-    { label: 'Level 1 / 2 earnings', value: `${level1Count} / ${level2Count}`, icon: 'bar-chart-2', color: '#1F7BFF' },
+    { label: 'Level 1 / 2 earnings', value: `${level1Count} / ${level2Count}`, icon: 'bar-chart-2', color: '#B44CFF' },
   ];
 
   if (!user || !session) {
@@ -229,7 +229,7 @@ export default function ReferralsScreen() {
               <Text style={s.retryText}>Could not load your referral data. Tap to retry.</Text>
             </TouchableOpacity>
           )}
-          <LinearGradient colors={['#7C3AED', '#1F7BFF']} style={s.topCard}>
+          <LinearGradient colors={['#7C3AED', '#B44CFF']} style={s.topCard}>
             <Text style={s.topTitle}>Invite & Earn</Text>
             <Text style={s.topSub}>Earn {commissionRates.l1}% when people you invite book{commissionRates.l2 > 0 ? `, and ${commissionRates.l2}% on their invites` : ''}</Text>
             <View style={s.codeBox}>
@@ -283,13 +283,13 @@ export default function ReferralsScreen() {
             <Text style={[s.commCardTitle, { color: colors.foreground }]}>Commission Rates</Text>
             <View style={s.commRates}>
               <View style={s.commRate}>
-                <Text style={[s.commLevel, { color: '#7B5CFA' }]}>L1</Text>
+                <Text style={[s.commLevel, { color: '#FF6B33' }]}>L1</Text>
                 <Text style={[s.commPct, { color: colors.foreground }]}>{commissionRates.l1}%</Text>
                 <Text style={[s.commDesc, { color: colors.mutedForeground }]}>Direct referral commission</Text>
               </View>
               <View style={[s.commSep, { backgroundColor: colors.border }]} />
               <View style={s.commRate}>
-                <Text style={[s.commLevel, { color: '#1F7BFF' }]}>L2</Text>
+                <Text style={[s.commLevel, { color: '#B44CFF' }]}>L2</Text>
                 <Text style={[s.commPct, { color: colors.foreground }]}>{commissionRates.l2}%</Text>
                 <Text style={[s.commDesc, { color: colors.mutedForeground }]}>{commissionRates.l2 > 0 ? '2nd-level commission' : 'Upgrade your plan to earn here'}</Text>
               </View>
@@ -334,8 +334,8 @@ export default function ReferralsScreen() {
                       {row.order_type && ORDER_LABELS[row.order_type] ? <Text style={[s.orderLabel, { color: colors.mutedForeground }]} numberOfLines={1}>{ORDER_LABELS[row.order_type]}</Text> : null}
                     </View>
                     <View style={s.colLevel}>
-                      <View style={[s.levelBadge, { backgroundColor: level === 'L1' ? '#7B5CFA20' : '#1F7BFF20' }]}>
-                        <Text style={[s.levelText, { color: level === 'L1' ? '#7B5CFA' : '#1F7BFF' }]}>{level}</Text>
+                      <View style={[s.levelBadge, { backgroundColor: level === 'L1' ? '#FF6B3320' : '#B44CFF20' }]}>
+                        <Text style={[s.levelText, { color: level === 'L1' ? '#FF6B33' : '#B44CFF' }]}>{level}</Text>
                       </View>
                     </View>
                     <Text style={[s.tdCell, s.colAmt, { color: '#22C55E' }]}>₹{row.commission_amount.toLocaleString('en-IN')}</Text>
@@ -378,8 +378,8 @@ export default function ReferralsScreen() {
                     <Text style={[s.planCell, { flex: 1.4, color: colors.foreground, textAlign: 'left', fontFamily: 'Inter_600SemiBold' }]}>
                       {pl.name}{mine ? '  (yours)' : ''}
                     </Text>
-                    <Text style={[s.planCell, { color: '#7B5CFA', fontFamily: 'Inter_700Bold' }]}>{pl.l1}%</Text>
-                    <Text style={[s.planCell, { color: pl.l2 > 0 ? '#1F7BFF' : colors.mutedForeground, fontFamily: 'Inter_700Bold' }]}>{pl.l2}%</Text>
+                    <Text style={[s.planCell, { color: '#FF6B33', fontFamily: 'Inter_700Bold' }]}>{pl.l1}%</Text>
+                    <Text style={[s.planCell, { color: pl.l2 > 0 ? '#B44CFF' : colors.mutedForeground, fontFamily: 'Inter_700Bold' }]}>{pl.l2}%</Text>
                   </View>
                 );
               })}

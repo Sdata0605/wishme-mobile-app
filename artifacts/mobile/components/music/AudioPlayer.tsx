@@ -13,7 +13,7 @@ import { Icon } from '@/components/Icon';
 import { useTheme } from '@/context/ThemeContext';
 import { saveAudioToCache, downloadToDevice, downloadUrlToDevice, fmtMs, s } from './shared';
 
-export function WaveformBar({ delay, color = '#7B5CFA', active = true }: { delay: number; color?: string; active?: boolean }) {
+export function WaveformBar({ delay, color = '#FF6B33', active = true }: { delay: number; color?: string; active?: boolean }) {
   const anim = useRef(new Animated.Value(0.3)).current;
   const loopRef = useRef<Animated.CompositeAnimation | null>(null);
 
@@ -110,7 +110,7 @@ export function AudioPlayerCard({ title, audioUri, badge }: { title: string; aud
 
   return (
     <View style={[s.playerCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.playerGradient}>
+      <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.playerGradient}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 }}>
           <Text style={s.playerTitle}>{title}</Text>
           {badge ? <View style={s.badgePill}><Text style={s.badgeText}>{badge}</Text></View> : null}

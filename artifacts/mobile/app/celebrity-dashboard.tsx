@@ -104,7 +104,7 @@ export default function CelebrityDashboardScreen() {
   if (loading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color="#7B5CFA" />
+        <ActivityIndicator size="large" color="#FF6B33" />
       </View>
     );
   }
@@ -195,7 +195,7 @@ export default function CelebrityDashboardScreen() {
         </TouchableOpacity>
         <Text style={[bar.title, { color: colors.foreground }]} numberOfLines={1}>{section.key === 'overview' ? 'Dashboard' : section.label}</Text>
         <TouchableOpacity onPress={onRefresh} style={bar.btn} accessibilityRole="button" accessibilityLabel="Refresh">
-          {refreshing ? <ActivityIndicator size="small" color="#D23FE0" /> : <Icon name="refresh-cw" size={20} color={colors.foreground} />}
+          {refreshing ? <ActivityIndicator size="small" color="#E8527A" /> : <Icon name="refresh-cw" size={20} color={colors.foreground} />}
         </TouchableOpacity>
       </View>
 
@@ -207,7 +207,7 @@ export default function CelebrityDashboardScreen() {
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#D23FE0" colors={['#D23FE0']} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#E8527A" colors={['#E8527A']} />}
       >
         {section.key === 'overview' ? (
           <OverviewScreen celebrity={celebrity} colors={colors} data={data} onOpen={open} userFirstName={user?.firstName ?? ''} />
@@ -247,7 +247,7 @@ export default function CelebrityDashboardScreen() {
 const bar = StyleSheet.create({
   wrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingBottom: 6, borderBottomWidth: StyleSheet.hairlineWidth, gap: 4 },
   btn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  dot: { position: 'absolute', top: 9, right: 9, width: 9, height: 9, borderRadius: 5, backgroundColor: '#D23FE0' },
+  dot: { position: 'absolute', top: 9, right: 9, width: 9, height: 9, borderRadius: 5, backgroundColor: '#E8527A' },
   title: { flex: 1, fontSize: 18, fontFamily: 'Inter_600SemiBold' },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 16 },
   sectionIcon: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

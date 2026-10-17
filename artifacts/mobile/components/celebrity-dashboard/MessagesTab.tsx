@@ -295,10 +295,10 @@ export function MessagesTab({ celebrity, colors, session, user, header }: TabPro
             disabled={generatingAI || fanMessages.length === 0}
             style={[styles.aiBtnSmall, { opacity: fanMessages.length === 0 ? 0.4 : 1 }]}
           >
-            {generatingAI ? <ActivityIndicator size="small" color="#7B5CFA" /> : (
+            {generatingAI ? <ActivityIndicator size="small" color="#FF6B33" /> : (
               <>
-                <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_700Bold', fontSize: 11 }}>AI</Text>
-                <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_500Medium', fontSize: 11, marginLeft: 3 }}>Reply</Text>
+                <Text style={{ color: '#FF6B33', fontFamily: 'Inter_700Bold', fontSize: 11 }}>AI</Text>
+                <Text style={{ color: '#FF6B33', fontFamily: 'Inter_500Medium', fontSize: 11, marginLeft: 3 }}>Reply</Text>
               </>
             )}
           </TouchableOpacity>
@@ -320,10 +320,10 @@ export function MessagesTab({ celebrity, colors, session, user, header }: TabPro
                 <View key={m.id} style={{ alignItems: isMine ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
                   {m.is_ai_generated && isMine && (
                     <View style={styles.aiBadge}>
-                      <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_700Bold', fontSize: 10 }}>AI</Text>
+                      <Text style={{ color: '#FF6B33', fontFamily: 'Inter_700Bold', fontSize: 10 }}>AI</Text>
                     </View>
                   )}
-                  <View style={[styles.bubble, { backgroundColor: isMine ? '#7B5CFA' : colors.card, borderColor: m.is_ai_generated ? '#7B5CFA' : colors.border }]}>
+                  <View style={[styles.bubble, { backgroundColor: isMine ? '#FF6B33' : colors.card, borderColor: m.is_ai_generated ? '#FF6B33' : colors.border }]}>
                     <Text style={{ color: isMine ? '#fff' : colors.foreground, fontFamily: 'Inter_400Regular', fontSize: 13 }}>{m.message_text}</Text>
                   </View>
                   <Text style={{ color: colors.mutedForeground, fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 2 }}>{fmtDate(m.created_at)}</Text>
@@ -364,7 +364,7 @@ export function MessagesTab({ celebrity, colors, session, user, header }: TabPro
           <TouchableOpacity
             onPress={toggleAIAutoReply}
             disabled={togglingAI}
-            style={[styles.toggleBtn, { backgroundColor: aiSettings?.ai_auto_reply_enabled ? '#7B5CFA' : colors.border }]}
+            style={[styles.toggleBtn, { backgroundColor: aiSettings?.ai_auto_reply_enabled ? '#FF6B33' : colors.border }]}
           >
             {togglingAI ? <ActivityIndicator size="small" color="#fff" /> : (
               <Text style={{ color: '#fff', fontFamily: 'Inter_700Bold', fontSize: 12 }}>

@@ -178,8 +178,8 @@ export function ContentTab({ celebrity, colors, session, onRefresh }: TabPropsWi
               <Icon name="user" size={40} color={colors.mutedForeground} />
             </View>
           )}
-          <TouchableOpacity onPress={changeAvatar} disabled={busy !== null} style={[styles.changePhotoBtn, { borderColor: '#7B5CFA' }]}>
-            {busy === 'avatar' ? <ActivityIndicator size="small" color="#7B5CFA" /> : <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Change Photo</Text>}
+          <TouchableOpacity onPress={changeAvatar} disabled={busy !== null} style={[styles.changePhotoBtn, { borderColor: '#FF6B33' }]}>
+            {busy === 'avatar' ? <ActivityIndicator size="small" color="#FF6B33" /> : <Text style={{ color: '#FF6B33', fontFamily: 'Inter_600SemiBold', fontSize: 13 }}>Change Photo</Text>}
           </TouchableOpacity>
         </View>
       </Card>
@@ -196,9 +196,9 @@ export function ContentTab({ celebrity, colors, session, onRefresh }: TabPropsWi
       </Card>
 
       <View style={[styles.rowBetween, { gap: 8 }]}>
-        <TouchableOpacity onPress={uploadPhotos} disabled={busy !== null} style={[styles.uploadBtn, { borderColor: '#7B5CFA', flex: 1, minHeight: 48, opacity: busy && busy !== 'photo' ? 0.5 : 1 }]}>
-          {busy === 'photo' ? <ActivityIndicator size="small" color="#7B5CFA" /> : <Icon name="image" size={16} color="#7B5CFA" />}
-          <Text style={{ color: '#7B5CFA', fontFamily: 'Inter_600SemiBold', fontSize: 13, marginLeft: 6 }}>{busy === 'photo' ? 'Uploading…' : 'Upload photos'}</Text>
+        <TouchableOpacity onPress={uploadPhotos} disabled={busy !== null} style={[styles.uploadBtn, { borderColor: '#FF6B33', flex: 1, minHeight: 48, opacity: busy && busy !== 'photo' ? 0.5 : 1 }]}>
+          {busy === 'photo' ? <ActivityIndicator size="small" color="#FF6B33" /> : <Icon name="image" size={16} color="#FF6B33" />}
+          <Text style={{ color: '#FF6B33', fontFamily: 'Inter_600SemiBold', fontSize: 13, marginLeft: 6 }}>{busy === 'photo' ? 'Uploading…' : 'Upload photos'}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={uploadVideoFile} disabled={busy !== null} style={[styles.uploadBtn, { borderColor: colors.border, flex: 1, minHeight: 48, opacity: busy && busy !== 'video' ? 0.5 : 1 }]}>
           {busy === 'video' ? <ActivityIndicator size="small" color={colors.mutedForeground} /> : <Icon name="video" size={16} color={colors.mutedForeground} />}

@@ -15,7 +15,7 @@ export function SubscribedCelebrityChips<T extends { id: string; name: string }>
   selectedId,
   onSelect,
   priceFor,
-  accent = '#7B5CFA',
+  accent = '#FF6B33',
   onAccentText = '#fff',
   invalid = false,
   emptyText = 'Subscribe to a celebrity to use this service.',

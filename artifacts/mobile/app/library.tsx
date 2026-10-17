@@ -326,7 +326,7 @@ export default function LibraryScreen() {
           renderItem={({ item }) => <Tile item={item} onPress={open} />}
           ListEmptyComponent={
             <View style={s.emptyWrap}>
-              <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.emptyIcon}>
+              <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.emptyIcon}>
                 <Icon name={filter === 'video' ? 'video' : 'image'} size={34} color="#fff" />
               </LinearGradient>
               <Text style={[s.emptyTitle, { color: colors.foreground }]}>

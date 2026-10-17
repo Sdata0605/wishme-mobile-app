@@ -125,7 +125,7 @@ export default function WishCelebrityScreen() {
           <Text style={[s.stateTitle, { color: colors.foreground }]}>Please sign in</Text>
           <Text style={[s.stateBody, { color: colors.mutedForeground }]}>You need to be logged in to wish celebrities.</Text>
           <TouchableOpacity onPress={() => router.push('/(auth)' as never)}>
-            <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
+            <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
               <Text style={s.primaryBtnText}>Login</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -163,7 +163,7 @@ export default function WishCelebrityScreen() {
           <Text style={[s.stateTitle, { color: colors.foreground }]}>Something went wrong</Text>
           <Text style={[s.stateBody, { color: colors.mutedForeground }]}>Could not load celebrities. Please try again.</Text>
           <TouchableOpacity onPress={fetchAll}>
-            <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
+            <LinearGradient colors={['#FF6B33', '#B44CFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.primaryBtn}>
               <Text style={s.primaryBtnText}>Try Again</Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -267,7 +267,7 @@ function CelebrityCard({
         {subscribed ? (
           <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
             <LinearGradient
-              colors={['#7B5CFA', '#1F7BFF']}
+              colors={['#FF6B33', '#B44CFF']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={s.wishNowBtn}

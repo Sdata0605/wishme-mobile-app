@@ -154,7 +154,7 @@ function OrderCard({ order, isPending, colors }: OrderCardProps) {
         {
           backgroundColor: colors.card,
           borderColor: colors.border,
-          borderLeftColor: isPending ? '#7B5CFA' : '#22C55E',
+          borderLeftColor: isPending ? '#FF6B33' : '#22C55E',
           borderLeftWidth: 4,
         },
       ]}
@@ -208,8 +208,8 @@ function OrderCard({ order, isPending, colors }: OrderCardProps) {
 
       {order.status === 'processing' && (
         <View style={s.processingRow}>
-          <ActivityIndicator size="small" color="#7B5CFA" />
-          <Text style={[s.processingText, { color: '#7B5CFA' }]}>Generating your card...</Text>
+          <ActivityIndicator size="small" color="#FF6B33" />
+          <Text style={[s.processingText, { color: '#FF6B33' }]}>Generating your card...</Text>
         </View>
       )}
 
@@ -217,12 +217,12 @@ function OrderCard({ order, isPending, colors }: OrderCardProps) {
         {isPending ? (
           <>
             <TouchableOpacity
-              style={[s.actionBtn, { backgroundColor: '#7B5CFA15', borderColor: '#7B5CFA40', flex: 1 }]}
+              style={[s.actionBtn, { backgroundColor: '#FF6B3315', borderColor: '#FF6B3340', flex: 1 }]}
               onPress={handleContinueWish}
               activeOpacity={0.8}
             >
-              <Icon name="arrow-right" size={14} color="#7B5CFA" />
-              <Text style={[s.actionText, { color: '#7B5CFA' }]}>Continue Wish</Text>
+              <Icon name="arrow-right" size={14} color="#FF6B33" />
+              <Text style={[s.actionText, { color: '#FF6B33' }]}>Continue Wish</Text>
             </TouchableOpacity>
             {cardUrl ? (
               <TouchableOpacity
@@ -353,18 +353,18 @@ export default function WishOrdersScreen() {
           </Text>
         </View>
         <TouchableOpacity
-          style={[s.newWishBtn, { backgroundColor: '#7B5CFA15', borderColor: '#7B5CFA40' }]}
+          style={[s.newWishBtn, { backgroundColor: '#FF6B3315', borderColor: '#FF6B3340' }]}
           onPress={() => router.push('/wish-celebrity')}
           activeOpacity={0.8}
         >
-          <Icon name="plus" size={14} color="#7B5CFA" />
-          <Text style={[s.newWishText, { color: '#7B5CFA' }]}>Make New Wish</Text>
+          <Icon name="plus" size={14} color="#FF6B33" />
+          <Text style={[s.newWishText, { color: '#FF6B33' }]}>Make New Wish</Text>
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={s.loadingWrap}>
-          <ActivityIndicator size="large" color="#7B5CFA" />
+          <ActivityIndicator size="large" color="#FF6B33" />
           <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Loading orders...</Text>
         </View>
       ) : (
@@ -372,7 +372,7 @@ export default function WishOrdersScreen() {
           contentContainerStyle={[s.scrollContent, { paddingBottom: bottomPad }]}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#FF6B33" />
           }
         >
           {orders.length === 0 ? (
@@ -383,7 +383,7 @@ export default function WishOrdersScreen() {
                 Send a celebrity greeting card to someone special
               </Text>
               <TouchableOpacity
-                style={[s.emptyBtn, { backgroundColor: '#7B5CFA', borderColor: '#7B5CFA' }]}
+                style={[s.emptyBtn, { backgroundColor: '#FF6B33', borderColor: '#FF6B33' }]}
                 onPress={() => router.push('/wish-celebrity')}
                 activeOpacity={0.85}
               >
@@ -396,12 +396,12 @@ export default function WishOrdersScreen() {
               {pendingOrders.length > 0 && (
                 <View style={s.section}>
                   <View style={s.sectionHeader}>
-                    <ActivityIndicator size="small" color="#7B5CFA" />
+                    <ActivityIndicator size="small" color="#FF6B33" />
                     <Text style={[s.sectionTitle, { color: colors.foreground }]}>
                       Active / Pending Orders
                     </Text>
-                    <View style={[s.sectionCount, { backgroundColor: '#7B5CFA20' }]}>
-                      <Text style={[s.sectionCountText, { color: '#7B5CFA' }]}>
+                    <View style={[s.sectionCount, { backgroundColor: '#FF6B3320' }]}>
+                      <Text style={[s.sectionCountText, { color: '#FF6B33' }]}>
                         {pendingOrders.length}
                       </Text>
                     </View>

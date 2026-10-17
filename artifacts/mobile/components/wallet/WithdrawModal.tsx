@@ -177,8 +177,8 @@ export function WithdrawModal({ withdraw, user, colors }: { withdraw: WithdrawSt
             <>
               <Text style={[styles.modalTitle, { color: colors.foreground }]}>Withdraw Funds</Text>
               <View style={styles.centeredSection}>
-                <View style={[styles.infoIconCircle, { backgroundColor: '#7B5CFA20' }]}>
-                  <Icon name="info" size={32} color="#7B5CFA" />
+                <View style={[styles.infoIconCircle, { backgroundColor: '#FF6B3320' }]}>
+                  <Icon name="info" size={32} color="#FF6B33" />
                 </View>
                 <Text style={[styles.infoText, { color: colors.foreground }]}>
                   Withdrawals are available for celebrity accounts. Regular users can use their wallet balance to book services.
@@ -226,7 +226,7 @@ export function WithdrawModal({ withdraw, user, colors }: { withdraw: WithdrawSt
 
               {bankLoading ? (
                 <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                  <ActivityIndicator color="#7B5CFA" />
+                  <ActivityIndicator color="#FF6B33" />
                 </View>
               ) : (
                 <>
@@ -288,7 +288,7 @@ export function WithdrawModal({ withdraw, user, colors }: { withdraw: WithdrawSt
                     activeOpacity={0.85}
                   >
                     <LinearGradient
-                      colors={['#7B5CFA', '#1F7BFF']}
+                      colors={['#FF6B33', '#B44CFF']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.payBtn}

@@ -92,7 +92,7 @@ function AudioRecorder({ onAudio, label = 'Record Audio' }: { onAudio: (base64: 
     return (
       <View style={[s.recorderPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={s.waveRow}>
-          {Array.from({ length: 12 }).map((_, i) => <WaveformBar key={i} delay={i * 80} color="#1F7BFF" active={false} />)}
+          {Array.from({ length: 12 }).map((_, i) => <WaveformBar key={i} delay={i * 80} color="#B44CFF" active={false} />)}
         </View>
         <Text style={[s.recDuration, { color: colors.mutedForeground }]}>{fmtTime(secs)}</Text>
         <TouchableOpacity style={[s.reRecordBtn, { borderColor: colors.border }]} onPress={() => { setState('idle'); setSecs(0); }}>
@@ -106,19 +106,19 @@ function AudioRecorder({ onAudio, label = 'Record Audio' }: { onAudio: (base64: 
   return (
     <View>
       <TouchableOpacity
-        style={[s.recorderBtn, { backgroundColor: state === 'recording' ? '#7B5CFA15' : colors.card, borderColor: state === 'recording' ? '#7B5CFA' : colors.border }]}
+        style={[s.recorderBtn, { backgroundColor: state === 'recording' ? '#FF6B3315' : colors.card, borderColor: state === 'recording' ? '#FF6B33' : colors.border }]}
         onPress={state === 'idle' ? startRecord : stopRecord}
         activeOpacity={0.8}
       >
         {state === 'recording' ? (
           <View style={s.recRow}>
             <Animated.View style={[s.recDot, { transform: [{ scale: pulseAnim }] }]} />
-            <Text style={[s.recLabel, { color: '#7B5CFA' }]}>Recording... {fmtTime(secs)}</Text>
+            <Text style={[s.recLabel, { color: '#FF6B33' }]}>Recording... {fmtTime(secs)}</Text>
             <Text style={[s.recHint, { color: colors.mutedForeground }]}>Tap to stop</Text>
           </View>
         ) : (
           <View style={s.recRow}>
-            <Icon name="mic" size={20} color="#1F7BFF" />
+            <Icon name="mic" size={20} color="#B44CFF" />
             <Text style={[s.recLabel, { color: colors.foreground }]}>{label}</Text>
           </View>
         )}
@@ -150,7 +150,7 @@ export function UploadOrRecord({ audioFileName, onAudio, onClear, showRecorder =
   if (audioFileName) {
     return (
       <View style={[s.recorderPreview, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Icon name="music" size={18} color="#1F7BFF" />
+        <Icon name="music" size={18} color="#B44CFF" />
         <Text style={[s.uploadText, { color: colors.foreground, flex: 1 }]} numberOfLines={1}>{audioFileName}</Text>
         <TouchableOpacity onPress={onClear}>
           <Icon name="x" size={16} color={colors.mutedForeground} />
@@ -162,7 +162,7 @@ export function UploadOrRecord({ audioFileName, onAudio, onClear, showRecorder =
   return (
     <View style={s.uploadOrRec}>
       <TouchableOpacity style={[s.uploadBtn, { borderColor: colors.border, backgroundColor: colors.card }]} activeOpacity={0.8} onPress={pickFile}>
-        <Icon name="upload" size={18} color="#1F7BFF" />
+        <Icon name="upload" size={18} color="#B44CFF" />
         <Text style={[s.uploadText, { color: colors.foreground }]}>Upload Audio File</Text>
       </TouchableOpacity>
       {showRecorder && (
@@ -199,7 +199,7 @@ export function ImageUploadArea({ imageUri, onImage, onClear }: { imageUri: stri
 
   if (imageUri) {
     return (
-      <View style={[s.imagePreview, { borderColor: '#1F7BFF' }]}>
+      <View style={[s.imagePreview, { borderColor: '#B44CFF' }]}>
         <Image source={{ uri: imageUri }} style={{ width: '100%', height: 160, borderRadius: 12 }} resizeMode="cover" />
         <TouchableOpacity style={s.changeImageBtn} onPress={onClear}>
           <Text style={s.changeImageText}>Change Image</Text>
@@ -210,7 +210,7 @@ export function ImageUploadArea({ imageUri, onImage, onClear }: { imageUri: stri
 
   return (
     <TouchableOpacity style={[s.imageUploadArea, { borderColor: colors.border, backgroundColor: colors.card }]} onPress={pick} activeOpacity={0.8}>
-      <Icon name="upload" size={28} color="#1F7BFF" />
+      <Icon name="upload" size={28} color="#B44CFF" />
       <Text style={[s.imageUploadText, { color: colors.foreground }]}>Tap to Upload Image</Text>
       <Text style={[{ fontSize: 12, fontFamily: 'Inter_400Regular' }, { color: colors.mutedForeground }]}>JPG, PNG up to 10MB</Text>
     </TouchableOpacity>

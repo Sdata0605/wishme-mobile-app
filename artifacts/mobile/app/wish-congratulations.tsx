@@ -92,7 +92,7 @@ export default function WishCongratulationsScreen() {
     <AmbientBackground><View style={[s.container, { backgroundColor: 'transparent' }]}>
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 40 }} showsVerticalScrollIndicator={false}>
         <LinearGradient
-          colors={['#7B5CFA', '#1F7BFF']}
+          colors={['#FF6B33', '#B44CFF']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[s.hero, { paddingTop: topPad + 32 }]}
@@ -111,9 +111,9 @@ export default function WishCongratulationsScreen() {
             </View>
           ) : order ? (
             <>
-              <View style={[s.celebBanner, { backgroundColor: '#7B5CFA10', borderColor: '#7B5CFA30' }]}>
-                <Icon name="star" size={18} color="#7B5CFA" />
-                <Text style={[s.celebBannerText, { color: '#7B5CFA' }]}>
+              <View style={[s.celebBanner, { backgroundColor: '#FF6B3310', borderColor: '#FF6B3330' }]}>
+                <Icon name="star" size={18} color="#FF6B33" />
+                <Text style={[s.celebBannerText, { color: '#FF6B33' }]}>
                   Wish delivered to {order.celebrities?.name}
                 </Text>
               </View>
@@ -155,9 +155,9 @@ export default function WishCongratulationsScreen() {
               </View>
             </>
           ) : (
-            <View style={[s.celebBanner, { backgroundColor: '#7B5CFA10', borderColor: '#7B5CFA30' }]}>
-              <Icon name="star" size={18} color="#7B5CFA" />
-              <Text style={[s.celebBannerText, { color: '#7B5CFA' }]}>Your wish has been sent!</Text>
+            <View style={[s.celebBanner, { backgroundColor: '#FF6B3310', borderColor: '#FF6B3330' }]}>
+              <Icon name="star" size={18} color="#FF6B33" />
+              <Text style={[s.celebBannerText, { color: '#FF6B33' }]}>Your wish has been sent!</Text>
             </View>
           )}
 

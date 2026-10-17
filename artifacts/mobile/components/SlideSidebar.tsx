@@ -99,7 +99,7 @@ export function SlideSidebar({ open, onClose, title, subtitle, groups, activeKey
         style={[s.panel, { width: WIDTH, backgroundColor: colors.background, transform: [{ translateX }] }]}
       >
         <LinearGradient
-          colors={['#7B5CFA', '#D23FE0', '#1F7BFF']}
+          colors={['#FF6B33', '#E8527A', '#B44CFF']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[s.head, { paddingTop: insets.top + 16 }]}
@@ -127,19 +127,19 @@ export function SlideSidebar({ open, onClose, title, subtitle, groups, activeKey
                     key={item.key}
                     activeOpacity={0.8}
                     onPress={() => onSelect(item.key)}
-                    style={[s.row, active && { backgroundColor: '#7B5CFA' + '1A', borderColor: '#7B5CFA' + '55' }]}
+                    style={[s.row, active && { backgroundColor: '#FF6B33' + '1A', borderColor: '#FF6B33' + '55' }]}
                   >
-                    <View style={[s.rowIcon, { backgroundColor: active ? '#7B5CFA' : colors.card, borderColor: colors.border }]}>
+                    <View style={[s.rowIcon, { backgroundColor: active ? '#FF6B33' : colors.card, borderColor: colors.border }]}>
                       <Icon name={item.icon} size={19} color={active ? '#fff' : colors.foreground} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={[s.rowLabel, { color: active ? '#7B5CFA' : colors.foreground }]} numberOfLines={1}>{item.label}</Text>
+                      <Text style={[s.rowLabel, { color: active ? '#FF6B33' : colors.foreground }]} numberOfLines={1}>{item.label}</Text>
                       {item.description ? (
                         <Text style={[s.rowDesc, { color: colors.mutedForeground }]} numberOfLines={1}>{item.description}</Text>
                       ) : null}
                     </View>
                     {item.count != null && item.count > 0 && (
-                      <View style={[s.count, { backgroundColor: active ? '#7B5CFA' : colors.border }]}>
+                      <View style={[s.count, { backgroundColor: active ? '#FF6B33' : colors.border }]}>
                         <Text style={[s.countText, { color: active ? '#fff' : colors.foreground }]}>{item.count}</Text>
                       </View>
                     )}

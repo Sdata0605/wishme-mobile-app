@@ -34,8 +34,8 @@ const OCCASIONS = [
 ];
 
 const GRAD_COLORS: [string, string][] = [
-  ['#7B5CFA', '#D23FE0'],
-  ['#D23FE0', '#1F7BFF'],
+  ['#FF6B33', '#E8527A'],
+  ['#E8527A', '#B44CFF'],
   ['#3B5BDB', '#7C3AED'],
   ['#22C55E', '#3B5BDB'],
 ];
@@ -401,7 +401,7 @@ export default function GreetingCardsScreen() {
 
   const statusColor = (st: string) => {
     if (st === 'completed') return '#22c55e';
-    if (st === 'processing') return '#7B5CFA';
+    if (st === 'processing') return '#FF6B33';
     return '#ef4444';
   };
 
@@ -426,8 +426,8 @@ export default function GreetingCardsScreen() {
       </View>
       <View style={s.histInfo}>
         <View style={s.histBadgeRow}>
-          <View style={[s.badge, { backgroundColor: '#D23FE020' }]}>
-            <Text style={[s.badgeText, { color: '#D23FE0' }]}>{item.occasion_name}</Text>
+          <View style={[s.badge, { backgroundColor: '#E8527A20' }]}>
+            <Text style={[s.badgeText, { color: '#E8527A' }]}>{item.occasion_name}</Text>
           </View>
           <View style={[s.badge, { backgroundColor: statusColor(item.status) + '20' }]}>
             <Text style={[s.badgeText, { color: statusColor(item.status) }]}>
@@ -445,8 +445,8 @@ export default function GreetingCardsScreen() {
               style={s.dlBtn}
               onPress={() => handleDownload(item.generated_image_url!)}
             >
-              <Icon name="download" size={13} color="#D23FE0" />
-              <Text style={[s.dlText, { color: '#D23FE0' }]}>Download</Text>
+              <Icon name="download" size={13} color="#E8527A" />
+              <Text style={[s.dlText, { color: '#E8527A' }]}>Download</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -495,7 +495,7 @@ export default function GreetingCardsScreen() {
           </TouchableOpacity>
 
           <View style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Icon name="sparkles" size={16} color="#D23FE0" />
+            <Icon name="sparkles" size={16} color="#E8527A" />
             <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Today</Text>
             <Text style={[s.statValue, { color: colors.foreground }]}>{todayCards.length}</Text>
             <Text style={[s.statSub, { color: colors.mutedForeground }]}>Cards</Text>
@@ -530,10 +530,10 @@ export default function GreetingCardsScreen() {
         <View style={[s.tabRow, { borderBottomColor: colors.border }]}>
           {(['create', 'cards'] as const).map(t => (
             <TouchableOpacity key={t} style={s.tabPill} onPress={() => setTab(t)}>
-              <Text style={[s.tabText, { color: tab === t ? '#D23FE0' : colors.mutedForeground }]}>
+              <Text style={[s.tabText, { color: tab === t ? '#E8527A' : colors.mutedForeground }]}>
                 {t === 'create' ? 'Create Card' : 'My Cards'}
               </Text>
-              {tab === t && <View style={[s.tabUnderline, { backgroundColor: '#D23FE0' }]} />}
+              {tab === t && <View style={[s.tabUnderline, { backgroundColor: '#E8527A' }]} />}
             </TouchableOpacity>
           ))}
         </View>
@@ -546,7 +546,7 @@ export default function GreetingCardsScreen() {
               {(['upload', 'library', 'none'] as RefImgTab[]).map(opt => (
                 <TouchableOpacity
                   key={opt}
-                  style={[s.refTabBtn, refImgTab === opt && { backgroundColor: '#D23FE0' }]}
+                  style={[s.refTabBtn, refImgTab === opt && { backgroundColor: '#E8527A' }]}
                   onPress={() => {
                     setRefImgTab(opt);
                     if (opt !== 'upload') setReferenceImageBase64(null);
@@ -563,7 +563,7 @@ export default function GreetingCardsScreen() {
             {refImgTab === 'upload' && (
               <View style={{ marginTop: 10 }}>
                 {referenceImageBase64 ? (
-                  <View style={[s.uploadedPreview, { borderColor: '#D23FE040', backgroundColor: '#D23FE008' }]}>
+                  <View style={[s.uploadedPreview, { borderColor: '#E8527A40', backgroundColor: '#E8527A08' }]}>
                     <Image
                       source={{ uri: `data:image/jpeg;base64,${referenceImageBase64}` }}
                       style={s.uploadedThumb}
@@ -578,11 +578,11 @@ export default function GreetingCardsScreen() {
                   </View>
                 ) : (
                   <TouchableOpacity
-                    style={[s.uploadZone, { borderColor: '#D23FE0', backgroundColor: '#D23FE010' }]}
+                    style={[s.uploadZone, { borderColor: '#E8527A', backgroundColor: '#E8527A10' }]}
                     onPress={pickImage}
                   >
-                    <Icon name="upload" size={22} color="#D23FE0" />
-                    <Text style={[s.uploadZoneText, { color: '#D23FE0' }]}>Choose Image</Text>
+                    <Icon name="upload" size={22} color="#E8527A" />
+                    <Text style={[s.uploadZoneText, { color: '#E8527A' }]}>Choose Image</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -605,7 +605,7 @@ export default function GreetingCardsScreen() {
                         style={[
                           s.libThumbWrap,
                           {
-                            borderColor: selectedLibraryId === card.id ? '#D23FE0' : colors.border,
+                            borderColor: selectedLibraryId === card.id ? '#E8527A' : colors.border,
                             borderWidth: selectedLibraryId === card.id ? 2.5 : 1,
                           },
                         ]}
@@ -618,7 +618,7 @@ export default function GreetingCardsScreen() {
                             contentFit="cover"
                           />
                         ) : (
-                          <LinearGradient colors={['#D23FE0', '#1F7BFF']} style={s.libThumb}>
+                          <LinearGradient colors={['#E8527A', '#B44CFF']} style={s.libThumb}>
                             <Icon name="image" size={16} color="rgba(255,255,255,0.8)" />
                           </LinearGradient>
                         )}
@@ -636,7 +636,7 @@ export default function GreetingCardsScreen() {
 
             {refImgTab === 'none' && (
               <View style={[s.aiOnlyNote, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Icon name="sparkles" size={16} color="#1F7BFF" />
+                <Icon name="sparkles" size={16} color="#B44CFF" />
                 <Text style={[s.aiOnlyText, { color: colors.mutedForeground }]}>
                   Card will be generated purely by AI
                 </Text>
@@ -658,13 +658,13 @@ export default function GreetingCardsScreen() {
                   {OCCASIONS.map(o => (
                     <TouchableOpacity
                       key={o}
-                      style={[s.dropdownItem, o === occasion && { backgroundColor: '#D23FE015' }]}
+                      style={[s.dropdownItem, o === occasion && { backgroundColor: '#E8527A15' }]}
                       onPress={() => { setOccasion(o); setShowOccasions(false); }}
                     >
-                      <Text style={[s.dropdownItemText, { color: o === occasion ? '#D23FE0' : colors.foreground }]}>
+                      <Text style={[s.dropdownItemText, { color: o === occasion ? '#E8527A' : colors.foreground }]}>
                         {o}
                       </Text>
-                      {o === occasion && <Icon name="check" size={14} color="#D23FE0" />}
+                      {o === occasion && <Icon name="check" size={14} color="#E8527A" />}
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -709,7 +709,7 @@ export default function GreetingCardsScreen() {
 
             {/* AI Refine checkbox */}
             <TouchableOpacity style={s.checkRow} onPress={() => setRefineAI(r => !r)}>
-              <View style={[s.checkbox, { borderColor: '#D23FE0', backgroundColor: refineAI ? '#D23FE0' : 'transparent' }]}>
+              <View style={[s.checkbox, { borderColor: '#E8527A', backgroundColor: refineAI ? '#E8527A' : 'transparent' }]}>
                 {refineAI && <Icon name="check" size={12} color="#fff" />}
               </View>
               <View>
@@ -750,7 +750,7 @@ export default function GreetingCardsScreen() {
               style={{ opacity: (generating || !sender.trim() || !prompt.trim() || wallet.balance < finalPrice) ? 0.6 : 1, marginTop: 16 }}
             >
               <LinearGradient
-                colors={['#D23FE0', '#1F7BFF']}
+                colors={['#E8527A', '#B44CFF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={s.genBtn}
@@ -779,10 +779,10 @@ export default function GreetingCardsScreen() {
               generating ? (
                 /* State A — Generating (initial API call in progress) */
                 <LinearGradient
-                  colors={['#7B5CFA20', '#D23FE020']}
+                  colors={['#FF6B3320', '#E8527A20']}
                   style={s.previewPlaceholder}
                 >
-                  <ActivityIndicator color="#D23FE0" size="large" />
+                  <ActivityIndicator color="#E8527A" size="large" />
                   <Text style={[s.previewPlaceholderTitle, { color: colors.foreground }]}>✦ Generating your card...</Text>
                   <Text style={[s.previewPlaceholderSub, { color: colors.mutedForeground }]}>This may take ~30 seconds</Text>
                 </LinearGradient>
@@ -836,11 +836,11 @@ export default function GreetingCardsScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[s.actionBtn, { borderColor: '#D23FE0' }]}
+                      style={[s.actionBtn, { borderColor: '#E8527A' }]}
                       onPress={() => handleDownload(currentGeneration.generated_image_url!)}
                     >
-                      <Icon name="download" size={16} color="#D23FE0" />
-                      <Text style={[s.actionBtnText, { color: '#D23FE0' }]}>Download Card</Text>
+                      <Icon name="download" size={16} color="#E8527A" />
+                      <Text style={[s.actionBtnText, { color: '#E8527A' }]}>Download Card</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -864,7 +864,7 @@ export default function GreetingCardsScreen() {
               {historyLoading ? 'Loading...' : `${history.length} greeting cards created`}
             </Text>
             {historyLoading ? (
-              <ActivityIndicator color="#D23FE0" style={{ marginTop: 32 }} />
+              <ActivityIndicator color="#E8527A" style={{ marginTop: 32 }} />
             ) : history.length === 0 ? (
               <View style={[s.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Icon name="image" size={36} color={colors.mutedForeground} />
@@ -940,7 +940,7 @@ const s = StyleSheet.create({
   pricingDiscount: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   pricingDivider: { height: 1 },
   pricingFinalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#D23FE0' },
+  pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#E8527A' },
   genBtn: { height: 52, borderRadius: 9999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   genBtnText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   genBtnStrike: { color: 'rgba(255,255,255,0.6)', textDecorationLine: 'line-through', fontSize: 13 },

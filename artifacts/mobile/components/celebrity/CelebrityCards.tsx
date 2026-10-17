@@ -75,7 +75,7 @@ export function CelebHeroCard({ celebrity, subscribed }: { celebrity: Celebrity;
             <Text style={s.heroPillText}>Subscribed</Text>
           </View>
         ) : (
-          <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.heroPill}>
+          <LinearGradient colors={['#FF6B33', '#E8527A']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.heroPill}>
             <Text style={s.heroPillText}>Subscribe · {inr(price)}</Text>
           </LinearGradient>
         )}

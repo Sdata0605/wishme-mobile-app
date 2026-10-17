@@ -70,7 +70,7 @@ export function useDeposit({ user, session, refetch }: { user: AuthUser; session
           email: user?.email ?? '',
           contact: user?.phone ?? '',
         },
-        theme: { color: '#7B5CFA' },
+        theme: { color: '#FF6B33' },
       });
 
       const verifyRes = await fetch(`${SUPABASE_URL}/functions/v1/verify-razorpay-payment`, {
@@ -246,7 +246,7 @@ export function DepositModal({ deposit, balance, colors }: { deposit: DepositSta
                 activeOpacity={0.85}
               >
                 <LinearGradient
-                  colors={['#7B5CFA', '#1F7BFF']}
+                  colors={['#FF6B33', '#B44CFF']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                   style={styles.payBtn}
@@ -267,7 +267,7 @@ export function DepositModal({ deposit, balance, colors }: { deposit: DepositSta
 
           {depositStep === 'processing' && (
             <View style={styles.centeredSection}>
-              <ActivityIndicator size="large" color="#7B5CFA" />
+              <ActivityIndicator size="large" color="#FF6B33" />
               <Text style={[styles.processingText, { color: colors.foreground }]}>Processing payment...</Text>
               <Text style={[styles.processingSubText, { color: colors.mutedForeground }]}>
                 Please do not close this screen

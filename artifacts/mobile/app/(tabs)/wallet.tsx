@@ -58,7 +58,7 @@ export default function WalletScreen() {
       </View>
 
       <LinearGradient
-        colors={['#7B5CFA', '#1F7BFF']}
+        colors={['#FF6B33', '#B44CFF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.heroCard}
