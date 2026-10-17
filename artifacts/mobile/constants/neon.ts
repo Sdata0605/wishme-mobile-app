@@ -148,31 +148,33 @@ export function buildNeon(isDark: boolean, accent: string | null = DEFAULT_ACCEN
   }
 
   if (isDark) {
-    const violet = custom ? accent! : '#9473F5';
-    const pink = custom ? accentPartner! : '#E555FF';
-    const blue = custom ? mix(accent!, '#2A6BFF', 0.5) : '#2A6BFF';
-    const cyan = '#25DFFF';
-    const bg = '#0A1556';
-    const surface = '#0A1B50';
-    const brand: readonly [string, string] = custom ? [violet, pink] : ['#0264FF', '#CA00EF'];
+    // "Neon Celebration": a deep plum night lit by neon orange, hot pink and electric purple, with glowing gold
+    // for the special moments.
+    const violet = custom ? accent! : '#B026FF'; // electric purple
+    const pink = custom ? accentPartner! : '#FF2E88'; // hot pink
+    const blue = custom ? mix(accent!, '#FF5F1F', 0.5) : '#FF5F1F'; // neon orange
+    const cyan = '#FFD23F'; // neon gold
+    const bg = '#12081F'; // plum night
+    const surface = '#1F0A31';
+    const brand: readonly [string, string] = custom ? [violet, pink] : ['#FF5F1F', '#FF2E88'];
     return {
       isDark,
-      violet, cyan, pink, lime: '#BDF64B', bg, surface, surfaceHigh: '#10215E',
+      violet, cyan, pink, lime: '#BDF64B', bg, surface, surfaceHigh: '#2B0D43',
       success: '#4DF0A6',
       warning: '#FFB347',
       error: '#FF8585',
       textHi: '#FFFFFF',
-      textLo: '#C9DBFB',
-      textDim: '#9EAFE2',
+      textLo: '#D9C9FB',
+      textDim: '#AE9ECF',
       onInk: bg,
-      line: 'rgba(120,150,255,0.20)',
-      lineBright: 'rgba(130,160,255,0.38)',
-      accentA: '#2B7BFF',
-      accentB: '#D83BE0',
-      accentC: '#12D3D9',
-      accentD: '#F5A00F',
+      line: 'rgba(176,38,255,0.20)',
+      lineBright: 'rgba(176,38,255,0.36)',
+      accentA: '#B026FF',
+      accentB: '#FF2E88',
+      accentC: '#FFD23F',
+      accentD: '#FF5F1F',
       accentE: '#0AF0A0',
-      accentF: '#3B82FF',
+      accentF: '#C051FF',
       gBrand: brand,
       gVioletCyan: [violet, cyan],
       gPinkViolet: [pink, violet],
@@ -186,13 +188,13 @@ export function buildNeon(isDark: boolean, accent: string | null = DEFAULT_ACCEN
         return [mix(c, '#FFFFFF', 0.16), deep] as const;
       },
       blue,
-      glass: 'rgba(9,24,84,0.72)',
-      cardBorder: '#2F3F9A',
-      dock: '#0B1E53',
-      orbDisc: '#14195C',
-      navIdle: '#9EAFE2',
-      wash: ['#18165B', '#0B1759', '#071048'],
-      aurora: { blue: '#2A4BFF', violet: '#7B3CF0', magenta: '#FF2BD6' },
+      glass: 'rgba(18,8,31,0.72)',
+      cardBorder: '#3D1F5C',
+      dock: '#1A0F2E',
+      orbDisc: '#190A2A',
+      navIdle: '#AE9ECF',
+      wash: ['#280C3E', '#1B0A2C', '#12081F'],
+      aurora: { blue: '#FF5F1F', violet: '#B026FF', magenta: '#FF2E88' },
     };
   }
 
