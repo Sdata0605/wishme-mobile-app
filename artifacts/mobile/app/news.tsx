@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import { Icon } from '@/components/Icon';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
-import { PressScale } from '@/components/neon/Motion';
 import { NeonHeader } from '@/components/neon/NeonHeader';
 import { StoryImage } from '@/components/news/StoryHero';
 import { useTheme } from '@/context/ThemeContext';
@@ -132,7 +131,7 @@ export default function NewsScreen() {
                   />
                 ) : null,
               )}
-              <PressScale onPress={() => open(current)} accessibilityRole="link" accessibilityLabel={current.title} style={styles.front}>
+              <Pressable onPress={() => open(current)} accessibilityRole="link" accessibilityLabel={current.title} style={styles.front}>
                 <View style={[styles.card, { backgroundColor: neon.bg, borderColor: neon.cardBorder }]}>
                   <StoryImage uri={current.image} loading={!current.enriched} style={styles.photo} />
                   <View style={styles.cardBody}>
@@ -145,7 +144,7 @@ export default function NewsScreen() {
                   </View>
                   <LinearGradient colors={neon.gVioletCyan as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.stripe} />
                 </View>
-              </PressScale>
+              </Pressable>
             </View>
 
             <View style={styles.pager}>

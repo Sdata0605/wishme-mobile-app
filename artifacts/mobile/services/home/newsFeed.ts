@@ -36,7 +36,7 @@ export interface NewsCard extends Story {
 }
 
 const FRESH_MS = 15 * 60_000;
-const MAX_STORIES = 12;
+const MAX_STORIES = 30;
 const keyOf = (tab: NewsTab | string) => `news_cards_v1:${typeof tab === 'string' ? tab.toLowerCase() : tab.id}`;
 
 export const asCard = (s: Story): NewsCard => ({ ...s, image: null, snippet: '', articleUrl: null, enriched: false });
