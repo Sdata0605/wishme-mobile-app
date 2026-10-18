@@ -7,6 +7,8 @@
  */
 
 import { bootLog } from '@/services/bootLog';
+import { endLine, logFragment, takeSession } from '@/services/assistant/conversationLog';
+import { indexPendingCalls, saveConversation } from '@/services/assistant/recall';
 import { router } from 'expo-router';
 import React, {
   createContext,
@@ -78,6 +80,19 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const verifySessionRef = useRef(verifySession);
   verifySessionRef.current = verifySession;
 
+  // What is said is kept line by line and saved to the long-term memory when the conversation ends (or the app leaves the
+  // screen): see services/assistant/recall.ts. Saving never blocks or breaks the conversation.
+  const flushConversation = useCallback(() => {
+    const s = takeSession();
+    if (!s) return;
+    void (async () => {
+      const token = (await getValidSessionRef.current())?.access_token;
+      if (token) await saveConversation(token, s.id, s.startedAt, s.lines);
+    })();
+  }, []);
+  const flushConversationRef = useRef(flushConversation);
+  flushConversationRef.current = flushConversation;
+
   // Follows phone calls the assistant made for the user, and reports the result when they end.
   // While one is going on the assistant stays open, and when it ends the assistant speaks the result,
   // reopening itself first if it had been closed.
@@ -101,6 +116,11 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       },
       onFinished: (call: AiCall) => {
         setActionLabelRef.current('');
+        // Its transcript is final a moment after the call ends: then it goes into the long-term memory.
+        setTimeout(async () => {
+          const token = (await getValidSessionRef.current())?.access_token ?? tokenRef.current;
+          if (token) void indexPendingCalls(token, true);
+        }, 15_000);
         const engine = clientRef.current;
         if (engine?.isConversing()) {
           // The assistant is open: have it tell the user out loud.
@@ -229,6 +249,8 @@ ${call.summary ?? 'The call has ended.'}`, [
         const before = lastStateRef.current;
         lastStateRef.current = s;
         setState(s);
+        // The conversation is over (mic off): keep it.
+        if (s === 'ready' || s === 'idle') flushConversationRef.current();
         // Idle timeout or stop: the panel goes away, the connection stays warm.
         // (An error keeps the panel up so the user can read it.) Only a conversation that was actually running can end
         // this way: a warm-up finishing in the background (idle -> ready) must not close a panel that is still opening.
@@ -238,6 +260,9 @@ ${call.summary ?? 'The call has ended.'}`, [
         }
       },
       onTranscript: (role, text, final) => {
+        if (role === 'user') logFragment('user', text);
+        else if (final) endLine();
+        else logFragment('assistant', text);
         if (role === 'user') {
           if (assistantDone.current) {
             // First words of a new turn: clear the previous exchange.
@@ -360,6 +385,13 @@ ${call.summary ?? 'The call has ended.'}`, [
     let bgTimer: ReturnType<typeof setTimeout> | null = null;
     const sub = AppState.addEventListener('change', (next) => {
       if (__DEV__) console.log(`[app] state -> ${next}`);
+      if (next === 'background') flushConversationRef.current();
+      else if (next === 'active') {
+        void (async () => {
+          const token = (await getValidSessionRef.current())?.access_token;
+          if (token) void indexPendingCalls(token);
+        })();
+      }
       if (next === 'active') {
         if (bgTimer) clearTimeout(bgTimer);
         bgTimer = null;
@@ -399,6 +431,17 @@ ${call.summary ?? 'The call has ended.'}`, [
       if (bgTimer) clearTimeout(bgTimer);
     };
   }, [loggedIn, personaKnown, client]);
+
+  // AI calls that are not in the long-term memory yet are added a little while after login, when nothing else is going on
+  // (the first run after the update catches up on the old ones).
+  useEffect(() => {
+    if (!loggedIn) return;
+    const timer = setTimeout(async () => {
+      const token = (await getValidSessionRef.current())?.access_token;
+      if (token) void indexPendingCalls(token, true);
+    }, 25_000);
+    return () => clearTimeout(timer);
+  }, [loggedIn]);
 
   // Reading the whole address book blocks the JS thread for a moment, so it is done once, a while after login when
   // nothing else is going on, instead of during the user's first sentence (that made the mic stutter).

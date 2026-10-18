@@ -175,6 +175,7 @@ export const CAPABILITIES: CapabilityCategory[] = [
       { label: 'Change my name, voice and style', say: 'Open my assistant settings', route: '/settings/assistant' },
       { label: 'Remember people and facts for next time', say: 'Remember that my sister is Anita and her birthday is 12 March', tool: 'remember_fact' },
       { label: 'What I remember, and forget on request', say: 'What do you know about Anita? Forget her birthday', tool: 'recall_memory', route: '/settings/memory' },
+      { label: 'What was said before, word for word', say: 'What did Rahul say when we called him four days ago?', tool: 'recall_past', route: '/settings/memory' },
     ],
   },
 ];

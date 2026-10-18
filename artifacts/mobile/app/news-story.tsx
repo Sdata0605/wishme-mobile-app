@@ -78,7 +78,7 @@ export default function NewsStoryScreen() {
     }
     const text = [title, ...body].join('. ');
     setSpeaking(true);
-    Speech.speak(text, { onDone: () => setSpeaking(false), onStopped: () => setSpeaking(false), onError: () => setSpeaking(false) });
+    Speech.speak(text, { rate: 1.1, onDone: () => setSpeaking(false), onStopped: () => setSpeaking(false), onError: () => setSpeaking(false) });
   };
   const open = () => {
     const target = articleUrl || url;

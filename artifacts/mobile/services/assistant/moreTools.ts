@@ -16,6 +16,7 @@ import { deleteEvent, listEvents, updateEvent, type CalendarEvent } from '@/serv
 import { createReminder, DEFAULT_DRAFT, deleteReminder, listReminders, setReminderDone, updateReminder, type Reminder } from '@/services/hub/reminders';
 import { forgetMemories, recallMemories, rememberFact } from './memory';
 import { findContacts, launchActivity } from './phone';
+import { describeHits, searchMemory } from './recall';
 
 const str = (description: string) => ({ type: 'STRING', description });
 const num = (description: string) => ({ type: 'NUMBER', description });
@@ -148,6 +149,19 @@ export const MORE_FUNCTION_DECLARATIONS = [
     name: 'recall_memory',
     description: 'Look up what you remember about a person or a topic ("what do you know about Anita?", "what is my wife\'s name?"). Pass nothing to get the latest memories.',
     parameters: { type: 'OBJECT', properties: { query: str('A name or topic') } },
+  },
+  {
+    name: 'recall_past',
+    description:
+      'Look up what was said earlier, word for word, in past conversations with you and in the AI phone calls you made for the user. Use it whenever the user asks about something said before: "what did Rahul say when we called him four days ago?", "what did I tell you about the sister wedding?", "what was the plan we talked about yesterday?". Pass the name of the person when there is one, how many days ago when they say when (4 for "four days ago", 1 for yesterday, 7 for last week), and the topic in a few words. It also returns the saved facts about that person or topic.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: str('The topic in a few words, e.g. "loan repayment" or "sister wedding". Leave empty to just get the conversations with that person or on that day.'),
+        person: str('The name of a person, if the question is about someone'),
+        days_ago: num('About how many days ago, if the user said when (0 today, 1 yesterday)'),
+      },
+    },
   },
   {
     name: 'forget_memory',
@@ -497,6 +511,30 @@ export async function runMoreTool(name: string, a: Record<string, unknown>, ctx:
       return rows.length
         ? { ok: true, memories: rows.map((m) => `${m.subject}: ${m.fact}`), instruction: 'Answer from these in natural sentences.' }
         : { ok: true, memories: [], instruction: 'You have nothing remembered about that. Say so, and offer to remember it if they tell you.' };
+    }
+    case 'recall_past': {
+      if (!token) return { ok: false, error: 'The user needs to log in again.' };
+      const daysAgo = Number(a.days_ago);
+      try {
+        const found = await searchMemory(token, {
+          query: typeof a.query === 'string' ? a.query : undefined,
+          person: typeof a.person === 'string' ? a.person : undefined,
+          days_ago: a.days_ago !== undefined && a.days_ago !== null && a.days_ago !== '' && Number.isFinite(daysAgo) ? daysAgo : undefined,
+          limit: 5,
+        });
+        ctx.onAction?.('Looking back');
+        if (!found.results.length) {
+          return { ok: true, found: [], instruction: 'Nothing was found for that. Say so honestly in one sentence and offer to look for it another way (a different name or day). Do not guess or invent what was said.' };
+        }
+        return {
+          ok: true,
+          found: describeHits(found.results),
+          instruction:
+            'These are the exact earlier records, newest relevant first. Answer the question from them: say what was actually said (quote the key words) and when, in natural speech. If they do not answer the question, say you found nothing about that. Never add details that are not in them.',
+        };
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : 'The lookup failed.', instruction: 'Say in one short sentence that you could not look it up right now, and offer to try again.' };
+      }
     }
     case 'forget_memory': {
       if (!token) return { ok: false, error: 'The user needs to log in again.' };

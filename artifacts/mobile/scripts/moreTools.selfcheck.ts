@@ -21,6 +21,9 @@ const FAKES: Record<string, string> = {
     export async function updateReminder(t, id, patch) { (globalThis.__calls ??= []).push(['updateReminder', id, patch]); }
     export async function deleteReminder(t, id) { (globalThis.__calls ??= []).push(['deleteReminder', id]); }
     export async function setReminderDone(t, id, done) { (globalThis.__calls ??= []).push(['setReminderDone', id, done]); }`,
+  './recall': `
+    export function describeHits(h) { return h.map((x) => ({ when: '15 Oct 2026', kind: 'phone call', person: x.person, text: x.content })); }
+    export async function searchMemory(t, args) { (globalThis.__calls ??= []).push(['searchMemory', args]); if (globalThis.__recall === 'fail') throw new Error('network'); return { results: globalThis.__recall ?? [], used: {} }; }`,
   './phone': `
     export async function launchActivity(action, params) { (globalThis.__intents ??= []).push({ action, ...params }); return globalThis.__clock === 'refuse' ? 'failed' : 'launched'; }
     export async function findContacts(q) { return globalThis.__contactReply(q); }`,
@@ -144,5 +147,23 @@ reset();
 const logged = await m.runMoreTool('remember_fact', { subject: 'Anita (sister)', fact: 'birthday is 12 March' }, { ...ctx(), getAccessToken: async () => null });
 check('memory needs a login', logged.ok === false);
 check('a tool it does not own is left alone', (await m.runMoreTool('web_search', {}, ctx())) === null);
+
+// ─── Looking back at past conversations and calls ───────────────────────────
+g.__calls = [];
+g.__recall = [{ content: 'Rahul: I will pay by Friday.', person: 'Rahul', at: '2026-10-15T10:00:00Z', source: 'call', kind: 'chunk' }];
+r = await m.runMoreTool('recall_past', { query: 'loan', person: 'Rahul', days_ago: 4 }, ctx());
+check('recall_past asks the memory with the person, topic and days', g.__calls.some((c: any) => c[0] === 'searchMemory' && c[1].person === 'Rahul' && c[1].query === 'loan' && c[1].days_ago === 4), g.__calls);
+check('recall_past hands back the exact words and tells the model not to invent', r.ok === true && r.found[0].text.includes('pay by Friday') && /Never add details/.test(r.instruction), r);
+g.__recall = [];
+r = await m.runMoreTool('recall_past', { query: 'cricket' }, ctx());
+check('nothing found is said honestly, not invented', r.ok === true && r.found.length === 0 && /Do not guess/.test(r.instruction), r);
+g.__calls = [];
+await m.runMoreTool('recall_past', { person: 'Anita' }, ctx());
+check('no days given means no day filter', g.__calls[0][1].days_ago === undefined, g.__calls);
+g.__recall = 'fail';
+r = await m.runMoreTool('recall_past', { query: 'x' }, ctx());
+check('a network failure is reported, not crashed', r.ok === false && /could not look it up/.test(r.instruction), r);
+const loggedOut = await m.runMoreTool('recall_past', { query: 'x' }, { ...ctx(), getAccessToken: async () => null });
+check('recall_past needs a login', loggedOut.ok === false);
 
 console.log(`${checks} checks passed`);

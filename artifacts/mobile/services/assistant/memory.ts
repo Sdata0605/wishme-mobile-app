@@ -7,15 +7,22 @@
 
 import { supabaseFetch } from '@/constants/supabase';
 
+export type MemoryCategory = 'about_me' | 'people' | 'goals' | 'events' | 'preferences' | 'follow_up' | 'work' | 'feelings' | 'places' | 'calls' | 'other';
+
 export interface Memory {
   id: string;
   subject: string;
   fact: string;
   created_at: string;
+  category: MemoryCategory;
+  person: string | null;
+  event_date: string | null;
+  /** user = told to remember, chat = noted from a conversation, call = from an AI phone call. */
+  source: 'user' | 'chat' | 'call';
 }
 
 const TABLE = '/rest/v1/assistant_memories';
-const COLUMNS = 'id,subject,fact,created_at';
+const COLUMNS = 'id,subject,fact,created_at,category,person,event_date,source';
 
 /** The most the assistant is shown, so the system prompt (resent every Sarvam turn) stays short. */
 const BLOCK_ROWS = 25;
