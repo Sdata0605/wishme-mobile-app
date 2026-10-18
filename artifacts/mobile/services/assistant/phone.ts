@@ -37,7 +37,7 @@ const LAUNCH_SETTLE_MS = 400;
  * the launched activity returns to us (a call or another app can take minutes), but we want to
  * answer straight away. A launch failure (app not installed) rejects almost instantly.
  */
-async function launchActivity(
+export async function launchActivity(
   action: string,
   params: IntentLauncher.IntentLauncherParams,
 ): Promise<'launched' | 'failed'> {

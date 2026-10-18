@@ -29,6 +29,7 @@ import { resolveLanguage, SARVAM_LANGUAGE_NAMES, type LanguageRequest } from './
 import { DOC_FUNCTION_DECLARATIONS, runDocTool, type DocToolContext } from './docTools';
 import { WEB_FUNCTION_DECLARATIONS, runWebTool } from './webSearch';
 import { spokenSummary } from './capabilities';
+import { MORE_FUNCTION_DECLARATIONS, runMoreTool } from './moreTools';
 import { openPictures, picturesUrl, sourceLabel, subjectOf, type PictureSource } from './pictures';
 import { newsAbout, topStories, type Story } from '../home/news';
 
@@ -54,7 +55,7 @@ export interface ToolContext extends HubToolContext, DocToolContext {
   /** Show the "What I can do" card (all categories, or one). */
   showCapabilities?: (categoryId?: string) => void;
   /** Opens a link after the assistant has finished its sentence, and resumes the conversation when the user comes back. */
-  openAfterReply?: (url: string, subject: string) => void;
+  openAfterReply?: (url: string, subject: string, backNote?: string) => void;
 }
 
 // ─── Screens the assistant can open ──────────────────────────────────────────
@@ -467,6 +468,7 @@ export const FUNCTION_DECLARATIONS = [
   ...HUB_FUNCTION_DECLARATIONS,
   ...DOC_FUNCTION_DECLARATIONS,
   ...WEB_FUNCTION_DECLARATIONS,
+  ...MORE_FUNCTION_DECLARATIONS,
   ...UI_FUNCTION_DECLARATIONS,
 ];
 
@@ -575,6 +577,14 @@ export async function runAssistantTool(
   // Reminders and calendar entries created by voice.
   const hubResult = await runHubTool(call.name, a, ctx);
   if (hubResult) return hubResult;
+
+  // Alarms and timers, WhatsApp / email drafts, maps, reading a page, changing reminders and events, memory.
+  try {
+    const moreResult = await runMoreTool(call.name, a, ctx);
+    if (moreResult) return moreResult;
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'That did not work.', instruction: 'Say in one sentence that it did not work, and offer to try again. Do not claim it worked.' };
+  }
 
   // Documents: written by the server, rendered and kept on the phone.
   const docResult = await runDocTool(call.name, a, {

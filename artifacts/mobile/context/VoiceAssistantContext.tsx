@@ -18,6 +18,7 @@ import React, {
 } from 'react';
 import { Alert, Animated, AppState, Easing, InteractionManager, Linking } from 'react-native';
 import type { Story } from '@/services/home/news';
+import { clearMemoryCache, refreshMemories } from '@/services/assistant/memory';
 import { useAgentState } from '@/context/AgentStateContext';
 import { useAssistantPersona } from '@/context/AssistantPersonaContext';
 import { useAuth } from '@/context/AuthContext';
@@ -139,7 +140,7 @@ ${call.summary ?? 'The call has ended.'}`, [
   const [actionLabel, setActionLabel] = useState('');
   const [news, setNews] = useState<{ topic: string; stories: Story[] } | null>(null);
   // Set when the assistant is about to leave the app on purpose (pictures in the browser): the app resumes the conversation on return.
-  const awayRef = useRef<{ subject: string; at: number } | null>(null);
+  const awayRef = useRef<{ subject: string; at: number; note?: string } | null>(null);
   const resumeNoteRef = useRef<string | null>(null);
   const [error, setErrorState] = useState<string | null>(null);
 
@@ -276,8 +277,8 @@ ${call.summary ?? 'The call has ended.'}`, [
             router.push({ pathname: '/features', params: category ? { category } : {} } as never);
           },
           // Let the assistant finish its sentence IN the app, then open the browser; coming back resumes the conversation.
-          openAfterReply: (url, subject) => {
-            awayRef.current = { subject, at: Date.now() };
+          openAfterReply: (url, subject, backNote) => {
+            awayRef.current = { subject, at: Date.now(), note: backNote };
             let waited = 0;
             let spoke = false;
             const timer = setInterval(() => {
@@ -319,6 +320,11 @@ ${call.summary ?? 'The call has ended.'}`, [
 
   // Warm the connection while logged in and the app is in the foreground.
   const loggedIn = !!session?.access_token;
+  // What the assistant remembers is read ahead of the next conversation (and forgotten when the user logs out).
+  useEffect(() => {
+    if (loggedIn) void refreshMemories(tokenRef.current);
+    else clearMemoryCache();
+  }, [loggedIn]);
   // Don't connect before we know which voice/persona to use (a cached persona counts as known).
   const personaKnown = personaStatus !== 'loading';
   useEffect(() => {
@@ -339,7 +345,7 @@ ${call.summary ?? 'The call has ended.'}`, [
         const away = awayRef.current;
         awayRef.current = null;
         if (away && Date.now() - away.at < 90_000 && !openRef.current) {
-          resumeNoteRef.current = `[The user is back from looking at pictures of ${away.subject}. This is the same conversation, so do not greet them. In one short sentence ask if they want more, for example from Instagram or Facebook. Then wait.]`;
+          resumeNoteRef.current = away.note ?? `[The user is back from looking at pictures of ${away.subject}. This is the same conversation, so do not greet them. In one short sentence ask if they want more, for example from Instagram or Facebook. Then wait.]`;
           setOpen(true);
           setMinimized(false);
           void client.startListening();

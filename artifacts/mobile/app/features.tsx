@@ -17,9 +17,8 @@ const BUILDING: [string, string][] = [
 ];
 
 const PLANNED: [string, string][] = [
-  ['Memory', 'The assistant remembers people and facts between conversations'],
-  ['Alarms and timers', 'Set and stop alarms and timers by voice'],
-  ['WhatsApp and email', 'Send messages and read your mail by voice'],
+  ['Email inbox', 'Link your mailbox so the assistant can read your mail'],
+  ['Real Instagram and Facebook profiles', 'Open a person\'s own profile, not just a search'],
   ['Clients & patients', 'Case files, notes and their documents'],
   ['Markets', 'Live stocks and analysis'],
   ['Style Studio', 'Try on outfits and hairstyles on your own photo'],

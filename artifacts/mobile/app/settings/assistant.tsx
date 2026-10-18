@@ -1,4 +1,5 @@
 import React from 'react';
+import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AssistantSettingsPanel } from '@/components/assistant/AssistantSettingsPanel';
@@ -56,6 +57,17 @@ export default function AssistantSettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         <AddressAs />
+        <Pressable
+          onPress={() => router.push('/settings/memory' as never)}
+          accessibilityRole="link"
+          style={[s.row, { borderColor: colors.border, marginBottom: 24 }]}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: colors.foreground, fontSize: 15.5, fontFamily: 'Inter_500Medium' }}>What I remember</Text>
+            <Text style={{ color: colors.mutedForeground, fontSize: 12.5, fontFamily: 'Inter_400Regular', marginTop: 3 }}>See, and remove, what the assistant remembers about you.</Text>
+          </View>
+          <Icon name="chevron-right" size={18} color={colors.mutedForeground} />
+        </Pressable>
         <AssistantSettingsPanel />
       </ScrollView>
     </View>

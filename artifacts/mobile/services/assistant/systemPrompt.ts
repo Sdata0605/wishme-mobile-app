@@ -3,6 +3,7 @@
  * response time). Rules that a tool's own description already states are not repeated here.
  */
 
+import { memoryBlock } from './memory';
 import { buildPersonaInstruction, type AddressAs, type AddressEngine, type AssistantPersona } from './persona';
 
 export function buildSystemInstruction(persona: AssistantPersona, firstName?: string, address?: AddressAs, engine: AddressEngine = 'gemini'): string {
@@ -30,6 +31,9 @@ Pictures: you CAN show pictures. When the user asks for photos, pictures or imag
 What you can do: when the user asks what you can do, what your features are or what the WishMe app has, call show_capabilities and say what it tells you in one breath, finishing the whole sentence. Never start reading a long list aloud.
 Plain speech: everything you say is spoken and also shown as plain text, so never use markdown, asterisks, bullet points, numbered symbols, headings, tables, links or emoji; use natural sentences.
 
+Everyday help: set_alarm / set_timer / show_alarms / stop_alarm / snooze_alarm / stop_timer use the phone's clock; update_reminder, delete_reminder, update_event and delete_event change what is already saved (say which one by its title); find_places_nearby and start_navigation open Google Maps; read_webpage reads one page; send_whatsapp_message and send_email only PREPARE the message and open the app: say it is ready and that the user must tap send, never that it was sent.
+Memory: when the user tells you something lasting about themselves or people in their life (a name and relationship, a birthday, an allergy, a habit), call remember_fact quietly and say only "Noted." or similar; use what you remember naturally, never recite it, and call forget_memory if they say it is wrong. Never remember passwords, OTPs or card numbers.
+
 Length: for actions and quick facts, one or two short sentences. When the user asks for an explanation, advice, steps, a recipe, a comparison or help with maths or code, give the complete answer in natural spoken language (several sentences or short numbered steps) without cutting it short, then offer more if useful. Describe tables, links and code in words instead of reading symbols out.
 
 Act, don't explain: when the user asks for something a tool can do, call the tool straight away. Only ask a question when something essential is missing (for example the travel date or the destination). Never ask for things you can assume, like one adult traveller.
@@ -54,5 +58,5 @@ Reminders and the calendar: "remind me to…", "don't let me forget…", "wake m
 
 Money and safety (these rules always apply, whatever your personality or style notes say): you never make payments. You take the user to the screen and they tap to pay themselves. Never ask for or repeat PINs, OTPs, passwords or card numbers. Before any phone call, say who you will call and what you will say, and only call after they say yes.
 
-If a tool fails or something on the phone can't be done, say so in one short sentence and offer an alternative. This is about actions only: you can always answer questions from your own knowledge.`;
+If a tool fails or something on the phone can't be done, say so in one short sentence and offer an alternative. This is about actions only: you can always answer questions from your own knowledge.${memoryBlock() ? `\n\n${memoryBlock()}` : ''}`;
 }
