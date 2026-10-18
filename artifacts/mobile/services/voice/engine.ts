@@ -235,6 +235,13 @@ export class AssistantEngine {
       if (!this.wantListening) return;
       const s = this.getState();
       if (s === 'listening' || s === 'speaking') return;
+      // Still working on the connection (fetching the token, opening the socket, retrying): wait for it. The engine is only
+      // handed over when it has really given up (its state is no longer "connecting"), never part-way through a connect.
+      if (s === 'connecting' && this.active === 'gemini') {
+        log('still connecting, waiting for', this.active, 'instead of switching');
+        this.armDeadline();
+        return;
+      }
       const other: EngineKind = this.active === 'gemini' ? 'sarvam' : 'gemini';
       if (this.fallback !== other) return;
       log('not listening after the deadline, switching to', other);
@@ -246,11 +253,15 @@ export class AssistantEngine {
     // The conversation starts now. Only wait for the server's answer on the very first run; after that the choice it made
     // last time is used straight away and refreshed in the background.
     this.wantListening = true;
+    const tEng = Date.now();
+    log('engine.startListening | active', this.active, '| haveChoice', this.haveChoice, '| geminiState', this.gemini.getState());
     // Boot the web-search function now, so the first question that needs it does not wait for a cold start.
     warmWebSearch(this.opts.getAccessToken);
     await this.remembered;
+    log('engine: remembered choice read after', Date.now() - tEng, 'ms');
     if (!this.haveChoice) await Promise.race([this.resolve(), new Promise<void>((r) => setTimeout(r, FIRST_RUN_WAIT_MS))]);
     else void this.resolve();
+    log('engine: handing over to', this.active, 'after', Date.now() - tEng, 'ms');
     if (!this.wantListening) return;
     this.armDeadline();
     if (this.active === 'sarvam') {
@@ -278,6 +289,11 @@ export class AssistantEngine {
   /** Sends typed text into the live conversation (used by the "try asking" chips). */
   sendText(text: string) {
     this.current.sendText(text);
+  }
+
+  /** The app went to the background: let the speaker and mic go (the connection is kept). */
+  releaseAudio() {
+    this.gemini.releaseAudioEngine();
   }
 
   stopListening() {

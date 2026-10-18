@@ -6,6 +6,7 @@
  * switch the microphone on. Tools run through services/assistant/tools.ts.
  */
 
+import { bootLog } from '@/services/bootLog';
 import { router } from 'expo-router';
 import React, {
   createContext,
@@ -335,7 +336,10 @@ ${call.summary ?? 'The call has ended.'}`, [
   const client = clientRef.current;
 
   // Warm the connection while logged in and the app is in the foreground.
-  const loggedIn = !!session?.access_token;
+  // The saved login counts at once: the app restores the user from the phone in a moment, while renewing an expired token
+  // can take seconds on a slow network. The connection's own token request waits for that renewal, so warming starts
+  // during the splash instead of after it.
+  const loggedIn = !!(session?.access_token || user?.id);
   // What the assistant remembers is read ahead of the next conversation (and forgotten when the user logs out).
   useEffect(() => {
     if (loggedIn) void refreshMemories(tokenRef.current);
@@ -344,15 +348,18 @@ ${call.summary ?? 'The call has ended.'}`, [
   // Don't connect before we know which voice/persona to use (a cached persona counts as known).
   const personaKnown = personaStatus !== 'loading';
   useEffect(() => {
+    bootLog('assistant: start-up check | logged in =', loggedIn, '| persona known =', personaKnown, '| app state =', AppState.currentState);
     if (!loggedIn || !personaKnown) {
       client.shutdown();
       setOpen(false);
       return;
     }
+    bootLog(`assistant: WARMING NOW (app is ${AppState.currentState})`);
     if (AppState.currentState === 'active') client.warm();
 
     let bgTimer: ReturnType<typeof setTimeout> | null = null;
     const sub = AppState.addEventListener('change', (next) => {
+      if (__DEV__) console.log(`[app] state -> ${next}`);
       if (next === 'active') {
         if (bgTimer) clearTimeout(bgTimer);
         bgTimer = null;
@@ -378,6 +385,7 @@ ${call.summary ?? 'The call has ended.'}`, [
         setMinimized(false);
         client.stopListening();
       }
+      client.releaseAudio();
       bgTimer = setTimeout(() => {
         bgTimer = null;
         if (client.isRequestingPermission() || isPermissionDialogOpen()) return;
@@ -445,7 +453,7 @@ ${call.summary ?? 'The call has ended.'}`, [
 
   // While the orb is minimised the user is working on screen, so be patient with silence.
   useEffect(() => {
-    client.setIdleTimeout(minimized ? 180_000 : 30_000);
+    client.setIdleTimeout(minimized ? 180_000 : 90_000);
   }, [minimized, client]);
 
   const close = useCallback(() => {
@@ -470,6 +478,7 @@ ${call.summary ?? 'The call has ended.'}`, [
     setMinimized(false);
     setOpen(true);
     sessionTitleRef.current = null;
+    if (__DEV__) console.log(`[tap] mic button pressed at ${new Date().toISOString()} | engine ${client.activeEngine}`);
     void client.startListening();
   }, [client, close]);
 

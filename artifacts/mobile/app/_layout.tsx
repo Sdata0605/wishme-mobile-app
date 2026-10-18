@@ -18,6 +18,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { bootLog } from '@/services/bootLog';
 import { adoptRootFromInstance } from '@/assistant-hook';
 import '@/constants/cancelableAlerts';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -234,12 +235,19 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    bootLog('root layout mounted: providers (login, persona, assistant) are being created now, fonts loaded =', fontsLoaded);
+  }, []);
+
+  useEffect(() => {
     if (fontsLoaded || fontError) {
+      bootLog('fonts ready: native splash hides, the first screen can draw. error =', !!fontError);
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
-  if (!fontsLoaded && !fontError) return null;
+  // The providers mount at once, while the fonts are still loading behind the native splash: the assistant's connection
+  // (login restore, voice token, socket, setup) starts then instead of after the first screen. Only what is drawn waits.
+  const fontsReady = fontsLoaded || !!fontError;
 
   return (
     <SafeAreaProvider>
@@ -254,6 +262,7 @@ export default function RootLayout() {
                     <VoiceAssistantProvider>
                       <DrawerProvider>
                       <OrderConfirmProvider>
+                        {fontsReady ? (
                         <View style={{ flex: 1 }} ref={adoptRootFromInstance}>
                           <ThemedStatusBar />
                           <RootLayoutNav />
@@ -263,6 +272,7 @@ export default function RootLayout() {
                           <ReminderNotifications />
                           <OccasionInApp />
                         </View>
+                        ) : null}
                       </OrderConfirmProvider>
                       </DrawerProvider>
                     </VoiceAssistantProvider>

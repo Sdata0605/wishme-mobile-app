@@ -8,6 +8,7 @@
  *  - 'ready'       persona loaded (or the user skipped, so the defaults are saved)
  */
 
+import { bootLog } from '@/services/bootLog';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, {
   createContext,
@@ -120,6 +121,7 @@ export function AssistantPersonaProvider({ children }: { children: React.ReactNo
         /* ignore a bad cache */
       }
       if (cancelled) return;
+      bootLog('persona: saved copy', cached ? 'found, voice ready' : 'not found, waiting for the database');
       if (cached) {
         setPersona(cached);
         setStatus('ready');

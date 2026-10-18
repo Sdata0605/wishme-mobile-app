@@ -1,3 +1,4 @@
+import { bootLog } from '@/services/bootLog';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
@@ -297,6 +298,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const storedSession = JSON.parse(sessionStr) as Session;
           const storedUser    = JSON.parse(userStr) as User;
           sessionRef.current = storedSession;
+          bootLog('login: restored from the phone | stale token (needs renewing) =', isTokenStale(storedSession.access_token));
           setUser(storedUser);
           // An expired token is renewed before screens get it: handing it out first made every screen's first
           // request fail with 401 after the app had been closed for an hour.
@@ -324,7 +326,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!toRefresh) return;
       const { session: stored, user: storedUser } = toRefresh;
+      const refreshStart = Date.now();
+      bootLog('login: renewing the expired token');
       const refreshed = await refreshOnce(stored);
+      bootLog('login: token renewal finished in', Date.now() - refreshStart, 'ms |', refreshed === 'offline' ? 'offline' : refreshed ? 'ok' : 'refused');
       if (refreshed === 'offline') {
         setSession(stored);
         return;
