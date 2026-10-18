@@ -82,4 +82,16 @@ check('the main tools are all in the list', unlisted.length === 0, unlisted);
 check('the spoken summary names every category once and is short', cap.spokenSummary().split(';').length === categories.length && cap.spokenSummary().length < 700, cap.spokenSummary().length);
 check('a category can be asked for by id or title', cap.categoriesFor('travel').length === 1 && cap.categoriesFor('Travel')[0].id === 'travel' && cap.categoriesFor('nonsense').length === categories.length);
 
+// ─── Claims without a tool call (seen on a phone: "I have opened the screen", and no show_pictures in the log) ───
+const claim = await import(new URL('../services/assistant/claimCheck.ts', import.meta.url).href);
+check('"I have opened the screen" after a pictures request, no tool: the model is told', claim.missedTool('I have opened the screen.', 'Show me hit pictures.', 0)?.tool === 'show_pictures');
+check('the nudge tells it to use the full name, never "his"', /full name/.test(claim.missedTool('Opened.', 'show me his photos', 0).nudge) && /never "his"/.test(claim.missedTool('Opened.', 'show me his photos', 0).nudge));
+check('a tool was called: nothing to say', claim.missedTool('I have opened it.', 'show me pictures of Virat Kohli', 1) === null);
+check('a clarifying question is not a claim', claim.missedTool('Which Rahul do you mean: Gandhi, Dravid or someone else?', 'show me pictures of Rahul', 0) === null);
+check('"I will show you pictures once you tell me" is not a claim', claim.missedTool('I will show you pictures once you tell me which one.', 'pictures please', 0) === null);
+check('an answer about something else is left alone', claim.missedTool('It is 32 degrees in Pune and it is open weather.', 'what is the weather', 0) === null);
+check('headlines claimed but show_news never called', claim.missedTool('The headlines are on your screen.', 'what is the news', 0)?.tool === 'show_news');
+check('a Hindi claim after a Hindi request is caught', claim.missedTool('मैंने खोल दिया है।', 'विराट कोहली की फोटो दिखाओ', 0)?.tool === 'show_pictures');
+check('an empty answer is left alone', claim.missedTool('', 'show me pictures', 0) === null);
+
 console.log(`${checks} checks passed`);

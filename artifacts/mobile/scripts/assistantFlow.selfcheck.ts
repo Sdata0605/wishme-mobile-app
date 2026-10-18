@@ -164,6 +164,22 @@ await run('read_screen', {});
 r = await run('open_website', { url: 'flipkart.com' });
 check('opening a website right after a screen tool still asks first', r.needs_confirmation === true, r);
 
+// Pictures: the tool opens Google Images after the spoken line (openAfterReply) and never refuses
+reset();
+const afterReply: { url: string; subject: string }[] = [];
+(ctx as Record<string, unknown>).openAfterReply = (url: string, subject: string) => afterReply.push({ url, subject });
+r = await run('show_pictures', { query: 'show me pictures of Virat Kohli' });
+check('show_pictures works and opens Google Images for the person after the sentence is spoken', r.ok === true && afterReply[0]?.subject === 'Virat Kohli' && afterReply[0].url === 'https://www.google.com/search?q=Virat%20Kohli&udm=2&tbm=isch', { r, afterReply });
+check('and tells the model to say one short sentence, not that it cannot show photos', /ONE short sentence/.test(String(r.instruction)) && /Do NOT say you cannot show photos/.test(String(r.instruction)), r);
+r = await run('show_pictures', { query: 'virat kohli', source: 'instagram' });
+check('Instagram pictures open as a Google image search on instagram.com', afterReply[1].url.includes('site%3Ainstagram.com'), afterReply[1]);
+r = await run('show_pictures', { query: '' });
+check('no subject: asks who', r.ok === false);
+delete (ctx as Record<string, unknown>).openAfterReply;
+reset();
+r = await run('show_pictures', { query: 'Taj Mahal' });
+check('without the timing hook it still opens straight away', r.ok === true && (globalThis as any).__opened?.some((u: string) => u.includes('Taj%20Mahal')), { r, opened: (globalThis as any).__opened });
+
 if (failures.length) {
   console.log(failures.map((f) => f.split('\n')[0]).join('\n'));
   console.log(`assistantFlow: ${failures.length} of ${checks} checks failed`);

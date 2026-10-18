@@ -19,6 +19,7 @@ import React, {
 import { Alert, Animated, AppState, Easing, InteractionManager, Linking } from 'react-native';
 import type { Story } from '@/services/home/news';
 import { clearMemoryCache, refreshMemories } from '@/services/assistant/memory';
+import { missedTool } from '@/services/assistant/claimCheck';
 import { useAgentState } from '@/context/AgentStateContext';
 import { useAssistantPersona } from '@/context/AssistantPersonaContext';
 import { useAuth } from '@/context/AuthContext';
@@ -142,6 +143,8 @@ ${call.summary ?? 'The call has ended.'}`, [
   // Set when the assistant is about to leave the app on purpose (pictures in the browser): the app resumes the conversation on return.
   const awayRef = useRef<{ subject: string; at: number; note?: string } | null>(null);
   const resumeNoteRef = useRef<string | null>(null);
+  // What was said and which tools ran in the turn in progress: if the assistant claims it did something and called no tool, it is told.
+  const turnRef = useRef({ heard: '', said: '', tools: 0, nudged: false });
   const [error, setErrorState] = useState<string | null>(null);
 
   // Raw loudness comes in at the mic/speaker event rate; a ticker turns it into one smoothed
@@ -238,25 +241,37 @@ ${call.summary ?? 'The call has ended.'}`, [
           if (assistantDone.current) {
             // First words of a new turn: clear the previous exchange.
             assistantDone.current = false;
+            turnRef.current = { heard: '', said: '', tools: 0, nudged: false };
             textBuffer.current = { user: '', assistant: '' };
             setUserText('');
             setAssistantText('');
           }
           textBuffer.current.user += text;
+          turnRef.current.heard += text;
           queueTextFlush();
         } else if (final) {
           assistantDone.current = true;
           flushText();
+          // The answer is finished: did it claim something it never did?
+          const t = turnRef.current;
+          const missed = t.nudged ? null : missedTool(t.said, t.heard, t.tools);
+          if (missed) {
+            t.nudged = true;
+            console.warn(`[assistant] said it was done but never called ${missed.tool}: telling it`);
+            clientRef.current?.sendText(missed.nudge);
+          }
         } else {
           textBuffer.current.assistant += text;
+          turnRef.current.said += text;
           queueTextFlush();
         }
       },
       onLevels: (levels) => {
         rawLevels.current = levels;
       },
-      onToolCall: (call) =>
-        runAssistantTool(call, {
+      onToolCall: (call) => {
+        turnRef.current.tools++;
+        return runAssistantTool(call, {
           router,
           setPrefill: (data) => {
             // Start each task from a clean slate so old details don't leak into new forms.
@@ -312,7 +327,8 @@ ${call.summary ?? 'The call has ended.'}`, [
             setOpen(false);
             client.stopListening();
           },
-        }),
+        });
+      },
       onError: setError,
     });
   }
