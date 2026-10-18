@@ -322,6 +322,11 @@ export class AssistantEngine {
     this.sarvam.setHoldOpen(hold);
   }
 
+  /** Which engine is talking right now. Only Gemini hears the user's voice. */
+  get activeEngine(): EngineKind {
+    return this.active;
+  }
+
   /**
    * Switches the spoken language mid-conversation.
    *

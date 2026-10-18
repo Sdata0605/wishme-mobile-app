@@ -4,34 +4,38 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AssistantSettingsPanel } from '@/components/assistant/AssistantSettingsPanel';
 import { SectionLabel } from '@/components/assistant/PersonaForm';
 import { SettingsHeader } from '@/components/settings/SettingsUI';
-import { useAuth, type Gender } from '@/context/AuthContext';
+import { Icon } from '@/components/Icon';
+import { useAuth } from '@/context/AuthContext';
+import { ADDRESS_OPTIONS } from '@/services/assistant/addressModes';
 import { useTheme } from '@/context/ThemeContext';
 
-const OPTIONS: { key: Gender; label: string }[] = [
-  { key: 'male', label: 'Sir' },
-  { key: 'female', label: "Ma'am" },
-  { key: 'other', label: 'No title' },
-];
-
-/** How the assistant addresses the user: "Hello sir", "Hello ma'am" or just "Hello". */
+/** How the assistant addresses the user: always sir, always ma'am, or decided from their voice in each conversation. */
 function AddressAs() {
   const { colors } = useTheme();
-  const { user, setGender } = useAuth();
+  const { user, setAddressMode } = useAuth();
   return (
-    <View style={{ marginBottom: 24 }}>
-      <SectionLabel title="How I address you" subtitle="The assistant greets you with this." />
-      <View style={s.row}>
-        {OPTIONS.map((o) => {
-          const on = user?.gender === o.key;
+    <View style={{ marginBottom: 24 }} accessibilityRole="radiogroup">
+      <SectionLabel title="How I address you" subtitle="Applies right away." />
+      <View style={{ gap: 10, marginTop: 10 }}>
+        {ADDRESS_OPTIONS.map((o) => {
+          const on = user?.addressMode === o.key;
           return (
             <Pressable
               key={o.key}
-              onPress={() => setGender(o.key)}
+              onPress={() => setAddressMode(o.key)}
               accessibilityRole="radio"
               accessibilityState={{ selected: on }}
-              style={[s.chip, { borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + '1F' : 'transparent' }]}
+              style={[s.row, { borderColor: on ? colors.primary : colors.border, backgroundColor: on ? colors.primary + '1F' : 'transparent' }]}
             >
-              <Text style={{ color: on ? colors.primary : colors.foreground, fontSize: 15, fontFamily: on ? 'Inter_600SemiBold' : 'Inter_500Medium' }}>{o.label}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: on ? colors.primary : colors.foreground, fontSize: 15.5, fontFamily: on ? 'Inter_600SemiBold' : 'Inter_500Medium' }}>{o.label}</Text>
+                {o.key === 'voice' ? (
+                  <Text style={{ color: colors.mutedForeground, fontSize: 12.5, fontFamily: 'Inter_400Regular', marginTop: 3, lineHeight: 17 }}>
+                    Says just “Hello”, then picks sir or ma’am from your voice. It decides again in every new conversation.
+                  </Text>
+                ) : null}
+              </View>
+              {on ? <Icon name="check" size={18} color={colors.primary} /> : null}
             </Pressable>
           );
         })}
@@ -59,6 +63,5 @@ export default function AssistantSettingsScreen() {
 }
 
 const s = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 10, marginTop: 10 },
-  chip: { borderWidth: 1.4, borderRadius: 22, paddingHorizontal: 22, height: 44, alignItems: 'center', justifyContent: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.4, borderRadius: 18, paddingHorizontal: 18, paddingVertical: 12, minHeight: 52 },
 });

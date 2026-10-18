@@ -3,8 +3,11 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import { AppState } from 'react-native';
 import { parseApiError, supabaseFetch } from '@/constants/supabase';
 
-/** How the user wants to be addressed: 'male' is sir, 'female' is ma'am, 'other' is no title. Unknown until they say. */
-export type Gender = 'male' | 'female' | 'other';
+/**
+ * How the user wants the assistant to address them. 'sir' and 'madam' are fixed. 'voice' means the assistant says just
+ * "Hello", listens, and decides sir or ma'am for each conversation. Unknown until the user chooses.
+ */
+export type AddressMode = 'sir' | 'madam' | 'voice';
 
 export interface User {
   id: string;
@@ -17,7 +20,7 @@ export interface User {
   walletBalance: number;
   memberSince: string;
   referralCode: string;
-  gender?: Gender;
+  addressMode?: AddressMode;
 }
 
 export interface Session {
@@ -31,7 +34,6 @@ export interface PendingSignup {
   lastName: string;
   phone: string;
   referral?: string;
-  gender?: Gender;
 }
 
 interface InternalSignupData extends PendingSignup {
@@ -90,14 +92,13 @@ interface AuthContextValue {
     lastName: string,
     phone: string,
     referral?: string,
-    gender?: Gender,
   ) => Promise<{ error: string | null }>;
   verifyOtp: (code: string) => Promise<{ error: string | null }>;
   resendOtp: () => Promise<{ error: string | null }>;
   logout: () => Promise<void>;
   updateUser: (updates: Partial<User>) => void;
-  /** Saves how the user wants to be addressed, on the phone at once and on their account in the background. */
-  setGender: (gender: Gender) => void;
+  /** Saves how the user wants the assistant to address them, on the phone at once and on their account in the background. */
+  setAddressMode: (mode: AddressMode) => void;
   forgotPasswordByEmail: (email: string) => Promise<{ error: string | null }>;
   forgotPasswordByPhone: (phone: string) => Promise<{ error: string | null }>;
   resetPasswordWithRecoveryToken: (recoveryAccessToken: string, newPassword: string) => Promise<{ error: string | null }>;
@@ -190,8 +191,8 @@ function isTokenStale(token: string): boolean {
   return exp === 0 || Date.now() > exp - 5 * 60 * 1000;
 }
 
-function asGender(v: unknown): Gender | undefined {
-  return v === 'male' || v === 'female' || v === 'other' ? v : undefined;
+function asAddressMode(v: unknown): AddressMode | undefined {
+  return v === 'sir' || v === 'madam' || v === 'voice' ? v : undefined;
 }
 
 function buildUserFromSupabase(supaUser: Record<string, unknown>, fallback: Partial<User> = {}): User {
@@ -211,7 +212,8 @@ function buildUserFromSupabase(supaUser: Record<string, unknown>, fallback: Part
       new Date().toISOString().split('T')[0],
     // meta.referral_code is the code the user signed up WITH (their referrer's), never their own.
     referralCode: fallback.referralCode ?? '',
-    gender: asGender(meta.gender) ?? fallback.gender,
+    // The old sign-up gender (meta.gender) is deliberately ignored: the assistant is no longer fixed by it.
+    addressMode: asAddressMode(meta.address_mode) ?? fallback.addressMode,
   };
 }
 
@@ -335,6 +337,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setSessionEndedAt(Date.now());
         return;
       }
+      // The address choice also lives on the account: adopt it on a new phone, and push one that never got saved.
+      let addressMode = storedUser.addressMode;
+      try {
+        const meRes = await supabaseFetch('/auth/v1/user', {}, refreshed.access_token);
+        if (meRes.ok) {
+          const meta = ((await meRes.json()) as { user_metadata?: Record<string, unknown> }).user_metadata ?? {};
+          const remote = asAddressMode(meta.address_mode);
+          if (addressMode && addressMode !== remote) {
+            await supabaseFetch('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ data: { address_mode: addressMode } }) }, refreshed.access_token);
+          } else if (!addressMode && remote) {
+            addressMode = remote;
+            const withMode = { ...storedUser, addressMode: remote };
+            setUser((prev) => (prev ? { ...prev, addressMode: remote } : prev));
+            await AsyncStorage.setItem(STORAGE_USER, JSON.stringify(withMode));
+          }
+        }
+      } catch {
+        // offline: it is reconciled the next time the app starts
+      }
+
       // Pick up anything that changed while the app was closed (wallet balance, role...).
       try {
         const profileRes = await supabaseFetch(
@@ -356,6 +378,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           walletBalance: (p.wallet_balance as number) ?? storedUser.walletBalance,
           memberSince:   (p.member_since as string)   ?? storedUser.memberSince,
           referralCode:  (p.referral_code as string)  ?? storedUser.referralCode,
+          addressMode,
         };
         setUser(freshUser);
         await AsyncStorage.setItem(STORAGE_USER, JSON.stringify(freshUser));
@@ -486,10 +509,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     lastName: string,
     phone: string,
     referral?: string,
-    gender?: Gender,
   ): Promise<{ error: string | null }> => {
     try {
-      const pending: PendingSignup = { email, firstName, lastName, phone, referral, gender };
+      const pending: PendingSignup = { email, firstName, lastName, phone, referral };
       const internal: InternalSignupData = { ...pending, password };
       setPendingSignup(pending);
       pendingRef.current = pending;
@@ -576,7 +598,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               last_name: internal.lastName,
               phone: internal.phone,
               referral_code: internal.referral ?? '',
-              gender: internal.gender ?? null,
               role: 'user',
               wallet_balance: 0,
               member_since: new Date().toISOString().split('T')[0],
@@ -653,7 +674,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         referralCode,
         walletBalance: 0,
         memberSince: new Date().toISOString().split('T')[0],
-        gender: internal.gender,
       });
 
       setSession(newSession);
@@ -770,16 +790,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const setGender = useCallback((gender: Gender) => {
-    updateUser({ gender });
+  const setAddressMode = useCallback((mode: AddressMode) => {
+    updateUser({ addressMode: mode });
     // Keep it on the account too (auth user metadata, so no database change is needed). Best effort: the phone copy is what counts.
     void (async () => {
       try {
         const token = (await getValidSession())?.access_token;
         if (!token) return;
-        await supabaseFetch('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ data: { gender } }) }, token);
+        await supabaseFetch('/auth/v1/user', { method: 'PUT', body: JSON.stringify({ data: { address_mode: mode } }) }, token);
       } catch {
-        // offline: it syncs the next time the user picks
+        // offline: it is saved to the account the next time the app starts (see the restore step)
       }
     })();
   }, [updateUser, getValidSession]);
@@ -1001,7 +1021,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resendOtp,
         logout,
         updateUser,
-        setGender,
+        setAddressMode,
         forgotPasswordByEmail,
         forgotPasswordByPhone,
         resetPasswordWithRecoveryToken,

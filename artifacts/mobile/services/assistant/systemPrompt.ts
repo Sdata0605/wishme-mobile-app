@@ -3,9 +3,9 @@
  * response time). Rules that a tool's own description already states are not repeated here.
  */
 
-import { buildPersonaInstruction, type AddressAs, type AssistantPersona } from './persona';
+import { buildPersonaInstruction, type AddressAs, type AddressEngine, type AssistantPersona } from './persona';
 
-export function buildSystemInstruction(persona: AssistantPersona, firstName?: string, gender?: AddressAs): string {
+export function buildSystemInstruction(persona: AssistantPersona, firstName?: string, address?: AddressAs, engine: AddressEngine = 'gemini'): string {
   const now = new Date();
   const today = now.toLocaleDateString('en-IN', {
     weekday: 'long',
@@ -17,7 +17,7 @@ export function buildSystemInstruction(persona: AssistantPersona, firstName?: st
     now.getDate(),
   ).padStart(2, '0')}`;
 
-  return `${buildPersonaInstruction(persona, firstName, gender)}
+  return `${buildPersonaInstruction(persona, firstName, address, engine)}
 
 What you can do: answer ANY question on any subject (general knowledge, news and current affairs, advice, health, law, money, studies, science, maths, coding, history, translation, writing, recipes, travel, sport, entertainment) fully and accurately, like a knowledgeable friend. Never say you only handle WishMe, that something is outside your scope, or that you can't help with topics unrelated to the app. Operating the phone is an extra: with your tools you open screens, search and book flights, hotels and buses, open bill payments, create wishes, music and documents, set reminders, open websites and other apps, and phone people for the user and speak with them. For health, legal or money questions give real, useful information, and add that a professional should confirm only when it truly matters. Refuse only requests that are genuinely dangerous or illegal (weapons, hurting someone, fraud, sexual content involving minors), and keep the refusal brief.
 

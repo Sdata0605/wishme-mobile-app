@@ -3,9 +3,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GenderCard, GetStartedCard, NewsCard, PlayMyDay, PromptChips, ToolChips, WeatherCard, type ToolChip } from '@/components/home/HomeBlocks';
+import { AddressCard, GetStartedCard, NewsCard, PlayMyDay, PromptChips, ToolChips, WeatherCard, type ToolChip } from '@/components/home/HomeBlocks';
 import { CallLed } from '@/components/home/HomeSections';
 import { Icon } from '@/components/Icon';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
@@ -15,6 +15,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useDrawer } from '@/context/DrawerContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useVoiceAssistant } from '@/context/VoiceAssistantContext';
+import { savedMessage } from '@/services/assistant/addressModes';
 import { listAiCalls, whoLabel, type AiCall } from '@/services/assistant/aiCalls';
 import { todaysQuote, tryAsking } from '@/services/home/dailyQuote';
 import { touchStreak } from '@/services/home/dayStreak';
@@ -55,7 +56,7 @@ const dayStamp = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDat
  */
 export default function AssistantHome() {
   const { neon } = useTheme();
-  const { user, getValidSession, setGender } = useAuth();
+  const { user, getValidSession, setAddressMode } = useAuth();
   const insets = useSafeAreaInsets();
   const { ask, toggle } = useVoiceAssistant();
   const drawer = useDrawer();
@@ -186,9 +187,14 @@ export default function AssistantHome() {
             <PlayMyDay onPress={() => void ask('Play my day: give me a short spoken brief of my day, covering what is on my calendar, my reminders, the weather and the top news.')} />
           </Reveal>
 
-          {user && !user.gender ? (
+          {user && !user.addressMode ? (
             <Reveal delayMs={70} style={{ marginBottom: 20 }}>
-              <GenderCard onPick={setGender} />
+              <AddressCard
+                onPick={(mode) => {
+                  setAddressMode(mode);
+                  Alert.alert('Saved', savedMessage(mode), [{ text: 'OK' }]);
+                }}
+              />
             </Reveal>
           ) : null}
 

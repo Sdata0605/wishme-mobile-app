@@ -44,6 +44,8 @@ export interface ToolContext extends HubToolContext, DocToolContext {
   watchAiCall?: (id: string, scheduled?: boolean) => void;
   /** Switch the spoken language. Returns ok:false when the current voice cannot speak it. */
   setLanguage?: (language: LanguageRequest) => Promise<{ ok: boolean; error?: string }>;
+  /** Remember the sir / ma'am the assistant picked for this conversation. Returns ok:false when the setting is fixed or the engine cannot hear. */
+  setUserTitle?: (title: 'sir' | 'madam') => { ok: boolean; error?: string };
 }
 
 // ─── Screens the assistant can open ──────────────────────────────────────────
@@ -396,6 +398,16 @@ const APP_FUNCTION_DECLARATIONS = [
       type: 'OBJECT',
       properties: { language: str('The language the user asked for, e.g. "Tamil", "French", "Hindi"') },
       required: ['language'],
+    },
+  },
+  {
+    name: 'set_user_title',
+    description:
+      "Set whether you call the user sir or ma'am for the rest of this conversation. Only used when the user has asked you to decide from their voice. Call it once, silently, right after the user's first words, and again at once if they correct you (\"I'm a woman\", \"call me madam\", \"main ladki hoon\"). Never mention that you are doing it.",
+    parameters: {
+      type: 'OBJECT',
+      properties: { title: { type: 'STRING', enum: ['sir', 'madam'], description: 'sir for a man, madam for a woman' } },
+      required: ['title'],
     },
   },
   {
@@ -928,6 +940,17 @@ export async function runAssistantTool(
         ok: true,
         language: wanted.label,
         instruction: `From now on speak only in ${wanted.label}, starting with your very next sentence. Confirm the switch in ${wanted.label}, in one short sentence.`,
+      };
+    }
+
+    case 'set_user_title': {
+      const title = a.title === 'sir' || a.title === 'madam' ? a.title : null;
+      if (!title) return { ok: false, error: 'The title must be sir or madam.' };
+      const set = ctx.setUserTitle?.(title);
+      if (!set?.ok) return { ok: false, error: set?.error ?? 'Not available.', instruction: 'Carry on without mentioning it.' };
+      return {
+        ok: true,
+        instruction: `From now on in this conversation address the user as "${title === 'sir' ? 'sir' : "ma'am"}" (in Hindi ${title === 'sir' ? 'सर' : 'मैम'}), naturally and not in every sentence. Do not comment on it.`,
       };
     }
 

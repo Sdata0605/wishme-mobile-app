@@ -4,6 +4,8 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, Line, RadialGradient, Stop } from 'react-native-svg';
 import { Icon, type IconName } from '@/components/Icon';
 import { PressScale } from '@/components/neon/Motion';
+import { ADDRESS_OPTIONS } from '@/services/assistant/addressModes';
+import type { AddressMode } from '@/context/AuthContext';
 import { NeonCard } from '@/components/neon/NeonCard';
 import { withAlpha } from '@/constants/neon';
 import { useTheme } from '@/context/ThemeContext';
@@ -32,24 +34,25 @@ export function PlayMyDay({ onPress }: { onPress: () => void }) {
 
 // ─── How to address the user ─────────────────────────────────────────────────
 
-/** Asked once, of people who signed up before the assistant knew: it decides "sir" or "ma'am". */
-export function GenderCard({ onPick }: { onPick: (g: 'male' | 'female' | 'other') => void }) {
+/**
+ * Asked until the user chooses: how should the assistant address them? Sir, ma'am, or decide from their voice. The choice
+ * is saved for the account and can be changed later in Settings (the caller shows a dialog that says where).
+ */
+export function AddressCard({ onPick }: { onPick: (mode: AddressMode) => void }) {
   const { neon } = useTheme();
-  const opt = (g: 'male' | 'female' | 'other', label: string) => (
-    <PressScale key={g} onPress={() => onPick(g)} accessibilityRole="button" accessibilityLabel={label}>
-      <View style={[styles.genderBtn, { backgroundColor: withAlpha(neon.cyan, 0.1), borderColor: withAlpha(neon.cyan, 0.45) }]}>
-        <Text style={[styles.genderText, { color: neon.textHi }]}>{label}</Text>
-      </View>
-    </PressScale>
-  );
   return (
     <NeonCard style={{ padding: 18 }} radius={28}>
       <Text style={[styles.gsLabel, { color: neon.textLo }]}>One quick thing</Text>
       <Text style={[styles.gsTitle, { color: neon.textHi, marginTop: 8, fontSize: 22 }]}>How should I address you?</Text>
-      <View style={[styles.gsButtons, { gap: 10 }]}>
-        {opt('male', 'Sir')}
-        {opt('female', "Ma'am")}
-        {opt('other', 'No title')}
+      <View style={{ gap: 10, marginTop: 14 }}>
+        {ADDRESS_OPTIONS.map((o) => (
+          <PressScale key={o.key} onPress={() => onPick(o.key)} accessibilityRole="button" accessibilityLabel={o.label}>
+            <View style={[styles.addressBtn, { backgroundColor: withAlpha(neon.cyan, 0.1), borderColor: withAlpha(neon.cyan, 0.45) }]}>
+              <Text style={[styles.genderText, { color: neon.textHi }]}>{o.label}</Text>
+              {o.helper ? <Text style={[styles.addressHelper, { color: neon.textLo }]}>{o.helper}</Text> : null}
+            </View>
+          </PressScale>
+        ))}
       </View>
     </NeonCard>
   );
@@ -241,7 +244,8 @@ const styles = StyleSheet.create({
   playText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   playHint: { flex: 1, fontSize: 14, lineHeight: 19, fontFamily: 'Inter_400Regular' },
 
-  genderBtn: { height: 46, paddingHorizontal: 22, borderRadius: 23, borderWidth: 1.3, alignItems: 'center', justifyContent: 'center' },
+  addressBtn: { minHeight: 48, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 24, borderWidth: 1.3, alignItems: 'center', justifyContent: 'center' },
+  addressHelper: { fontSize: 12.5, fontFamily: 'Inter_400Regular', textAlign: 'center', marginTop: 3, lineHeight: 17 },
   genderText: { fontSize: 16, fontFamily: 'Inter_600SemiBold' },
   gsHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   gsTile: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },

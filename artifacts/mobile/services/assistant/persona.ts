@@ -3,6 +3,8 @@
  * Stored per user in Supabase (`assistant_settings`) and applied when a Gemini Live session starts.
  */
 
+import type { AddressMode } from '@/context/AuthContext';
+
 export type PersonalityId = 'friendly' | 'professional' | 'funny' | 'calm' | 'energetic' | 'custom';
 export type LanguageId = 'auto' | 'english' | 'hindi' | 'hinglish';
 
@@ -128,25 +130,47 @@ export function isDefaultName(name: string) {
   return !name.trim() || name.trim().toLowerCase() === DEFAULT_ASSISTANT_NAME.toLowerCase();
 }
 
-/** How the user wants to be addressed. Unknown until they say, in which case there is no title. */
-export type AddressAs = 'male' | 'female' | 'other' | undefined;
+/** The title the assistant uses for one person in one conversation. */
+export type AddressTitle = 'sir' | 'madam';
+
+/**
+ * How the assistant addresses the user right now.
+ *  - `mode` is what the user chose (and saved): always "sir", always "madam", or decide from their voice. Unset until they choose.
+ *  - `title` is only used when the mode is 'voice' (or unset): what the assistant decided for THIS conversation. It starts empty
+ *    in every conversation, so the assistant says just "Hello." and decides again.
+ */
+export interface AddressAs {
+  mode?: AddressMode;
+  title: AddressTitle | null;
+}
+
+/** Which voice engine is talking: only Gemini hears the voice, so only Gemini can decide a title from it. */
+export type AddressEngine = 'gemini' | 'sarvam';
+
+/** The title to use now, or null for none. */
+export function titleFor(a?: AddressAs): AddressTitle | null {
+  if (a?.mode === 'sir') return 'sir';
+  if (a?.mode === 'madam') return 'madam';
+  return a?.title ?? null;
+}
+
+/** True when the assistant is meant to decide the title itself (the user chose it, or has not chosen yet). */
+export const decidesByVoice = (a?: AddressAs): boolean => a?.mode !== 'sir' && a?.mode !== 'madam';
 
 /** "sir", "ma'am" or nothing. */
-export const honorific = (g?: AddressAs): string => (g === 'male' ? 'sir' : g === 'female' ? "ma'am" : '');
+export const honorific = (t?: AddressTitle | null): string => (t === 'sir' ? 'sir' : t === 'madam' ? "ma'am" : '');
 
 /** The part of the system instruction that describes who the assistant is. */
-export function buildPersonaInstruction(persona: AssistantPersona, userFirstName?: string, gender?: AddressAs): string {
+export function buildPersonaInstruction(persona: AssistantPersona, userFirstName?: string, address?: AddressAs, engine: AddressEngine = 'gemini'): string {
   const name = cleanText(persona.name, MAX_NAME_LENGTH) || DEFAULT_ASSISTANT_NAME;
   const personality = PERSONALITIES.find((p) => p.id === persona.personality) ?? PERSONALITIES[0];
   const language = LANGUAGES.find((l) => l.id === persona.language) ?? LANGUAGES[0];
   const note = cleanText(persona.customNote, MAX_NOTE_LENGTH);
-  const title = honorific(gender);
+  const title = honorific(titleFor(address));
 
   const lines = [
     `You are ${name}, ${userFirstName ? `${userFirstName}'s` : "the user's"} personal AI assistant. You live inside the WishMe app on their phone, but you are a complete general-purpose assistant, not only an app helper. If asked your name, say it is ${name}; otherwise do not introduce yourself.`,
-    title
-      ? `Address the user as "${title}" (for example "Sure, ${title}."), naturally and not in every sentence. In Hindi you may say "${gender === 'male' ? 'सर' : 'मैम'}" or use "जी".`
-      : 'Do not call the user "sir" or "ma\'am"; use their name, or no title.',
+    addressLine(address, engine),
     personality.prompt,
     language.prompt,
   ].filter(Boolean);
@@ -159,15 +183,42 @@ export function buildPersonaInstruction(persona: AssistantPersona, userFirstName
   return lines.join(' ');
 }
 
+/**
+ * The line about how to address the user (one of four, kept short: Sarvam sends the system prompt on every turn).
+ *  - a fixed choice: always that title;
+ *  - Gemini, decide by voice, not decided yet: no title until the user has spoken, then pick one from the voice and say so with a tool;
+ *  - Gemini, decided: use it, and change it the moment the user corrects it;
+ *  - Sarvam (it only sees text, never hears the voice): no title, unless the user says what to call them.
+ */
+export function addressLine(address: AddressAs | undefined, engine: AddressEngine): string {
+  const title = honorific(titleFor(address));
+  const hindi = titleFor(address) === 'sir' ? 'सर' : 'मैम';
+  if (address?.mode === 'sir' || address?.mode === 'madam') {
+    return `Address the user as "${title}" (for example "Sure, ${title}."), naturally and not in every sentence. In Hindi you may say "${hindi}" or use "जी". If they ask to be called something else, do that for this conversation only.`;
+  }
+  if (engine === 'sarvam') {
+    return 'Do not call the user "sir" or "ma\'am"; use their name, or no title. If they tell you what to call them, use that for this conversation.';
+  }
+  if (title) {
+    return `Address the user as "${title}" (for example "Sure, ${title}."), naturally and not in every sentence. In Hindi you may say "${hindi}" or use "जी". If the user corrects you ("I'm a woman", "call me madam", "main ladki hoon"), call set_user_title with the right one at once, without comment.`;
+  }
+  return 'You have not yet decided whether to call the user "sir" or "ma\'am": do not say either yet. As soon as the user has spoken, decide from how their voice sounds (pitch, tone) and from gendered words they use (in Hindi or Marathi: रहा/रही, गया/गई, करतो/करते), and call set_user_title with "sir" or "madam" in that same turn, silently, before you reply. Then use that title for the rest of this conversation. If you truly cannot tell, do not guess: use no title (in Hindi, "जी") and call set_user_title as soon as you can tell.';
+}
+
 /** The exact sentence the assistant opens with: "Hello sir.", "Hello ma'am." or just "Hello.". */
-export function buildGreetingLine(_persona?: AssistantPersona, gender?: AddressAs): string {
-  const title = honorific(gender);
+export function buildGreetingLine(_persona?: AssistantPersona, address?: AddressAs): string {
+  // The title chosen for the conversation is not used here: the greeting comes before the user has spoken.
+  const title = honorific(address?.mode === 'sir' ? 'sir' : address?.mode === 'madam' ? 'madam' : null);
   return title ? `Hello ${title}.` : 'Hello.';
 }
 
 /** What the model is asked to say when the user taps the assistant. */
-export function buildGreetingPrompt(persona: AssistantPersona, gender?: AddressAs): string {
-  return `[The user just opened the assistant] Say exactly "${buildGreetingLine(persona, gender)}" and nothing more: do not introduce yourself, do not say your name and do not ask how you can help. Then wait for the user to speak.`;
+export function buildGreetingPrompt(persona: AssistantPersona, address?: AddressAs): string {
+  // The connection stays open between conversations, so the model may still remember the last person it spoke to.
+  const fresh = decidesByVoice(address)
+    ? "[New conversation: the user just opened the assistant. It may be a different person from last time: forget any sir/ma'am you used before.] "
+    : '[The user just opened the assistant] ';
+  return `${fresh}Say exactly "${buildGreetingLine(persona, address)}" and nothing more: do not introduce yourself, do not say your name and do not ask how you can help. Then wait for the user to speak.`;
 }
 
 /**

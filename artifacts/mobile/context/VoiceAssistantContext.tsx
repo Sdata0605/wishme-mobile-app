@@ -24,6 +24,7 @@ import {
   buildGreetingLine,
   buildGreetingPrompt,
   type AddressAs,
+  type AddressTitle,
   sarvamSpeakerFor,
 } from '@/services/assistant/persona';
 import { buildSystemInstruction } from '@/services/assistant/systemPrompt';
@@ -142,8 +143,12 @@ ${call.summary ?? 'The call has ended.'}`, [
   tokenRef.current = session?.access_token;
   const nameRef = useRef(user?.firstName);
   nameRef.current = user?.firstName;
-  const genderRef = useRef<AddressAs>(user?.gender);
-  genderRef.current = user?.gender;
+  // How to address the user: the saved choice, plus (in 'decide by voice' mode) the title picked for the conversation in
+  // progress. The pick is forgotten at the start of every conversation, so each one begins with a plain "Hello.".
+  const addressModeRef = useRef(user?.addressMode);
+  addressModeRef.current = user?.addressMode;
+  const sessionTitleRef = useRef<AddressTitle | null>(null);
+  const addressRef = (): AddressAs => ({ mode: addressModeRef.current, title: sessionTitleRef.current });
   // Reminders and calendar rows belong to the auth user, not the profile.
   const userIdRef = useRef(user?.id);
   userIdRef.current = user?.id;
@@ -183,20 +188,20 @@ ${call.summary ?? 'The call has ended.'}`, [
       // Refreshes an expired login so reconnects after the first hour still work.
       getAccessToken: async () => (await getValidSessionRef.current())?.access_token ?? tokenRef.current,
       onAuthRejected: () => { void verifySessionRef.current(); },
-      getSystemInstruction: () => buildSystemInstruction(personaRef.current, nameRef.current, genderRef.current),
+      getSystemInstruction: () => buildSystemInstruction(personaRef.current, nameRef.current, addressRef(), clientRef.current?.activeEngine ?? 'gemini'),
       functionDeclarations: FUNCTION_DECLARATIONS,
       getVoiceName: () => personaRef.current.voice,
       getGreetingPrompt: () => {
         const report = takeReport();
         return report
           ? `A phone call you made for the user has just finished. Do not greet them: tell them right away, briefly, in the language they speak. Facts: ${JSON.stringify(describeCall(report))}. Say who picked up and what was said or agreed. If it did not connect (status no-answer, busy, voicemail or failed) say so and offer to try again. If there is a next step, tell them. Then wait.`
-          : buildGreetingPrompt(personaRef.current, genderRef.current);
+          : buildGreetingPrompt(personaRef.current, addressRef());
       },
       getSarvamSpeaker: () => sarvamSpeakerFor(personaRef.current.voice),
       getLanguage: () => personaRef.current.language,
       getGreetingLine: () => {
         const report = takeReport();
-        return report ? spokenReport(report) : buildGreetingLine(personaRef.current, genderRef.current);
+        return report ? spokenReport(report) : buildGreetingLine(personaRef.current, addressRef());
       },
       onState: (s) => {
         const before = lastStateRef.current;
@@ -247,6 +252,13 @@ ${call.summary ?? 'The call has ended.'}`, [
           // Through the ref, not `client`: that is assigned below, and referring to it here would
           // make the engine's type depend on itself.
           setLanguage: (language) => clientRef.current!.setLanguage(language),
+          setUserTitle: (title) => {
+            const mode = addressModeRef.current;
+            if (mode === 'sir' || mode === 'madam') return { ok: false, error: "The user chose how to be addressed in Settings: keep using that." };
+            if (clientRef.current?.activeEngine === 'sarvam') return { ok: false, error: 'You cannot hear the voice in this mode: use no title unless the user tells you what to call them.' };
+            sessionTitleRef.current = title;
+            return { ok: true };
+          },
           // A reminder created by voice has to reach the phone's own scheduler straight away,
           // otherwise it would not fire until the next time the app was opened.
           onRemindersChanged: () => {
@@ -334,7 +346,7 @@ ${call.summary ?? 'The call has ended.'}`, [
   }, [loggedIn, aiCallWatcher]);
 
   // A changed voice, name or personality needs a fresh session to take effect.
-  const personaKey = `${persona.voice}|${persona.name}|${persona.personality}|${persona.language}|${persona.customNote}|${user?.gender ?? ''}`;
+  const personaKey = `${persona.voice}|${persona.name}|${persona.personality}|${persona.language}|${persona.customNote}|${user?.addressMode ?? ''}`;
   const lastPersonaKey = useRef(personaKey);
   useEffect(() => {
     if (lastPersonaKey.current === personaKey) return;
@@ -388,6 +400,7 @@ ${call.summary ?? 'The call has ended.'}`, [
     assistantDone.current = true;
     setMinimized(false);
     setOpen(true);
+    sessionTitleRef.current = null;
     void client.startListening();
   }, [client, close]);
 
@@ -412,6 +425,7 @@ ${call.summary ?? 'The call has ended.'}`, [
     setUserText('');
     setAssistantText('');
     textBuffer.current = { user: '', assistant: '' };
+    sessionTitleRef.current = null;
     void client.startListening();
   }, [client, setError]);
 
@@ -427,7 +441,8 @@ ${call.summary ?? 'The call has ended.'}`, [
       assistantDone.current = true;
       setMinimized(false);
       setOpen(true);
-      void client.startListening();
+      sessionTitleRef.current = null;
+    void client.startListening();
     },
     [client, setError],
   );

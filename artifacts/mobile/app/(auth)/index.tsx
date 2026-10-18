@@ -7,7 +7,7 @@ import { Reveal } from '@/components/neon/Motion';
 import { NeonCard } from '@/components/neon/NeonCard';
 import { withAlpha } from '@/constants/neon';
 import { supabaseFetch, warmUpBackend } from '@/constants/supabase';
-import { useAuth, type Gender } from '@/context/AuthContext';
+import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 
 type Tab = 'signin' | 'signup' | 'celebrity';
@@ -220,7 +220,6 @@ function SignUpTab({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [gender, setGender] = useState<Gender | null>(null);
   const [referral, setReferral] = useState('');
   const [refState, setRefState] = useState<'idle' | 'checking' | 'valid' | 'invalid'>('idle');
   const [refName, setRefName] = useState('');
@@ -263,7 +262,6 @@ function SignUpTab({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!firstName.trim()) e.firstName = 'First name is required';
-    if (!gender) e.gender = 'Choose one so the assistant knows how to address you';
     if (!email.trim() || !/\S+@\S+\.\S+/.test(email)) e.email = 'Enter a valid email address';
     if (!phone.trim() || !validateIndianPhone(phone)) e.phone = 'Enter a valid Indian mobile number (e.g. 9876543210)';
     if (!password || strength.score < 5) e.password = 'Password must pass all 5 strength checks';
@@ -286,7 +284,7 @@ function SignUpTab({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
         return;
       }
     }
-    const { error } = await signup(email, password, firstName, lastName, phone, code, gender ?? undefined);
+    const { error } = await signup(email, password, firstName, lastName, phone, code);
     setLoading(false);
     if (error) { setApiError(error); return; }
     router.push({
@@ -327,17 +325,6 @@ function SignUpTab({ onSwitchToSignIn }: { onSwitchToSignIn: () => void }) {
                 />
               </View>
             </View>
-            <AuthSegmented
-              value={gender ?? ('' as Gender)}
-              onChange={(g) => { setGender(g); setErrors((prev) => ({ ...prev, gender: '' })); }}
-              options={[
-                { key: 'male', label: 'Male' },
-                { key: 'female', label: 'Female' },
-                { key: 'other', label: 'Prefer not to say', weight: 1.9 },
-              ]}
-            />
-            {errors.gender ? <Text style={[styles.genderError, { color: neon.error }]}>{errors.gender}</Text> : null}
-            <Text style={[styles.genderHint, { color: neon.textDim }]}>Your assistant uses this to say “sir” or “ma’am”.</Text>
           </AuthSection>
 
           <AuthSection label="Contact">
@@ -566,8 +553,6 @@ export default function AuthScreen() {
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: 10 },
-  genderError: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: -4, marginBottom: 6, marginLeft: 4 },
-  genderHint: { fontSize: 11.5, fontFamily: 'Inter_400Regular', marginTop: -4, marginBottom: 2, marginLeft: 4 },
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20, alignSelf: 'flex-start' },
   backText: { fontSize: 14, fontFamily: 'Inter_600SemiBold' },
   helper: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: -4, marginBottom: 4, marginLeft: 4, lineHeight: 18 },

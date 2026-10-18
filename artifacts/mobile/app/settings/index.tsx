@@ -7,6 +7,7 @@ import { Icon, type IconName } from '@/components/Icon';
 import { SettingsGroup, SettingsHeader, SettingsRow } from '@/components/settings/SettingsUI';
 import { useAssistantPersona } from '@/context/AssistantPersonaContext';
 import { useAuth } from '@/context/AuthContext';
+import { addressShort } from '@/services/assistant/addressModes';
 import { useTheme } from '@/context/ThemeContext';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
 
@@ -69,7 +70,7 @@ export default function SettingsScreen() {
             id: 'assistant',
             icon: 'sparkles',
             label: 'AI Assistant',
-            subtitle: `${persona.name} · ${persona.voice} voice`,
+            subtitle: `${persona.name} · ${persona.voice} voice · ${addressShort(user?.addressMode)}`,
             route: '/settings/assistant',
             keywords: 'voice name personality language ai talk',
           },
