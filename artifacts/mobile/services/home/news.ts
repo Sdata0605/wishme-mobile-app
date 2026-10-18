@@ -43,7 +43,7 @@ export function parseFeed(xml: string): Story[] {
       url: tag(it, 'link'),
       at: when && !isNaN(when.getTime()) ? when.toISOString() : new Date().toISOString(),
     });
-    if (stories.length >= 40) break;
+    if (stories.length >= 100) break;
   }
   return stories;
 }

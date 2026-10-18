@@ -117,3 +117,34 @@ export async function fetchArticle(url: string): Promise<{ image: string | null;
   const a = extractArticle(page.html, page.finalUrl);
   return { image: a.image, paragraphs: a.paragraphs, description: a.description, finalUrl: page.finalUrl };
 }
+
+const SEARCH_TERM: Record<string, string> = {
+  top: 'top news India', india: 'India news', world: 'world news', business: 'business news India', tech: 'technology news',
+  sports: 'sports news', entertainment: 'entertainment news', science: 'science news', health: 'health news',
+};
+/** Each window reaches further back, so each step turns up stories the earlier ones did not. */
+const WINDOWS = ['1h', '3h', '6h', '12h', '1d', '2d', '3d', '5d', '7d'];
+
+/**
+ * The next batch of stories for a tab (Google's feed has no page 2, so older time windows are asked for in turn).
+ * `cursor` says which window to try next; the returned cursor goes into the next call. An empty list means nothing older is left.
+ */
+export async function fetchMore(tab: NewsTab, known: Set<string>, cursor: number, want = 12): Promise<{ stories: Story[]; cursor: number }> {
+  const term = SEARCH_TERM[tab.id] ?? tab.label;
+  const found: Story[] = [];
+  let c = cursor;
+  while (c < WINDOWS.length && found.length < want) {
+    const heads = await fetchHeadlines(`${term} when:${WINDOWS[c]}`, 60);
+    c++;
+    for (const h of heads.sort((a, b) => b.at.localeCompare(a.at))) {
+      const k = h.title.toLowerCase().slice(0, 48);
+      if (known.has(k)) continue;
+      known.add(k);
+      found.push(h);
+      if (found.length >= want) break;
+    }
+  }
+  return { stories: found, cursor: c };
+}
+
+export const titleKey = (title: string) => title.toLowerCase().slice(0, 48);
