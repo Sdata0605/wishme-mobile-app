@@ -113,7 +113,7 @@ fresh(); // the failures above used up the minute's budget
 mode = 'slow';
 const t0 = Date.now();
 const slow = await run({ queries: ['a question the server never answers'] });
-check('a server that never answers is given up on in about ten seconds', slow.ok === false && Date.now() - t0 >= 9500 && Date.now() - t0 < 13000, { ms: Date.now() - t0, slow });
+check('a server that never answers is given up on in about seventeen seconds (OpenAI gets up to 15 s on the server)', slow.ok === false && Date.now() - t0 >= 16500 && Date.now() - t0 < 20000, { ms: Date.now() - t0, slow });
 
 // ─── Warm-up ─────────────────────────────────────────────────────────────────
 fresh();

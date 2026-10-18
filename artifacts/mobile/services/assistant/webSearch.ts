@@ -3,8 +3,8 @@
  * reliably know (news, people, prices, a protest's latest, anything).
  *
  * The model writes up to three searches and says how fresh the answer must be; the phone passes them to the `web-search`
- * Supabase function (Tavily reads the web there; no search key is ever on the phone), and the short, dated, source-named
- * text that comes back is what the model turns into a spoken answer. If the first result is weak the model searches
+ * Supabase function (OpenAI's web search reads the web there, with Tavily and free sources as backups; no search key is ever
+ * on the phone), and the short, dated, source-named text that comes back is what the model turns into a spoken answer. If the first result is weak the model searches
  * again with different words; the phone only stops a loop (a handful of searches a minute) and bounds the wait.
  *
  * Pure of React Native apart from the app's two Supabase constants, so it can be self-checked.
@@ -40,8 +40,11 @@ export const WEB_FUNCTION_DECLARATIONS = [
   },
 ];
 
-/** The wait for the function: Tavily 7 s, then the fallback sources 2.5 s, on the server. */
-const SEARCH_TIMEOUT_MS = 10_000;
+/**
+ * The wait for the function. OpenAI usually answers in 3-5 s; the server allows it up to 15 s (including one wider second
+ * try when the first found nothing) before falling back to Tavily, so the phone waits a little longer than that.
+ */
+const SEARCH_TIMEOUT_MS = 17_000;
 /** An identical search asked again soon after is answered from memory. */
 const CACHE_MS = 60_000;
 const CACHE_MAX = 40;
