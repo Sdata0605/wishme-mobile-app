@@ -1,7 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { AnimatedSplash } from '@/components/splash/AnimatedSplash';
+// Previous animated splash, kept for the client to compare. To switch back, uncomment this import and the
+// <AnimatedSplash> line at the bottom, and remove the VideoSplash ones.
+// import { AnimatedSplash } from '@/components/splash/AnimatedSplash';
+import { VideoSplash } from '@/components/splash/VideoSplash';
 
 const STORAGE_ONBOARDING = '@wishme/onboarding_seen';
 const STORAGE_USER = '@wishme/user';
@@ -29,7 +32,7 @@ async function resolveDestination(): Promise<string> {
 }
 
 /**
- * The entry route: plays the animated splash while the destination is worked out, and only navigates once the
+ * The entry route: plays the splash while the destination is worked out, and only navigates once the
  * splash has finished its exit, so the first screen never pops in under a half-played animation.
  */
 export default function Index() {
@@ -49,5 +52,6 @@ export default function Index() {
     if (destination) router.replace(destination as never);
   }, [destination]);
 
-  return <AnimatedSplash ready={destination !== null} onDone={go} />;
+  // return <AnimatedSplash ready={destination !== null} onDone={go} />;
+  return <VideoSplash ready={destination !== null} onDone={go} />;
 }
