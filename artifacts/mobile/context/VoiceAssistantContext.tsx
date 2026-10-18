@@ -454,6 +454,7 @@ ${call.summary ?? 'The call has ended.'}`, [
   // While the orb is minimised the user is working on screen, so be patient with silence.
   useEffect(() => {
     client.setIdleTimeout(minimized ? 180_000 : 90_000);
+    client.setNudges(!minimized);
   }, [minimized, client]);
 
   const close = useCallback(() => {

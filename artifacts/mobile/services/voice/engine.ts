@@ -327,6 +327,11 @@ export class AssistantEngine {
     this.current.notify(text);
   }
 
+  /** Spoken nudges while the user is silent (Gemini only; off while the orb is minimised). */
+  setNudges(enabled: boolean) {
+    this.gemini.setNudges(enabled);
+  }
+
   setIdleTimeout(ms: number) {
     this.gemini.setIdleTimeout(ms);
     this.sarvam.setIdleTimeout(ms);

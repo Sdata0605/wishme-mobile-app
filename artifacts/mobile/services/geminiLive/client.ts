@@ -69,6 +69,61 @@ const SETUP_TIMEOUT_MS = 8000;
 const GREETING_REPLY_TIMEOUT_MS = 6000;
 /** The audio engine stays up this long after the last conversation, then is let go (it holds audio focus). */
 const AUDIO_KEEP_MS = 120_000;
+
+/**
+ * Gemini's live audio ends its turn after roughly 25 to 50 seconds of speech and waits, even when the answer is not finished
+ * (a long story, a long explanation). When a long turn ends like that, the app quietly asks it to carry on. Every limit below
+ * exists so this can never loop: a few continues per request, a time cap, a progress check, and it stops the moment the user
+ * speaks, a tool runs, or the conversation closes.
+ */
+const AUTO_CONTINUE = true;
+/** Only a turn that played at least this long can have hit the model's own length limit. */
+const AUTO_CONTINUE_MIN_AUDIO_MS = 20_000;
+const AUTO_CONTINUE_MAX = 5;
+/** A continuation shorter than this means the answer was already complete. */
+const AUTO_CONTINUE_MIN_PROGRESS_MS = 5_000;
+const AUTO_CONTINUE_MIN_PROGRESS_CHARS = 80;
+const AUTO_CONTINUE_CAP_MS = 5 * 60_000;
+const AUTO_CONTINUE_MAX_CAP_MS = 15 * 60_000;
+/** If nothing at all comes back after the request to continue, forget that it was sent. */
+const AUTO_CONTINUE_SILENCE_MS = 15_000;
+const CONTINUE_PROMPT =
+  '[Instruction from the app, not spoken by the user] If your answer to the last request from the user is not finished, carry on from exactly where you stopped: no introduction, no repeating, no asking whether to continue. If it is already finished, say nothing.';
+
+/**
+ * Like a person: when the user goes quiet after the assistant has finished speaking, it speaks up now and then in different
+ * words (a check-in, an offer, a suggestion), a few times, then says one soft closing line and ends the conversation. A goodbye
+ * from the user gets one short farewell and the conversation then closes. Nothing is said while the panel is minimised, a tool
+ * or a call is running, or the user is talking.
+ */
+const NUDGES = true;
+const NUDGE_AFTER_MS = 15_000;
+const NUDGE_MAX = 3;
+const NUDGE_ANGLES = [
+  "Gently check in: say you are here and they can ask you anything.",
+  "Ask in a few words how you can help them right now.",
+  "Offer something specific and useful, for example today's latest news, the weather, or something you remember about the user, and ask if they would like it.",
+  "Mention one thing you can do for them that they may not know about, in a single short line.",
+];
+const nudgePrompt = (angle: string) =>
+  "[Instruction from the app, not spoken by the user] The user has been quiet for a while. Say ONE short, natural, friendly line to invite them to speak, in the language they have been speaking. " + angle + " Do not repeat anything you have already said in this conversation and do not mention this instruction. Then wait.";
+const FINAL_NUDGE_PROMPT =
+  "[Instruction from the app, not spoken by the user] The user is still quiet. Say ONE short, warm line, in the language they have been speaking, saying you will be around whenever they need you. No question and no offer. Then stop.";
+/** Short farewells only: a long sentence that merely contains "bye" is not one. */
+const GOODBYE = /\b(bye|goodbye|good bye|good night|see you|see ya|talk to you later|that is all|that's all|thats all|nothing else|nothing more|no thanks|no thank you|all done)\b|^\W*(?:(?:no|nope)\W+)?nothing(?:\W+(?:else|more))?\W*$|अलविदा|बाय|बस इतना|कुछ नहीं चाहिए|शुक्रिया बस/i;
+const isGoodbye = (text: string) => {
+  const t = text.trim();
+  return t.length > 0 && t.length <= 60 && GOODBYE.test(t);
+};
+
+const NUMBER_WORDS: Record<string, number> = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, fifteen: 15, twenty: 20 };
+/** How long the user asked it to go on for ("for ten minutes"), plus a minute of margin; the normal cap when they named none. */
+function continueCapFor(request: string): number {
+  const m = /(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty)\s*(?:minutes?|mins?)/i.exec(request);
+  if (!m) return AUTO_CONTINUE_CAP_MS;
+  const n = Number(m[1]) || NUMBER_WORDS[m[1].toLowerCase()] || 0;
+  return Math.min(AUTO_CONTINUE_MAX_CAP_MS, Math.max(AUTO_CONTINUE_CAP_MS, (n + 1) * 60_000));
+}
 /** Reply audio that arrives while the speaker is still starting is kept (up to ~2 s at 24 kHz) and played once it is up. */
 const EARLY_AUDIO_MAX_BYTES = 96_000;
 
@@ -141,6 +196,21 @@ export class GeminiLiveClient {
   private lastChunkAt = 0;
   private replyMicPeak = 0;
   private replyLoudChunks = 0;
+  // Automatic continue (see AUTO_CONTINUE)
+  private autoContinues = 0;
+  private requestStartAt = 0;
+  private requestCapMs = AUTO_CONTINUE_CAP_MS;
+  private continuePending = false;
+  private continueWatchdog: ReturnType<typeof setTimeout> | null = null;
+  private prevTurnText = '';
+  private lastUserSpeechAt = 0;
+  private toolsRunning = 0;
+  // Silence nudges and goodbyes (see NUDGES)
+  private nudgeCount = 0;
+  private nudgeTimer: ReturnType<typeof setTimeout> | null = null;
+  private nudgesEnabled = true;
+  private closeAfterReply = false;
+  private nudgeBase = Math.floor(Math.random() * NUDGE_ANGLES.length);
   private requestingPermission = false;
   private audioReady = false;
   /** True once the microphone permission is known to be granted (so a tap never has to ask again). */
@@ -201,6 +271,9 @@ export class GeminiLiveClient {
   /** Switches the microphone on (opening the socket first if it isn't ready yet). */
   async startListening() {
     tapMark = Date.now();
+    this.nudgeCount = 0;
+    this.closeAfterReply = false;
+    this.nudgeBase = Math.floor(Math.random() * NUDGE_ANGLES.length);
     log(
       '=== TAP === socketReady', this.socketReady, '| ws', this.ws ? this.ws.readyState : 'none (0 connecting, 1 open)', '| setupDone', this.setupDone,
       '| wantWarm', this.wantWarm, '| state', this.state, '| reconnectTimer', !!this.reconnectTimer, '| reconnectAttempts', this.reconnectAttempts,
@@ -404,6 +477,9 @@ export class GeminiLiveClient {
   /** Mic off and audio released, but the connection stays warm for the next tap. */
   stopListening() {
     this.wantListening = false;
+    this.continuePending = false;
+    this.clearNudge();
+    this.closeAfterReply = false;
     this.lastUserWordAt = 0;
     this.clearPlayback();
     this.idleAudio();
@@ -449,6 +525,45 @@ export class GeminiLiveClient {
     ws?.close();
     this.resumeHandle = null;
     this.setState('idle');
+  }
+
+  /** Silence nudges are for a conversation the user is looking at; off while the orb is minimised. */
+  setNudges(enabled: boolean) {
+    this.nudgesEnabled = enabled;
+    if (!enabled) this.clearNudge();
+    else if (this.state === 'listening') this.scheduleNudge();
+  }
+
+  private clearNudge() {
+    if (this.nudgeTimer) clearTimeout(this.nudgeTimer);
+    this.nudgeTimer = null;
+  }
+
+  private scheduleNudge() {
+    this.clearNudge();
+    if (!NUDGES || !this.nudgesEnabled || !this.wantListening || this.holdOpen || this.closeAfterReply) return;
+    this.nudgeTimer = setTimeout(() => this.fireNudge(), NUDGE_AFTER_MS);
+  }
+
+  private fireNudge() {
+    this.nudgeTimer = null;
+    if (!NUDGES || !this.nudgesEnabled || !this.wantListening || this.holdOpen || !this.socketReady || this.closeAfterReply) return;
+    // Something else is going on: the state change that follows will schedule the next one.
+    if (this.state !== 'listening' || this.toolsRunning > 0 || this.continuePending) return;
+    if (Date.now() - this.lastSpeechTouch < 3000) {
+      this.nudgeTimer = setTimeout(() => this.fireNudge(), 4000);
+      return;
+    }
+    if (this.nudgeCount >= NUDGE_MAX) {
+      log('nudge: the user is still silent, saying the closing line, then ending the conversation');
+      this.closeAfterReply = true;
+      this.send({ realtimeInput: { text: FINAL_NUDGE_PROMPT } });
+      return;
+    }
+    const angle = NUDGE_ANGLES[(this.nudgeBase + this.nudgeCount) % NUDGE_ANGLES.length];
+    this.nudgeCount += 1;
+    log(`nudge #${this.nudgeCount}: user silent for ${NUDGE_AFTER_MS / 1000} s after the reply, asking Gemini to speak up |`, angle);
+    this.send({ realtimeInput: { text: nudgePrompt(angle) } });
   }
 
   /** How long silence is tolerated before the mic switches off (longer while the user works on screen). */
@@ -792,12 +907,17 @@ export class GeminiLiveClient {
     if (!sc) return;
     if (this.greetAt && this.lastContentAt < this.greetAt) log('first reply content from Gemini,', Date.now() - this.greetAt, 'ms after the greeting was sent');
     this.lastContentAt = Date.now();
+    if (this.continueWatchdog) {
+      clearTimeout(this.continueWatchdog);
+      this.continueWatchdog = null;
+    }
     this.touch();
 
     for (const key of ['generationComplete', 'waitingForInput'] as const) {
       if ((sc as Record<string, unknown>)[key]) log('server flag:', key, '| reply so far', this.replyStartAt ? `${Date.now() - this.replyStartAt} ms` : 'none');
     }
     if (sc.interrupted) {
+      this.continuePending = false;
       this.lastInterruptAt = Date.now();
       log(
         'CUT: INTERRUPTED by Gemini (it heard speech) |', this.replyStartAt ? `reply had run ${Date.now() - this.replyStartAt} ms, ${Math.round(this.replyBytes / 48)} ms of audio received` : 'no reply in progress',
@@ -813,6 +933,17 @@ export class GeminiLiveClient {
       this.turnFirstAudio = false;
       log('you said:', sc.inputTranscription.text);
       this.pendingUser += sc.inputTranscription.text;
+      // A genuine new request from the user: the automatic-continue allowance starts again.
+      this.lastUserSpeechAt = Date.now();
+      this.autoContinues = 0;
+      this.continuePending = false;
+      this.requestStartAt = Date.now();
+      this.requestCapMs = continueCapFor(this.pendingUser);
+      // The user is talking: no nudges, the count starts again, and a goodbye ends the conversation once it has been answered.
+      this.clearNudge();
+      this.nudgeCount = 0;
+      this.closeAfterReply = NUDGES && isGoodbye(this.pendingUser);
+      if (this.closeAfterReply) log('goodbye heard:', JSON.stringify(this.pendingUser.trim()), '- the conversation will close after the farewell');
       this.opts.onTranscript?.('user', sc.inputTranscription.text, false);
     }
     if (sc.outputTranscription?.text) {
@@ -854,6 +985,9 @@ export class GeminiLiveClient {
     }
 
     if (sc.turnComplete) {
+      const turnAudioMs = this.replyStartAt ? Math.round(this.replyBytes / 48) : 0;
+      const turnText = this.pendingAssistant;
+      const turnStartedAt = this.replyStartAt;
       log(
         'turnComplete (Gemini finished its turn) |', this.replyStartAt ? `reply lasted ${Date.now() - this.replyStartAt} ms, ${Math.round(this.replyBytes / 48)} ms of audio, ${this.replyChunks} chunks` : 'no audio in this turn',
         '| reply text length', this.pendingAssistant.length, '| ended with:', JSON.stringify(this.pendingAssistant.slice(-60)),
@@ -862,6 +996,7 @@ export class GeminiLiveClient {
       this.turnFirstAudio = false;
       this.flushHistoryLines();
       this.opts.onTranscript?.('assistant', '', true);
+      this.considerContinue(turnAudioMs, turnText, turnStartedAt);
       if (CAN_FLUSH) {
         // Native player has no "finished" callback; the output level dropping to 0 ends it.
         this.speakingTail();
@@ -871,7 +1006,41 @@ export class GeminiLiveClient {
     }
   }
 
+  /** After a turn ends: asks Gemini to carry on when a long answer was probably cut short by its own turn limit. */
+  private considerContinue(audioMs: number, text: string, turnStartedAt: number) {
+    const wasContinuation = this.continuePending;
+    this.continuePending = false;
+    if (this.continueWatchdog) clearTimeout(this.continueWatchdog);
+    this.continueWatchdog = null;
+    const why = (reason: string) => log('auto-continue: not continuing,', reason, `(audio ${audioMs} ms, ${text.trim().length} chars, continues used ${this.autoContinues}/${AUTO_CONTINUE_MAX})`);
+    if (!AUTO_CONTINUE) return;
+    if (!this.wantListening || this.holdOpen || !this.socketReady) return why('not in a conversation');
+    if (this.toolsRunning > 0) return why('a tool is running');
+    const clean = text.trim();
+    if (wasContinuation) {
+      if (audioMs < AUTO_CONTINUE_MIN_PROGRESS_MS || clean.length < AUTO_CONTINUE_MIN_PROGRESS_CHARS) return why('the answer was already complete');
+      const head = clean.slice(0, 60).toLowerCase();
+      if (head.length >= 30 && this.prevTurnText.toLowerCase().includes(head)) return why('it repeated what it had just said');
+    }
+    this.prevTurnText = clean.slice(-400);
+    if (audioMs < AUTO_CONTINUE_MIN_AUDIO_MS) return;
+    if (clean.endsWith('?')) return why('it ended with a question for the user');
+    if (this.lastUserSpeechAt > turnStartedAt) return why('the user spoke during the reply');
+    if (this.autoContinues >= AUTO_CONTINUE_MAX) return why('the limit for one request was reached');
+    if (Date.now() - this.requestStartAt > this.requestCapMs) return why('the time limit for one request was reached');
+    this.autoContinues += 1;
+    this.continuePending = true;
+    log(`auto-continue #${this.autoContinues}: the reply ended after ${audioMs} ms of speech, asking Gemini to carry on | ended with:`, JSON.stringify(clean.slice(-60)));
+    this.send({ realtimeInput: { text: CONTINUE_PROMPT } });
+    this.continueWatchdog = setTimeout(() => {
+      this.continueWatchdog = null;
+      this.continuePending = false;
+    }, AUTO_CONTINUE_SILENCE_MS);
+  }
+
   private async runTools(calls: LiveToolCall[]) {
+    this.toolsRunning += 1;
+    this.continuePending = false;
     const functionResponses = await Promise.all(
       calls.map(async (call) => {
         let response: Record<string, unknown>;
@@ -891,6 +1060,7 @@ export class GeminiLiveClient {
         return { id: call.id, name: call.name, response };
       }),
     );
+    this.toolsRunning = Math.max(0, this.toolsRunning - 1);
     this.send({ toolResponse: { functionResponses } });
   }
 
@@ -1047,12 +1217,30 @@ export class GeminiLiveClient {
       log('tap -> listening in', Date.now() - this.tapAt, 'ms');
       this.tapAt = 0;
     }
+    const before = this.state;
     this.state = state;
     if (state === 'speaking') {
       if (this.idleTimer) clearTimeout(this.idleTimer);
       this.idleTimer = null;
+      this.clearNudge();
     } else if (this.wantListening) {
       this.touch();
+    }
+    if (state === 'listening') {
+      if (before === 'speaking' && this.closeAfterReply && this.wantListening) {
+        // The farewell (or the closing line) has been spoken: end the conversation.
+        setTimeout(() => {
+          if (this.closeAfterReply && this.wantListening && this.state === 'listening') {
+            log('closing the conversation after the farewell');
+            this.closeAfterReply = false;
+            this.stopListening();
+          }
+        }, 600);
+      } else {
+        this.scheduleNudge();
+      }
+    } else if (state !== 'speaking') {
+      this.clearNudge();
     }
     this.opts.onState?.(state);
   }
