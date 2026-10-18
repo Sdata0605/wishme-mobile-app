@@ -209,7 +209,7 @@ export default function VoiceCallWishScreen() {
   return (
     <AmbientBackground><View style={[styles.container, { backgroundColor: 'transparent' }]}>
       <LinearGradient
-        colors={['#B026FF', '#FF5F1F']}
+        colors={['#7B5CFA', '#1F7BFF']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={[styles.header, { paddingTop: topPad + 12 }]}
@@ -359,7 +359,7 @@ export default function VoiceCallWishScreen() {
             </View>
 
             <TouchableOpacity onPress={handleMakeCall} disabled={submitting || !selectedVoice} activeOpacity={0.85} style={submitting && { opacity: 0.7 }}>
-              <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
+              <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
                 {submitting ? <ActivityIndicator color="#fff" /> : <Icon name="phone" size={18} color="#fff" />}
                 <Text style={styles.ctaText}>{submitting ? 'Initiating Call...' : `Make Wish Call (₹${CALL_PRICE})`}</Text>
               </LinearGradient>
@@ -394,7 +394,7 @@ export default function VoiceCallWishScreen() {
               activeOpacity={0.85}
               style={(uploading || !voiceName.trim() || !audioBase64) && { opacity: 0.6 }}
             >
-              <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
+              <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.cta}>
                 {uploading ? <ActivityIndicator color="#fff" /> : <Icon name="upload" size={18} color="#fff" />}
                 <Text style={styles.ctaText}>{uploading ? 'Uploading Voice...' : 'Upload Voice'}</Text>
               </LinearGradient>

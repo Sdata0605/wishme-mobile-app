@@ -343,7 +343,7 @@ export default function WishBookingScreen() {
           name: 'WishMe',
           description: `Wish for ${celeb?.name}`,
           prefill: { name: prefillName, email: user?.email ?? '', contact: user?.phone ?? '' },
-          theme: { color: '#B026FF' },
+          theme: { color: '#7B5CFA' },
           handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
             try {
               await onPaymentSuccess(response.razorpay_payment_id, response.razorpay_order_id, response.razorpay_signature);
@@ -390,7 +390,7 @@ export default function WishBookingScreen() {
           name: 'WishMe',
           description: `Wish for ${celeb?.name}`,
           prefill: { name: prefillName, email: user?.email ?? '', contact: user?.phone ?? '' },
-          theme: { color: '#B026FF' },
+          theme: { color: '#7B5CFA' },
         });
 
         if (data?.razorpay_payment_id) {
@@ -445,7 +445,7 @@ export default function WishBookingScreen() {
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                   <Text style={[s.celebName, { color: colors.foreground }]}>{celeb.name}</Text>
-                  {celeb.is_verified && <Icon name="check-circle" size={14} color="#FF5F1F" />}
+                  {celeb.is_verified && <Icon name="check-circle" size={14} color="#1F7BFF" />}
                 </View>
                 <Text style={[s.celebCat, { color: colors.mutedForeground }]}>{celeb.category}</Text>
               </View>
@@ -635,12 +635,12 @@ export default function WishBookingScreen() {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[s.payBtn, { borderColor: '#B026FF' }]}
+                style={[s.payBtn, { borderColor: '#7B5CFA' }]}
                 onPress={handleRazorpayPay}
                 disabled={paying}
               >
-                {paying ? <ActivityIndicator size="small" color="#B026FF" /> : <Icon name="credit-card" size={20} color="#B026FF" />}
-                <Text style={[s.payBtnLabel, { color: '#B026FF' }]}>Pay via Razorpay</Text>
+                {paying ? <ActivityIndicator size="small" color="#7B5CFA" /> : <Icon name="credit-card" size={20} color="#7B5CFA" />}
+                <Text style={[s.payBtnLabel, { color: '#7B5CFA' }]}>Pay via Razorpay</Text>
               </TouchableOpacity>
             </View>
 
@@ -687,8 +687,8 @@ const s = StyleSheet.create({
   celebAvatarPlaceholder: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   celebName: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   celebCat: { fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
-  priceTag: { backgroundColor: '#B026FF18', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
-  priceTagText: { color: '#B026FF', fontSize: 14, fontFamily: 'Inter_700Bold' },
+  priceTag: { backgroundColor: '#7B5CFA18', borderRadius: 8, paddingVertical: 4, paddingHorizontal: 10 },
+  priceTagText: { color: '#7B5CFA', fontSize: 14, fontFamily: 'Inter_700Bold' },
   sectionLabel: { fontSize: 14, fontFamily: 'Inter_600SemiBold', marginBottom: 8, marginTop: 4 },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 4 },
   suggestBtn: { borderWidth: 1, borderRadius: 20, paddingVertical: 4, paddingHorizontal: 12 },

@@ -129,14 +129,14 @@ export function ImageMusicTab({ ctx }: { ctx: MusicCtx }) {
             placeholder="Calming piano melody for a sunset beach..." placeholderTextColor={colors.mutedForeground}
             value={desc} onChangeText={setDesc} multiline numberOfLines={3} />
           <SL text="Genre" />
-          <ChipSelect options={IMG_MUSIC_GENRES} value={genre} onChange={setGenre} activeColor="#FF5F1F" />
+          <ChipSelect options={IMG_MUSIC_GENRES} value={genre} onChange={setGenre} activeColor="#1F7BFF" />
           <SL text="Mood" />
-          <ChipSelect options={IMG_MUSIC_MOODS} value={mood} onChange={setMood} activeColor="#B026FF" />
+          <ChipSelect options={IMG_MUSIC_MOODS} value={mood} onChange={setMood} activeColor="#7B5CFA" />
           <LanguageDropdown value={language} onChange={setLanguage} />
           <View style={s.lyricHeader}>
             <SL text="Lyrics (optional)" />
-            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#FF5F1F' }]} onPress={generateLyrics} disabled={lyricsGen}>
-              <Icon name="zap" size={13} color="#FF5F1F" />
+            <TouchableOpacity style={[s.aiLyricsBtn, { borderColor: '#1F7BFF' }]} onPress={generateLyrics} disabled={lyricsGen}>
+              <Icon name="zap" size={13} color="#1F7BFF" />
               <Text style={s.aiLyricsBtnText}>{lyricsGen ? 'Generating...' : 'AI Generate'}</Text>
             </TouchableOpacity>
           </View>

@@ -147,8 +147,8 @@ function getStatusColor(status: string): string {
   const s = status?.toLowerCase();
   if (s === 'completed') return '#22C55E';
   if (s === 'failed' || s === 'cancelled') return '#EF4444';
-  if (s === 'processing' || s === 'scheduled') return '#FF5F1F';
-  if (s === 'ready') return '#B026FF';
+  if (s === 'processing' || s === 'scheduled') return '#1F7BFF';
+  if (s === 'ready') return '#7B5CFA';
   return '#F59E0B';
 }
 
@@ -175,7 +175,7 @@ export const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 12, marginTop: 12,
     padding: 12, borderRadius: 16, borderWidth: 1,
   },
-  sectionBarIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#B026FF', alignItems: 'center', justifyContent: 'center' },
+  sectionBarIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#7B5CFA', alignItems: 'center', justifyContent: 'center' },
   sectionBarTitle: { fontSize: 15, fontFamily: 'Inter_700Bold' },
   sectionBarHint: { fontSize: 11, fontFamily: 'Inter_400Regular', marginTop: 1 },
   listContent: { padding: 12, gap: 12 },
@@ -221,7 +221,7 @@ export const s = StyleSheet.create({
   processingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 },
   empty: { alignItems: 'center', paddingTop: 60, gap: 12 },
   emptyTitle: { fontSize: 16, fontFamily: 'Inter_500Medium', textAlign: 'center' },
-  emptyBtn: { backgroundColor: '#B026FF', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 9999, marginTop: 4 },
+  emptyBtn: { backgroundColor: '#7B5CFA', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 9999, marginTop: 4 },
   emptyBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   errorBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

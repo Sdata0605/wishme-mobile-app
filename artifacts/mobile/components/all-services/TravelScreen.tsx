@@ -326,7 +326,7 @@ const use_sv = () => useThemedStyles(make_sv);
 // ─── Popular destinations ────────────────────────────────────────────────────
 const DESTINATIONS = [
   { city: 'Goa', tag: 'Beaches', color: T(C.orange, 'fg'), bg: '#F5F0FF' },
-  { city: 'Manali', tag: 'Mountains', color: '#FF5F1F', bg: '#EFF6FF' },
+  { city: 'Manali', tag: 'Mountains', color: '#1F7BFF', bg: '#EFF6FF' },
   { city: 'Jaipur', tag: 'Heritage', color: '#DC2626', bg: '#FEE2E2' },
   { city: 'Kerala', tag: 'Backwaters', color: T(C.green, 'fg'), bg: '#ECFDF5' },
   { city: 'Mumbai', tag: 'City life', color: T(C.purpleLight, 'fg'), bg: '#F5F3FF' },
@@ -468,7 +468,7 @@ const use_of = () => useThemedStyles(make_of);
 const TRUST = [
   { Icon: ShieldCheck, color: T(C.green, 'fg'), title: 'Secure Booking', sub: 'Bank-grade payment safety' },
   { Icon: Zap, color: '#FBBF24', title: 'Instant Confirm', sub: 'Tickets in seconds' },
-  { Icon: Headphones, color: '#FFD23F', title: '24x7 Support', sub: 'Help anytime, anywhere' },
+  { Icon: Headphones, color: '#25DFFF', title: '24x7 Support', sub: 'Help anytime, anywhere' },
   { Icon: Users, color: T(C.green, 'fg'), title: 'Trusted', sub: '2M+ happy travellers' },
 ];
 

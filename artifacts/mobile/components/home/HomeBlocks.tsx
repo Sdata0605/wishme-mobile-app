@@ -156,7 +156,7 @@ export function WeatherCard({ w }: { w: Weather }) {
       <View style={styles.wStrip}>
         <Stat icon="thermometer" tint="#FF7A59" value={`${w.feelsC}°`} label="Feels" />
         <View style={styles.statSep} />
-        <Stat icon="droplet" tint="#FFD23F" value={`${w.humidity}%`} label="Humidity" />
+        <Stat icon="droplet" tint="#25DFFF" value={`${w.humidity}%`} label="Humidity" />
         <View style={styles.statSep} />
         <Stat icon="wind" tint="#D9C9FB" value={`${w.windKmh} km/h`} label="Wind" />
         <View style={styles.statSep} />
@@ -189,7 +189,7 @@ export function NewsCard({ stories, onMore, onDismiss, onOpen }: { stories: Stor
         </PressScale>
       ))}
       <PressScale onPress={onMore} accessibilityRole="button" style={{ alignSelf: 'flex-end', marginTop: 22 }}>
-        <Text style={[styles.more, { color: neon.isDark ? '#FF2E88' : neon.violet }]}>More news</Text>
+        <Text style={[styles.more, { color: neon.isDark ? '#D23FE0' : neon.violet }]}>More news</Text>
       </PressScale>
     </NeonCard>
   );

@@ -121,18 +121,160 @@ export interface Neon {
   wash: readonly [string, string, string];
   /** The aurora's pools: blue, violet, magenta. Null in light, where the page stays calm. */
   aurora: { blue: string; violet: string; magenta: string } | null;
+  /** The four stops of the light swoosh across the lower right of the dark page. */
+  swoosh: readonly [string, string, string, string];
 }
+
+/**
+ * The themes a user can pick in Settings → Appearance. Aurora (the default) shares the MyAssistant colours; Neon
+ * Celebration, Electric Lime and Holi Neon are the WishMe design directions.
+ */
+export type ThemeId = 'light' | 'aurora' | 'neon' | 'lime' | 'holi';
+
+export const THEMES: { id: ThemeId; name: string; blurb: string; swatches: readonly string[] }[] = [
+  { id: 'aurora', name: 'Aurora', blurb: 'Royal navy with electric blue, violet and magenta', swatches: ['#0A1556', '#25DFFF', '#9473F5', '#E555FF'] },
+  { id: 'light', name: 'Light', blurb: 'Bright and clean', swatches: ['#F7F7FB', '#A855F7', '#DB2777', '#0891B2'] },
+  { id: 'neon', name: 'Neon Celebration', blurb: 'Plum night with neon orange, hot pink and gold', swatches: ['#12081F', '#FF5F1F', '#FF2E88', '#B026FF', '#FFD23F'] },
+  { id: 'lime', name: 'Electric Lime', blurb: 'True black with fluoro lime, neon pink and violet', swatches: ['#07070C', '#C6FF00', '#FF2E97', '#7C4DFF'] },
+  { id: 'holi', name: 'Holi Neon', blurb: 'Festival saffron, magenta, green and yellow', swatches: ['#1A0716', '#FF9F1C', '#FF1F8F', '#39FF14', '#FFE600'] },
+];
+
+export const DEFAULT_DARK_THEME: Exclude<ThemeId, 'light'> = 'aurora';
+
+/**
+ * One dark theme's fixed colours. `violet` is the primary (buttons, selection) and always takes white text;
+ * `cyan` is the highlight (links, rings, special moments) and is read on the dark page; `blue` is the left of the
+ * aurora and of custom-accent gradients.
+ */
+interface DarkPalette {
+  violet: string;
+  pink: string;
+  blue: string;
+  cyan: string;
+  lime: string;
+  bg: string;
+  surface: string;
+  surfaceHigh: string;
+  textLo: string;
+  textDim: string;
+  /** The primary as r,g,b, for the hairlines. */
+  lineRgb: string;
+  brand: readonly [string, string];
+  accents: readonly [string, string, string, string, string, string];
+  glass: string;
+  cardBorder: string;
+  dock: string;
+  orbDisc: string;
+  wash: readonly [string, string, string];
+  /** The page's colour pools, when they differ from blue / violet / pink. */
+  aurora?: { blue: string; violet: string; magenta: string };
+  swoosh: readonly [string, string, string, string];
+}
+
+const DARK: Record<Exclude<ThemeId, 'light'>, DarkPalette> = {
+  // "Aurora", the MyAssistant colours: a deep royal-navy page with a blue pool top-left and a magenta swoosh
+  // lower-right, glass cards outlined in blue-violet, a cyan highlight and a blue-to-magenta brand gradient.
+  aurora: {
+    violet: '#9473F5',
+    pink: '#E555FF',
+    blue: '#2A6BFF',
+    cyan: '#25DFFF',
+    lime: '#BDF64B',
+    bg: '#0A1556',
+    surface: '#0A1B50',
+    surfaceHigh: '#10215E',
+    textLo: '#C9DBFB',
+    textDim: '#9EAFE2',
+    lineRgb: '120,150,255',
+    brand: ['#0264FF', '#CA00EF'],
+    accents: ['#2B7BFF', '#D83BE0', '#12D3D9', '#F5A00F', '#0AF0A0', '#3B82FF'],
+    glass: 'rgba(9,24,84,0.72)',
+    cardBorder: '#2F3F9A',
+    dock: '#0B1E53',
+    orbDisc: '#14195C',
+    wash: ['#18165B', '#0B1759', '#071048'],
+    aurora: { blue: '#2A4BFF', violet: '#7B3CF0', magenta: '#FF2BD6' },
+    swoosh: ['#3A7BFF', '#8A5CFF', '#E23CE8', '#FF7BE6'],
+  },
+  // "Neon Celebration": a deep plum night lit by neon orange, hot pink and electric purple, with glowing gold for the
+  // special moments.
+  neon: {
+    violet: '#B026FF', // electric purple
+    pink: '#FF2E88', // hot pink
+    blue: '#FF5F1F', // neon orange
+    cyan: '#FFD23F', // neon gold
+    lime: '#BDF64B',
+    bg: '#12081F', // plum night
+    surface: '#1F0A31',
+    surfaceHigh: '#2B0D43',
+    textLo: '#D9C9FB',
+    textDim: '#AE9ECF',
+    lineRgb: '176,38,255',
+    brand: ['#FF5F1F', '#FF2E88'],
+    accents: ['#B026FF', '#FF2E88', '#FFD23F', '#FF5F1F', '#0AF0A0', '#C051FF'],
+    glass: 'rgba(18,8,31,0.72)',
+    cardBorder: '#3D1F5C',
+    dock: '#1A0F2E',
+    orbDisc: '#190A2A',
+    wash: ['#280C3E', '#1B0A2C', '#12081F'],
+    swoosh: ['#FF5F1F', '#B026FF', '#FF2E88', '#FFD23F'],
+  },
+  // "Electric Lime": true black with fluorescent lime, neon pink and electric violet. Lime is the highlight; violet
+  // carries the buttons so their white text stays legible.
+  lime: {
+    violet: '#7C4DFF', // electric violet
+    pink: '#FF2E97', // neon pink
+    blue: '#7C4DFF',
+    cyan: '#C6FF00', // fluoro lime
+    lime: '#C6FF00',
+    bg: '#07070C',
+    surface: '#13131C',
+    surfaceHigh: '#1D1D29',
+    textLo: '#D2DBC8',
+    textDim: '#9AA3A0',
+    lineRgb: '198,255,0',
+    brand: ['#7C4DFF', '#FF2E97'],
+    accents: ['#7C4DFF', '#FF2E97', '#C6FF00', '#FFB347', '#4DF0A6', '#9B7BFF'],
+    glass: 'rgba(7,7,12,0.74)',
+    cardBorder: '#2A2F1C',
+    dock: '#0B0B12',
+    orbDisc: '#07070C',
+    wash: ['#12160A', '#0B0C0D', '#07070C'],
+    swoosh: ['#7C4DFF', '#FF2E97', '#C6FF00', '#7CFF4F'],
+  },
+  // "Holi Neon": India's festival colours as light, neon saffron, hot magenta, fluorescent green and electric yellow
+  // on a deep magenta-black.
+  holi: {
+    violet: '#E0177D', // hot magenta, deep enough for white text
+    pink: '#FF9F1C', // neon saffron
+    blue: '#FF9F1C',
+    cyan: '#FFE600', // electric yellow
+    lime: '#39FF14', // fluoro green
+    bg: '#1A0716',
+    surface: '#2A0D24',
+    surfaceHigh: '#3A1232',
+    textLo: '#F2CFE2',
+    textDim: '#C39AB4',
+    lineRgb: '255,31,143',
+    brand: ['#FF9F1C', '#FF1F8F'],
+    accents: ['#FF1F8F', '#FF9F1C', '#FFE600', '#FF7A1C', '#39FF14', '#FF5FB0'],
+    glass: 'rgba(26,7,22,0.72)',
+    cardBorder: '#4A1840',
+    dock: '#200A1C',
+    orbDisc: '#1F0A1B',
+    wash: ['#36101F', '#230A1D', '#1A0716'],
+    swoosh: ['#FF9F1C', '#FF1F8F', '#FFE600', '#39FF14'],
+  },
+};
 
 /**
  * The tokens for one theme and one (optional) user accent.
  *
- * DARK is the aurora look of the installed MyAssistant app, sampled from its screenshots: a deep royal-navy page with
- * a blue pool top-left and a magenta swoosh lower-right, glass cards outlined in blue-violet, a cyan highlight, and a
- * blue-to-magenta brand gradient. LIGHT keeps the Daylight values from the Flutter source. Choosing any accent other
- * than the default re-derives the violet / partner / brand gradient from it exactly as the Flutter app does; the navy
- * page stays.
+ * The dark themes are the WishMe design directions (see DARK). LIGHT keeps the Daylight values. Choosing any accent
+ * other than the default re-derives the primary / partner / brand gradient from it; the theme's page stays.
  */
-export function buildNeon(isDark: boolean, accent: string | null = DEFAULT_ACCENT): Neon {
+export function buildNeon(theme: ThemeId, accent: string | null = DEFAULT_ACCENT): Neon {
+  const isDark = theme !== 'light';
   const custom = !!accent && accent.toLowerCase() !== DEFAULT_ACCENT.toLowerCase();
   let accentPartner: string | null = null;
   let accentInk: string | null = null;
@@ -147,38 +289,35 @@ export function buildNeon(isDark: boolean, accent: string | null = DEFAULT_ACCEN
     accentInk = hslToHex({ h: h.h, s: clamp(h.s * 1.05, 0.45, 1), l: clamp(h.l * 0.52, 0.24, 0.48) });
   }
 
-  if (isDark) {
-    // "Neon Celebration": a deep plum night lit by neon orange, hot pink and electric purple, with glowing gold
-    // for the special moments.
-    const violet = custom ? accent! : '#B026FF'; // electric purple
-    const pink = custom ? accentPartner! : '#FF2E88'; // hot pink
-    const blue = custom ? mix(accent!, '#FF5F1F', 0.5) : '#FF5F1F'; // neon orange
-    const cyan = '#FFD23F'; // neon gold
-    const bg = '#12081F'; // plum night
-    const surface = '#1F0A31';
-    const brand: readonly [string, string] = custom ? [violet, pink] : ['#FF5F1F', '#FF2E88'];
+  if (theme !== 'light') {
+    const d = DARK[theme];
+    const violet = custom ? accent! : d.violet;
+    const pink = custom ? accentPartner! : d.pink;
+    const blue = custom ? mix(accent!, d.blue, 0.5) : d.blue;
+    const cyan = d.cyan;
+    const [accentA, accentB, accentC, accentD, accentE, accentF] = d.accents;
     return {
       isDark,
-      violet, cyan, pink, lime: '#BDF64B', bg, surface, surfaceHigh: '#2B0D43',
+      violet, cyan, pink, lime: d.lime, bg: d.bg, surface: d.surface, surfaceHigh: d.surfaceHigh,
       success: '#4DF0A6',
       warning: '#FFB347',
       error: '#FF8585',
       textHi: '#FFFFFF',
-      textLo: '#D9C9FB',
-      textDim: '#AE9ECF',
-      onInk: bg,
-      line: 'rgba(176,38,255,0.20)',
-      lineBright: 'rgba(176,38,255,0.36)',
-      accentA: '#B026FF',
-      accentB: '#FF2E88',
-      accentC: '#FFD23F',
-      accentD: '#FF5F1F',
-      accentE: '#0AF0A0',
-      accentF: '#C051FF',
-      gBrand: brand,
+      textLo: d.textLo,
+      textDim: d.textDim,
+      onInk: d.bg,
+      line: `rgba(${d.lineRgb},0.20)`,
+      lineBright: `rgba(${d.lineRgb},0.36)`,
+      accentA,
+      accentB,
+      accentC,
+      accentD,
+      accentE,
+      accentF,
+      gBrand: custom ? [violet, pink] : d.brand,
       gVioletCyan: [violet, cyan],
       gPinkViolet: [pink, violet],
-      gCyanLime: [cyan, '#BDF64B'],
+      gCyanLime: [cyan, d.lime],
       gOrb: [violet, cyan, pink, violet],
       radius,
       spacing,
@@ -188,13 +327,14 @@ export function buildNeon(isDark: boolean, accent: string | null = DEFAULT_ACCEN
         return [mix(c, '#FFFFFF', 0.16), deep] as const;
       },
       blue,
-      glass: 'rgba(18,8,31,0.72)',
-      cardBorder: '#3D1F5C',
-      dock: '#1A0F2E',
-      orbDisc: '#190A2A',
-      navIdle: '#AE9ECF',
-      wash: ['#280C3E', '#1B0A2C', '#12081F'],
-      aurora: { blue: '#FF5F1F', violet: '#B026FF', magenta: '#FF2E88' },
+      glass: d.glass,
+      cardBorder: d.cardBorder,
+      dock: d.dock,
+      orbDisc: d.orbDisc,
+      navIdle: d.textDim,
+      wash: d.wash,
+      aurora: d.aurora ?? { blue: d.blue, violet: d.violet, magenta: d.pink },
+      swoosh: d.swoosh,
     };
   }
 
@@ -245,6 +385,7 @@ export function buildNeon(isDark: boolean, accent: string | null = DEFAULT_ACCEN
     navIdle: '#9BA0B0',
     wash: [mix(bg, violet, 0.07), mix(bg, violet, 0.03), bg],
     aurora: null,
+    swoosh: [violet, pink, cyan, pink],
   };
 }
 

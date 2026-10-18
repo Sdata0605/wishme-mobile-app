@@ -44,7 +44,7 @@ export function CloneTab({ ctx }: { ctx: MusicCtx }) {
 
   return (
     <View style={s.tabContent}>
-      <InfoBox msg="For best results, record 1–5 minutes of clear, natural speech." color="#B026FF" />
+      <InfoBox msg="For best results, record 1–5 minutes of clear, natural speech." color="#7B5CFA" />
       <SL text="Upload or Record Voice Sample" />
       <UploadOrRecord audioFileName={audioFileName} onAudio={handleAudio} onClear={() => { setAudioBase64(null); setAudioFileName(null); }} />
       <SL text="Voice Name" />

@@ -1,29 +1,33 @@
 import React from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Icon, type IconName } from '@/components/Icon';
+import { Icon } from '@/components/Icon';
 import { SettingsHeader } from '@/components/settings/SettingsUI';
-import { ACCENT_CHOICES, DEFAULT_ACCENT } from '@/constants/neon';
+import { ACCENT_CHOICES, DEFAULT_ACCENT, THEMES, type ThemeId } from '@/constants/neon';
 import { useTheme } from '@/context/ThemeContext';
 
 export default function AppearanceScreen() {
-  const { colors, isDark, toggle, accent, setAccent, neon } = useTheme();
+  const { colors, theme, setTheme, accent, setAccent, neon } = useTheme();
 
-  const option = (dark: boolean, icon: IconName, title: string, subtitle: string) => {
-    const selected = isDark === dark;
+  const option = (id: ThemeId, title: string, subtitle: string, swatches: readonly string[]) => {
+    const selected = theme === id;
+    const [page, ...inks] = swatches;
     return (
       <TouchableOpacity
-        key={title}
+        key={id}
         activeOpacity={0.8}
         onPress={() => {
-          if (!selected) toggle();
+          if (!selected) setTheme(id);
         }}
         style={[s.card, { backgroundColor: colors.card, borderColor: selected ? colors.primary : colors.border, borderWidth: selected ? 2 : 1 }]}
         accessibilityRole="radio"
         accessibilityState={{ selected }}
         accessibilityLabel={`${title}. ${subtitle}`}
       >
-        <View style={[s.iconCircle, { backgroundColor: colors.primary + '1F' }]}>
-          <Icon name={icon} size={22} color={colors.primary} />
+        {/* a little preview of the theme: its page colour with its accent colours as dots on it */}
+        <View style={[s.preview, { backgroundColor: page, borderColor: colors.border }]}>
+          {inks.map((c) => (
+            <View key={c} style={[s.previewDot, { backgroundColor: c }]} />
+          ))}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[s.title, { color: colors.foreground }]}>{title}</Text>
@@ -45,12 +49,11 @@ export default function AppearanceScreen() {
       <SettingsHeader title="Appearance" />
       <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
         <Text style={[s.intro, { color: colors.mutedForeground }]}>Choose how WishMe looks on your phone.</Text>
-        {option(false, 'sun', 'Light', 'Bright and clean')}
-        {option(true, 'moon', 'Dark', 'Easier on the eyes at night')}
+        {THEMES.map((t) => option(t.id, t.name, t.blurb, t.swatches))}
 
         <Text style={[s.section, { color: colors.foreground }]}>Accent colour</Text>
         <Text style={[s.intro, { color: colors.mutedForeground, marginBottom: 14 }]}>
-          Every screen, the mic and the buttons follow this colour in light and dark.
+          Every screen, the mic and the buttons follow this colour in every theme.
         </Text>
         <View style={s.swatches}>
           {ACCENT_CHOICES.map((c) => {
@@ -86,7 +89,19 @@ export default function AppearanceScreen() {
 const s = StyleSheet.create({
   intro: { fontSize: 14, lineHeight: 20, fontFamily: 'Inter_400Regular', marginBottom: 18 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 14, padding: 16, borderRadius: 18, marginBottom: 12 },
-  iconCircle: { width: 46, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center' },
+  preview: {
+    width: 54,
+    height: 54,
+    borderRadius: 14,
+    borderWidth: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignContent: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    padding: 8,
+  },
+  previewDot: { width: 13, height: 13, borderRadius: 6.5 },
   title: { fontSize: 16.5, fontFamily: 'Inter_600SemiBold' },
   sub: { fontSize: 13, fontFamily: 'Inter_400Regular', marginTop: 2 },
   check: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },

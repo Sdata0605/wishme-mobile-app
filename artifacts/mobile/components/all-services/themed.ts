@@ -13,7 +13,7 @@ import { useTheme } from '@/context/ThemeContext';
  */
 type Role = 'bg' | 'border' | 'fg' | 'page';
 
-let cur: { isDark: boolean; neon: Neon } = { isDark: false, neon: buildNeon(false) };
+let cur: { isDark: boolean; neon: Neon } = { isDark: false, neon: buildNeon('light') };
 
 const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
 
@@ -86,9 +86,9 @@ const cache = new WeakMap<object, Map<string, unknown>>();
 
 /** Builds a StyleSheet from `make` for the current theme, once per theme, and re-renders when the theme changes. */
 export function useThemedStyles<S>(make: () => S): S {
-  const { isDark, neon, accent } = useTheme();
+  const { isDark, neon, accent, theme } = useTheme();
   cur = { isDark, neon };
-  const key = `${isDark ? 'd' : 'l'}:${accent}`;
+  const key = `${theme}:${accent}`;
   let byKey = cache.get(make);
   if (!byKey) { byKey = new Map(); cache.set(make, byKey); }
   let styles = byKey.get(key) as S | undefined;

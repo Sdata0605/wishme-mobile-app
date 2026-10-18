@@ -27,15 +27,15 @@ interface QuickItem {
 }
 
 const QUICK_ITEMS: QuickItem[] = [
-  { icon: 'home', label: 'Dashboard', route: '/(tabs)', color: '#B026FF' },
-  { icon: 'user', label: 'Profile', route: '/(tabs)/profile', color: '#FF2E88' },
-  { icon: 'briefcase', label: 'For Business', route: '/for-business', color: '#B026FF' },
-  { icon: 'mail', label: 'Greeting Cards', route: '/greeting-cards', color: '#FF5F1F' },
+  { icon: 'home', label: 'Dashboard', route: '/(tabs)', color: '#7B5CFA' },
+  { icon: 'user', label: 'Profile', route: '/(tabs)/profile', color: '#D23FE0' },
+  { icon: 'briefcase', label: 'For Business', route: '/for-business', color: '#7B5CFA' },
+  { icon: 'mail', label: 'Greeting Cards', route: '/greeting-cards', color: '#1F7BFF' },
   { icon: 'star', label: 'Browse Celebrities', route: '/(tabs)/celebrities', color: '#F59E0B' },
-  { icon: 'share-2', label: 'Referrals', route: '/referrals', color: '#FF5F1F' },
-  { icon: 'credit-card', label: 'Wallet', route: '/wallet', color: '#B026FF' },
-  { icon: 'image', label: 'Photo Wish', route: '/photo-wish', color: '#FF2E88' },
-  { icon: 'calendar', label: 'Bookings', route: '/bookings', color: '#FF5F1F' },
+  { icon: 'share-2', label: 'Referrals', route: '/referrals', color: '#1F7BFF' },
+  { icon: 'credit-card', label: 'Wallet', route: '/wallet', color: '#7B5CFA' },
+  { icon: 'image', label: 'Photo Wish', route: '/photo-wish', color: '#D23FE0' },
+  { icon: 'calendar', label: 'Bookings', route: '/bookings', color: '#1F7BFF' },
 ];
 
 export function DraggableMoreButton() {

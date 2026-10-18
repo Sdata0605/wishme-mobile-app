@@ -37,21 +37,21 @@ const BANNERS: { id: string; title: string; subtitle: string; colors: readonly [
     id: '1',
     title: 'Get a Birthday Wish\nfrom Your Idol',
     subtitle: 'Starting from ₹999',
-    colors: ['#FF5F1F', '#FF2E88', '#B026FF'] as const,
+    colors: ['#1F7BFF', '#D23FE0', '#7B5CFA'] as const,
     route: '/wish-celebrity',
   },
   {
     id: '2',
     title: 'AI Music Studio\nNow Live!',
     subtitle: 'Generate songs in seconds',
-    colors: ['#B026FF', '#FF2E88', '#FF5F1F'] as const,
+    colors: ['#7B5CFA', '#D23FE0', '#1F7BFF'] as const,
     route: '/(tabs)/music',
   },
   {
     id: '3',
     title: 'Book a Voice Call\nwith Celebrities',
     subtitle: 'Live 1-on-1 sessions',
-    colors: ['#FF2E88', '#FF5F1F', '#FFD23F'] as const,
+    colors: ['#D23FE0', '#1F7BFF', '#25DFFF'] as const,
     route: '/(tabs)/voice-call',
   },
 ];
@@ -75,9 +75,9 @@ const PRICE_RANGES = [
 ];
 
 const VIDEO_CARDS = [
-  { id: 'v1', title: 'Graduation Wishes', desc: 'Send a heartfelt congratulations video to your graduate', tag: 'Graduation', gradient: ['#B026FF', '#FF2E88'] as const },
-  { id: 'v2', title: 'Birthday Magic', desc: 'Make their birthday unforgettable with a celebrity wish', tag: 'Birthday', gradient: ['#FF5F1F', '#FF2E88'] as const },
-  { id: 'v3', title: 'Anniversary Special', desc: 'Celebrate love with a romantic celebrity message', tag: 'Anniversary', gradient: ['#FF2E88', '#B026FF'] as const },
+  { id: 'v1', title: 'Graduation Wishes', desc: 'Send a heartfelt congratulations video to your graduate', tag: 'Graduation', gradient: ['#7B5CFA', '#D23FE0'] as const },
+  { id: 'v2', title: 'Birthday Magic', desc: 'Make their birthday unforgettable with a celebrity wish', tag: 'Birthday', gradient: ['#1F7BFF', '#D23FE0'] as const },
+  { id: 'v3', title: 'Anniversary Special', desc: 'Celebrate love with a romantic celebrity message', tag: 'Anniversary', gradient: ['#D23FE0', '#7B5CFA'] as const },
 ];
 
 const BIRTHDAY_VIDEO = require('../../assets/videos/happy-birthday.mp4');
@@ -594,7 +594,7 @@ export default function HomeScreen() {
                   <Text style={[styles.videoTitle, { color: colors.foreground }]}>{item.title}</Text>
                   <Text style={[styles.videoDesc, { color: colors.mutedForeground }]} numberOfLines={2}>{item.desc}</Text>
                   <TouchableOpacity onPress={() => router.push('/(tabs)/celebrities')} style={{ marginTop: 10 }}>
-                    <LinearGradient colors={['#FF2E88', '#B026FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.wishBtn}>
+                    <LinearGradient colors={['#D23FE0', '#7B5CFA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.wishBtn}>
                       <Icon name="video" size={14} color="#fff" />
                       <Text style={styles.wishBtnText}>Create Your Wish</Text>
                     </LinearGradient>
@@ -616,7 +616,7 @@ export default function HomeScreen() {
               { num: '3', icon: 'video' as IconName, title: 'Get Your Wish', caption: 'Receive a personal video' },
             ].map((step) => (
               <View key={step.num} style={styles.howStep}>
-                <LinearGradient colors={['#FF2E88', '#B026FF']} style={styles.stepCircle}>
+                <LinearGradient colors={['#D23FE0', '#7B5CFA']} style={styles.stepCircle}>
                   <Text style={styles.stepNum}>{step.num}</Text>
                 </LinearGradient>
                 <Icon name={step.icon} size={20} color={colors.primary} />
@@ -629,7 +629,7 @@ export default function HomeScreen() {
 
         {/* Referral Banner */}
         <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
-          <LinearGradient colors={['#B026FF', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.referralBanner}>
+          <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.referralBanner}>
             <View style={{ flex: 1 }}>
               <Text style={styles.referralTitle}>Earn with WishMe</Text>
               <Text style={styles.referralSub}>Refer friends & earn up to 10% commission</Text>
@@ -671,7 +671,7 @@ const styles = StyleSheet.create({
   bannerBtnText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   dotRow: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginTop: 10 },
   dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.3)' },
-  dotActive: { backgroundColor: '#FF2E88', width: 16 },
+  dotActive: { backgroundColor: '#D23FE0', width: 16 },
   quickGrid: { paddingHorizontal: 16 },
   quickRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
   quickItem: { alignItems: 'center', padding: 10, borderRadius: 14, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 6, elevation: 2 },

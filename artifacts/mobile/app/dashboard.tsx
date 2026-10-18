@@ -115,7 +115,7 @@ function buildStatCards(txns: WalletTransaction[]): StatCard[] {
   return [
     { label: 'Bookings Spent', icon: 'video', color: '#14B8A6', amount: sum(BOOKING_TYPES) },
     { label: 'Music Generated', icon: 'music-2', color: '#EAB308', amount: sum(MUSIC_TYPES) },
-    { label: 'Voice Calls', icon: 'phone', color: '#B026FF', amount: sum(CALL_TYPES) },
+    { label: 'Voice Calls', icon: 'phone', color: '#7B5CFA', amount: sum(CALL_TYPES) },
     { label: 'Other Services', icon: 'more-horizontal', color: 'rgba(255,255,255,0.5)', amount: sum(OTHER_TYPES) },
   ];
 }
@@ -270,7 +270,7 @@ export default function DashboardScreen() {
 
       {loading ? (
         <View style={styles.loader}>
-          <ActivityIndicator color="#B026FF" size="large" />
+          <ActivityIndicator color="#7B5CFA" size="large" />
         </View>
       ) : (
         <ScrollView
@@ -280,7 +280,7 @@ export default function DashboardScreen() {
         >
           {/* Wallet Balance Card */}
           <LinearGradient
-            colors={['#EC4899', '#B026FF']}
+            colors={['#EC4899', '#7B5CFA']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.balanceCard}
@@ -340,8 +340,8 @@ export default function DashboardScreen() {
                 const statusColor = STATUS_COLORS[tx.status] ?? '#F59E0B';
                 return (
                   <View key={tx.id} style={styles.txRow}>
-                    <View style={[styles.txIconWrap, { backgroundColor: isCredit ? '#22C55E20' : '#B026FF20' }]}>
-                      <Icon name={icon} size={18} color={isCredit ? '#22C55E' : '#B026FF'} />
+                    <View style={[styles.txIconWrap, { backgroundColor: isCredit ? '#22C55E20' : '#7B5CFA20' }]}>
+                      <Icon name={icon} size={18} color={isCredit ? '#22C55E' : '#7B5CFA'} />
                     </View>
                     <View style={styles.txInfo}>
                       <Text style={styles.txTitle} numberOfLines={1}>
@@ -373,7 +373,7 @@ export default function DashboardScreen() {
           activeOpacity={0.85}
         >
           <LinearGradient
-            colors={['#B026FF', '#B026FF']}
+            colors={['#7B5CFA', '#7B5CFA']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.fabGradient}
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
   seeAll: {
     fontSize: 13,
     fontFamily: 'Inter_500Medium',
-    color: '#B026FF',
+    color: '#7B5CFA',
   },
   emptyState: {
     alignItems: 'center',
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
     right: 16,
     borderRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#B026FF',
+    shadowColor: '#7B5CFA',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,

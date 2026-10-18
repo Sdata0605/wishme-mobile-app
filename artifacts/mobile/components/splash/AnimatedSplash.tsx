@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
     borderRadius: MARK_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#B026FF',
+    shadowColor: '#7B5CFA',
     shadowOpacity: 0.45,
     shadowRadius: 22,
     shadowOffset: { width: 0, height: 10 },

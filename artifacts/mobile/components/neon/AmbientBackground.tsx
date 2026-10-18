@@ -7,9 +7,9 @@ import { useTheme } from '@/context/ThemeContext';
 /**
  * THE ROOM THE APP SITS IN. Every screen floats on this.
  *
- * Dark is the "Neon Celebration" look: a plum-night page with a neon-orange pool at the top-left, a faint
- * hot-pink glow at the top-right, and a swoosh of orange-to-gold light sweeping up the lower right with a
- * hot-pink haze under it.
+ * Dark is the theme's aurora (by default the MyAssistant one): a deep page with a colour pool at the top-left, a
+ * faint glow at the top-right, and a swoosh of light sweeping up the lower right with a haze under it. The colours
+ * come from the theme (neon.aurora, neon.swoosh).
  * Light stays calm: a wash and two soft pools of the accent. Everything is a gradient (no blur filter), so it costs
  * almost nothing to paint.
  */
@@ -45,10 +45,10 @@ export function AmbientBackground({ children }: { children?: React.ReactNode }) 
                 <Stop offset="1" stopColor={a.magenta} stopOpacity={0} />
               </RadialGradient>
               <LinearGradient id="swoosh" x1="0" y1="0" x2="1" y2="0">
-                <Stop offset="0" stopColor="#FF5F1F" />
-                <Stop offset="0.45" stopColor="#B026FF" />
-                <Stop offset="0.8" stopColor="#FF2E88" />
-                <Stop offset="1" stopColor="#FFD23F" />
+                <Stop offset="0" stopColor={neon.swoosh[0]} />
+                <Stop offset="0.45" stopColor={neon.swoosh[1]} />
+                <Stop offset="0.8" stopColor={neon.swoosh[2]} />
+                <Stop offset="1" stopColor={neon.swoosh[3]} />
               </LinearGradient>
               <LinearGradient id="haze" x1="0" y1="0" x2="0" y2="1">
                 <Stop offset="0" stopColor={a.magenta} stopOpacity={0.5} />

@@ -44,7 +44,7 @@ const RELATIONS = ['Mom', 'Dad', 'Partner', 'Friend', 'Sibling', 'Child', 'Colle
 export function AddOccasionSheet({ visible, onClose, profileId, token, onSaved }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const accent = '#FF2E88';
+  const accent = '#D23FE0';
 
   const [people, setPeople] = useState<LovedOneLite[] | null>(null);
   const [personId, setPersonId] = useState<string | 'new' | null>(null);
@@ -240,7 +240,7 @@ export function AddOccasionSheet({ visible, onClose, profileId, token, onSaved }
           </ScrollView>
 
           <TouchableOpacity onPress={save} disabled={!valid || saving} activeOpacity={0.9} style={{ opacity: valid && !saving ? 1 : 0.45 }}>
-            <LinearGradient colors={['#B026FF', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
+            <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.saveBtn}>
               {saving ? <ActivityIndicator color="#fff" /> : <Text style={s.saveText}>Save occasion</Text>}
             </LinearGradient>
           </TouchableOpacity>

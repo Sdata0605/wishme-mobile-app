@@ -43,12 +43,12 @@ function fmtDate(date: string, long?: boolean): string {
 }
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#B026FF', '#FF2E88'],
-  ['#FF2E88', '#FF5F1F'],
-  ['#FF5F1F', '#B026FF'],
-  ['#FF5F1F', '#B026FF'],
-  ['#B026FF', '#FF5F1F'],
-  ['#B026FF', '#FF5F1F'],
+  ['#7B5CFA', '#D23FE0'],
+  ['#D23FE0', '#1F7BFF'],
+  ['#1F7BFF', '#7B5CFA'],
+  ['#1F7BFF', '#7B5CFA'],
+  ['#7B5CFA', '#1F7BFF'],
+  ['#7B5CFA', '#1F7BFF'],
 ];
 
 function gradientForName(name: string): [string, string] {
@@ -127,7 +127,7 @@ export default function OccasionsScreen() {
         >
           {/* Hero */}
           <LinearGradient
-            colors={['#B026FF', '#FF5F1F']}
+            colors={['#7B5CFA', '#1F7BFF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.hero}
@@ -240,7 +240,7 @@ export default function OccasionsScreen() {
 
           {/* Info Banner */}
           <LinearGradient
-            colors={['#FF5F1F', '#FF2E88']}
+            colors={['#1F7BFF', '#D23FE0']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={s.banner}

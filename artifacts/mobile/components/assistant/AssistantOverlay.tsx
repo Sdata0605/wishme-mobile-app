@@ -117,10 +117,10 @@ function Orb({ speaking, busy }: { speaking: boolean; busy: boolean }) {
 
       <Animated.View style={[styles.orb, { transform: [{ scale: coreScale }], opacity: busy ? 0.7 : 1 }]}>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: listenOpacity }]}>
-          <LinearGradient colors={['#2DD4FF', '#4F7CFF', '#B026FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['#2DD4FF', '#4F7CFF', '#7B5CFA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
         <Animated.View style={[StyleSheet.absoluteFill, { opacity: speakMix }]}>
-          <LinearGradient colors={['#F59E0B', '#EC4899', '#B026FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+          <LinearGradient colors={['#F59E0B', '#EC4899', '#7B5CFA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
 
         <Animated.View style={[styles.swirl, { transform: [{ rotate: spinADeg }] }]}>
@@ -228,10 +228,10 @@ function MiniOrb({ progress }: { progress: Animated.Value }) {
           <Animated.View style={[styles.miniRing, { transform: [{ scale: ringScale }], opacity: 0.22 }]} />
           <Animated.View style={[styles.miniOrb, { transform: [{ scale }] }]}>
             <Animated.View style={[StyleSheet.absoluteFill, { opacity: listenOpacity }]}>
-              <LinearGradient colors={['#2DD4FF', '#4F7CFF', '#B026FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={['#2DD4FF', '#4F7CFF', '#7B5CFA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
             </Animated.View>
             <Animated.View style={[StyleSheet.absoluteFill, { opacity: speakMix }]}>
-              <LinearGradient colors={['#F59E0B', '#EC4899', '#B026FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+              <LinearGradient colors={['#F59E0B', '#EC4899', '#7B5CFA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
             </Animated.View>
             <Animated.View style={[styles.miniSwirl, { transform: [{ rotate: deg }] }]}>
               <LinearGradient colors={['rgba(255,255,255,0.55)', 'rgba(255,255,255,0)']} start={{ x: 0.1, y: 0.1 }} end={{ x: 0.9, y: 0.7 }} style={StyleSheet.absoluteFill} />
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
     height: ORB,
     borderRadius: ORB / 2,
     overflow: 'hidden',
-    shadowColor: '#B026FF',
+    shadowColor: '#7B5CFA',
     shadowOpacity: 0.7,
     shadowRadius: 28,
     shadowOffset: { width: 0, height: 0 },
@@ -510,7 +510,7 @@ const styles = StyleSheet.create({
     height: MINI,
     borderRadius: MINI / 2,
     overflow: 'hidden',
-    shadowColor: '#B026FF',
+    shadowColor: '#7B5CFA',
     shadowOpacity: 0.7,
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 0 },

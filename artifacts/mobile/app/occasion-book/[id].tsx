@@ -41,12 +41,12 @@ function fmtDate(date: string): string {
 }
 
 const GRADIENT_PAIRS: [string, string][] = [
-  ['#B026FF', '#FF2E88'],
-  ['#FF2E88', '#FF5F1F'],
-  ['#FF5F1F', '#B026FF'],
-  ['#FF5F1F', '#B026FF'],
-  ['#B026FF', '#FF5F1F'],
-  ['#B026FF', '#FF5F1F'],
+  ['#7B5CFA', '#D23FE0'],
+  ['#D23FE0', '#1F7BFF'],
+  ['#1F7BFF', '#7B5CFA'],
+  ['#1F7BFF', '#7B5CFA'],
+  ['#7B5CFA', '#1F7BFF'],
+  ['#7B5CFA', '#1F7BFF'],
 ];
 
 function gradientForName(name: string): [string, string] {
@@ -444,7 +444,7 @@ export default function OccasionBookScreen() {
             activeOpacity={0.85}
           >
             <LinearGradient
-              colors={canSubmit ? ['#B026FF', '#FF5F1F'] : ['#aaa', '#888']}
+              colors={canSubmit ? ['#7B5CFA', '#1F7BFF'] : ['#aaa', '#888']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={s.submitBtn}

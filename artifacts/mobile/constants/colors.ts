@@ -42,8 +42,8 @@ export function makeGradients(n: Neon) {
   };
 }
 
-const lightNeon = buildNeon(false);
-const darkNeon = buildNeon(true);
+const lightNeon = buildNeon('light');
+const darkNeon = buildNeon('aurora');
 
 export const lightColors = makeColors(lightNeon);
 export const darkColors = makeColors(darkNeon);

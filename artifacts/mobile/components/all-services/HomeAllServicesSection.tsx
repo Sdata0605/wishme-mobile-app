@@ -49,7 +49,7 @@ const HOME_SERVICES: ServiceItem[] = [
   { name: 'Hotels', Icon: HotelIcon, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'screen', view: 'hotels' } },
   { name: 'Bus', Icon: Bus, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'screen', view: 'busTickets' } },
   { name: 'Electricity', Icon: Zap, color: '#D97706', bgColor: '#FFFBEB', action: { type: 'bill', kind: 'electricity' } },
-  { name: 'Water', Icon: Droplet, color: '#FF5F1F', bgColor: '#EFF6FF', action: { type: 'bill', kind: 'water' } },
+  { name: 'Water', Icon: Droplet, color: '#1F7BFF', bgColor: '#EFF6FF', action: { type: 'bill', kind: 'water' } },
   { name: 'Gas', Icon: Flame, color: T(C.orange, 'fg'), bgColor: '#F5F0FF', action: { type: 'bill', kind: 'gas' } },
   { name: 'Mobile', Icon: Smartphone, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'bill', kind: 'mobile' } },
   { name: 'DTH', Icon: Tv, color: '#374151', bgColor: '#F9FAFB', action: { type: 'bill', kind: 'dth' } },

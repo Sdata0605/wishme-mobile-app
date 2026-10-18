@@ -34,10 +34,10 @@ const OCCASIONS = [
 ];
 
 const GRAD_COLORS: [string, string][] = [
-  ['#B026FF', '#FF2E88'],
-  ['#FF2E88', '#FF5F1F'],
-  ['#FF5F1F', '#B026FF'],
-  ['#22C55E', '#FF5F1F'],
+  ['#7B5CFA', '#D23FE0'],
+  ['#D23FE0', '#1F7BFF'],
+  ['#1F7BFF', '#7B5CFA'],
+  ['#22C55E', '#1F7BFF'],
 ];
 
 function showToast(msg: string) {
@@ -401,7 +401,7 @@ export default function GreetingCardsScreen() {
 
   const statusColor = (st: string) => {
     if (st === 'completed') return '#22c55e';
-    if (st === 'processing') return '#B026FF';
+    if (st === 'processing') return '#7B5CFA';
     return '#ef4444';
   };
 
@@ -426,8 +426,8 @@ export default function GreetingCardsScreen() {
       </View>
       <View style={s.histInfo}>
         <View style={s.histBadgeRow}>
-          <View style={[s.badge, { backgroundColor: '#FF2E8820' }]}>
-            <Text style={[s.badgeText, { color: '#FF2E88' }]}>{item.occasion_name}</Text>
+          <View style={[s.badge, { backgroundColor: '#D23FE020' }]}>
+            <Text style={[s.badgeText, { color: '#D23FE0' }]}>{item.occasion_name}</Text>
           </View>
           <View style={[s.badge, { backgroundColor: statusColor(item.status) + '20' }]}>
             <Text style={[s.badgeText, { color: statusColor(item.status) }]}>
@@ -445,8 +445,8 @@ export default function GreetingCardsScreen() {
               style={s.dlBtn}
               onPress={() => handleDownload(item.generated_image_url!)}
             >
-              <Icon name="download" size={13} color="#FF2E88" />
-              <Text style={[s.dlText, { color: '#FF2E88' }]}>Download</Text>
+              <Icon name="download" size={13} color="#D23FE0" />
+              <Text style={[s.dlText, { color: '#D23FE0' }]}>Download</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -488,14 +488,14 @@ export default function GreetingCardsScreen() {
             style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => router.push('/wallet')}
           >
-            <Icon name="credit-card" size={16} color="#FF5F1F" />
+            <Icon name="credit-card" size={16} color="#1F7BFF" />
             <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Wallet</Text>
-            <Text style={[s.statValue, { color: '#FF5F1F' }]}>₹{wallet.balance}</Text>
-            <Text style={[s.statSub, { color: '#FF5F1F' }]}>Add Funds</Text>
+            <Text style={[s.statValue, { color: '#1F7BFF' }]}>₹{wallet.balance}</Text>
+            <Text style={[s.statSub, { color: '#1F7BFF' }]}>Add Funds</Text>
           </TouchableOpacity>
 
           <View style={[s.statCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Icon name="sparkles" size={16} color="#FF2E88" />
+            <Icon name="sparkles" size={16} color="#D23FE0" />
             <Text style={[s.statLabel, { color: colors.mutedForeground }]}>Today</Text>
             <Text style={[s.statValue, { color: colors.foreground }]}>{todayCards.length}</Text>
             <Text style={[s.statSub, { color: colors.mutedForeground }]}>Cards</Text>
@@ -530,10 +530,10 @@ export default function GreetingCardsScreen() {
         <View style={[s.tabRow, { borderBottomColor: colors.border }]}>
           {(['create', 'cards'] as const).map(t => (
             <TouchableOpacity key={t} style={s.tabPill} onPress={() => setTab(t)}>
-              <Text style={[s.tabText, { color: tab === t ? '#FF2E88' : colors.mutedForeground }]}>
+              <Text style={[s.tabText, { color: tab === t ? '#D23FE0' : colors.mutedForeground }]}>
                 {t === 'create' ? 'Create Card' : 'My Cards'}
               </Text>
-              {tab === t && <View style={[s.tabUnderline, { backgroundColor: '#FF2E88' }]} />}
+              {tab === t && <View style={[s.tabUnderline, { backgroundColor: '#D23FE0' }]} />}
             </TouchableOpacity>
           ))}
         </View>
@@ -546,7 +546,7 @@ export default function GreetingCardsScreen() {
               {(['upload', 'library', 'none'] as RefImgTab[]).map(opt => (
                 <TouchableOpacity
                   key={opt}
-                  style={[s.refTabBtn, refImgTab === opt && { backgroundColor: '#FF2E88' }]}
+                  style={[s.refTabBtn, refImgTab === opt && { backgroundColor: '#D23FE0' }]}
                   onPress={() => {
                     setRefImgTab(opt);
                     if (opt !== 'upload') setReferenceImageBase64(null);
@@ -563,7 +563,7 @@ export default function GreetingCardsScreen() {
             {refImgTab === 'upload' && (
               <View style={{ marginTop: 10 }}>
                 {referenceImageBase64 ? (
-                  <View style={[s.uploadedPreview, { borderColor: '#FF2E8840', backgroundColor: '#FF2E8808' }]}>
+                  <View style={[s.uploadedPreview, { borderColor: '#D23FE040', backgroundColor: '#D23FE008' }]}>
                     <Image
                       source={{ uri: `data:image/jpeg;base64,${referenceImageBase64}` }}
                       style={s.uploadedThumb}
@@ -578,11 +578,11 @@ export default function GreetingCardsScreen() {
                   </View>
                 ) : (
                   <TouchableOpacity
-                    style={[s.uploadZone, { borderColor: '#FF2E88', backgroundColor: '#FF2E8810' }]}
+                    style={[s.uploadZone, { borderColor: '#D23FE0', backgroundColor: '#D23FE010' }]}
                     onPress={pickImage}
                   >
-                    <Icon name="upload" size={22} color="#FF2E88" />
-                    <Text style={[s.uploadZoneText, { color: '#FF2E88' }]}>Choose Image</Text>
+                    <Icon name="upload" size={22} color="#D23FE0" />
+                    <Text style={[s.uploadZoneText, { color: '#D23FE0' }]}>Choose Image</Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -605,7 +605,7 @@ export default function GreetingCardsScreen() {
                         style={[
                           s.libThumbWrap,
                           {
-                            borderColor: selectedLibraryId === card.id ? '#FF2E88' : colors.border,
+                            borderColor: selectedLibraryId === card.id ? '#D23FE0' : colors.border,
                             borderWidth: selectedLibraryId === card.id ? 2.5 : 1,
                           },
                         ]}
@@ -618,7 +618,7 @@ export default function GreetingCardsScreen() {
                             contentFit="cover"
                           />
                         ) : (
-                          <LinearGradient colors={['#FF2E88', '#FF5F1F']} style={s.libThumb}>
+                          <LinearGradient colors={['#D23FE0', '#1F7BFF']} style={s.libThumb}>
                             <Icon name="image" size={16} color="rgba(255,255,255,0.8)" />
                           </LinearGradient>
                         )}
@@ -636,7 +636,7 @@ export default function GreetingCardsScreen() {
 
             {refImgTab === 'none' && (
               <View style={[s.aiOnlyNote, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                <Icon name="sparkles" size={16} color="#FF5F1F" />
+                <Icon name="sparkles" size={16} color="#1F7BFF" />
                 <Text style={[s.aiOnlyText, { color: colors.mutedForeground }]}>
                   Card will be generated purely by AI
                 </Text>
@@ -658,13 +658,13 @@ export default function GreetingCardsScreen() {
                   {OCCASIONS.map(o => (
                     <TouchableOpacity
                       key={o}
-                      style={[s.dropdownItem, o === occasion && { backgroundColor: '#FF2E8815' }]}
+                      style={[s.dropdownItem, o === occasion && { backgroundColor: '#D23FE015' }]}
                       onPress={() => { setOccasion(o); setShowOccasions(false); }}
                     >
-                      <Text style={[s.dropdownItemText, { color: o === occasion ? '#FF2E88' : colors.foreground }]}>
+                      <Text style={[s.dropdownItemText, { color: o === occasion ? '#D23FE0' : colors.foreground }]}>
                         {o}
                       </Text>
-                      {o === occasion && <Icon name="check" size={14} color="#FF2E88" />}
+                      {o === occasion && <Icon name="check" size={14} color="#D23FE0" />}
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
@@ -709,7 +709,7 @@ export default function GreetingCardsScreen() {
 
             {/* AI Refine checkbox */}
             <TouchableOpacity style={s.checkRow} onPress={() => setRefineAI(r => !r)}>
-              <View style={[s.checkbox, { borderColor: '#FF2E88', backgroundColor: refineAI ? '#FF2E88' : 'transparent' }]}>
+              <View style={[s.checkbox, { borderColor: '#D23FE0', backgroundColor: refineAI ? '#D23FE0' : 'transparent' }]}>
                 {refineAI && <Icon name="check" size={12} color="#fff" />}
               </View>
               <View>
@@ -750,7 +750,7 @@ export default function GreetingCardsScreen() {
               style={{ opacity: (generating || !sender.trim() || !prompt.trim() || wallet.balance < finalPrice) ? 0.6 : 1, marginTop: 16 }}
             >
               <LinearGradient
-                colors={['#FF2E88', '#FF5F1F']}
+                colors={['#D23FE0', '#1F7BFF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={s.genBtn}
@@ -779,20 +779,20 @@ export default function GreetingCardsScreen() {
               generating ? (
                 /* State A — Generating (initial API call in progress) */
                 <LinearGradient
-                  colors={['#B026FF20', '#FF2E8820']}
+                  colors={['#7B5CFA20', '#D23FE020']}
                   style={s.previewPlaceholder}
                 >
-                  <ActivityIndicator color="#FF2E88" size="large" />
+                  <ActivityIndicator color="#D23FE0" size="large" />
                   <Text style={[s.previewPlaceholderTitle, { color: colors.foreground }]}>✦ Generating your card...</Text>
                   <Text style={[s.previewPlaceholderSub, { color: colors.mutedForeground }]}>This may take ~30 seconds</Text>
                 </LinearGradient>
               ) : currentGeneration?.status === 'processing' ? (
                 /* State B — Polling (edge function returned processing) */
                 <LinearGradient
-                  colors={['#FF5F1F20', '#B026FF20']}
+                  colors={['#1F7BFF20', '#7B5CFA20']}
                   style={s.previewPlaceholder}
                 >
-                  <ActivityIndicator color="#FF5F1F" size="large" />
+                  <ActivityIndicator color="#1F7BFF" size="large" />
                   <Text style={[s.previewPlaceholderTitle, { color: colors.foreground }]}>Processing card...</Text>
                   <Text style={[s.previewPlaceholderSub, { color: colors.mutedForeground }]}>Checking every few seconds</Text>
                 </LinearGradient>
@@ -816,9 +816,9 @@ export default function GreetingCardsScreen() {
                   </View>
 
                   {currentGeneration.refined_prompt ? (
-                    <View style={[s.refinedBox, { backgroundColor: '#FF5F1F10', borderColor: '#FF5F1F30' }]}>
-                      <Icon name="info" size={14} color="#FF5F1F" />
-                      <Text style={[s.refinedText, { color: '#FF5F1F' }]}>
+                    <View style={[s.refinedBox, { backgroundColor: '#1F7BFF10', borderColor: '#1F7BFF30' }]}>
+                      <Icon name="info" size={14} color="#1F7BFF" />
+                      <Text style={[s.refinedText, { color: '#1F7BFF' }]}>
                         AI refined your prompt: {currentGeneration.refined_prompt}
                       </Text>
                     </View>
@@ -836,11 +836,11 @@ export default function GreetingCardsScreen() {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[s.actionBtn, { borderColor: '#FF2E88' }]}
+                      style={[s.actionBtn, { borderColor: '#D23FE0' }]}
                       onPress={() => handleDownload(currentGeneration.generated_image_url!)}
                     >
-                      <Icon name="download" size={16} color="#FF2E88" />
-                      <Text style={[s.actionBtnText, { color: '#FF2E88' }]}>Download Card</Text>
+                      <Icon name="download" size={16} color="#D23FE0" />
+                      <Text style={[s.actionBtnText, { color: '#D23FE0' }]}>Download Card</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -864,7 +864,7 @@ export default function GreetingCardsScreen() {
               {historyLoading ? 'Loading...' : `${history.length} greeting cards created`}
             </Text>
             {historyLoading ? (
-              <ActivityIndicator color="#FF2E88" style={{ marginTop: 32 }} />
+              <ActivityIndicator color="#D23FE0" style={{ marginTop: 32 }} />
             ) : history.length === 0 ? (
               <View style={[s.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
                 <Icon name="image" size={36} color={colors.mutedForeground} />
@@ -940,7 +940,7 @@ const s = StyleSheet.create({
   pricingDiscount: { fontSize: 13, fontFamily: 'Inter_600SemiBold' },
   pricingDivider: { height: 1 },
   pricingFinalLabel: { fontSize: 14, fontFamily: 'Inter_700Bold' },
-  pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#FF2E88' },
+  pricingFinal: { fontSize: 18, fontFamily: 'Inter_700Bold', color: '#D23FE0' },
   genBtn: { height: 52, borderRadius: 9999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
   genBtnText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   genBtnStrike: { color: 'rgba(255,255,255,0.6)', textDecorationLine: 'line-through', fontSize: 13 },

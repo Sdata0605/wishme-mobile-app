@@ -144,7 +144,7 @@ export const HOTELS: Hotel[] = [
     distance: '1.2 km from BKC',
     description:
       'Modern business hotel with fast Wi-Fi, work desks and easy access to BKC meetings and city transit.',
-    tint: '#B026FF',
+    tint: '#7B5CFA',
     rooms: [
       {
         id: 'r3',
@@ -306,7 +306,7 @@ export const HOTELS: Hotel[] = [
     distance: '0.6 km from Fateh Sagar',
     description:
       'Self-catering apartments with lake views, modern kitchens and space for longer family stays.',
-    tint: '#FF5F1F',
+    tint: '#1F7BFF',
     rooms: [
       {
         id: 'r9',
@@ -360,7 +360,7 @@ export const HOTELS: Hotel[] = [
     distance: '0.3 km from CP Metro',
     description:
       'Affordable central stay with clean AC rooms, perfect for short city trips and transit nights.',
-    tint: '#FF2E88',
+    tint: '#D23FE0',
     rooms: [
       {
         id: 'r11',

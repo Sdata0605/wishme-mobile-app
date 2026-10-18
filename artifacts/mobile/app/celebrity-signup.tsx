@@ -378,7 +378,7 @@ export default function CelebritySignupScreen() {
         >
           <View style={{ alignItems: 'center', paddingVertical: 20, gap: 12 }}>
             <LinearGradient
-              colors={['#B026FF', '#FF5F1F']}
+              colors={['#7B5CFA', '#1F7BFF']}
               style={[cs.otpIconCircle]}
             >
               <Icon name="mail" size={32} color="#fff" />
@@ -419,7 +419,7 @@ export default function CelebritySignupScreen() {
               style={({ pressed }) => [{ opacity: pressed || loading || otp.length < 6 ? 0.7 : 1, marginTop: 16 }]}
             >
               <LinearGradient
-                colors={['#B026FF', '#FF5F1F']}
+                colors={['#7B5CFA', '#1F7BFF']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={cs.gradBtn}
@@ -469,7 +469,7 @@ export default function CelebritySignupScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <LinearGradient
-          colors={['#B026FF', '#FF5F1F']}
+          colors={['#7B5CFA', '#1F7BFF']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={cs.heroBanner}
@@ -686,7 +686,7 @@ export default function CelebritySignupScreen() {
           style={({ pressed }) => [{ opacity: pressed || loading ? 0.7 : 1, marginTop: 20 }]}
         >
           <LinearGradient
-            colors={['#B026FF', '#FF5F1F']}
+            colors={['#7B5CFA', '#1F7BFF']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={cs.gradBtn}

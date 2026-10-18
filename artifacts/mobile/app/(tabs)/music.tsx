@@ -73,7 +73,7 @@ export default function MusicScreen() {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={[{ flex: 1 }, { backgroundColor: colors.background }]} contentContainerStyle={{ paddingBottom: insets.bottom + 32 }} showsVerticalScrollIndicator={false}>
-        <LinearGradient colors={['#B026FF', '#FF5F1F', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.header, { paddingTop: topPad + 12 }]}>
+        <LinearGradient colors={['#7B5CFA', '#1F7BFF', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[s.header, { paddingTop: topPad + 12 }]}>
           <Text style={s.headerTagline}><Text style={s.headerTaglineItalic}>Your Symphony,{'\n'}Powered by AI.</Text></Text>
         </LinearGradient>
         <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>

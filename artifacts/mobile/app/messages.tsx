@@ -373,7 +373,7 @@ export default function MessagesScreen() {
 
       {loading ? (
         <View style={s.loadingWrap}>
-          <ActivityIndicator size="large" color="#B026FF" />
+          <ActivityIndicator size="large" color="#7B5CFA" />
           <Text style={[s.loadingText, { color: colors.mutedForeground }]}>Loading conversations...</Text>
         </View>
       ) : (
@@ -383,7 +383,7 @@ export default function MessagesScreen() {
           contentContainerStyle={{ paddingTop: 6, paddingBottom: insets.bottom + 20, flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#B026FF" />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#7B5CFA" />
           }
           ListEmptyComponent={
             <View style={s.emptyWrap}>
@@ -398,12 +398,12 @@ export default function MessagesScreen() {
               </Text>
               {!search && (
                 <TouchableOpacity
-                  style={[s.emptyBtn, { backgroundColor: '#B026FF15', borderColor: '#B026FF40' }]}
+                  style={[s.emptyBtn, { backgroundColor: '#7B5CFA15', borderColor: '#7B5CFA40' }]}
                   onPress={() => router.push('/(tabs)/celebrities')}
                   activeOpacity={0.8}
                 >
-                  <Icon name="heart" size={15} color="#B026FF" />
-                  <Text style={[s.emptyBtnText, { color: '#B026FF' }]}>Explore Celebrities</Text>
+                  <Icon name="heart" size={15} color="#7B5CFA" />
+                  <Text style={[s.emptyBtnText, { color: '#7B5CFA' }]}>Explore Celebrities</Text>
                 </TouchableOpacity>
               )}
             </View>

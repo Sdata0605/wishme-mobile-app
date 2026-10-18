@@ -588,7 +588,7 @@ interface TrustBadge {
 const TRUST: TrustBadge[] = [
   { Icon: ShieldCheck, color: T(C.green, 'fg'), title: 'Safe & Secure', sub: 'Bank-grade security for your safety' },
   { Icon: Zap, color: '#FBBF24', title: 'Instant Payments', sub: 'Lightning fast payments in just a few taps' },
-  { Icon: Headphones, color: '#FFD23F', title: '24x7 Support', sub: "We're here for you anytime, anywhere" },
+  { Icon: Headphones, color: '#25DFFF', title: '24x7 Support', sub: "We're here for you anytime, anywhere" },
   { Icon: Users, color: T(C.green, 'fg'), title: 'Trusted by Millions', sub: '10Cr+ happy users across India' },
 ];
 

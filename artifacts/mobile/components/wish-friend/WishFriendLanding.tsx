@@ -91,7 +91,7 @@ function Hero({ dim }: { dim: boolean }) {
   const driftB = drift.interpolate({ inputRange: [0, 1], outputRange: [4, -4] });
 
   return (
-    <LinearGradient colors={['#B026FF', '#FF2E88', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
+    <LinearGradient colors={['#7B5CFA', '#D23FE0', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
       <View style={[s.circle, { width: 160, height: 160, top: -40, right: -50, opacity: deco }]} />
       <View style={[s.circle, { width: 90, height: 90, bottom: -30, left: -20, opacity: deco }]} />
       <View style={[s.circle, { width: 14, height: 14, top: 34, right: 90, opacity: 0.3 }]} />
@@ -144,9 +144,9 @@ export function WishFriendLanding({ onPick, onOpenOrders }: Props) {
           delay={0}
           onPress={() => onPick('video_wish')}
           accessibilityLabel="Video Wish with a signed card. Pick a celebrity"
-          style={[s.featured, { backgroundColor: '#FF5F1F' }, shadow('#FF5F1F')]}
+          style={[s.featured, { backgroundColor: '#1F7BFF' }, shadow('#1F7BFF')]}
         >
-          <LinearGradient colors={['#FF5F1F', '#B026FF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.featuredInner}>
+          <LinearGradient colors={['#1F7BFF', '#7B5CFA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.featuredInner}>
             <View style={s.watermark} pointerEvents="none">
               <Icon name="play-circle" size={120} color="rgba(255,255,255,0.15)" />
             </View>
@@ -156,7 +156,7 @@ export function WishFriendLanding({ onPick, onOpenOrders }: Props) {
             <Chips chips={videoChips} />
             <View style={s.featuredCta}>
               <Text style={s.featuredCtaText}>Pick a celebrity</Text>
-              <Icon name="arrow-right" size={14} color="#B026FF" />
+              <Icon name="arrow-right" size={14} color="#7B5CFA" />
             </View>
           </LinearGradient>
         </PressCard>
@@ -169,7 +169,7 @@ export function WishFriendLanding({ onPick, onOpenOrders }: Props) {
             accessibilityLabel="Greeting Card. Create a card"
             style={[s.tile, { backgroundColor: '#EC4899' }, shadow('#EC4899')]}
           >
-            <LinearGradient colors={['#EC4899', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tileInner}>
+            <LinearGradient colors={['#EC4899', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tileInner}>
               <View style={s.tileIcon}><Icon name="gift" size={20} color="#fff" /></View>
               <Text style={s.tileTitle}>Greeting Card</Text>
               <Text style={s.tileDesc} numberOfLines={2}>An AI-designed card, ready in seconds.</Text>
@@ -182,9 +182,9 @@ export function WishFriendLanding({ onPick, onOpenOrders }: Props) {
             delay={160}
             onPress={() => onPick('ugc_video')}
             accessibilityLabel="UGC Video. Request a video"
-            style={[s.tile, { backgroundColor: '#B026FF' }, shadow('#B026FF')]}
+            style={[s.tile, { backgroundColor: '#7B5CFA' }, shadow('#7B5CFA')]}
           >
-            <LinearGradient colors={['#B026FF', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tileInner}>
+            <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.tileInner}>
               <View style={s.tileIcon}><Icon name="video" size={20} color="#fff" /></View>
               <Text style={s.tileTitle}>UGC Video</Text>
               <Text style={s.tileDesc} numberOfLines={2}>A creator-style video for your friend.</Text>
@@ -252,11 +252,11 @@ const s = StyleSheet.create({
   featuredInner: { minHeight: 190, borderRadius: 24, padding: 18, gap: 8, overflow: 'hidden' },
   watermark: { position: 'absolute', right: -24, top: 28 },
   featuredPill: { alignSelf: 'flex-start', backgroundColor: '#fff', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  featuredPillText: { color: '#B026FF', fontSize: 11, fontFamily: 'Inter_700Bold' },
+  featuredPillText: { color: '#7B5CFA', fontSize: 11, fontFamily: 'Inter_700Bold' },
   featuredTitle: { color: '#fff', fontSize: 22, fontFamily: 'Inter_700Bold', marginTop: 2 },
   featuredDesc: { color: 'rgba(255,255,255,0.92)', fontSize: 13, lineHeight: 18, fontFamily: 'Inter_400Regular', maxWidth: '82%' },
   featuredCta: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', height: 36, paddingHorizontal: 16, borderRadius: 18, backgroundColor: '#fff', marginTop: 4 },
-  featuredCtaText: { color: '#B026FF', fontSize: 13, fontFamily: 'Inter_700Bold' },
+  featuredCtaText: { color: '#7B5CFA', fontSize: 13, fontFamily: 'Inter_700Bold' },
 
   tileRow: { flexDirection: 'row', gap: 12 },
   tile: { flex: 1, borderRadius: 20 },

@@ -76,7 +76,7 @@ export function BookingAudioPlayer({ audioUrl, colors }: { audioUrl: string | nu
   const progress = duration > 0 ? position / duration : 0;
   return (
     <View style={[s.audioPlayer, { backgroundColor: colors.background, borderColor: colors.border }]}>
-      <TouchableOpacity onPress={toggle} style={[s.playBtn, { backgroundColor: '#B026FF' }]} disabled={!audioUrl}>
+      <TouchableOpacity onPress={toggle} style={[s.playBtn, { backgroundColor: '#7B5CFA' }]} disabled={!audioUrl}>
         {loading ? (
           <ActivityIndicator size="small" color="#fff" />
         ) : (
@@ -84,7 +84,7 @@ export function BookingAudioPlayer({ audioUrl, colors }: { audioUrl: string | nu
         )}
       </TouchableOpacity>
       <View style={s.audioBar}>
-        <View style={[s.audioProgress, { backgroundColor: '#B026FF', width: `${progress * 100}%` }]} />
+        <View style={[s.audioProgress, { backgroundColor: '#7B5CFA', width: `${progress * 100}%` }]} />
       </View>
       <Text style={[s.audioDuration, { color: colors.mutedForeground }]}>
         {duration > 0 ? `${fmtMs(position)} / ${fmtMs(duration)}` : audioUrl ? '--:--' : 'N/A'}
@@ -99,8 +99,8 @@ export function DownloadLink({ url, colors }: { url: string; colors: Colors }) {
       onPress={() => Linking.openURL(url).catch(() => {})}
       style={s.downloadLink}
     >
-      <Icon name="download" size={13} color="#FF5F1F" />
-      <Text style={[s.downloadLinkText, { color: '#FF5F1F' }]}>Download</Text>
+      <Icon name="download" size={13} color="#1F7BFF" />
+      <Text style={[s.downloadLinkText, { color: '#1F7BFF' }]}>Download</Text>
     </TouchableOpacity>
   );
 }

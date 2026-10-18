@@ -41,7 +41,7 @@ interface Props {
 
 const STAGE: Record<Stage, { label: string; icon: IconName; color: string }> = {
   awaiting: { label: 'Awaiting review', icon: 'clock', color: '#F59E0B' },
-  production: { label: 'In production', icon: 'loader', color: '#FF5F1F' },
+  production: { label: 'In production', icon: 'loader', color: '#1F7BFF' },
   ready: { label: 'Ready', icon: 'check-circle', color: '#22C55E' },
   failed: { label: 'Failed', icon: 'alert-circle', color: '#EF4444' },
 };

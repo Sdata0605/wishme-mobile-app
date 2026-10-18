@@ -208,7 +208,7 @@ export function FlightSuccessScreen({
               )}
               {addons.insurance && (
                 <View style={s.addonChip}>
-                  <ShieldCheck size={12} color={T('#FF5F1F', 'fg')} />
+                  <ShieldCheck size={12} color={T('#1F7BFF', 'fg')} />
                   <Text style={s.addonChipText}>Trip Insurance Active</Text>
                 </View>
               )}

@@ -501,7 +501,7 @@ export default function EditProfileScreen() {
         <View style={styles.avatarSection}>
           <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.8} disabled={avatarUploading}>
             <LinearGradient
-              colors={['#B026FF', '#FF5F1F']}
+              colors={['#7B5CFA', '#1F7BFF']}
               style={styles.avatarBorder}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
@@ -533,7 +533,7 @@ export default function EditProfileScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Profile Completion</Text>
           <View style={[styles.progressTrack, { backgroundColor: colors.muted }]}>
             <LinearGradient
-              colors={['#B026FF', '#FF5F1F']}
+              colors={['#7B5CFA', '#1F7BFF']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={[styles.progressFill, { width: `${completionPct}%` }]}
@@ -580,7 +580,7 @@ export default function EditProfileScreen() {
                 <Text style={styles.referralBtnText}>{referralCopied ? 'Copied!' : 'Copy'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.referralBtn, { backgroundColor: '#FF5F1F' }]}
+                style={[styles.referralBtn, { backgroundColor: '#1F7BFF' }]}
                 onPress={handleShareReferral}
               >
                 <Icon name="share-2" size={15} color="#fff" />
@@ -721,7 +721,7 @@ export default function EditProfileScreen() {
                 onPress={handleChangePassword}
                 disabled={passwordSaving}
               >
-                <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.updatePwGrad}>
+                <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.updatePwGrad}>
                   {passwordSaving ? (
                     <ActivityIndicator size="small" color="#fff" />
                   ) : (
@@ -739,7 +739,7 @@ export default function EditProfileScreen() {
           onPress={handleSave}
           disabled={saving}
         >
-          <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.saveBtnGrad}>
+          <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.saveBtnGrad}>
             {saving ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
@@ -814,7 +814,7 @@ const styles = StyleSheet.create({
   avatarBorder: { width: 100, height: 100, borderRadius: 50, padding: 3, alignItems: 'center', justifyContent: 'center' },
   avatarInner: { width: 94, height: 94, borderRadius: 47, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImage: { width: 94, height: 94, borderRadius: 47 },
-  avatarInitials: { fontSize: 34, fontFamily: 'Inter_700Bold', color: '#B026FF' },
+  avatarInitials: { fontSize: 34, fontFamily: 'Inter_700Bold', color: '#7B5CFA' },
   cameraOverlay: { position: 'absolute', bottom: 2, right: 2, width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   displayName: { fontSize: 18, fontFamily: 'Inter_700Bold', marginTop: 4 },
   completionBadge: { fontSize: 13, fontFamily: 'Inter_400Regular' },

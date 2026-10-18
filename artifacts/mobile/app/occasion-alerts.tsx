@@ -316,13 +316,13 @@ export default function OccasionAlertsScreen() {
       >
         {alerts.length === 0 ? (
           <View style={s.emptyWrap}>
-            <LinearGradient colors={['#B026FF', '#FF2E88', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.emptyIcon}>
+            <LinearGradient colors={['#7B5CFA', '#D23FE0', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.emptyIcon}>
               <Icon name="calendar" size={42} color="#fff" />
             </LinearGradient>
             <Text style={[s.emptyTitle, { color: colors.foreground }]}>No occasions yet</Text>
             <Text style={[s.emptyText, { color: colors.mutedForeground }]}>Add a birthday, anniversary or any special day for anyone, turn on Notify me, and we'll remind you on the day.</Text>
             <TouchableOpacity onPress={openAdd} activeOpacity={0.9}>
-              <LinearGradient colors={['#B026FF', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.gradBtn}>
+              <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.gradBtn}>
                 <Icon name="plus" size={16} color="#fff" />
                 <Text style={s.gradBtnText}>Add your first occasion</Text>
               </LinearGradient>
@@ -332,7 +332,7 @@ export default function OccasionAlertsScreen() {
           <>
             {/* Hero: next occasion */}
             {next && heroMeta ? (
-              <LinearGradient colors={['#B026FF', '#FF2E88', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
+              <LinearGradient colors={['#7B5CFA', '#D23FE0', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.hero}>
                 <View style={s.watermark} pointerEvents="none">
                   <Icon name={heroMeta.icon} size={120} color="rgba(255,255,255,0.12)" />
                 </View>
@@ -349,7 +349,7 @@ export default function OccasionAlertsScreen() {
                   <View style={s.ringWrap}>
                     {next.days === 0 ? (
                       <View style={s.todayDisc}>
-                        <Icon name="gift" size={28} color="#FF2E88" />
+                        <Icon name="gift" size={28} color="#D23FE0" />
                         <Text style={s.todayText}>Today!</Text>
                       </View>
                     ) : (
@@ -365,7 +365,7 @@ export default function OccasionAlertsScreen() {
                 </View>
                 <Animated.View style={{ transform: [{ scale: next.days === 0 ? pulse : 1 }] }}>
                   <TouchableOpacity onPress={sendWish} activeOpacity={0.9} style={s.heroCta}>
-                    <Icon name="sparkles" size={16} color="#FF2E88" />
+                    <Icon name="sparkles" size={16} color="#D23FE0" />
                     <Text style={s.heroCtaText}>Send a wish</Text>
                   </TouchableOpacity>
                 </Animated.View>
@@ -449,7 +449,7 @@ export default function OccasionAlertsScreen() {
 
                         {isToday && !open && (
                           <TouchableOpacity onPress={sendWish} activeOpacity={0.9} style={{ marginTop: 12 }}>
-                            <LinearGradient colors={['#B026FF', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.wishBtn}>
+                            <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.wishBtn}>
                               <Icon name="sparkles" size={15} color="#fff" />
                               <Text style={s.wishBtnText}>Send a wish</Text>
                             </LinearGradient>
@@ -500,13 +500,13 @@ export default function OccasionAlertsScreen() {
                             </View>
                             {a.auto_send_enabled && (
                               <View style={s.autoRow}>
-                                <Icon name="zap" size={13} color="#FF5F1F" />
+                                <Icon name="zap" size={13} color="#1F7BFF" />
                                 <Text style={{ color: colors.mutedForeground, fontSize: 12 }}>Auto-send is on for this occasion</Text>
                               </View>
                             )}
                             <View style={s.actions}>
                               <TouchableOpacity onPress={sendWish} activeOpacity={0.9} style={{ flex: 1 }}>
-                                <LinearGradient colors={['#B026FF', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.wishBtn}>
+                                <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.wishBtn}>
                                   <Icon name="sparkles" size={15} color="#fff" />
                                   <Text style={s.wishBtnText}>Send a wish</Text>
                                 </LinearGradient>
@@ -523,7 +523,7 @@ export default function OccasionAlertsScreen() {
                     return (
                       <FadeUp key={a.id} index={idx} enabled={!reduceMotion}>
                         {isToday ? (
-                          <LinearGradient colors={['#B026FF', '#FF2E88', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 21, padding: 1.5 }}>
+                          <LinearGradient colors={['#7B5CFA', '#D23FE0', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 21, padding: 1.5 }}>
                             {card}
                           </LinearGradient>
                         ) : card}
@@ -567,7 +567,7 @@ export default function OccasionAlertsScreen() {
 
       {!!user && !!session && !loading && (
         <TouchableOpacity onPress={openAdd} activeOpacity={0.9} style={[s.fab, { bottom: insets.bottom + 20 }]} accessibilityLabel="Add occasion">
-          <LinearGradient colors={['#B026FF', '#FF2E88']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.fabInner}>
+          <LinearGradient colors={['#7B5CFA', '#D23FE0']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.fabInner}>
             <Icon name="plus" size={20} color="#fff" />
             <Text style={s.fabText}>Add occasion</Text>
           </LinearGradient>
@@ -621,9 +621,9 @@ const s = StyleSheet.create({
   ringNum: { color: '#fff', fontSize: 28, fontFamily: 'Inter_700Bold' },
   ringUnit: { color: 'rgba(255,255,255,0.9)', fontSize: 11, fontFamily: 'Inter_500Medium', marginTop: -3 },
   todayDisc: { width: 76, height: 76, borderRadius: 38, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  todayText: { color: '#FF2E88', fontSize: 11, fontFamily: 'Inter_700Bold' },
+  todayText: { color: '#D23FE0', fontSize: 11, fontFamily: 'Inter_700Bold' },
   heroCta: { height: 46, borderRadius: 23, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  heroCtaText: { color: '#FF2E88', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  heroCtaText: { color: '#D23FE0', fontSize: 15, fontFamily: 'Inter_700Bold' },
   heroEmpty: { borderWidth: 1, borderStyle: 'dashed', borderRadius: 24, padding: 22, alignItems: 'center', gap: 12 },
 
   strip: { flexDirection: 'row', borderRadius: 16, borderWidth: 1, height: 64, alignItems: 'center' },
@@ -655,7 +655,7 @@ const s = StyleSheet.create({
   savedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { minWidth: 64, height: 36, paddingHorizontal: 12, borderRadius: 18, borderWidth: 1.2, alignItems: 'center', justifyContent: 'center' },
-  fab: { position: 'absolute', right: 20, borderRadius: 28, elevation: 6, shadowColor: '#FF2E88', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
+  fab: { position: 'absolute', right: 20, borderRadius: 28, elevation: 6, shadowColor: '#D23FE0', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 6 } },
   fabInner: { height: 56, paddingHorizontal: 20, borderRadius: 28, flexDirection: 'row', alignItems: 'center', gap: 8 },
   fabText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_700Bold' },
   autoRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },

@@ -128,7 +128,7 @@ export default function SecurityScreen() {
               {error ? <Text style={s.error}>{error}</Text> : null}
 
               <TouchableOpacity onPress={submit} disabled={busy} activeOpacity={0.85} style={{ marginTop: 8 }}>
-                <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btn}>
+                <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.btn}>
                   {busy ? <ActivityIndicator color="#fff" /> : null}
                   <Text style={s.btnText}>{busy ? 'Changing…' : 'Change password'}</Text>
                 </LinearGradient>

@@ -190,7 +190,7 @@ export function ServiceCategoryScreen({
             [
               { Icon: ShieldCheck, color: T(C.green, 'fg'), title: 'Secure', sub: 'Safe payments' },
               { Icon: Zap, color: T('#FBBF24', 'fg'), title: 'Instant', sub: 'Quick confirm' },
-              { Icon: Headphones, color: T('#FFD23F', 'fg'), title: '24x7', sub: 'Always help' },
+              { Icon: Headphones, color: T('#25DFFF', 'fg'), title: '24x7', sub: 'Always help' },
               { Icon: Percent, color: T(C.orange, 'fg'), title: 'Offers', sub: 'Cashback deals' },
             ] as { Icon: LucideIcon; color: string; title: string; sub: string }[]
           ).map((b, i, arr) => (

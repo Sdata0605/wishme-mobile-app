@@ -157,15 +157,15 @@ export default function BookingSummaryScreen() {
             </View>
           ) : null}
 
-          <View style={[styles.infoBox, { backgroundColor: '#FF5F1F15', borderColor: '#FF5F1F' }]}>
-            <Icon name="info" size={18} color="#FF5F1F" />
+          <View style={[styles.infoBox, { backgroundColor: '#1F7BFF15', borderColor: '#1F7BFF' }]}>
+            <Icon name="info" size={18} color="#1F7BFF" />
             <Text style={[styles.infoText, { color: colors.foreground }]}>
               Your booking is under admin review. You'll be notified once approved and the video is generated. Expected delivery: 7–14 business days.
             </Text>
           </View>
 
           <Pressable style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1, marginTop: 20 }]} onPress={() => router.push('/bookings')}>
-            <LinearGradient colors={['#B026FF','#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryBtn}>
+            <LinearGradient colors={['#7B5CFA','#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryBtn}>
               <Icon name="calendar" size={18} color="#fff" />
               <Text style={styles.primaryBtnText}>View My Bookings</Text>
             </LinearGradient>

@@ -84,7 +84,7 @@ const Tile = React.memo(function Tile({ item, onPress }: { item: LibraryItem; on
           transition={120}
         />
       ) : (
-        <LinearGradient colors={['#FF5F1F', '#B026FF']} style={StyleSheet.absoluteFill} />
+        <LinearGradient colors={['#1F7BFF', '#7B5CFA']} style={StyleSheet.absoluteFill} />
       )}
       <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.78)']} style={s.tileShade} />
 
@@ -326,7 +326,7 @@ export default function LibraryScreen() {
           renderItem={({ item }) => <Tile item={item} onPress={open} />}
           ListEmptyComponent={
             <View style={s.emptyWrap}>
-              <LinearGradient colors={['#B026FF', '#FF5F1F']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.emptyIcon}>
+              <LinearGradient colors={['#7B5CFA', '#1F7BFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={s.emptyIcon}>
                 <Icon name={filter === 'video' ? 'video' : 'image'} size={34} color="#fff" />
               </LinearGradient>
               <Text style={[s.emptyTitle, { color: colors.foreground }]}>
