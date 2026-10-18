@@ -28,6 +28,9 @@ import { HUB_FUNCTION_DECLARATIONS, runHubTool, type HubToolContext } from './hu
 import { resolveLanguage, SARVAM_LANGUAGE_NAMES, type LanguageRequest } from './languages';
 import { DOC_FUNCTION_DECLARATIONS, runDocTool, type DocToolContext } from './docTools';
 import { WEB_FUNCTION_DECLARATIONS, runWebTool } from './webSearch';
+import { spokenSummary } from './capabilities';
+import { openPictures, picturesUrl, sourceLabel, subjectOf, type PictureSource } from './pictures';
+import { newsAbout, topStories, type Story } from '../home/news';
 
 export interface ToolContext extends HubToolContext, DocToolContext {
   router: Router;
@@ -46,6 +49,12 @@ export interface ToolContext extends HubToolContext, DocToolContext {
   setLanguage?: (language: LanguageRequest) => Promise<{ ok: boolean; error?: string }>;
   /** Remember the sir / ma'am the assistant picked for this conversation. Returns ok:false when the setting is fixed or the engine cannot hear. */
   setUserTitle?: (title: 'sir' | 'madam') => { ok: boolean; error?: string };
+  /** Show a list of headlines as a pop-up card over the assistant. */
+  showNews?: (panel: { topic: string; stories: Story[] }) => void;
+  /** Show the "What I can do" card (all categories, or one). */
+  showCapabilities?: (categoryId?: string) => void;
+  /** Opens a link after the assistant has finished its sentence, and resumes the conversation when the user comes back. */
+  openAfterReply?: (url: string, subject: string) => void;
 }
 
 // ─── Screens the assistant can open ──────────────────────────────────────────
@@ -398,6 +407,37 @@ const APP_FUNCTION_DECLARATIONS = [
       type: 'OBJECT',
       properties: { language: str('The language the user asked for, e.g. "Tamil", "French", "Hindi"') },
       required: ['language'],
+    },
+  },
+  {
+    name: 'show_pictures',
+    description:
+      "Show pictures of a person, place or thing. You CAN show pictures: this opens Google Images (or Instagram / Facebook) for it on the phone, and the user sees them there. Use it the moment the user asks for photos, pictures, images or a look at someone or something (\"show me pictures of Amitabh Bachchan\", \"photos of the Taj Mahal\", \"his Instagram photos\"). Never say you cannot provide photos. Pass only the subject, not the words show/pictures.",
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: str('Who or what: "Amitabh Bachchan", "Taj Mahal at sunset"'),
+        source: { type: 'STRING', enum: ['google', 'instagram', 'facebook'], description: 'google (the default) for pictures in general; instagram or facebook only when the user names them' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'show_news',
+    description:
+      'Show the latest news as a pop-up card of headlines on the user\'s screen (tap one to read it). Use it for "the news", "today\'s headlines", "what is happening", and for news about a person, company or topic. Pass the topic only when there is one. Then say ONE short line and mention the top two or three headlines in a few words each: never read the whole list aloud.',
+    parameters: {
+      type: 'OBJECT',
+      properties: { topic: str('Optional: a person, company or subject, e.g. "Virat Kohli", "Sensex", "Maharashtra drought"') },
+    },
+  },
+  {
+    name: 'show_capabilities',
+    description:
+      'Show a card listing EVERYTHING you can do and everything the WishMe app has, in groups the user can scroll. Use it for "what can you do", "what are your features", "what does the app do", "help", "what all is in WishMe". Pass category only when they ask about one area (ask, phone, calls, plan, docs, celebrity, friend, music, travel, money, you).',
+    parameters: {
+      type: 'OBJECT',
+      properties: { category: str('Optional: ask, phone, calls, plan, docs, celebrity, friend, music, travel, money or you') },
     },
   },
   {
@@ -940,6 +980,51 @@ export async function runAssistantTool(
         ok: true,
         language: wanted.label,
         instruction: `From now on speak only in ${wanted.label}, starting with your very next sentence. Confirm the switch in ${wanted.label}, in one short sentence.`,
+      };
+    }
+
+    case 'show_pictures': {
+      const wanted = String(a.query ?? '').trim();
+      if (!wanted) return { ok: false, error: 'Ask the user whose or what pictures they want.' };
+      const source: PictureSource = a.source === 'instagram' || a.source === 'facebook' ? a.source : 'google';
+      const subject = subjectOf(wanted);
+      if (subject.length < 2) return { ok: false, error: 'Ask the user whose or what pictures they want.' };
+      const result = { ok: true as const, subject };
+      if (ctx.openAfterReply) {
+        // The browser opens once the one-line answer has been spoken, so the sentence is never cut off.
+        ctx.openAfterReply(picturesUrl(subject, source), subject);
+      } else {
+        const direct = await openPictures(wanted, source);
+        if (!direct.ok) return { ok: false, error: direct.error, instruction: 'Say in one sentence that the pictures could not be opened, and offer to try again.' };
+      }
+      ctx.onAction?.(`Opening ${sourceLabel(source)}`);
+      return {
+        ok: true,
+        opened: `${result.subject} on ${sourceLabel(source)}`,
+        instruction: `The pictures of ${result.subject} are opening on the phone in ${sourceLabel(source)} right after you speak. Say ONE short sentence, in the user's language (for example "Here are pictures of ${result.subject}."). If the name could be several well-known people or is only a first name, ask which one instead and do not call this tool again until they answer. Do NOT say you cannot show photos and do not describe how they look.`,
+      };
+    }
+
+    case 'show_news': {
+      const topic = String(a.topic ?? '').trim();
+      const stories = topic ? await newsAbout(topic, 8) : await topStories(8);
+      if (!stories.length) {
+        return { ok: false, error: 'No headlines were found.', instruction: 'Say in one sentence that no headlines were found just now (do not guess any news), and offer to search the web for it instead.' };
+      }
+      ctx.showNews?.({ topic, stories });
+      return {
+        ok: true,
+        count: stories.length,
+        top: stories.slice(0, 3).map((s) => `${s.title} (${s.source})`),
+        instruction: `${stories.length} headlines are now on the user's screen as cards they can tap. Say one short line that the headlines are on screen, then the top two or three in a few words each, in the user's language. Do not read the rest, and do not use lists, symbols or markdown: speak naturally.`,
+      };
+    }
+
+    case 'show_capabilities': {
+      ctx.showCapabilities?.(a.category ? String(a.category) : undefined);
+      return {
+        ok: true,
+        instruction: `The full list is now on the user's screen. Say it in one breath, never as a long list: "I can ${spokenSummary()}. Everything is on your screen: tap anything to try it." Keep it to that, in the user's language, no bullets or markdown, and finish the whole sentence.`,
       };
     }
 

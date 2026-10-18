@@ -25,6 +25,29 @@ function tag(block: string, name: string): string {
   return m ? decode(m[1]) : '';
 }
 
+/** Reads the stories out of a Google News RSS feed. */
+export function parseFeed(xml: string): Story[] {
+  const stories: Story[] = [];
+  for (const it of xml.split('<item>').slice(1)) {
+    let title = tag(it, 'title');
+    const sourceName = tag(it, 'source');
+    const srcUrl = (it.match(/<source[^>]*url="([^"]+)"/) ?? [])[1] ?? '';
+    // Google appends " - Source Name" to the headline; the source gets its own line.
+    if (sourceName && title.endsWith(` - ${sourceName}`)) title = title.slice(0, -(sourceName.length + 3));
+    const pub = tag(it, 'pubDate');
+    const when = pub ? new Date(pub) : null;
+    if (!title) continue;
+    stories.push({
+      title,
+      source: srcUrl ? srcUrl.replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '') : sourceName,
+      url: tag(it, 'link'),
+      at: when && !isNaN(when.getTime()) ? when.toISOString() : new Date().toISOString(),
+    });
+    if (stories.length >= 12) break;
+  }
+  return stories;
+}
+
 /** Top headlines from Google News (India edition). Cached for 15 minutes; an empty list means "nothing to show". */
 export async function topStories(limit = 6): Promise<Story[]> {
   try {
@@ -35,27 +58,22 @@ export async function topStories(limit = 6): Promise<Story[]> {
     }
     const res = await fetch(FEED);
     if (!res.ok) return [];
-    const xml = await res.text();
-    const items = xml.split('<item>').slice(1);
-    const stories: Story[] = [];
-    for (const it of items) {
-      let title = tag(it, 'title');
-      const sourceName = tag(it, 'source');
-      const srcUrl = (it.match(/<source[^>]*url="([^"]+)"/) ?? [])[1] ?? '';
-      // Google appends " - Source Name" to the headline; the source gets its own line.
-      if (sourceName && title.endsWith(` - ${sourceName}`)) title = title.slice(0, -(sourceName.length + 3));
-      const pub = tag(it, 'pubDate');
-      const when = pub ? new Date(pub) : null;
-      if (!title) continue;
-      stories.push({
-        title,
-        source: srcUrl ? srcUrl.replace(/^https?:\/\/(www\.)?/, '').replace(/\/.*$/, '') : sourceName,
-        url: tag(it, 'link'),
-        at: when && !isNaN(when.getTime()) ? when.toISOString() : new Date().toISOString(),
-      });
-      if (stories.length >= 12) break;
-    }
+    const stories = parseFeed(await res.text());
     if (stories.length) await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), stories }));
+    return stories.slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+/** Headlines about a topic, a person or a company (Google News search, India edition), newest first. Empty when none were found. */
+export async function newsAbout(topic: string, limit = 8): Promise<Story[]> {
+  const q = topic.replace(/\s+/g, ' ').trim().slice(0, 100);
+  if (!q) return topStories(limit);
+  try {
+    const res = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=en-IN&gl=IN&ceid=IN:en`);
+    if (!res.ok) return [];
+    const stories = parseFeed(await res.text()).sort((a, b) => b.at.localeCompare(a.at));
     return stories.slice(0, limit);
   } catch {
     return [];

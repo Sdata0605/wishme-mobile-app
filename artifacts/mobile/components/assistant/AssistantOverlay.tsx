@@ -13,7 +13,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/Icon';
+import { NewsPanel } from '@/components/assistant/NewsPanel';
 import { useVoiceAssistant } from '@/context/VoiceAssistantContext';
+import { stripMarkdown } from '@/services/assistant/speechText';
 
 const ORB = 132;
 const MINI = 58;
@@ -246,8 +248,11 @@ function MiniOrb({ progress }: { progress: Animated.Value }) {
 
 export function AssistantOverlay() {
   const insets = useSafeAreaInsets();
-  const { open, minimized, setMinimized, state, userText, assistantText, actionLabel, error, close, retry } =
+  const { open, minimized, setMinimized, state, userText: rawUserText, assistantText: rawAssistantText, actionLabel, error, close, retry, news, clearNews, openStory } =
     useVoiceAssistant();
+  // The model is told not to use markdown; if it slips, the symbols are not shown.
+  const userText = stripMarkdown(rawUserText);
+  const assistantText = stripMarkdown(rawAssistantText);
 
   const mode: 'closed' | 'panel' | 'mini' = !open ? 'closed' : minimized ? 'mini' : 'panel';
 
@@ -405,6 +410,8 @@ export function AssistantOverlay() {
       )}
 
       {miniMounted && <MiniOrb progress={mini} />}
+
+      {open && news ? <NewsPanel topic={news.topic} stories={news.stories} onClose={clearNews} onOpen={openStory} /> : null}
     </View>
   );
 }

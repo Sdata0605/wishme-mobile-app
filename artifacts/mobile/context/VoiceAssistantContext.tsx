@@ -16,7 +16,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { Alert, Animated, AppState, Easing, InteractionManager } from 'react-native';
+import { Alert, Animated, AppState, Easing, InteractionManager, Linking } from 'react-native';
+import type { Story } from '@/services/home/news';
 import { useAgentState } from '@/context/AgentStateContext';
 import { useAssistantPersona } from '@/context/AssistantPersonaContext';
 import { useAuth } from '@/context/AuthContext';
@@ -55,6 +56,11 @@ interface VoiceAssistantValue {
   close: () => void;
   /** Try again after an error (reconnects and starts listening). */
   retry: () => void;
+  /** The headlines pop-up shown over the assistant, or null. */
+  news: { topic: string; stories: Story[] } | null;
+  clearNews: () => void;
+  /** Opens one story on its own screen and tucks the assistant away. */
+  openStory: (story: Story) => void;
 }
 
 const Ctx = createContext<VoiceAssistantValue | null>(null);
@@ -131,6 +137,10 @@ ${call.summary ?? 'The call has ended.'}`, [
   const [userText, setUserText] = useState('');
   const [assistantText, setAssistantText] = useState('');
   const [actionLabel, setActionLabel] = useState('');
+  const [news, setNews] = useState<{ topic: string; stories: Story[] } | null>(null);
+  // Set when the assistant is about to leave the app on purpose (pictures in the browser): the app resumes the conversation on return.
+  const awayRef = useRef<{ subject: string; at: number } | null>(null);
+  const resumeNoteRef = useRef<string | null>(null);
   const [error, setErrorState] = useState<string | null>(null);
 
   // Raw loudness comes in at the mic/speaker event rate; a ticker turns it into one smoothed
@@ -192,6 +202,9 @@ ${call.summary ?? 'The call has ended.'}`, [
       functionDeclarations: FUNCTION_DECLARATIONS,
       getVoiceName: () => personaRef.current.voice,
       getGreetingPrompt: () => {
+        const resume = resumeNoteRef.current;
+        resumeNoteRef.current = null;
+        if (resume) return resume;
         const report = takeReport();
         return report
           ? `A phone call you made for the user has just finished. Do not greet them: tell them right away, briefly, in the language they speak. Facts: ${JSON.stringify(describeCall(report))}. Say who picked up and what was said or agreed. If it did not connect (status no-answer, busy, voicemail or failed) say so and offer to try again. If there is a next step, tell them. Then wait.`
@@ -200,6 +213,10 @@ ${call.summary ?? 'The call has ended.'}`, [
       getSarvamSpeaker: () => sarvamSpeakerFor(personaRef.current.voice),
       getLanguage: () => personaRef.current.language,
       getGreetingLine: () => {
+        if (resumeNoteRef.current) {
+          resumeNoteRef.current = null;
+          return 'Welcome back. Would you like more pictures, maybe from Instagram?';
+        }
         const report = takeReport();
         return report ? spokenReport(report) : buildGreetingLine(personaRef.current, addressRef());
       },
@@ -252,6 +269,26 @@ ${call.summary ?? 'The call has ended.'}`, [
           // Through the ref, not `client`: that is assigned below, and referring to it here would
           // make the engine's type depend on itself.
           setLanguage: (language) => clientRef.current!.setLanguage(language),
+          showNews: (panel) => setNews(panel),
+          showCapabilities: (category) => {
+            setNews(null);
+            setMinimized(true);
+            router.push({ pathname: '/features', params: category ? { category } : {} } as never);
+          },
+          // Let the assistant finish its sentence IN the app, then open the browser; coming back resumes the conversation.
+          openAfterReply: (url, subject) => {
+            awayRef.current = { subject, at: Date.now() };
+            let waited = 0;
+            let spoke = false;
+            const timer = setInterval(() => {
+              waited += 200;
+              const st = clientRef.current?.getState();
+              if (st === 'speaking') spoke = true;
+              if (!((spoke && st !== 'speaking') || waited >= (spoke ? 9000 : 3500))) return;
+              clearInterval(timer);
+              Linking.openURL(url).catch(() => { awayRef.current = null; });
+            }, 200);
+          },
           setUserTitle: (title) => {
             const mode = addressModeRef.current;
             if (mode === 'sir' || mode === 'madam') return { ok: false, error: "The user chose how to be addressed in Settings: keep using that." };
@@ -298,6 +335,15 @@ ${call.summary ?? 'The call has ended.'}`, [
         if (bgTimer) clearTimeout(bgTimer);
         bgTimer = null;
         client.warm();
+        // Back from the pictures the assistant opened: pick the conversation up again with one short line.
+        const away = awayRef.current;
+        awayRef.current = null;
+        if (away && Date.now() - away.at < 90_000 && !openRef.current) {
+          resumeNoteRef.current = `[The user is back from looking at pictures of ${away.subject}. This is the same conversation, so do not greet them. In one short sentence ask if they want more, for example from Instagram or Facebook. Then wait.]`;
+          setOpen(true);
+          setMinimized(false);
+          void client.startListening();
+        }
         return;
       }
       // 'inactive' is just a blip, and the system permission dialogs (microphone, contacts, phone) also make
@@ -381,6 +427,7 @@ ${call.summary ?? 'The call has ended.'}`, [
   }, [minimized, client]);
 
   const close = useCallback(() => {
+    setNews(null);
     setOpen(false);
     setMinimized(false);
     setActionLabel('');
@@ -419,6 +466,19 @@ ${call.summary ?? 'The call has ended.'}`, [
       }
     }, 250);
   }, [client, toggle]);
+
+  const clearNews = useCallback(() => setNews(null), []);
+
+  // Whenever the assistant goes away (closed, idle, left the app) the headlines go with it.
+  useEffect(() => {
+    if (!open) setNews(null);
+  }, [open]);
+
+  const openStory = useCallback((story: Story) => {
+    setNews(null);
+    setMinimized(true);
+    router.push({ pathname: '/news-story', params: { title: story.title, source: story.source, url: story.url, at: story.at } } as never);
+  }, []);
 
   const retry = useCallback(() => {
     setError(null);
@@ -464,8 +524,11 @@ ${call.summary ?? 'The call has ended.'}`, [
       ask,
       close,
       retry,
+      news,
+      clearNews,
+      openStory,
     }),
-    [state, open, minimized, userText, assistantText, actionLabel, error, level, toggle, ask, close, retry],
+    [state, open, minimized, userText, assistantText, actionLabel, error, level, toggle, ask, close, retry, news, clearNews, openStory],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -1,4 +1,4 @@
-import * as WebBrowser from 'expo-web-browser';
+import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,7 +41,7 @@ export default function NewsScreen() {
         ) : (
           stories.map((s, i) => (
             <Reveal key={s.url || s.title} delayMs={Math.min(i, 6) * 40}>
-              <PressScale onPress={() => void WebBrowser.openBrowserAsync(s.url)} accessibilityRole="link" accessibilityLabel={s.title}>
+              <PressScale onPress={() => router.push({ pathname: '/news-story', params: { title: s.title, source: s.source, url: s.url, at: s.at } } as never)} accessibilityRole="link" accessibilityLabel={s.title}>
                 <NeonCard style={{ padding: 16 }}>
                   <Text style={[styles.title, { color: neon.textHi }]}>{s.title}</Text>
                   <View style={styles.meta}>

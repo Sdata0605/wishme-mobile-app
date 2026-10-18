@@ -1,7 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -220,7 +219,7 @@ export default function AssistantHome() {
                 stories={stories}
                 onMore={() => router.push('/news' as never)}
                 onDismiss={hideNews}
-                onOpen={(s) => void WebBrowser.openBrowserAsync(s.url)}
+                onOpen={(s) => router.push({ pathname: '/news-story', params: { title: s.title, source: s.source, url: s.url, at: s.at } } as never)}
               />
             </Reveal>
           ) : null}
