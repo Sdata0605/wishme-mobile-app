@@ -62,9 +62,17 @@ const DEFAULT_GREETING_PROMPT =
   '[The user just opened the assistant] Say exactly "Hello." and nothing more, then wait for the user to speak.';
 
 /** How long to wait for the token, for the socket to finish its setup, and for the first reply to the greeting. */
-const TOKEN_TIMEOUT_MS = 6000;
-/** A second token request goes out in parallel when the first has not answered after this long. */
-const TOKEN_HEDGE_MS = 1200;
+const TOKEN_TIMEOUT_MS = 17_000;
+/**
+ * The voice-token function sometimes answers in 6 to 10 seconds. A request is never cancelled and restarted (that threw away the
+ * time already waited): more identical requests are started alongside it at these moments instead (milliseconds after the first),
+ * and the first good answer wins. Each request may take up to TOKEN_TIMEOUT_MS.
+ */
+const TOKEN_BACKUP_AT_MS = [1200, 4000, 8000];
+const TOKEN_MAX_REQUESTS = 4;
+/** A spare token (fetched after a connection is up, for the next reconnect) is used for at most this long. The server makes it valid for 20 minutes. */
+const SPARE_MAX_AGE_MS = 15 * 60_000;
+const SPARE_REFRESH_MS = 12 * 60_000;
 const SETUP_TIMEOUT_MS = 8000;
 const GREETING_REPLY_TIMEOUT_MS = 6000;
 /** The audio engine stays up this long after the last conversation, then is let go (it holds audio focus). */
@@ -211,6 +219,10 @@ export class GeminiLiveClient {
   private nudgesEnabled = true;
   private closeAfterReply = false;
   private nudgeBase = Math.floor(Math.random() * NUDGE_ANGLES.length);
+  // A token fetched ahead for the next reconnect (see ensureSpare)
+  private spare: { data: Record<string, any>; at: number } | null = null;
+  private spareBusy = false;
+  private spareTimer: ReturnType<typeof setTimeout> | null = null;
   private requestingPermission = false;
   private audioReady = false;
   /** True once the microphone permission is known to be granted (so a tap never has to ask again). */
@@ -507,6 +519,9 @@ export class GeminiLiveClient {
 
   /** Closes everything (logout / app backgrounded). */
   shutdown() {
+    this.spare = null;
+    if (this.spareTimer) clearTimeout(this.spareTimer);
+    this.spareTimer = null;
     this.wantWarm = false;
     this.wantListening = false;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -602,87 +617,84 @@ export class GeminiLiveClient {
 
   // ─── Connection ────────────────────────────────────────────────────────────
 
-  private async fetchToken(): Promise<string> {
+  /**
+   * Asks the voice-token function for a token. The first request goes out at once; if it has not answered after a moment, backup
+   * requests join it (see TOKEN_BACKUP_AT_MS). The first good answer is used and the others are dropped.
+   */
+  private requestToken(accessToken: string, spare: boolean): Promise<Record<string, any>> {
     const t0 = Date.now();
-    log('token: getting the login token');
-    const accessToken = await this.opts.getAccessToken();
-    log('token: login token ready in', Date.now() - t0, 'ms');
-    if (!accessToken) throw new Error('Please log in to use the voice assistant.');
-
-    // The function is sometimes cold and takes several seconds to answer. So a second identical request goes out in parallel
-    // when the first has not answered within a moment (or at once if the first failed); whichever answers first is used.
-    const send = (label: string): Promise<Response> => {
-      const abort = new AbortController();
-      const timer = setTimeout(() => abort.abort(), TOKEN_TIMEOUT_MS);
-      log('token: voice-token request sent (' + label + ')');
-      return fetch(`${SUPABASE_URL}/functions/v1/voice-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${accessToken}`,
-        },
-        // `want: 'gemini'`: mint the token whatever the admin chose, and report the admin's choice alongside it.
-        body: JSON.stringify({ want: 'gemini', supports: ['gemini', 'sarvam'] }),
-        signal: abort.signal,
-      })
-        .then((r) => {
-          log('token: voice-token', label, 'answered', r.status, 'after', Date.now() - t0, 'ms');
-          return r;
-        })
-        .finally(() => clearTimeout(timer));
-    };
-    let res: Response;
-    try {
-      res = await new Promise<Response>((resolve, reject) => {
-        let launched = 0;
-        let finished = 0;
-        let done = false;
-        let lastBad: Response | null = null;
-        let hedge: ReturnType<typeof setTimeout> | null = null;
-        const fail = () => {
-          finished += 1;
-          if (done) return;
-          if (launched < 2) {
-            launch('retry');
-          } else if (finished >= 2) {
-            done = true;
-            if (lastBad) resolve(lastBad);
-            else reject(new Error('no answer'));
+    const kind = spare ? 'spare token' : 'token';
+    return new Promise((resolve, reject) => {
+      let launched = 0;
+      let finished = 0;
+      let done = false;
+      let lastStatus = 0;
+      const timers: ReturnType<typeof setTimeout>[] = [];
+      const aborts: AbortController[] = [];
+      const end = (fn: () => void) => {
+        if (done) return;
+        done = true;
+        timers.forEach(clearTimeout);
+        aborts.forEach((a) => {
+          try {
+            a.abort();
+          } catch {
+            /* already finished */
           }
-        };
-        const launch = (label: string) => {
-          launched += 1;
-          send(label).then(
-            (r) => {
-              if (done) return;
-              if (r.ok || r.status === 401) {
-                done = true;
-                if (hedge) clearTimeout(hedge);
-                resolve(r);
-              } else {
-                lastBad = r;
-                fail();
+        });
+        fn();
+      };
+      const settle = () => {
+        finished += 1;
+        if (done || finished < launched) return;
+        // Everything started has failed: try once more, until the limit.
+        if (launched < TOKEN_MAX_REQUESTS) launch('retry');
+        else end(() => reject(new Error(lastStatus ? `Voice service unavailable (${lastStatus}).` : 'The voice service is slow to respond. Check your connection.')));
+      };
+      const launch = (label: string) => {
+        if (done || launched >= TOKEN_MAX_REQUESTS) return;
+        launched += 1;
+        const abort = new AbortController();
+        aborts.push(abort);
+        const timer = setTimeout(() => abort.abort(), TOKEN_TIMEOUT_MS);
+        log(`${kind}: voice-token request sent (${label})`);
+        fetch(`${SUPABASE_URL}/functions/v1/voice-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${accessToken}` },
+          // `want: 'gemini'`: mint the token whatever the admin chose, and report the admin's choice alongside it.
+          body: JSON.stringify({ want: 'gemini', supports: ['gemini', 'sarvam'], spare }),
+          signal: abort.signal,
+        }).then(
+          async (r) => {
+            clearTimeout(timer);
+            log(`${kind}: voice-token ${label} answered`, r.status, 'after', Date.now() - t0, 'ms');
+            if (done) return;
+            if (r.status === 401) {
+              this.opts.onAuthRejected?.();
+              return end(() => reject(new AuthRejectedError()));
+            }
+            if (r.ok) {
+              const data = await r.json().catch(() => null);
+              if (data?.token) {
+                log(`${kind}: server timing`, JSON.stringify(data.timing ?? {}), '| whole request', Date.now() - t0, 'ms');
+                return end(() => resolve(data));
               }
-            },
-            () => fail(),
-          );
-        };
-        launch('first');
-        hedge = setTimeout(() => {
-          if (!done && launched < 2) launch('parallel');
-        }, TOKEN_HEDGE_MS);
-      });
-    } catch {
-      throw new Error('The voice service is slow to respond. Check your connection.');
-    }
-    log('token: voice-token answered', res.status, 'in', Date.now() - t0, 'ms');
-    if (res.status === 401) {
-      this.opts.onAuthRejected?.();
-      throw new AuthRejectedError();
-    }
-    if (!res.ok) throw new Error(`Voice service unavailable (${res.status}).`);
-    const data = await res.json();
+            }
+            lastStatus = r.status;
+            settle();
+          },
+          () => {
+            clearTimeout(timer);
+            settle();
+          },
+        );
+      };
+      launch('first');
+      TOKEN_BACKUP_AT_MS.forEach((ms, i) => timers.push(setTimeout(() => launch(`backup ${i + 1}`), ms)));
+    });
+  }
+
+  private applyTokenData(data: Record<string, any>): string {
     if (data.engine) {
       this.opts.onServerConfig?.({
         engine: data.engine,
@@ -690,9 +702,57 @@ export class GeminiLiveClient {
         relayUrl: typeof data.relay_url === 'string' ? data.relay_url : undefined,
       });
     }
-    if (!data.token) throw new Error('Voice service returned no token.');
     this.model = data.model;
     return data.token as string;
+  }
+
+  private async fetchToken(): Promise<string> {
+    const t0 = Date.now();
+    // A token fetched ahead after the last connection: no request, no wait.
+    const spare = this.spare;
+    this.spare = null;
+    if (spare && Date.now() - spare.at < SPARE_MAX_AGE_MS) {
+      log('token: using the spare token fetched earlier (no request needed)');
+      return this.applyTokenData(spare.data);
+    }
+    log('token: getting the login token');
+    const accessToken = await this.opts.getAccessToken();
+    log('token: login token ready in', Date.now() - t0, 'ms');
+    if (!accessToken) throw new Error('Please log in to use the voice assistant.');
+    let data: Record<string, any>;
+    try {
+      data = await this.requestToken(accessToken, false);
+    } catch (e) {
+      if (e instanceof AuthRejectedError) throw e;
+      throw e instanceof Error ? e : new Error('The voice service is slow to respond. Check your connection.');
+    }
+    return this.applyTokenData(data);
+  }
+
+  /** Right after a connection is up: fetches the token for the next one, so a reconnect does not wait for the server. */
+  private ensureSpare() {
+    if (this.spare || this.spareBusy || !this.wantWarm) return;
+    this.spareBusy = true;
+    void (async () => {
+      try {
+        const accessToken = await this.opts.getAccessToken();
+        if (!accessToken || !this.wantWarm) return;
+        const data = await this.requestToken(accessToken, true);
+        if (!this.wantWarm) return;
+        this.spare = { data, at: Date.now() };
+        log('spare token ready for the next reconnect');
+        if (this.spareTimer) clearTimeout(this.spareTimer);
+        this.spareTimer = setTimeout(() => {
+          this.spareTimer = null;
+          this.spare = null;
+          this.ensureSpare();
+        }, SPARE_REFRESH_MS);
+      } catch (e) {
+        log('spare token: could not fetch one:', e instanceof Error ? e.message : e);
+      } finally {
+        this.spareBusy = false;
+      }
+    })();
   }
 
   private async openSocket() {
@@ -880,6 +940,7 @@ export class GeminiLiveClient {
       this.reconnectAttempts = 0;
       this.socketReady = true;
       this.setupDone = true;
+      setTimeout(() => this.ensureSpare(), 1500);
       log('setupComplete (Google took', this.setupSentAtGlobal ? Date.now() - this.setupSentAtGlobal : '?', 'ms to accept the setup)');
       this.setState(this.wantListening ? 'listening' : 'ready');
       this.maybeGreet();
