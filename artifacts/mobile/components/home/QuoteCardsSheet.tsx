@@ -26,14 +26,12 @@ export function QuoteCardsSheet({
   text,
   day,
   onDay,
-  getToken,
 }: {
   visible: boolean;
   onClose: () => void;
   text: string;
   day: QuoteDay | null;
   onDay: (d: QuoteDay) => void;
-  getToken: () => Promise<string | null | undefined>;
 }) {
   const { neon } = useTheme();
   const insets = useSafeAreaInsets();
@@ -52,7 +50,7 @@ export function QuoteCardsSheet({
     let timer: ReturnType<typeof setTimeout> | null = null;
     const opened = Date.now();
     const look = async () => {
-      const d = await fetchQuoteDay(await getToken().catch(() => null));
+      const d = await fetchQuoteDay();
       if (stop) return;
       if (d) onDay(d);
       if (d?.status === 'generating' && Date.now() - opened < POLL_FOR_MS) timer = setTimeout(look, POLL_MS);
@@ -62,7 +60,7 @@ export function QuoteCardsSheet({
       stop = true;
       if (timer) clearTimeout(timer);
     };
-  }, [visible, getToken, onDay]);
+  }, [visible, onDay]);
 
   useEffect(() => {
     if (!visible) {

@@ -1,13 +1,15 @@
 /**
- * The day's line and its pictures, from the server (supabase/functions/quote-cards). Once per India day the server writes a
- * new line and makes one text-free picture per style, the same for every user; the words are set over the picture on the
- * phone. Until the server answers (or with no network) Home shows the app's own line for the day (dailyQuote.ts), so the
- * quote is never blank.
+ * The day's line and its pictures, read from the MyAssistant server (api.hariassistant.tech, GET /quote-cards/public/today).
+ * Once per India day that server writes a new line and makes one text-free picture per style, the same for every user of
+ * both apps; the words are set over the picture on the phone. No login is needed: it is the same for everyone and carries
+ * nothing personal. Until the server answers (or with no network) Home shows the app's own line for the day
+ * (dailyQuote.ts), so the quote is never blank.
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/constants/supabase';
 import { todaysQuote } from './dailyQuote';
+
+const QUOTE_SERVER = process.env.EXPO_PUBLIC_QUOTE_SERVER || 'https://api.hariassistant.tech';
 
 const CACHE_KEY = 'home_quote_day_v1';
 
@@ -50,22 +52,20 @@ export async function cachedQuoteDay(): Promise<QuoteDay | null> {
   }
 }
 
+/** The picture urls come relative to the server ("/quote-cards/img/…"). */
+const absolute = (url: string) => (/^https?:\/\//.test(url) ? url : `${QUOTE_SERVER}${url.startsWith('/') ? '' : '/'}${url}`);
+
 /** Asks the server for today. Null on any problem; the caller keeps what it shows. */
-export async function fetchQuoteDay(token: string | null | undefined): Promise<QuoteDay | null> {
-  if (!token) return null;
+export async function fetchQuoteDay(): Promise<QuoteDay | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/quote-cards`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` },
-      body: '{}',
-      signal: controller.signal,
-    });
+    const res = await fetch(`${QUOTE_SERVER}/quote-cards/public/today`, { signal: controller.signal });
     if (!res.ok) return null;
     const d = (await res.json()) as QuoteDay;
     if (!d?.text || !d.date) return null;
-    const day: QuoteDay = { ...d, cards: Array.isArray(d.cards) ? d.cards : [] };
+    const cards = (Array.isArray(d.cards) ? d.cards : []).filter((c) => c?.url).map((c) => ({ ...c, place: c.place ?? 'center', url: absolute(c.url) }));
+    const day: QuoteDay = { ...d, cards };
     await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(day)).catch(() => {});
     return day;
   } catch {

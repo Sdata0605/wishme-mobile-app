@@ -92,7 +92,7 @@ export default function AssistantHome() {
     setNow(new Date());
     void touchStreak();
     void getValidSession().then((sess) => currentWeather(sess?.access_token).then(setWeather)).catch(() => {});
-    void getValidSession().then((sess) => fetchQuoteDay(sess?.access_token)).then((d) => { if (d) setQuoteDay(d); }).catch(() => {});
+    void fetchQuoteDay().then((d) => { if (d) setQuoteDay(d); });
     void topStories(6).then(setStories);
   }, [getValidSession]);
 
@@ -131,8 +131,6 @@ export default function AssistantHome() {
     await refresh();
     setRefreshing(false);
   };
-
-  const getToken = useCallback(async () => (await getValidSession())?.access_token ?? null, [getValidSession]);
 
   const dismissStart = () => { setShowStart(false); void AsyncStorage.setItem(GS_KEY, '1'); };
   const hideNews = () => { setNewsHidden(true); void AsyncStorage.setItem(NEWS_KEY, dayStamp(new Date())); };
@@ -254,7 +252,6 @@ export default function AssistantHome() {
         text={quote}
         day={quoteDay}
         onDay={setQuoteDay}
-        getToken={getToken}
       />
     </AmbientBackground>
   );
