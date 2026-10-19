@@ -22,6 +22,7 @@ import React, {
 import { Alert, Animated, AppState, Easing, InteractionManager, Linking } from 'react-native';
 import type { Story } from '@/services/home/news';
 import { clearMemoryCache, dailyMemoryUpkeep, refreshMemories } from '@/services/assistant/memory';
+import { clearRulesCache, refreshRules } from '@/services/assistant/rules';
 import { missedTool } from '@/services/assistant/claimCheck';
 import { useAgentState } from '@/context/AgentStateContext';
 import { useAssistantPersona } from '@/context/AssistantPersonaContext';
@@ -365,10 +366,16 @@ ${call.summary ?? 'The call has ended.'}`, [
   // can take seconds on a slow network. The connection's own token request waits for that renewal, so warming starts
   // during the splash instead of after it.
   const loggedIn = !!(session?.access_token || user?.id);
-  // What the assistant remembers is read ahead of the next conversation (and forgotten when the user logs out).
+  // What the assistant remembers, and the standing rules it follows, are read ahead of the next conversation (and
+  // forgotten when the user logs out).
   useEffect(() => {
-    if (loggedIn) void refreshMemories(tokenRef.current);
-    else clearMemoryCache();
+    if (loggedIn) {
+      void refreshMemories(tokenRef.current);
+      void refreshRules(tokenRef.current);
+    } else {
+      clearMemoryCache();
+      clearRulesCache();
+    }
   }, [loggedIn]);
   // Don't connect before we know which voice/persona to use (a cached persona counts as known).
   const personaKnown = personaStatus !== 'loading';

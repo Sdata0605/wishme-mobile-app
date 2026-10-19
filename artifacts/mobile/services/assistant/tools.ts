@@ -29,6 +29,7 @@ import { resolveLanguage, SARVAM_LANGUAGE_NAMES, type LanguageRequest } from './
 import { DOC_FUNCTION_DECLARATIONS, runDocTool, type DocToolContext } from './docTools';
 import { WEB_FUNCTION_DECLARATIONS, runWebTool } from './webSearch';
 import { spokenSummary } from './capabilities';
+import { EVERYDAY_FUNCTION_DECLARATIONS, runEverydayTool } from './everydayTools';
 import { MORE_FUNCTION_DECLARATIONS, runMoreTool } from './moreTools';
 import { openPictures, picturesUrl, sourceLabel, subjectOf, type PictureSource } from './pictures';
 import { newsAbout, topStories, type Story } from '../home/news';
@@ -108,6 +109,8 @@ const SCREENS: Record<string, ScreenTarget> = {
   documents: { route: '/documents', label: 'Documents' },
   my_finance: { route: '/finance', label: 'Finance' },
   features: { route: '/features', label: 'Features' },
+  shopping_list: { route: '/shopping-list', label: 'Shopping list' },
+  promises: { route: '/promises', label: 'Promises' },
   ai_home: { route: '/(tabs)/assistant', label: 'AI home' },
 };
 
@@ -469,6 +472,7 @@ export const FUNCTION_DECLARATIONS = [
   ...DOC_FUNCTION_DECLARATIONS,
   ...WEB_FUNCTION_DECLARATIONS,
   ...MORE_FUNCTION_DECLARATIONS,
+  ...EVERYDAY_FUNCTION_DECLARATIONS,
   ...UI_FUNCTION_DECLARATIONS,
 ];
 
@@ -582,6 +586,9 @@ export async function runAssistantTool(
   try {
     const moreResult = await runMoreTool(call.name, a, ctx);
     if (moreResult) return moreResult;
+    // Weather, currency, promises, the shopping list and standing rules.
+    const everydayResult = await runEverydayTool(call.name, a, { ...ctx, openShoppingList: () => ctx.router.push('/shopping-list' as never) });
+    if (everydayResult) return everydayResult;
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'That did not work.', instruction: 'Say in one sentence that it did not work, and offer to try again. Do not claim it worked.' };
   }

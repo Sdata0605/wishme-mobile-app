@@ -63,6 +63,7 @@ const FAKES = {
   './hubTools': `export const HUB_FUNCTION_DECLARATIONS = []; export async function runHubTool() { return null; }`,
   './docTools': `export const DOC_FUNCTION_DECLARATIONS = []; export async function runDocTool() { return null; }`,
   './moreTools': `export const MORE_FUNCTION_DECLARATIONS = []; export async function runMoreTool() { return null; }`,
+  './everydayTools': `export const EVERYDAY_FUNCTION_DECLARATIONS = []; export async function runEverydayTool() { return null; }`,
 };
 
 export async function resolve(specifier, context, next) {

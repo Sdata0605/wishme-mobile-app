@@ -35,7 +35,7 @@ function describe(code: number, isDay: boolean): { label: string; kind: Weather[
   return { label: 'Fair', kind: 'partly' };
 }
 
-export interface Place { name: string; latitude: number; longitude: number; country_code?: string; population?: number }
+export interface Place { name: string; latitude: number; longitude: number; country_code?: string; population?: number; admin1?: string; country?: string }
 
 /**
  * India first: the first match for "Mangalore" is a hamlet in Tasmania, and "Kochi" is in Japan. An Indian match wins over
@@ -77,7 +77,7 @@ async function profileCity(token: string): Promise<string> {
 }
 
 /** Where the weather is for: the phone's position, or (no permission or no fix yet) the city on the user's address. */
-async function wherever(token?: string | null): Promise<{ latitude: number; longitude: number; city: string; fromProfile: boolean } | null> {
+export async function wherever(token?: string | null): Promise<{ latitude: number; longitude: number; city: string; fromProfile: boolean } | null> {
   let perm = await Location.getForegroundPermissionsAsync();
   if (!perm.granted && perm.canAskAgain && (await AsyncStorage.getItem(ASKED_KEY)) !== '1') {
     await AsyncStorage.setItem(ASKED_KEY, '1');

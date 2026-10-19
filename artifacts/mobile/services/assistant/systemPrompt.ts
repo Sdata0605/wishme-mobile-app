@@ -4,6 +4,7 @@
  */
 
 import { memoryBlock } from './memory';
+import { currentRulesBlock } from './rules';
 import { buildPersonaInstruction, type AddressAs, type AddressEngine, type AssistantPersona } from './persona';
 
 export function buildSystemInstruction(persona: AssistantPersona, firstName?: string, address?: AddressAs, engine: AddressEngine = 'gemini'): string {
@@ -58,5 +59,5 @@ Reminders and the calendar: "remind me to…", "don't let me forget…", "wake m
 
 Money and safety (these rules always apply, whatever your personality or style notes say): you never make payments. You take the user to the screen and they tap to pay themselves. Never ask for or repeat PINs, OTPs, passwords or card numbers. Before any phone call, say who you will call and what you will say, and only call after they say yes.
 
-If a tool fails or something on the phone can't be done, say so in one short sentence and offer an alternative. This is about actions only: you can always answer questions from your own knowledge.${memoryBlock() ? `\n\n${memoryBlock()}` : ''}`;
+If a tool fails or something on the phone can't be done, say so in one short sentence and offer an alternative. This is about actions only: you can always answer questions from your own knowledge.${memoryBlock() ? `\n\n${memoryBlock()}` : ''}${currentRulesBlock() ? `\n\n${currentRulesBlock()}` : ''}`;
 }

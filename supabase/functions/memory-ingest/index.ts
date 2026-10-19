@@ -1,6 +1,7 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { chunkLines, embedTexts, extractFacts, vectorLiteral, type Line } from "../_shared/memoryCore.ts";
 import { learnFromConversation, saidAgain } from "../_shared/memoryLearning.ts";
+import { extractPromises } from "../_shared/promiseExtract.ts";
 
 /**
  * memory-ingest — saves a finished conversation (or an AI call) to the assistant's long-term memory.
@@ -15,7 +16,8 @@ import { learnFromConversation, saidAgain } from "../_shared/memoryLearning.ts";
  *   3. asks Gemini for the lasting facts in them (family, goals, plans, follow-ups...) and saves those with a category,
  *      replacing facts they correct, and never saving the same fact twice (a fact told again grows stronger instead),
  *   4. learns from it (_shared/memoryLearning.ts): facts the assistant's answers drew on grow stronger, and facts the user
- *      contradicted lose standing.
+ *      contradicted lose standing,
+ *   5. files the promises the user made in it ("I'll send Ravi the proposal by Friday", _shared/promiseExtract.ts).
  * Saving the same session twice does nothing. The user's two switches (save chats, learn facts) are respected.
  */
 
@@ -210,8 +212,9 @@ Deno.serve(async (req) => {
     // the other side is someone else.
     let learned = { used: 0, weakened: 0 };
     if (learnFacts && source === "assistant") learned = await learnFromConversation(db, apiKey, user.id, lines);
+    const promises = learnFacts && source === "assistant" ? await extractPromises(db, apiKey, user.id, lines, "chat") : 0;
 
-    return json({ ok: true, conversation_id: conversationId, lines: lines.length, chunks: chunkCount, facts: saved, replaced, ...learned });
+    return json({ ok: true, conversation_id: conversationId, lines: lines.length, chunks: chunkCount, facts: saved, replaced, ...learned, promises });
   } catch (e) {
     console.log("memory-ingest failed:", e instanceof Error ? e.message : e);
     return json({ error: e instanceof Error ? e.message : "memory-ingest failed" }, 500);

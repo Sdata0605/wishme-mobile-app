@@ -33,6 +33,8 @@ const TOOLS: ToolChip[] = [
   { label: 'Reminders', icon: 'bell', route: '/reminders' },
   { label: 'Documents', icon: 'copy', route: '/documents' },
   { label: 'Finance', icon: 'wallet', route: '/finance' },
+  { label: 'Shopping', icon: 'shopping-cart', route: '/shopping-list' },
+  { label: 'Promises', icon: 'check-circle', route: '/promises' },
   { label: 'News', icon: 'newspaper', route: '/news' },
   { label: 'Calls', icon: 'phone', route: '/call-logs' },
 ];
