@@ -254,7 +254,7 @@ export default function SelectPlanScreen() {
           Alert.alert(
             'Plan Activated!',
             `Your ${plan.name} plan is now active. Enjoy your new benefits!`,
-            [{ text: 'OK', onPress: () => router.replace('/(tabs)') }],
+            [{ text: 'OK', onPress: () => (isPostSignup ? router.replace({ pathname: '/setting-up', params: { next: 'home' } } as never) : router.replace('/(tabs)')) }],
           );
         } catch (err) {
           Alert.alert(
@@ -351,10 +351,11 @@ export default function SelectPlanScreen() {
     } finally {
       setPurchasingPlanId(null);
     }
-  }, [profileId, accessToken, user, isCurrentPlan]);
+  }, [profileId, accessToken, user, isCurrentPlan, isPostSignup]);
 
   const handleSkip = () => {
-    router.replace('/(tabs)');
+    if (isPostSignup) router.replace({ pathname: '/setting-up', params: { next: 'home' } } as never);
+    else router.replace('/(tabs)');
   };
 
   if (loading) {

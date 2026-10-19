@@ -8,6 +8,7 @@ import { GradientButton } from '@/components/GradientButton';
 import { Icon, type IconName } from '@/components/Icon';
 import { choiceAccents } from '@/constants/colors';
 import { useTheme } from '@/context/ThemeContext';
+import { useVoiceAssistant } from '@/context/VoiceAssistantContext';
 import {
   getPermissionStates,
   isBlocked,
@@ -171,20 +172,29 @@ export default function PermissionsScreen() {
   const [states, setStates] = useState<PermissionStates | null>(null);
   const [pending, setPending] = useState<PermissionKind | null>(null);
   const [askingAll, setAskingAll] = useState(false);
+  // The moment the microphone is allowed, the speaker and microphone engine starts, so the assistant's first conversation starts at once.
+  const { prepareAudio } = useVoiceAssistant();
 
   useEffect(() => {
     let cancelled = false;
     getPermissionStates().then((loaded) => {
-      if (!cancelled) setStates(loaded);
+      if (!cancelled) {
+        setStates(loaded);
+        if (loaded.microphone?.granted) prepareAudio();
+      }
     });
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const apply = useCallback((state: PermissionState) => {
-    setStates((current) => (current ? { ...current, [state.kind]: state } : current));
-  }, []);
+  const apply = useCallback(
+    (state: PermissionState) => {
+      setStates((current) => (current ? { ...current, [state.kind]: state } : current));
+      if (state.kind === 'microphone' && state.granted) prepareAudio();
+    },
+    [prepareAudio],
+  );
 
   const allow = useCallback(
     async (kind: PermissionKind) => {

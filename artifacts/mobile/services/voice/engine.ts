@@ -292,6 +292,11 @@ export class AssistantEngine {
     this.current.sendText(text);
   }
 
+  /** The microphone has just been allowed: start the audio engine now. */
+  prepareAudio() {
+    this.gemini.prepareAudioEarly();
+  }
+
   /** The app went to the background: make sure a token is waiting for the next launch. */
   topUpSpare() {
     this.gemini.topUpSpare();

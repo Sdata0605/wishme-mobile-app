@@ -79,7 +79,8 @@ function SignInTab({ onSwitchToCelebrity, onSwitchToSignUp }: { onSwitchToCelebr
     if (role === 'celebrity') {
       router.replace('/celebrity-dashboard');
     } else {
-      router.replace('/(tabs)/assistant' as never);
+      // The assistant gets ready first (see app/setting-up.tsx), so the first tap on it is instant.
+      router.replace({ pathname: '/setting-up', params: { next: 'assistant' } } as never);
     }
   };
 

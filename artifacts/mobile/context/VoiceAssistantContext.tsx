@@ -66,6 +66,8 @@ interface VoiceAssistantValue {
   clearNews: () => void;
   /** Opens one story on its own screen and tucks the assistant away. */
   openStory: (story: Story) => void;
+  /** The microphone has just been allowed: start the audio engine so the first conversation starts at once. */
+  prepareAudio: () => void;
 }
 
 const Ctx = createContext<VoiceAssistantValue | null>(null);
@@ -514,6 +516,8 @@ ${call.summary ?? 'The call has ended.'}`, [
     client.stopListening();
   }, [client]);
 
+  const prepareAudio = useCallback(() => clientRef.current?.prepareAudio(), []);
+
   const toggle = useCallback(() => {
     if (openRef.current) {
       close();
@@ -608,8 +612,9 @@ ${call.summary ?? 'The call has ended.'}`, [
       news,
       clearNews,
       openStory,
+      prepareAudio,
     }),
-    [state, open, minimized, userText, assistantText, actionLabel, error, level, toggle, ask, close, retry, news, clearNews, openStory],
+    [state, open, minimized, userText, assistantText, actionLabel, error, level, toggle, ask, close, retry, news, clearNews, openStory, prepareAudio],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

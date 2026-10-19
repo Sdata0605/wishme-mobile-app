@@ -39,7 +39,7 @@ SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
 
-const HIDDEN_SEGMENTS = new Set(['(auth)', 'onboarding']);
+const HIDDEN_SEGMENTS = new Set(['(auth)', 'onboarding', 'setting-up']);
 
 function FloatingButtons() {
   const segments = useSegments();
@@ -204,6 +204,7 @@ function RootLayoutNav() {
       <Stack.Screen name="celebrity-dashboard" />
       <Stack.Screen name="dashboard" />
       <Stack.Screen name="select-plan" />
+      <Stack.Screen name="setting-up" options={{ gestureEnabled: false, animation: 'fade' }} />
       <Stack.Screen name="edit-profile" />
       <Stack.Screen name="services/index" options={{ presentation: 'card', headerShown: false }} />
       <Stack.Screen name="+not-found" />

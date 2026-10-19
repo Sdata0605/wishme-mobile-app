@@ -418,6 +418,16 @@ export class GeminiLiveClient {
     return this.audioPrep;
   }
 
+  /**
+   * Starts the speaker and microphone engine now (the user has just allowed the microphone, possibly before logging in, when
+   * there is no connection to warm yet). It is let go again after a while if no conversation uses it.
+   */
+  prepareAudioEarly() {
+    this.micGranted = true;
+    if (this.audioReady || this.audioPrep || this.wantListening) return;
+    void this.prepareAudio().then(() => this.scheduleAudioRelease());
+  }
+
   /** Starts the audio engine ahead of the first tap, when the microphone permission is already there (never asks). */
   private async prewarmAudio() {
     if (this.audioReady || this.audioPrep || this.wantListening) return;
