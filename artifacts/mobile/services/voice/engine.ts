@@ -35,7 +35,7 @@ const FIRST_CONNECT_DEADLINE_MS = 7000;
 
 type Shared = Pick<
   GeminiLiveOptions,
-  'getAccessToken' | 'onAuthRejected' | 'getSystemInstruction' | 'functionDeclarations' | 'onToolCall' | 'onState' | 'onTranscript' | 'onLevels' | 'onError'
+  'getAccessToken' | 'getUserId' | 'onAuthRejected' | 'getSystemInstruction' | 'functionDeclarations' | 'onToolCall' | 'onState' | 'onTranscript' | 'onLevels' | 'onError'
 >;
 
 export interface EngineOptions extends Shared {
@@ -92,6 +92,7 @@ export class AssistantEngine {
 
     this.gemini = new GeminiLiveClient({
       getAccessToken: opts.getAccessToken,
+      getUserId: opts.getUserId,
       onAuthRejected: opts.onAuthRejected,
       getSystemInstruction: opts.getSystemInstruction,
       getVoiceName: opts.getVoiceName,
@@ -289,6 +290,11 @@ export class AssistantEngine {
   /** Sends typed text into the live conversation (used by the "try asking" chips). */
   sendText(text: string) {
     this.current.sendText(text);
+  }
+
+  /** Logout: forget the voice token saved on the phone. */
+  forgetSavedToken() {
+    this.gemini.forgetSavedToken();
   }
 
   /** The app went to the background: let the speaker and mic go (the connection is kept). */

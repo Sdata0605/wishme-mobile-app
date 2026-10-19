@@ -5,6 +5,7 @@
  */
 export function stripMarkdown(text: string): string {
   return text
+    .replace(/\bend of (?:the |this )?(?:conversational|conversation) turn\b\.?/gi, '')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/https?:\/\/\S+/g, '')

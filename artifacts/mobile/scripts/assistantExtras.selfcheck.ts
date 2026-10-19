@@ -54,6 +54,8 @@ check('bare links go', !md('see https://example.com/x for more').includes('examp
 check('emoji go', md('Good morning ☀️ sir') === 'Good morning sir', md('Good morning ☀️ sir'));
 check('a plain sentence is unchanged', md('It is 32 degrees in Pune, and it may rain.') === 'It is 32 degrees in Pune, and it may rain.');
 check('a half-finished "**" at the end of a chunk does not show', !md('the big **').includes('*'), md('the big **'));
+check('"End of conversational turn." never reaches the screen', md('Hello. End of conversational turn.') === 'Hello.' && md('End of conversational turn. ') === '', md('Hello. End of conversational turn.'));
+check('a normal sentence with "turn" is untouched', md('Take a left turn at the end of the road.') === 'Take a left turn at the end of the road.');
 check('a multiplication sign is not eaten', md('3 * 4 is twelve') === '3 * 4 is twelve' || md('3 * 4 is twelve') === '3 4 is twelve', md('3 * 4 is twelve'));
 
 // ─── The capabilities list ───────────────────────────────────────────────────

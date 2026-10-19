@@ -20,6 +20,13 @@ const FAKES: Record<string, string> = {
   'react-native': `export const Platform = { OS: 'android' };`,
   '@/constants/supabase': `export const SUPABASE_URL = 'https://example.supabase.co'; export const SUPABASE_ANON_KEY = 'anon';`,
   '@/services/bootLog': `export const bootStamp = () => 'app+0s';`,
+  '@react-native-async-storage/async-storage': `
+    const store = (globalThis.__store ??= new Map());
+    export default {
+      getItem: async (k) => (store.has(k) ? store.get(k) : null),
+      setItem: async (k, v) => { store.set(k, v); },
+      removeItem: async (k) => { store.delete(k); },
+    };`,
 };
 register('data:text/javascript,' + encodeURIComponent(`
   const FAKES = ${JSON.stringify(FAKES)};
@@ -64,8 +71,9 @@ const okBody = { engine: 'gemini', token: 'tok-1', model: 'gemini-x', fallback_e
 };
 
 let authRejected = 0;
+let currentUser: string | undefined = 'u1';
 const make = () => {
-  const c: any = new GeminiLiveClient({ getAccessToken: async () => 'jwt', onAuthRejected: () => authRejected++ });
+  const c: any = new GeminiLiveClient({ getAccessToken: async () => 'jwt', getUserId: () => currentUser, onAuthRejected: () => authRejected++ });
   c.wantWarm = true;
   return c;
 };
@@ -121,7 +129,7 @@ check('and it is used only once', c.spare === null);
 // 7. A spare that is too old is ignored.
 sent = [];
 c = make();
-c.spare = { data: { ...okBody, token: 'old-spare' }, at: Date.now() - 16 * 60_000 };
+c.spare = { data: { ...okBody, token: 'old-spare' }, at: Date.now() - 12 * 3600_000 };
 const fresh = await c.fetchToken();
 check('an old spare is replaced by a fresh token', fresh === 'tok-1' && sent.length === 1, { fresh, n: sent.length });
 
@@ -134,5 +142,50 @@ await new Promise((res) => setTimeout(res, 400));
 check('the spare request is marked as a spare and is kept', sent[0]?.body.spare === true && c.spare?.data.token === 'tok-1', { body: sent[0]?.body, spare: !!c.spare });
 c.shutdown();
 check('shutting down forgets the spare', c.spare === null);
+
+// 9. The spare is also saved on the phone, so the next launch needs no request.
+const store = (globalThis as Record<string, any>).__store as Map<string, string>;
+store.clear();
+sent = [];
+plans = [{ after: 50 }];
+c = make();
+c.ensureSpare();
+await new Promise((res) => setTimeout(res, 400));
+const savedRaw = store.get('gemini_live_saved_token_v1');
+const saved = savedRaw ? JSON.parse(savedRaw) : null;
+check('a made spare is saved on the phone for this user', saved?.sub === 'u1' && saved?.data?.token === 'tok-1' && typeof saved?.at === 'number', saved);
+check('the saved token does not keep the server timing', saved && !('timing' in saved.data));
+c.shutdown(); // stops the refresh timer, which would keep this script running
+
+// 10. A new launch (a new client) connects with it, with no request, and the saved copy is removed (it is single-use).
+sent = [];
+const launch = make();
+const first = await launch.fetchToken();
+check('a new launch uses the saved token without a request', first === 'tok-1' && sent.length === 0, { first, n: sent.length });
+await new Promise((res) => setTimeout(res, 50));
+check('and it is removed from the phone once used', !store.has('gemini_live_saved_token_v1'));
+
+// 11. Someone else's token is never used.
+store.set('gemini_live_saved_token_v1', JSON.stringify({ data: { ...okBody, token: 'theirs' }, at: Date.now(), sub: 'u2' }));
+sent = [];
+const other = await make().fetchToken();
+check("another person's saved token is ignored", other === 'tok-1' && sent.length === 1, { other, n: sent.length });
+store.set('gemini_live_saved_token_v1', JSON.stringify({ data: { ...okBody, token: 'anon' }, at: Date.now(), sub: 'u1' }));
+currentUser = undefined;
+sent = [];
+check('with nobody known yet it is not used', (await make().fetchToken()) === 'tok-1' && sent.length === 1);
+currentUser = 'u1';
+
+// 12. A saved token that is too old is not used.
+store.set('gemini_live_saved_token_v1', JSON.stringify({ data: { ...okBody, token: 'stale' }, at: Date.now() - 12 * 3600_000, sub: 'u1' }));
+sent = [];
+check('a token older than the window is replaced by a fresh one', (await make().fetchToken()) === 'tok-1' && sent.length === 1);
+
+// 13. Logout forgets it.
+store.set('gemini_live_saved_token_v1', JSON.stringify({ data: okBody, at: Date.now(), sub: 'u1' }));
+c = make();
+c.forgetSavedToken();
+await new Promise((res) => setTimeout(res, 50));
+check('logout removes the saved token', !store.has('gemini_live_saved_token_v1') && c.spare === null);
 
 console.log(`${checks} checks passed`);

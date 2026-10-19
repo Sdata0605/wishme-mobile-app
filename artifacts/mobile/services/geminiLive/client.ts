@@ -10,6 +10,7 @@
  * checks the logged-in user and mints a short-lived, single-use token.
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { bootStamp } from '@/services/bootLog';
 import {
   addExpoTwoWayAudioEventListener,
@@ -71,8 +72,11 @@ const TOKEN_TIMEOUT_MS = 17_000;
 const TOKEN_BACKUP_AT_MS = [1200, 4000, 8000];
 const TOKEN_MAX_REQUESTS = 4;
 /** A spare token (fetched after a connection is up, for the next reconnect) is used for at most this long. The server makes it valid for 20 minutes. */
-const SPARE_MAX_AGE_MS = 15 * 60_000;
-const SPARE_REFRESH_MS = 12 * 60_000;
+const SPARE_MAX_AGE_MS = 11 * 60 * 60_000;
+/** The spare is replaced with a newer one this often while the app is open. */
+const SPARE_REFRESH_MS = 6 * 60 * 60_000;
+/** Where the spare is kept on the phone, so the next app launch can connect without waiting for the server. */
+const SAVED_TOKEN_KEY = 'gemini_live_saved_token_v1';
 const SETUP_TIMEOUT_MS = 8000;
 const GREETING_REPLY_TIMEOUT_MS = 6000;
 /** The audio engine stays up this long after the last conversation, then is let go (it holds audio focus). */
@@ -152,6 +156,8 @@ class AuthRejectedError extends Error {
 export interface GeminiLiveOptions {
   /** Supabase user access token, refreshed if stale (the anon key is rejected by voice-token). */
   getAccessToken: () => Promise<string | null | undefined> | string | null | undefined;
+  /** Who is logged in, so a token saved on the phone is only ever used for the same person. */
+  getUserId?: () => string | undefined;
   /** The server refused the login (401): the app checks it and signs the user out if it really has ended. */
   onAuthRejected?: () => void;
   /** Built fresh on every (re)connect so it can include today's date etc. */
@@ -479,8 +485,13 @@ export class GeminiLiveClient {
     this.greetTimer = setTimeout(() => {
       this.greetTimer = null;
       if (!this.wantListening || this.lastContentAt >= this.greetAt) return;
-      log('no reply to the greeting, reconnecting');
+      log('no reply to the greeting: starting a fresh session (the old one is dropped with its history)');
       this.greeted = false;
+      // Resuming would bring back the very session that ignored the greeting.
+      this.resumeHandle = null;
+      this.history = [];
+      this.pendingUser = '';
+      this.pendingAssistant = '';
       this.dropSocket();
       this.scheduleReconnect();
     }, GREETING_REPLY_TIMEOUT_MS);
@@ -709,12 +720,15 @@ export class GeminiLiveClient {
   private async fetchToken(): Promise<string> {
     const t0 = Date.now();
     // A token fetched ahead after the last connection: no request, no wait.
-    const spare = this.spare;
+    let spare = this.spare;
     this.spare = null;
+    if (!spare) spare = await this.loadSavedToken();
     if (spare && Date.now() - spare.at < SPARE_MAX_AGE_MS) {
-      log('token: using the spare token fetched earlier (no request needed)');
+      log('token: using the spare token fetched earlier (no request needed, it was made', Math.round((Date.now() - spare.at) / 60_000), 'minutes ago)');
+      void this.clearSavedToken();
       return this.applyTokenData(spare.data);
     }
+    if (spare) void this.clearSavedToken();
     log('token: getting the login token');
     const accessToken = await this.opts.getAccessToken();
     log('token: login token ready in', Date.now() - t0, 'ms');
@@ -729,6 +743,49 @@ export class GeminiLiveClient {
     return this.applyTokenData(data);
   }
 
+  /** The token saved on the phone by an earlier run, if it is for the same person and still fresh. Never throws. */
+  private async loadSavedToken(): Promise<{ data: Record<string, any>; at: number } | null> {
+    try {
+      const raw = await AsyncStorage.getItem(SAVED_TOKEN_KEY);
+      if (!raw) return null;
+      const saved = JSON.parse(raw) as { data?: Record<string, any>; at?: number; sub?: string };
+      const me = this.opts.getUserId?.();
+      if (!saved?.data?.token || typeof saved.at !== 'number') return null;
+      if (!me || saved.sub !== me) {
+        log('saved token: belongs to someone else (or nobody is known yet), ignoring it');
+        return null;
+      }
+      return { data: saved.data, at: saved.at };
+    } catch {
+      return null;
+    }
+  }
+
+  private async saveToken(spare: { data: Record<string, any>; at: number }) {
+    try {
+      const sub = this.opts.getUserId?.();
+      if (!sub) return;
+      const { timing: _timing, ...data } = spare.data;
+      await AsyncStorage.setItem(SAVED_TOKEN_KEY, JSON.stringify({ data, at: spare.at, sub }));
+    } catch {
+      /* the next launch simply asks the server */
+    }
+  }
+
+  private async clearSavedToken() {
+    try {
+      await AsyncStorage.removeItem(SAVED_TOKEN_KEY);
+    } catch {
+      /* nothing to clear */
+    }
+  }
+
+  /** Logout: the token saved on the phone must not outlive the login. */
+  forgetSavedToken() {
+    this.spare = null;
+    void this.clearSavedToken();
+  }
+
   /** Right after a connection is up: fetches the token for the next one, so a reconnect does not wait for the server. */
   private ensureSpare() {
     if (this.spare || this.spareBusy || !this.wantWarm) return;
@@ -740,7 +797,8 @@ export class GeminiLiveClient {
         const data = await this.requestToken(accessToken, true);
         if (!this.wantWarm) return;
         this.spare = { data, at: Date.now() };
-        log('spare token ready for the next reconnect');
+        void this.saveToken(this.spare);
+        log('spare token ready for the next reconnect (also saved on the phone for the next launch)');
         if (this.spareTimer) clearTimeout(this.spareTimer);
         this.spareTimer = setTimeout(() => {
           this.spareTimer = null;

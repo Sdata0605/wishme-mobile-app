@@ -30,5 +30,9 @@ ok('sarvam fixed sir still says sir', /Address the user as "sir"/.test(g(A('sir'
 // greeting prompt
 const gp = (a: any) => p.buildGreetingPrompt({}, a);
 ok('voice greeting prompt marks a new conversation and says exactly Hello.', /New conversation/.test(gp(A('voice'))) && /Say exactly "Hello\."/.test(gp(A('voice'))), gp(A('voice')));
+const g1 = gp(A('sir'));
+const g2 = gp(A('sir'));
+ok('every greeting prompt is different, so it never looks like a repeat', g1 !== g2 && /opening number \d+/.test(g1) && /opening number \d+/.test(g2), [g1.slice(0, 80), g2.slice(0, 80)]);
+ok('the greeting prompt says it is a private command to answer aloud every time', /private command/.test(g1) && /always answer it by speaking/.test(g1) && /stay quiet/.test(g1));
 ok('fixed greeting prompt says exactly Hello sir.', /Say exactly "Hello sir\."/.test(gp(A('sir'))) && !/New conversation/.test(gp(A('sir'))));
 console.log(n + ' checks passed');

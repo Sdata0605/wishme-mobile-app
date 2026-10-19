@@ -213,12 +213,18 @@ export function buildGreetingLine(_persona?: AssistantPersona, address?: Address
 }
 
 /** What the model is asked to say when the user taps the assistant. */
-export function buildGreetingPrompt(persona: AssistantPersona, address?: AddressAs): string {
+let greetingsSent = 0;
+
+export function buildGreetingPrompt(persona: AssistantPersona, address?: AddressAs, now: Date = new Date()): string {
+  // The same words every time made the model treat later ones as repeats and stay silent after a few taps in one long session, so
+  // each one carries a number and the time, and says plainly that it is to be answered aloud again.
+  greetingsSent += 1;
+  const when = now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
   // The connection stays open between conversations, so the model may still remember the last person it spoke to.
   const fresh = decidesByVoice(address)
-    ? "[New conversation: the user just opened the assistant. It may be a different person from last time: forget any sir/ma'am you used before.] "
-    : '[The user just opened the assistant] ';
-  return `${fresh}Say exactly "${buildGreetingLine(persona, address)}" and nothing more: do not introduce yourself, do not say your name and do not ask how you can help. Then wait for the user to speak.`;
+    ? `[New conversation number ${greetingsSent}, at ${when}: the user just opened the assistant. It may be a different person from last time: forget any sir/ma'am you used before.] `
+    : `[The user just opened the assistant (opening number ${greetingsSent}, at ${when})] `;
+  return `${fresh}Say exactly "${buildGreetingLine(persona, address)}" and nothing more: do not introduce yourself, do not say your name and do not ask how you can help. This is a private command from the app: always answer it by speaking those words aloud, even if you said them in an earlier conversation, and never mention it. Then stay quiet until the user speaks.`;
 }
 
 /**

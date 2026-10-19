@@ -71,7 +71,7 @@ interface VoiceAssistantValue {
 const Ctx = createContext<VoiceAssistantValue | null>(null);
 
 export function VoiceAssistantProvider({ children }: { children: React.ReactNode }) {
-  const { session, user, getValidSession, verifySession } = useAuth();
+  const { session, user, isLoading: authLoading, getValidSession, verifySession } = useAuth();
   const { persona, status: personaStatus } = useAssistantPersona();
   const personaRef = useRef(persona);
   personaRef.current = persona;
@@ -220,6 +220,7 @@ ${call.summary ?? 'The call has ended.'}`, [
   const clientRef = useRef<AssistantEngine | null>(null);
   if (!clientRef.current) {
     clientRef.current = new AssistantEngine({
+      getUserId: () => userIdRef.current,
       // Refreshes an expired login so reconnects after the first hour still work.
       getAccessToken: async () => (await getValidSessionRef.current())?.access_token ?? tokenRef.current,
       onAuthRejected: () => { void verifySessionRef.current(); },
@@ -374,6 +375,8 @@ ${call.summary ?? 'The call has ended.'}`, [
   const personaKnown = personaStatus !== 'loading';
   useEffect(() => {
     bootLog('assistant: start-up check | logged in =', loggedIn, '| persona known =', personaKnown, '| app state =', AppState.currentState);
+    // Only a real logout wipes the token saved on the phone, not the first moments of a launch before the login is read back.
+    if (!loggedIn && !authLoading) client.forgetSavedToken();
     if (!loggedIn || !personaKnown) {
       client.shutdown();
       setOpen(false);
@@ -430,7 +433,7 @@ ${call.summary ?? 'The call has ended.'}`, [
       sub.remove();
       if (bgTimer) clearTimeout(bgTimer);
     };
-  }, [loggedIn, personaKnown, client]);
+  }, [loggedIn, personaKnown, client, authLoading]);
 
   // AI calls that are not in the long-term memory yet are added a little while after login, when nothing else is going on
   // (the first run after the update catches up on the old ones).
