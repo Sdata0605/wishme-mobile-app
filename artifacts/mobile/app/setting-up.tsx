@@ -1,9 +1,8 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Animated, BackHandler, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, BackHandler, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Icon } from '@/components/Icon';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
 import { GradientText } from '@/components/neon/GradientText';
 import { NeonCard } from '@/components/neon/NeonCard';
@@ -12,47 +11,53 @@ import { useTheme } from '@/context/ThemeContext';
 import { useVoiceAssistant } from '@/context/VoiceAssistantContext';
 import { getPermissionState, request } from '@/services/permissions';
 
-type StepState = 'waiting' | 'working' | 'done' | 'problem';
-
 /** After this long a "Continue" button appears; after the second, the app carries on by itself. */
 const SLOW_AFTER_S = 10;
 const GIVE_UP_AFTER_S = 15;
 /** When the voice connection fails there is no point waiting: carry on after a moment. */
 const ERROR_CARRY_ON_S = 5;
+const TRACK_W = 140;
+const SEGMENT_W = 48;
 
 /**
- * Shown right after a login or sign-up, before the home screen, while the voice assistant gets ready (its settings, the
- * connection to the voice service, the microphone), so the first tap on the assistant is instant. It never traps anyone: a
- * Continue button appears after 10 seconds and the app carries on by itself after 15.
+ * Shown right after a login or sign-up, before the home screen, while the voice assistant gets ready in the background (its
+ * settings, the connection to the voice service, the microphone), so the first tap on the assistant is instant. It says nothing
+ * about what is happening behind the scenes. It never traps anyone: a Continue button appears after 10 seconds and the app
+ * carries on by itself after 15.
  */
 export default function SettingUpScreen() {
   const { neon } = useTheme();
-  const insets = useSafeAreaInsets();
   const { next } = useLocalSearchParams<{ next?: string }>();
   // A word, not a path, so this screen can never be pointed at an arbitrary route.
   const target = next === 'home' ? '/(tabs)' : '/(tabs)/assistant';
   const { state } = useVoiceAssistant();
   const { status: personaStatus } = useAssistantPersona();
 
-  const [mic, setMic] = useState<'checking' | 'granted' | 'skipped'>('checking');
+  const [mic, setMic] = useState<'checking' | 'ready'>('checking');
   const [seconds, setSeconds] = useState(0);
   const [finished, setFinished] = useState<'done' | 'carried-on' | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
-  const fade = useRef(new Animated.Value(1)).current;
+  const [slowNote, setSlowNote] = useState(false);
+
+  const cardFade = useRef(new Animated.Value(1)).current;
   const pulse = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(0)).current;
+  const fill = useRef(new Animated.Value(0)).current;
+  const noteFade = useRef(new Animated.Value(1)).current;
+  const buttonFade = useRef(new Animated.Value(0)).current;
   const left = useRef(false);
 
-  // The microphone: read, and ask once if the phone has not been asked yet.
+  // The microphone: read, and ask once if the phone has not been asked yet. Allowed or not, it never holds this screen up.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        let m = await getPermissionState('microphone');
-        if (!m.granted && m.status === 'undetermined' && m.canAskAgain) m = await request('microphone');
-        if (!cancelled) setMic(m.granted ? 'granted' : 'skipped');
+        const m = await getPermissionState('microphone');
+        if (!m.granted && m.status === 'undetermined' && m.canAskAgain) await request('microphone');
       } catch {
-        if (!cancelled) setMic('skipped');
+        /* the assistant asks again when the user first talks */
       }
+      if (!cancelled) setMic('ready');
     })();
     return () => {
       cancelled = true;
@@ -61,6 +66,7 @@ export default function SettingUpScreen() {
 
   useEffect(() => {
     AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion).catch(() => {});
+    AccessibilityInfo.announceForAccessibility('Setting things up for you, this will take a few seconds');
     const sub = BackHandler.addEventListener('hardwareBackPress', () => true);
     const tick = setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => {
@@ -69,42 +75,41 @@ export default function SettingUpScreen() {
     };
   }, []);
 
+  // The orb pulse and the sliding bar.
   useEffect(() => {
+    if (finished) return;
+    // With reduce motion on nothing moves: the halo and the bar stay still.
     if (reduceMotion) return;
-    const loop = Animated.loop(
+    const beat = Animated.loop(
       Animated.sequence([
         Animated.timing(pulse, { toValue: 1, duration: 1200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
         Animated.timing(pulse, { toValue: 0, duration: 1200, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
       ]),
     );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse, reduceMotion]);
+    const bar = Animated.loop(Animated.timing(slide, { toValue: 1, duration: 1400, easing: Easing.inOut(Easing.quad), useNativeDriver: true }), { resetBeforeIteration: true });
+    beat.start();
+    bar.start();
+    return () => {
+      beat.stop();
+      bar.stop();
+    };
+  }, [pulse, slide, reduceMotion, finished]);
 
   const settingsReady = personaStatus !== 'loading';
   const voiceReady = state === 'ready' || state === 'listening' || state === 'speaking';
   const voiceFailed = state === 'error';
-  const micChecked = mic !== 'checking';
-  const allDone = settingsReady && voiceReady && micChecked;
-
-  const steps = useMemo(() => {
-    const voice: StepState = voiceReady ? 'done' : voiceFailed ? 'problem' : settingsReady ? 'working' : 'waiting';
-    const micStep: StepState = mic === 'granted' ? 'done' : mic === 'skipped' ? 'problem' : 'working';
-    return [
-      { key: 'signed', label: 'Signed in', state: 'done' as StepState },
-      { key: 'settings', label: 'Setting up your assistant', state: (settingsReady ? 'done' : 'working') as StepState },
-      { key: 'voice', label: 'Connecting your voice', state: voice },
-      { key: 'mic', label: 'Microphone ready', state: micStep, help: mic === 'skipped' ? "We'll ask when you first talk" : undefined },
-    ];
-  }, [settingsReady, voiceReady, voiceFailed, mic]);
+  const allDone = settingsReady && voiceReady && mic === 'ready';
 
   const leave = (how: 'done' | 'carried-on', holdMs: number) => {
     if (left.current) return;
     left.current = true;
     setFinished(how);
-    AccessibilityInfo.announceForAccessibility(how === 'done' ? 'All set' : 'Carrying on');
+    if (how === 'done') {
+      AccessibilityInfo.announceForAccessibility('All set');
+      Animated.timing(fill, { toValue: 1, duration: holdMs ? 250 : 0, useNativeDriver: true }).start();
+    }
     setTimeout(() => {
-      Animated.timing(fade, { toValue: 0, duration: holdMs ? 300 : 0, useNativeDriver: true }).start(() => router.replace(target as never));
+      Animated.timing(cardFade, { toValue: 0, duration: holdMs ? 300 : 0, useNativeDriver: true }).start(() => router.replace(target as never));
     }, holdMs);
   };
 
@@ -124,95 +129,85 @@ export default function SettingUpScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seconds]);
 
-  // Each step reached is announced to a screen reader.
-  const announced = useRef<Record<string, StepState>>({});
+  // After 10 seconds (or a failure) the note changes quietly and a Continue button appears.
+  const slow = (seconds >= SLOW_AFTER_S || voiceFailed) && !finished;
   useEffect(() => {
-    for (const step of steps) {
-      if (announced.current[step.key] !== step.state && step.state === 'done') AccessibilityInfo.announceForAccessibility(`${step.label}, done`);
-      announced.current[step.key] = step.state;
-    }
-  }, [steps]);
-
-  const slow = seconds >= SLOW_AFTER_S && !finished;
-  const title = finished === 'done' ? 'All set!' : 'Setting things up for you';
-  const subtitle = voiceFailed
-    ? "We couldn't connect your voice just now. Carry on - we'll keep trying in the background."
-    : slow
-      ? 'Taking a little longer than usual - you can carry on, your assistant will finish getting ready.'
-      : 'Getting your assistant ready. This only takes a moment.';
+    if (!slow) return;
+    Animated.timing(noteFade, { toValue: 0, duration: 125, useNativeDriver: true }).start(() => {
+      setSlowNote(true);
+      Animated.timing(noteFade, { toValue: 1, duration: 125, useNativeDriver: true }).start();
+    });
+    Animated.timing(buttonFade, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+  }, [slow, noteFade, buttonFade]);
 
   const haloScale = pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] });
   const haloOpacity = pulse.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0.8] });
+  const segmentX = slide.interpolate({ inputRange: [0, 1], outputRange: [-SEGMENT_W, TRACK_W] });
+  const cardScale = cardFade.interpolate({ inputRange: [0, 1], outputRange: [0.98, 1] });
 
-  const wellFor = (st: StepState) => {
-    if (st === 'done') return <View style={[styles.well, { backgroundColor: neon.success }]}><Icon name="check" size={16} color="#04122E" /></View>;
-    if (st === 'problem') return <View style={[styles.well, { backgroundColor: `${neon.warning}33`, borderColor: neon.warning, borderWidth: 1.5 }]}><Text style={{ color: neon.warning, fontSize: 15, fontFamily: 'Inter_700Bold' }}>!</Text></View>;
-    if (st === 'working') return <View style={styles.well}><ActivityIndicator size="small" color={neon.violet} /></View>;
-    return <View style={[styles.well, { borderColor: neon.cardBorder, borderWidth: 1.5 }]} />;
-  };
+  const title = finished === 'done' ? 'All set!' : 'Setting things up for you';
+  const note = slowNote ? "Almost there - you can carry on, we'll finish in the background." : 'This will take only a few seconds.';
 
   return (
     <AmbientBackground>
-      <Animated.View style={[styles.wrap, { opacity: fade, paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 }]}>
-        <View style={styles.hero} accessible={false}>
-          <Animated.View style={[styles.halo, { backgroundColor: finished === 'done' ? neon.success : neon.violet, opacity: reduceMotion ? 0.55 : haloOpacity, transform: [{ scale: reduceMotion ? 1 : haloScale }] }]} />
-          <Svg width={120} height={120} viewBox="0 0 120 120">
-            <Defs>
-              <RadialGradient id="orb" cx="40%" cy="35%" r="70%">
-                <Stop offset="0" stopColor={neon.cyan} stopOpacity="1" />
-                <Stop offset="0.6" stopColor={neon.violet} stopOpacity="1" />
-                <Stop offset="1" stopColor={neon.pink} stopOpacity="1" />
-              </RadialGradient>
-            </Defs>
-            <Circle cx="60" cy="60" r="52" fill="url(#orb)" />
-          </Svg>
-        </View>
+      <View style={styles.center}>
+        <Animated.View style={{ opacity: cardFade, transform: [{ scale: cardScale }], alignSelf: 'stretch', alignItems: 'center' }}>
+          <NeonCard style={styles.card} radius={28}>
+            <View style={styles.hero} accessible={false} importantForAccessibility="no-hide-descendants">
+              <Animated.View
+                style={[
+                  styles.halo,
+                  { backgroundColor: finished === 'done' ? neon.success : neon.violet, opacity: reduceMotion ? 0.55 : haloOpacity, transform: [{ scale: reduceMotion ? 1 : haloScale }] },
+                ]}
+              />
+              <Svg width={96} height={96} viewBox="0 0 96 96">
+                <Defs>
+                  <RadialGradient id="orb" cx="40%" cy="35%" r="70%">
+                    <Stop offset="0" stopColor={neon.cyan} stopOpacity="1" />
+                    <Stop offset="0.6" stopColor={neon.violet} stopOpacity="1" />
+                    <Stop offset="1" stopColor={neon.pink} stopOpacity="1" />
+                  </RadialGradient>
+                </Defs>
+                <Circle cx="48" cy="48" r="44" fill="url(#orb)" />
+              </Svg>
+            </View>
 
-        <View style={{ alignItems: 'center', marginTop: 28 }}>
-          <GradientText colors={neon.gVioletCyan} fontSize={26} fontFamily="PlayfairDisplay_700Bold">{title}</GradientText>
-        </View>
-        <Text style={[styles.subtitle, { color: neon.textLo }]} accessibilityLiveRegion="polite">{subtitle}</Text>
+            <View style={{ marginTop: 24, alignItems: 'center' }}>
+              <GradientText colors={neon.gVioletCyan} fontSize={22} fontFamily="PlayfairDisplay_700Bold">{title}</GradientText>
+            </View>
 
-        <NeonCard style={styles.card}>
-          <View
-            accessible
-            accessibilityLabel={`Setting things up. ${steps.map((s) => `${s.label}: ${s.state === 'done' ? 'done' : s.state === 'problem' ? 'needs attention' : 'in progress'}`).join('. ')}`}
-          >
-            {steps.map((s) => (
-              <View key={s.key} style={styles.row}>
-                {wellFor(s.state)}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: s.state === 'waiting' ? neon.textDim : neon.textHi, fontSize: 15.5, fontFamily: 'Inter_600SemiBold' }}>{s.label}</Text>
-                  {s.help ? <Text style={{ color: neon.textLo, fontSize: 12.5, fontFamily: 'Inter_400Regular', marginTop: 2 }}>{s.help}</Text> : null}
-                </View>
-              </View>
-            ))}
-          </View>
-        </NeonCard>
+            <View style={[styles.track, { backgroundColor: neon.cardBorder }]} accessible={false} importantForAccessibility="no-hide-descendants">
+              <Animated.View style={[styles.segment, { opacity: reduceMotion ? 0.8 : 1, transform: [{ translateX: reduceMotion ? (TRACK_W - SEGMENT_W) / 2 : segmentX }] }]}>
+                <LinearGradient colors={neon.gVioletCyan as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              </Animated.View>
+              <Animated.View style={[StyleSheet.absoluteFill, { opacity: fill }]}>
+                <LinearGradient colors={neon.gVioletCyan as unknown as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={StyleSheet.absoluteFill} />
+              </Animated.View>
+            </View>
 
-        <View style={{ flex: 1 }} />
-        {(slow || voiceFailed) && !finished ? (
-          <Pressable
-            onPress={() => leave('carried-on', 0)}
-            accessibilityRole="button"
-            accessibilityLabel="Continue"
-            style={[styles.button, { borderColor: neon.cardBorder }]}
-          >
-            <Text style={{ color: neon.textHi, fontSize: 16, fontFamily: 'Inter_600SemiBold' }}>Continue</Text>
-          </Pressable>
-        ) : null}
-      </Animated.View>
+            <Animated.Text style={[styles.note, { color: neon.textLo, opacity: noteFade }]}>{finished === 'done' ? ' ' : note}</Animated.Text>
+
+            {slow ? (
+              <Animated.View style={{ opacity: buttonFade }}>
+                <Pressable onPress={() => leave('carried-on', 0)} accessibilityRole="button" accessibilityLabel="Continue" style={styles.button} hitSlop={8}>
+                  <Text style={{ color: neon.textHi, fontSize: 15, fontFamily: 'Inter_600SemiBold' }}>Continue</Text>
+                </Pressable>
+              </Animated.View>
+            ) : null}
+          </NeonCard>
+        </Animated.View>
+      </View>
     </AmbientBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { flex: 1, paddingHorizontal: 24, alignItems: 'stretch' },
-  hero: { alignItems: 'center', justifyContent: 'center', height: 150 },
-  halo: { position: 'absolute', width: 150, height: 150, borderRadius: 75 },
-  subtitle: { fontSize: 15, lineHeight: 22, textAlign: 'center', marginTop: 10, marginHorizontal: 12, fontFamily: 'Inter_400Regular' },
-  card: { marginTop: 28, paddingVertical: 8, paddingHorizontal: 16 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 14, minHeight: 56 },
-  well: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  button: { height: 52, borderRadius: 26, borderWidth: 1.4, alignItems: 'center', justifyContent: 'center' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  card: { width: '100%', maxWidth: 340, paddingHorizontal: 28, paddingTop: 32, paddingBottom: 24, alignItems: 'center' },
+  hero: { width: 124, height: 124, alignItems: 'center', justifyContent: 'center' },
+  halo: { position: 'absolute', width: 124, height: 124, borderRadius: 62 },
+  track: { width: TRACK_W, height: 4, borderRadius: 2, overflow: 'hidden', marginTop: 20 },
+  segment: { position: 'absolute', left: 0, top: 0, width: SEGMENT_W, height: 4, borderRadius: 2, overflow: 'hidden' },
+  note: { fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 16, fontFamily: 'Inter_400Regular' },
+  button: { minHeight: 44, minWidth: 120, alignItems: 'center', justifyContent: 'center', marginTop: 12 },
 });
