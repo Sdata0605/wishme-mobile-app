@@ -292,6 +292,11 @@ export class AssistantEngine {
     this.current.sendText(text);
   }
 
+  /** The app went to the background: make sure a token is waiting for the next launch. */
+  topUpSpare() {
+    this.gemini.topUpSpare();
+  }
+
   /** Logout: forget the voice token saved on the phone. */
   forgetSavedToken() {
     this.gemini.forgetSavedToken();

@@ -388,7 +388,10 @@ ${call.summary ?? 'The call has ended.'}`, [
     let bgTimer: ReturnType<typeof setTimeout> | null = null;
     const sub = AppState.addEventListener('change', (next) => {
       if (__DEV__) console.log(`[app] state -> ${next}`);
-      if (next === 'background') flushConversationRef.current();
+      if (next === 'background') {
+        flushConversationRef.current();
+        client.topUpSpare();
+      }
       else if (next === 'active') {
         void (async () => {
           const token = (await getValidSessionRef.current())?.access_token;

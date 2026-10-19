@@ -188,4 +188,20 @@ c.forgetSavedToken();
 await new Promise((res) => setTimeout(res, 50));
 check('logout removes the saved token', !store.has('gemini_live_saved_token_v1') && c.spare === null);
 
+// 14. A failed spare fetch is gentle (two requests, not four) and is tried again later; it is also tried when the app goes to the background.
+sent = [];
+plans = [{ after: 20, status: 500 }];
+c = make();
+c.ensureSpare();
+await new Promise((res) => setTimeout(res, 300));
+check('a failed spare fetch used only two requests', sent.length === 2, sent.length);
+check('and a retry is scheduled', c.spareFailures === 1 && c.spareRetryTimer !== null && c.spare === null);
+plans = [{ after: 20 }];
+sent = [];
+c.topUpSpare();
+await new Promise((res) => setTimeout(res, 300));
+check('going to the background tries at once and gets the spare', c.spare?.data?.token === 'tok-1' && c.spareFailures === 0, { spare: !!c.spare, f: c.spareFailures });
+c.shutdown();
+check('shutting down cancels the retries', c.spareRetryTimer === null && c.spareTimer === null);
+
 console.log(`${checks} checks passed`);

@@ -71,6 +71,12 @@ const TOKEN_TIMEOUT_MS = 17_000;
  */
 const TOKEN_BACKUP_AT_MS = [1200, 4000, 8000];
 const TOKEN_MAX_REQUESTS = 4;
+/** The token for the next launch is not urgent: one request, one backup after a while, and a longer wait (no hammering a slow server). */
+const SPARE_BACKUP_AT_MS = [6000];
+const SPARE_MAX_REQUESTS = 2;
+const SPARE_TIMEOUT_MS = 30_000;
+/** When fetching the spare fails, try again after these delays (then every 15 minutes) while the app is open. */
+const SPARE_RETRY_MS = [30_000, 120_000, 300_000, 900_000];
 /** A spare token (fetched after a connection is up, for the next reconnect) is used for at most this long. The server makes it valid for 20 minutes. */
 const SPARE_MAX_AGE_MS = 11 * 60 * 60_000;
 /** The spare is replaced with a newer one this often while the app is open. */
@@ -229,6 +235,8 @@ export class GeminiLiveClient {
   private spare: { data: Record<string, any>; at: number } | null = null;
   private spareBusy = false;
   private spareTimer: ReturnType<typeof setTimeout> | null = null;
+  private spareRetryTimer: ReturnType<typeof setTimeout> | null = null;
+  private spareFailures = 0;
   private requestingPermission = false;
   private audioReady = false;
   /** True once the microphone permission is known to be granted (so a tap never has to ask again). */
@@ -533,6 +541,8 @@ export class GeminiLiveClient {
     this.spare = null;
     if (this.spareTimer) clearTimeout(this.spareTimer);
     this.spareTimer = null;
+    if (this.spareRetryTimer) clearTimeout(this.spareRetryTimer);
+    this.spareRetryTimer = null;
     this.wantWarm = false;
     this.wantListening = false;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
@@ -635,6 +645,9 @@ export class GeminiLiveClient {
   private requestToken(accessToken: string, spare: boolean): Promise<Record<string, any>> {
     const t0 = Date.now();
     const kind = spare ? 'spare token' : 'token';
+    const backups = spare ? SPARE_BACKUP_AT_MS : TOKEN_BACKUP_AT_MS;
+    const maxRequests = spare ? SPARE_MAX_REQUESTS : TOKEN_MAX_REQUESTS;
+    const timeoutMs = spare ? SPARE_TIMEOUT_MS : TOKEN_TIMEOUT_MS;
     return new Promise((resolve, reject) => {
       let launched = 0;
       let finished = 0;
@@ -659,15 +672,15 @@ export class GeminiLiveClient {
         finished += 1;
         if (done || finished < launched) return;
         // Everything started has failed: try once more, until the limit.
-        if (launched < TOKEN_MAX_REQUESTS) launch('retry');
+        if (launched < maxRequests) launch('retry');
         else end(() => reject(new Error(lastStatus ? `Voice service unavailable (${lastStatus}).` : 'The voice service is slow to respond. Check your connection.')));
       };
       const launch = (label: string) => {
-        if (done || launched >= TOKEN_MAX_REQUESTS) return;
+        if (done || launched >= maxRequests) return;
         launched += 1;
         const abort = new AbortController();
         aborts.push(abort);
-        const timer = setTimeout(() => abort.abort(), TOKEN_TIMEOUT_MS);
+        const timer = setTimeout(() => abort.abort(), timeoutMs);
         log(`${kind}: voice-token request sent (${label})`);
         fetch(`${SUPABASE_URL}/functions/v1/voice-token`, {
           method: 'POST',
@@ -701,7 +714,7 @@ export class GeminiLiveClient {
         );
       };
       launch('first');
-      TOKEN_BACKUP_AT_MS.forEach((ms, i) => timers.push(setTimeout(() => launch(`backup ${i + 1}`), ms)));
+      backups.forEach((ms, i) => timers.push(setTimeout(() => launch(`backup ${i + 1}`), ms)));
     });
   }
 
@@ -797,6 +810,7 @@ export class GeminiLiveClient {
         const data = await this.requestToken(accessToken, true);
         if (!this.wantWarm) return;
         this.spare = { data, at: Date.now() };
+        this.spareFailures = 0;
         void this.saveToken(this.spare);
         log('spare token ready for the next reconnect (also saved on the phone for the next launch)');
         if (this.spareTimer) clearTimeout(this.spareTimer);
@@ -806,11 +820,28 @@ export class GeminiLiveClient {
           this.ensureSpare();
         }, SPARE_REFRESH_MS);
       } catch (e) {
-        log('spare token: could not fetch one:', e instanceof Error ? e.message : e);
+        const wait = SPARE_RETRY_MS[Math.min(this.spareFailures, SPARE_RETRY_MS.length - 1)];
+        this.spareFailures += 1;
+        log('spare token: could not fetch one:', e instanceof Error ? e.message : e, `| trying again in ${Math.round(wait / 1000)} s`);
+        if (this.wantWarm) {
+          if (this.spareRetryTimer) clearTimeout(this.spareRetryTimer);
+          this.spareRetryTimer = setTimeout(() => {
+            this.spareRetryTimer = null;
+            this.ensureSpare();
+          }, wait);
+        }
       } finally {
         this.spareBusy = false;
       }
     })();
+  }
+
+  /** Called when the app goes to the background: if no token is waiting for the next launch yet, try to get one now. */
+  topUpSpare() {
+    if (this.spare || !this.wantWarm) return;
+    if (this.spareRetryTimer) clearTimeout(this.spareRetryTimer);
+    this.spareRetryTimer = null;
+    this.ensureSpare();
   }
 
   private async openSocket() {
