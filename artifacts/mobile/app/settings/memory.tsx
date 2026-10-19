@@ -22,7 +22,7 @@ const CATEGORY_TITLES: Record<MemoryCategory, { chip: string; title: string }> =
   other: { chip: 'Other', title: 'Other' },
 };
 const ORDER = Object.keys(CATEGORY_TITLES) as MemoryCategory[];
-const SOURCE_WORD = { user: 'You said', chat: 'From a chat', call: 'From a call' } as const;
+const SOURCE_WORD = { user: 'You said', chat: 'From a chat', call: 'From a call', learned: 'Learnt from use' } as const;
 
 const shortDate = (iso: string | null) => {
   if (!iso) return '';

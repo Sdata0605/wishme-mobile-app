@@ -21,7 +21,7 @@ import React, {
 } from 'react';
 import { Alert, Animated, AppState, Easing, InteractionManager, Linking } from 'react-native';
 import type { Story } from '@/services/home/news';
-import { clearMemoryCache, refreshMemories } from '@/services/assistant/memory';
+import { clearMemoryCache, dailyMemoryUpkeep, refreshMemories } from '@/services/assistant/memory';
 import { missedTool } from '@/services/assistant/claimCheck';
 import { useAgentState } from '@/context/AgentStateContext';
 import { useAssistantPersona } from '@/context/AssistantPersonaContext';
@@ -433,12 +433,16 @@ ${call.summary ?? 'The call has ended.'}`, [
   }, [loggedIn, personaKnown, client]);
 
   // AI calls that are not in the long-term memory yet are added a little while after login, when nothing else is going on
-  // (the first run after the update catches up on the old ones).
+  // (the first run after the update catches up on the old ones). The once-a-day memory upkeep (fading, merging, habits) is
+  // asked for at the same moment; the server does nothing if it already ran today.
   useEffect(() => {
     if (!loggedIn) return;
     const timer = setTimeout(async () => {
       const token = (await getValidSessionRef.current())?.access_token;
-      if (token) void indexPendingCalls(token, true);
+      if (token) {
+        void indexPendingCalls(token, true);
+        dailyMemoryUpkeep(token);
+      }
     }, 25_000);
     return () => clearTimeout(timer);
   }, [loggedIn]);

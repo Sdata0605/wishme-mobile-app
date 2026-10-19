@@ -6,6 +6,7 @@ import { Alert, AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Tex
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddressCard, GetStartedCard, NewsCard, PlayMyDay, PromptChips, ToolChips, WeatherCard, type ToolChip } from '@/components/home/HomeBlocks';
 import { CallLed } from '@/components/home/HomeSections';
+import { QuoteCardsSheet } from '@/components/home/QuoteCardsSheet';
 import { Icon } from '@/components/Icon';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
 import { GradientText } from '@/components/neon/GradientText';
@@ -16,9 +17,10 @@ import { useTheme } from '@/context/ThemeContext';
 import { useVoiceAssistant } from '@/context/VoiceAssistantContext';
 import { savedMessage } from '@/services/assistant/addressModes';
 import { listAiCalls, whoLabel, type AiCall } from '@/services/assistant/aiCalls';
-import { todaysQuote, tryAsking } from '@/services/home/dailyQuote';
+import { tryAsking } from '@/services/home/dailyQuote';
 import { touchStreak } from '@/services/home/dayStreak';
 import { topStories, type Story } from '@/services/home/news';
+import { cachedQuoteDay, fetchQuoteDay, lineFor, type QuoteDay } from '@/services/home/quoteOfDay';
 import { currentWeather, type Weather } from '@/services/home/weather';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -67,15 +69,19 @@ export default function AssistantHome() {
   const [showStart, setShowStart] = useState(false);
   const [call, setCall] = useState<AiCall | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [quoteDay, setQuoteDay] = useState<QuoteDay | null>(null);
+  const [quoteOpen, setQuoteOpen] = useState(false);
 
   const first = (user?.firstName ?? '').trim().split(/\s+/)[0];
-  const quote = useMemo(() => todaysQuote(now), [now]);
+  // The server's line for today (new every day, the same for everyone); the app's own until it answers.
+  const quote = useMemo(() => lineFor(quoteDay, now), [quoteDay, now]);
   const ideas = useMemo(() => tryAsking(now), [now]);
   // The tab bar is absolute and the raised mic sits over the last row.
   const bottomPad = 66 + insets.bottom + 56;
   const night = now.getHours() >= 19 || now.getHours() < 6;
 
   useEffect(() => {
+    void cachedQuoteDay().then((d) => { if (d) setQuoteDay(d); });
     void AsyncStorage.multiGet([GS_KEY, NEWS_KEY]).then(([gs, nw]) => {
       setShowStart(gs[1] !== '1');
       setNewsHidden(nw[1] === dayStamp(new Date()));
@@ -85,9 +91,10 @@ export default function AssistantHome() {
   const refresh = useCallback(async () => {
     setNow(new Date());
     void touchStreak();
-    void currentWeather().then(setWeather);
+    void getValidSession().then((sess) => currentWeather(sess?.access_token).then(setWeather)).catch(() => {});
+    void getValidSession().then((sess) => fetchQuoteDay(sess?.access_token)).then((d) => { if (d) setQuoteDay(d); }).catch(() => {});
     void topStories(6).then(setStories);
-  }, []);
+  }, [getValidSession]);
 
   // Refresh on focus (greeting, weather, news) and when the app comes back to the foreground.
   useFocusEffect(
@@ -124,6 +131,8 @@ export default function AssistantHome() {
     await refresh();
     setRefreshing(false);
   };
+
+  const getToken = useCallback(async () => (await getValidSession())?.access_token ?? null, [getValidSession]);
 
   const dismissStart = () => { setShowStart(false); void AsyncStorage.setItem(GS_KEY, '1'); };
   const hideNews = () => { setNewsHidden(true); void AsyncStorage.setItem(NEWS_KEY, dayStamp(new Date())); };
@@ -174,10 +183,15 @@ export default function AssistantHome() {
               {DAYS[now.getDay()]}, {now.getDate()} {MONTHS[now.getMonth()]}
             </Text>
 
-            <View style={styles.quoteRow}>
+            <Pressable
+              onPress={() => setQuoteOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Today's quote. Open to share it as a picture"
+              style={({ pressed }) => [styles.quoteRow, { opacity: pressed ? 0.7 : 1 }]}
+            >
               <LinearGradient colors={[neon.blue, neon.pink]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.quoteBar} />
               <Text style={[styles.quote, { color: neon.textHi }]}>{quote}</Text>
-            </View>
+            </Pressable>
           </Reveal>
         </View>
 
@@ -234,6 +248,14 @@ export default function AssistantHome() {
           <ToolChips tools={TOOLS} onOpen={(r) => router.push(r as never)} />
         </Reveal>
       </ScrollView>
+      <QuoteCardsSheet
+        visible={quoteOpen}
+        onClose={() => setQuoteOpen(false)}
+        text={quote}
+        day={quoteDay}
+        onDay={setQuoteDay}
+        getToken={getToken}
+      />
     </AmbientBackground>
   );
 }

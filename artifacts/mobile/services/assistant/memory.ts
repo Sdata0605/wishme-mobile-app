@@ -6,6 +6,7 @@
  */
 
 import { supabaseFetch } from '@/constants/supabase';
+import { pickForPrompt } from './memoryStrength';
 
 export type MemoryCategory = 'about_me' | 'people' | 'goals' | 'events' | 'preferences' | 'follow_up' | 'work' | 'feelings' | 'places' | 'calls' | 'other';
 
@@ -17,15 +18,22 @@ export interface Memory {
   category: MemoryCategory;
   person: string | null;
   event_date: string | null;
-  /** user = told to remember, chat = noted from a conversation, call = from an AI phone call. */
-  source: 'user' | 'chat' | 'call';
+  /** user = told to remember, chat = noted from a conversation, call = from an AI phone call, learned = a habit noticed. */
+  source: 'user' | 'chat' | 'call' | 'learned';
+  /** 1 as stored, up to 3 when used and said again, down when unused for weeks or corrected (memory-learn). */
+  strength?: number | null;
+  last_used_at?: string | null;
 }
 
 const TABLE = '/rest/v1/assistant_memories';
-const COLUMNS = 'id,subject,fact,created_at,category,person,event_date,source';
+const COLUMNS = 'id,subject,fact,created_at,category,person,event_date,source,strength,last_used_at';
+/** Older rows, before the learning columns existed (the migration has not run yet). */
+const BASIC_COLUMNS = 'id,subject,fact,created_at,category,person,event_date,source';
 
 /** The most the assistant is shown, so the system prompt (resent every Sarvam turn) stays short. */
 const BLOCK_ROWS = 25;
+/** How many are read to choose those 25 from: the strongest and the newest win. */
+const POOL_ROWS = 80;
 const BLOCK_CHARS = 1100;
 const MAX_FACT = 300;
 const MAX_SUBJECT = 80;
@@ -37,7 +45,9 @@ async function fail(res: Response, fallback: string): Promise<never> {
 }
 
 export async function listMemories(token: string, limit = 200): Promise<Memory[]> {
-  const res = await supabaseFetch(`${TABLE}?select=${COLUMNS}&order=created_at.desc&limit=${limit}`, {}, token);
+  let res = await supabaseFetch(`${TABLE}?select=${COLUMNS}&order=created_at.desc&limit=${limit}`, {}, token);
+  // 400 = a column is missing: the learning migration has not been applied, so read what there is.
+  if (res.status === 400) res = await supabaseFetch(`${TABLE}?select=${BASIC_COLUMNS}&order=created_at.desc&limit=${limit}`, {}, token);
   if (!res.ok) await fail(res, 'The memories could not be loaded');
   return (await res.json()) as Memory[];
 }
@@ -46,7 +56,7 @@ export async function listMemories(token: string, limit = 200): Promise<Memory[]
 export async function refreshMemories(token: string | null | undefined): Promise<void> {
   if (!token) return;
   try {
-    cached = await listMemories(token, BLOCK_ROWS);
+    cached = await listMemories(token, POOL_ROWS);
   } catch {
     /* keep what was there */
   }
@@ -61,7 +71,8 @@ export function memoryBlock(rows: Memory[] = cached): string {
   if (!rows.length) return '';
   const lines: string[] = [];
   let used = 0;
-  for (const m of rows.slice(0, BLOCK_ROWS)) {
+  // A faded fact (unused for months, or doubted) stays listed and recallable but no longer rides in the prompt.
+  for (const m of pickForPrompt(rows, BLOCK_ROWS)) {
     const line = `- ${m.subject}: ${m.fact}`;
     if (used + line.length > BLOCK_CHARS) break;
     lines.push(line);
@@ -74,18 +85,43 @@ export function memoryBlock(rows: Memory[] = cached): string {
 
 const clean = (s: unknown, max: number) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 
-/** Saves one fact. The same fact about the same subject is not saved twice; a new fact about a subject is added next to the old. */
+/**
+ * Tells memory-learn what just happened, without waiting: a fact told again grows stronger, and a new fact retires the
+ * remembered ones it replaces ("my office moved to Whitefield" replaces "office is in Koramangala"). Never throws.
+ */
+function learn(token: string, action: 'remembered' | 'said_again', id: string): void {
+  void supabaseFetch('/functions/v1/memory-learn', { method: 'POST', body: JSON.stringify({ action, id }) }, token, 60_000)
+    .then(async (r) => {
+      // A replaced fact has gone: the next conversation must not be given it.
+      if (r.ok && action === 'remembered') await refreshMemories(token);
+    })
+    .catch(() => {});
+}
+
+/** Once a day per user, memory-learn tidies the memory: fading, merging duplicates, habits. Called after login; never throws. */
+export function dailyMemoryUpkeep(token: string): void {
+  void supabaseFetch('/functions/v1/memory-learn', { method: 'POST', body: JSON.stringify({ action: 'daily' }) }, token, 150_000).catch(() => {});
+}
+
+/**
+ * Saves one fact. The same fact about the same subject is not saved twice (it is reinforced instead); a new fact replaces
+ * the remembered ones it updates or contradicts (memory-learn decides which, after the answer).
+ */
 export async function rememberFact(token: string, subject: unknown, fact: unknown): Promise<{ ok: true; subject: string; fact: string; duplicate: boolean } | { ok: false; error: string }> {
   const s = clean(subject, MAX_SUBJECT);
   const f = clean(fact, MAX_FACT);
   if (s.length < 2 || f.length < 2) return { ok: false, error: 'Ask the user what exactly to remember, and about whom.' };
   const existing = await listMemories(token, 200);
-  if (existing.some((m) => m.subject.toLowerCase() === s.toLowerCase() && m.fact.toLowerCase() === f.toLowerCase())) {
+  const same = existing.find((m) => m.subject.toLowerCase() === s.toLowerCase() && m.fact.toLowerCase() === f.toLowerCase());
+  if (same) {
+    learn(token, 'said_again', same.id);
     return { ok: true, subject: s, fact: f, duplicate: true };
   }
-  const res = await supabaseFetch(TABLE, { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ subject: s, fact: f }) }, token);
+  const res = await supabaseFetch(TABLE, { method: 'POST', headers: { Prefer: 'return=representation' }, body: JSON.stringify({ subject: s, fact: f }) }, token);
   if (!res.ok) await fail(res, 'That could not be remembered');
+  const saved = ((await res.json().catch(() => [])) as { id?: string }[])[0];
   await refreshMemories(token);
+  if (saved?.id) learn(token, 'remembered', saved.id);
   return { ok: true, subject: s, fact: f, duplicate: false };
 }
 
