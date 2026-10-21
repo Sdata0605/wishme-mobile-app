@@ -1,3 +1,4 @@
+import { SheetBackdrop } from '@/components/SheetBackdrop';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
@@ -189,8 +190,9 @@ export function DatePickerField({ label, value, onChange, kind = 'occasion', pla
         <Icon name="chevron-down" size={16} color={colors.mutedForeground} />
       </TouchableOpacity>
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)} statusBarTranslucent>
-        <Pressable style={s.backdrop} onPress={() => setOpen(false)}>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)} statusBarTranslucent>
+        <View style={s.backdrop}>
+          <SheetBackdrop onPress={() => setOpen(false)} />
           <Pressable onPress={() => {}} style={[s.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 14 }]}>
             <View style={s.head}>
               <TouchableOpacity onPress={() => setOpen(false)} hitSlop={10}>
@@ -227,7 +229,7 @@ export function DatePickerField({ label, value, onChange, kind = 'occasion', pla
               <Text style={s.doneText}>Done</Text>
             </TouchableOpacity>
           </Pressable>
-        </Pressable>
+        </View>
       </Modal>
     </>
   );
@@ -235,7 +237,7 @@ export function DatePickerField({ label, value, onChange, kind = 'occasion', pla
 
 const s = StyleSheet.create({
   field: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, height: 48 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 16, paddingTop: 16, gap: 12 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontSize: 16, fontFamily: 'Inter_700Bold' },

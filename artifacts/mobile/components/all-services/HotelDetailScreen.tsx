@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
+  Dimensions,
   Image,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   ScrollView,
   StyleSheet,
@@ -25,6 +28,10 @@ import type { Hotel, HotelRoom, HotelSearchParams } from './hotelData';
 import { serviceColors as C } from './serviceColors';
 import { T, useThemedStyles, glass, dockBar } from './themed';
 import { BrandFill } from './BrandFill';
+import { LinearGradient } from 'expo-linear-gradient';
+import { hotelGallery, roomPhoto } from './hotelImages';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 function RoomCard({
   room,
@@ -42,6 +49,7 @@ function RoomCard({
       activeOpacity={0.85}
       onPress={onSelect}
     >
+      <Image source={roomPhoto(room.id)} style={rm.photo} resizeMode="cover" />
       <View style={rm.top}>
         <View style={{ flex: 1 }}>
           <Text style={rm.name}>{room.name}</Text>
@@ -91,7 +99,9 @@ const make_rm = () => StyleSheet.create({
     borderColor: T(C.border, 'border'),
     padding: 14,
     marginBottom: 10,
+    overflow: 'hidden',
    ...glass(18), },
+  photo: { height: 130, marginTop: -14, marginHorizontal: -14, marginBottom: 12, backgroundColor: T(C.lightGray, 'bg') },
   cardOn: { borderColor: T(C.green, 'border'), backgroundColor: T('#F0FDF4', 'bg') },
   top: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   name: { fontSize: 14, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
@@ -163,6 +173,13 @@ export function HotelDetailScreen({
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const [selectedRoomId, setSelectedRoomId] = useState(hotel.rooms[0]?.id ?? '');
+  const gallery = hotelGallery(hotel);
+  const [photoIdx, setPhotoIdx] = useState(0);
+  const galleryRef = useRef<ScrollView>(null);
+  const showPhoto = (i: number) => {
+    galleryRef.current?.scrollTo({ x: i * SCREEN_WIDTH, animated: true });
+    setPhotoIdx(i);
+  };
   const selectedRoom = hotel.rooms.find((r) => r.id === selectedRoomId) ?? hotel.rooms[0];
   const total = (selectedRoom?.price ?? 0) * search.nights;
 
@@ -170,12 +187,30 @@ export function HotelDetailScreen({
     <View style={st.root}>
       <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
         <View style={[st.hero, { backgroundColor: T(hotel.tint, 'bg') }]}>
-          <Image
-            source={require('../../assets/images/travel-hotels.jpg')}
-            style={st.heroImg}
-            resizeMode="cover"
+          <ScrollView
+            ref={galleryRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e: NativeSyntheticEvent<NativeScrollEvent>) =>
+              setPhotoIdx(Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH))
+            }
+          >
+            {gallery.map((src, i) => (
+              <Image key={i} source={src} style={st.heroImg} resizeMode="cover" />
+            ))}
+          </ScrollView>
+          <LinearGradient
+            pointerEvents="none"
+            colors={['rgba(0,0,0,0.35)', 'transparent', 'transparent', 'rgba(0,0,0,0.55)']}
+            locations={[0, 0.3, 0.65, 1]}
+            style={StyleSheet.absoluteFill}
           />
-          <View style={[st.heroTint, { backgroundColor: `${hotel.tint}AA` }]} />
+          <View style={st.photoCounter} pointerEvents="none">
+            <Text style={st.photoCounterText}>
+              {photoIdx + 1} / {gallery.length}
+            </Text>
+          </View>
           <TouchableOpacity
             style={[st.backBtn, { top: topPad + 8 }]}
             onPress={onBack}
@@ -208,6 +243,15 @@ export function HotelDetailScreen({
               <Text style={st.typeText}>{hotel.propertyType}</Text>
             </View>
           </View>
+
+          <Text style={st.section}>Photos</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.thumbRow}>
+            {gallery.map((src, i) => (
+              <TouchableOpacity key={i} activeOpacity={0.85} onPress={() => showPhoto(i)}>
+                <Image source={src} style={[st.thumb, i === photoIdx && st.thumbOn]} resizeMode="cover" />
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
 
           <Text style={st.section}>Amenities</Text>
           <View style={st.amenityGrid}>
@@ -283,9 +327,21 @@ export function HotelDetailScreen({
 
 const make_st = () => StyleSheet.create({
   root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
-  hero: { height: 220, position: 'relative' },
-  heroImg: { width: '100%', height: '100%' },
-  heroTint: { ...StyleSheet.absoluteFillObject },
+  hero: { height: 240, position: 'relative' },
+  heroImg: { width: SCREEN_WIDTH, height: 240 },
+  photoCounter: {
+    position: 'absolute',
+    right: 14,
+    bottom: 26,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  photoCounterText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  thumbRow: { gap: 8, paddingBottom: 2 },
+  thumb: { width: 84, height: 62, borderRadius: 8, borderWidth: 2, borderColor: 'transparent' },
+  thumbOn: { borderColor: '#7C3AED' },
   backBtn: {
     position: 'absolute',
     left: 14,
@@ -299,7 +355,7 @@ const make_st = () => StyleSheet.create({
   heroStars: {
     position: 'absolute',
     left: 14,
-    bottom: 14,
+    bottom: 26,
     flexDirection: 'row',
     gap: 3,
   },

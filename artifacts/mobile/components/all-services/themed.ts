@@ -121,3 +121,14 @@ export function dockBar() {
       } as const)
     : ({} as const);
 }
+
+/** A frosted-glass bottom sheet: translucent fill, hairline highlight edge, clipped so a GlassBlur layer stays inside the corners. */
+export function glassSheet() {
+  return {
+    backgroundColor: cur.isDark ? '#240c40' : '#ffffff',
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: cur.isDark ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.85)',
+    overflow: 'hidden',
+  } as const;
+}

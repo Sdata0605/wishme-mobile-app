@@ -508,11 +508,13 @@ const openService = (params: Record<string, string>) =>
 
 const EXPLORE: ExploreItem[] = [
   { label: 'Scan & Pay', Icon: Scan, color: T(C.purpleLight, 'fg'), open: () => router.push('/(tabs)/scan-pay') },
+  { label: 'Pay to Number', Icon: Smartphone, color: T(C.purpleLight, 'fg'), open: () => router.push('/pay-mobile' as Href) },
+  { label: 'Pay to UPI / Bank', Icon: Landmark, color: T(C.purpleLight, 'fg'), open: () => router.push('/pay-upi' as Href) },
   {
     label: 'Insurance',
     Icon: ShieldCheck,
     color: T(C.green, 'fg'),
-    open: () => openService({ start: 'billPay', kind: 'insurance' }),
+    open: () => router.push('/insurance' as Href),
   },
   { label: 'My Bookings', Icon: CalendarCheck, color: T(C.orange, 'fg'), open: () => router.push('/bookings') },
   { label: 'Wish a Friend', Icon: Gift, color: '#EF4444', open: () => router.push('/wish-friend' as Href) },

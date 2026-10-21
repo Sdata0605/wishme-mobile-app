@@ -1,3 +1,4 @@
+import { SheetBackdrop } from '@/components/SheetBackdrop';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from 'react';
 import {
@@ -141,8 +142,9 @@ export function AddOccasionSheet({ visible, onClose, profileId, token, onSaved }
   const inputStyle = [s.input, { color: colors.foreground, borderColor: colors.border, backgroundColor: colors.card }];
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={s.backdrop} onPress={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <View style={s.backdrop}>
+        <SheetBackdrop onPress={onClose} />
         <Pressable onPress={() => {}} style={[s.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 12 }]}>
           <View style={s.head}>
             <Text style={[s.title, { color: colors.foreground }]}>Add an occasion</Text>
@@ -245,13 +247,13 @@ export function AddOccasionSheet({ visible, onClose, profileId, token, onSaved }
             </LinearGradient>
           </TouchableOpacity>
         </Pressable>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: { maxHeight: '92%', borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 16 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
   title: { fontSize: 20, fontFamily: 'Inter_700Bold' },

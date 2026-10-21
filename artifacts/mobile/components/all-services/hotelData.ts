@@ -48,6 +48,10 @@ export interface HotelSearchParams {
   rooms: number;
   adults: number;
   children: number;
+  /** Only show this kind of stay (the "Stay type" chips on the search screen). */
+  propertyType?: Hotel['propertyType'];
+  /** Only show stays with free cancellation. */
+  freeCancelOnly?: boolean;
 }
 
 export const HOTEL_CITIES = [

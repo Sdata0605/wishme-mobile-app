@@ -21,7 +21,7 @@ export default function TabLayout() {
           initialRouteName="assistant"
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           tabBar={(props: any) => <NeonTabBar {...props} />}
-          screenOptions={{ headerShown: false }}
+          screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: '#1B0829' } }}
         >
           {/* The app opens on the AI home (the centre mic); Home is the WishMe home. */}
           <Tabs.Screen name="index" options={{ title: 'Home' }} />
@@ -31,7 +31,7 @@ export default function TabLayout() {
           <Tabs.Screen name="profile" options={{ title: 'You' }} />
 
           {/* Still reachable from Home, the menu and the assistant, just not in the tab bar */}
-          <Tabs.Screen name="scan-pay" options={{ href: null }} />
+          <Tabs.Screen name="scan-pay" options={{ href: null, tabBarStyle: { display: 'none' } }} />
           <Tabs.Screen name="wallet" options={{ href: null }} />
           <Tabs.Screen name="celebrities" options={{ href: null }} />
           <Tabs.Screen name="music" options={{ href: null }} />

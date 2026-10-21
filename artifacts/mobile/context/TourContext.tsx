@@ -2,7 +2,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import type { View } from 'react-native';
 
-export const TOUR_STORAGE_KEY = '@wishme/tour_seen_v1';
+export const TOUR_STORAGE_KEY = '@wishme/tour_seen_v2';
+/** Key for the user ID stored by AuthContext — used to detect a new user logging in. */
+const AUTH_USER_KEY = '@wishme/user';
 
 /** Header things the tour can point at. The tab-bar steps are positioned from the bar's geometry. */
 export type TourTargetId = 'menu' | 'scan';
@@ -66,7 +68,7 @@ interface TourContextValue {
   step: number;
   next: () => void;
   skip: () => void;
-  /** Called by Home when it is focused: shows the tour once per install. Returns a cleanup that hides it again. */
+  /** Called by Home when it is focused: shows the tour once per user per install. Returns a cleanup that hides it again. */
   begin: () => () => void;
   registerTarget: (id: TourTargetId, ref: React.RefObject<View | null>) => void;
   getTarget: (id: TourTargetId) => React.RefObject<View | null> | undefined;
@@ -78,7 +80,18 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
   const targets = useRef(new Map<TourTargetId, React.RefObject<View | null>>());
+
+  /**
+   * `null`  = not yet checked for the current user
+   * `true`  = this user has already seen the tour
+   * `false` = this user has NOT seen the tour yet
+   *
+   * Reset to `null` whenever we detect a different user has logged in so the
+   * new user always gets the tour on their first visit to Home.
+   */
   const seen = useRef<boolean | null>(null);
+  /** The user ID that `seen` was last resolved for. */
+  const seenForUserId = useRef<string | null>(null);
 
   const registerTarget = useCallback((id: TourTargetId, ref: React.RefObject<View | null>) => {
     targets.current.set(id, ref);
@@ -89,7 +102,7 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     seen.current = true;
     setVisible(false);
     setStep(0);
-    AsyncStorage.setItem(TOUR_STORAGE_KEY, '1').catch(() => {});
+    AsyncStorage.setItem(TOUR_STORAGE_KEY, JSON.stringify({ seen: true, userId: seenForUserId.current })).catch(() => {});
   }, []);
 
   const next = useCallback(() => {
@@ -106,13 +119,39 @@ export function TourProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
     (async () => {
-      if (seen.current === null) {
-        try {
-          seen.current = (await AsyncStorage.getItem(TOUR_STORAGE_KEY)) === '1';
-        } catch {
-          seen.current = true; // never nag if storage is unreadable
+      try {
+        // Determine the currently logged-in user's ID.
+        const userStr = await AsyncStorage.getItem(AUTH_USER_KEY);
+        const currentUserId: string | null = userStr
+          ? ((JSON.parse(userStr) as { id?: string }).id ?? null)
+          : null;
+
+        // If the user changed since we last resolved the tour flag, invalidate the cache.
+        if (currentUserId !== seenForUserId.current) {
+          seen.current = null;
+          seenForUserId.current = currentUserId;
         }
+
+        // Read the flag from disk only when not yet cached for this user.
+        if (seen.current === null) {
+          try {
+            const raw = await AsyncStorage.getItem(TOUR_STORAGE_KEY);
+            if (raw) {
+              const stored = JSON.parse(raw) as { seen?: boolean; userId?: string };
+              // Only honour the stored flag if it was recorded for the same user.
+              seen.current = stored.seen === true && stored.userId === currentUserId;
+            } else {
+              seen.current = false;
+            }
+          } catch {
+            seen.current = true; // never nag if storage is unreadable
+          }
+        }
+      } catch {
+        // If we can't read the user at all, fall back to the legacy single-flag behaviour.
+        if (seen.current === null) seen.current = false;
       }
+
       if (cancelled || seen.current) return;
       // Let Home finish laying out so the header buttons can be measured.
       timer = setTimeout(() => { if (!cancelled) setVisible(true); }, 700);

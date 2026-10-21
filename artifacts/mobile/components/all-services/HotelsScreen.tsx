@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import { SheetBackdrop } from '@/components/SheetBackdrop';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAgentPrefill } from '@/context/AgentStateContext';
 import {
+  Dimensions,
   Image,
   Modal,
   Platform,
   ScrollView,
+  Pressable,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -12,28 +15,39 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-  ArrowLeft,
+  ArrowRight,
   Building2,
   Calendar,
   Check,
+  ChevronLeft,
   ChevronRight,
+  CircleQuestionMark,
   Headphones,
+  Info,
   MapPin,
   Minus,
-  Percent,
+  Moon,
   Plus,
-  Search,
   ShieldCheck,
   Star,
   Tag,
-  Users,
+  CalendarX,
   X,
   Zap,
+  TreePalm,
+  House,
+  Building,
 } from 'lucide-react-native';
-import { HOTEL_CITIES, type HotelSearchParams } from './hotelData';
+import { router } from 'expo-router';
+import { LinearGradient } from 'expo-linear-gradient';
+import { HOTEL_CITIES, HOTELS, type Hotel, type HotelSearchParams } from './hotelData';
+import { HOTEL_PHOTOS, hotelGallery } from './hotelImages';
 import { serviceColors as C } from './serviceColors';
-import { T, useThemedStyles, glass, dk, N } from './themed';
-import { BrandFill, BannerScrim } from './BrandFill';
+import { T, useThemedStyles, glass, dk, N, glassSheet } from './themed';
+import { BrandFill } from './BrandFill';
+import { P } from './bookingTheme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 
 
@@ -85,8 +99,9 @@ function CityPicker({
 }) {
   const md = use_md();
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={md.backdrop}>
+        <SheetBackdrop onPress={onClose} />
         <View style={md.sheet}>
           <View style={md.head}>
             <Text style={md.title}>Where are you going?</Text>
@@ -105,10 +120,10 @@ function CityPicker({
                 }}
               >
                 <View style={md.icon}>
-                  <MapPin size={16} color={T(C.green, 'fg')} />
+                  <MapPin size={16} color={T(P.purple, 'fg')} />
                 </View>
                 <Text style={md.city}>{city}</Text>
-                {selected === city && <Check size={18} color={T(C.green, 'fg')} />}
+                {selected === city && <Check size={18} color={T(P.purple, 'fg')} />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -136,8 +151,9 @@ function DatePicker({
   const md = use_md();
   const days = nextDays(21).filter((d) => !minDate || d >= new Date(minDate.setHours(0, 0, 0, 0)));
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={md.backdrop}>
+        <SheetBackdrop onPress={onClose} />
         <View style={md.sheet}>
           <View style={md.head}>
             <Text style={md.title}>{title}</Text>
@@ -159,7 +175,7 @@ function DatePicker({
                   <Calendar size={16} color={T(C.purpleLight, 'fg')} />
                 </View>
                 <Text style={md.city}>{formatDate(d)}</Text>
-                {sameDay(selected, d) && <Check size={18} color={T(C.green, 'fg')} />}
+                {sameDay(selected, d) && <Check size={18} color={T(P.purple, 'fg')} />}
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -170,9 +186,9 @@ function DatePicker({
 }
 
 const make_md = () => StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: T(C.white, 'bg'),
+    ...glassSheet(),
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 24,
@@ -200,7 +216,7 @@ const make_md = () => StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: T('#ECFDF5', 'bg'),
+    backgroundColor: T(P.lavenderIcon, 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -291,8 +307,9 @@ function GuestsModal({
   const [c, setC] = useState(children);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={md.backdrop}>
+        <SheetBackdrop onPress={onClose} />
         <View style={md.sheet}>
           <View style={md.head}>
             <Text style={md.title}>Rooms & Guests</Text>
@@ -322,7 +339,7 @@ function GuestsModal({
 
 const make_guest = () => StyleSheet.create({
   apply: {
-    backgroundColor: T(C.orange, 'bg'),
+    backgroundColor: T(P.purple, 'bg'),
     borderRadius: 22,
     paddingVertical: 13,
     alignItems: 'center',
@@ -333,7 +350,37 @@ const make_guest = () => StyleSheet.create({
 });
 const use_guest = () => useThemedStyles(make_guest);
 
-function SearchCard({ onSearch }: { onSearch: (params: HotelSearchParams) => void }) {
+type StayType = 'any' | Hotel['propertyType'];
+
+const STAY_TYPES: { key: StayType; label: string }[] = [
+  { key: 'any', label: 'Any' },
+  { key: 'Hotel', label: 'Hotels' },
+  { key: 'Resort', label: 'Resorts' },
+  { key: 'Homestay', label: 'Homestays' },
+  { key: 'Apartment', label: 'Apartments' },
+];
+
+/** A city or stay type picked further down the page, put into the form; `n` changes on every tap. */
+interface FormPreset {
+  city?: string;
+  type?: StayType;
+  n: number;
+}
+
+function shortDate(d: Date) {
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+function dayYear(d: Date) {
+  return `${d.toLocaleDateString('en-IN', { weekday: 'short' })}, ${d.getFullYear()}`;
+}
+
+function SearchCard({
+  onSearch,
+  preset,
+}: {
+  onSearch: (params: HotelSearchParams) => void;
+  preset: FormPreset | null;
+}) {
   const sc = use_sc();
   const agentPrefill = useAgentPrefill();
   const today = new Date();
@@ -346,6 +393,8 @@ function SearchCard({ onSearch }: { onSearch: (params: HotelSearchParams) => voi
   const [rooms, setRooms] = useState(agentPrefill.rooms || 1);
   const [adults, setAdults] = useState(agentPrefill.adults || 2);
   const [children, setChildren] = useState(0);
+  const [stayType, setStayType] = useState<StayType>('any');
+  const [freeCancelOnly, setFreeCancelOnly] = useState(false);
   const [picker, setPicker] = useState<'city' | 'in' | 'out' | 'guests' | null>(null);
 
   // Sync with agent prefill
@@ -361,51 +410,116 @@ function SearchCard({ onSearch }: { onSearch: (params: HotelSearchParams) => voi
     }
   }, [agentPrefill.hotelCity, agentPrefill.rooms, agentPrefill.adults]);
 
+  useEffect(() => {
+    if (!preset) return;
+    if (preset.city) setCity(preset.city);
+    if (preset.type) setStayType(preset.type);
+  }, [preset?.n]);
+
   const nights = nightsBetween(new Date(checkIn), new Date(checkOut));
+  const guests = adults + children;
 
   return (
-    <View style={sc.card}>
-      <TouchableOpacity style={sc.field} onPress={() => setPicker('city')} activeOpacity={0.75}>
-        <MapPin size={18} color={T(C.green, 'fg')} />
+    <View style={sc.wrap}>
+      {/* Destination */}
+      <TouchableOpacity style={[sc.box, sc.row]} onPress={() => setPicker('city')} activeOpacity={0.75}>
         <View style={{ flex: 1 }}>
-          <Text style={sc.label}>City / Area / Hotel</Text>
-          <Text style={sc.value}>{city}</Text>
+          <Text style={sc.label}>CITY, AREA OR PROPERTY</Text>
+          <Text style={sc.big} numberOfLines={1}>{city}</Text>
+          <Text style={sc.sub}>India</Text>
         </View>
-        <ChevronRight size={16} color={T(C.gray, 'fg')} />
+        <MapPin size={18} color={T(P.purpleSoft, 'fg')} />
       </TouchableOpacity>
 
-      <View style={sc.datesRow}>
-        <TouchableOpacity style={[sc.field, { flex: 1 }]} onPress={() => setPicker('in')}>
-          <Calendar size={16} color={T(C.purpleLight, 'fg')} />
-          <View style={{ flex: 1 }}>
-            <Text style={sc.label}>Check-in</Text>
-            <Text style={sc.valueSm}>{formatDate(checkIn)}</Text>
-          </View>
-        </TouchableOpacity>
-        <View style={sc.nightsPill}>
-          <Text style={sc.nightsText}>
-            {nights}N
+      {/* Dates */}
+      <View style={sc.pairRow}>
+        <TouchableOpacity style={[sc.box, sc.half]} onPress={() => setPicker('in')} activeOpacity={0.75}>
+          <Text style={sc.label}>CHECK-IN</Text>
+          <Text style={sc.line} numberOfLines={1}>
+            <Text style={sc.big}>{shortDate(checkIn)}</Text>
+            <Text style={sc.light}>  {dayYear(checkIn)}</Text>
           </Text>
-        </View>
-        <TouchableOpacity style={[sc.field, { flex: 1 }]} onPress={() => setPicker('out')}>
-          <Calendar size={16} color={T(C.orange, 'fg')} />
-          <View style={{ flex: 1 }}>
-            <Text style={sc.label}>Check-out</Text>
-            <Text style={sc.valueSm}>{formatDate(checkOut)}</Text>
-          </View>
+          <Text style={sc.sub}>From 12:00 PM</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={[sc.box, sc.half, sc.halfRight]} onPress={() => setPicker('out')} activeOpacity={0.75}>
+          <Text style={sc.label}>CHECK-OUT</Text>
+          <Text style={sc.line} numberOfLines={1}>
+            <Text style={sc.big}>{shortDate(checkOut)}</Text>
+            <Text style={sc.light}>  {dayYear(checkOut)}</Text>
+          </Text>
+          <Text style={sc.sub}>Until 11:00 AM</Text>
+        </TouchableOpacity>
+        <View style={sc.nightsPill} pointerEvents="none">
+          <Moon size={10} color={T(P.purple, 'fg')} />
+          <Text style={sc.nightsText}>{nights}N</Text>
+        </View>
       </View>
 
-      <TouchableOpacity style={sc.field} onPress={() => setPicker('guests')} activeOpacity={0.75}>
-        <Users size={18} color={T(C.orange, 'fg')} />
+      {/* Rooms & guests */}
+      <TouchableOpacity style={[sc.box, sc.row, { marginTop: 8 }]} onPress={() => setPicker('guests')} activeOpacity={0.75}>
         <View style={{ flex: 1 }}>
-          <Text style={sc.label}>Rooms & Guests</Text>
-          <Text style={sc.value}>
-            {rooms} Room · {adults} Adults{children > 0 ? ` · ${children} Children` : ''}
+          <Text style={sc.label}>ROOMS & GUESTS</Text>
+          <Text style={sc.line} numberOfLines={1}>
+            <Text style={sc.big}>{rooms}</Text>
+            <Text style={sc.medium}> Room{rooms > 1 ? 's' : ''}, </Text>
+            <Text style={sc.big}>{guests}</Text>
+            <Text style={sc.medium}> Guest{guests > 1 ? 's' : ''}</Text>
+          </Text>
+          <Text style={sc.sub}>
+            {adults} Adult{adults > 1 ? 's' : ''}
+            {children > 0 ? ` · ${children} Child${children > 1 ? 'ren' : ''}` : ''}
           </Text>
         </View>
-        <ChevronRight size={16} color={T(C.gray, 'fg')} />
+        <ChevronRight size={18} color={T(P.purple, 'fg')} />
       </TouchableOpacity>
+
+      {/* Stay type */}
+      <Text style={sc.sectionLabel}>STAY TYPE</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={sc.chips} style={sc.chipScroller}>
+        {STAY_TYPES.map((t) => {
+          const active = stayType === t.key;
+          return (
+            <TouchableOpacity
+              key={t.key}
+              style={[sc.chip, active && sc.chipActive]}
+              activeOpacity={0.8}
+              onPress={() => setStayType(t.key)}
+            >
+              {active && <Check size={12} color={T(P.purple, 'fg')} strokeWidth={3} />}
+              <Text style={[sc.chipText, active && sc.chipTextActive]}>{t.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Free cancellation */}
+      <TouchableOpacity
+        style={sc.option}
+        activeOpacity={0.8}
+        onPress={() => setFreeCancelOnly(!freeCancelOnly)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: freeCancelOnly }}
+      >
+        <View style={[sc.checkbox, freeCancelOnly && sc.checkboxOn]}>
+          {freeCancelOnly && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={sc.optionTitle}>Free cancellation only</Text>
+          <Text style={sc.optionSub}>Show stays you can cancel for free before check-in.</Text>
+        </View>
+        <View style={sc.optionArt} pointerEvents="none">
+          <CalendarX size={18} color={T(P.purple, 'fg')} />
+        </View>
+      </TouchableOpacity>
+
+      {/* Consent */}
+      <View style={sc.consent}>
+        <Info size={14} color={T(C.textLight, 'fg')} />
+        <Text style={sc.consentText}>
+          Prices are per room per night, before taxes. Cancellation rules depend on the property and the room you
+          pick, and are shown before you pay.
+        </Text>
+      </View>
 
       <TouchableOpacity
         style={sc.searchBtn}
@@ -419,11 +533,24 @@ function SearchCard({ onSearch }: { onSearch: (params: HotelSearchParams) => voi
             rooms,
             adults,
             children,
+            propertyType: stayType === 'any' ? undefined : stayType,
+            freeCancelOnly: freeCancelOnly || undefined,
           })
         }
-      ><BrandFill />
-        <Search size={18} color={T(C.white, 'fg')} />
-        <Text style={sc.searchText}>Search Hotels</Text>
+      >
+        <LinearGradient
+          pointerEvents="none"
+          colors={['#8B5CF6', P.purpleDeep]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={StyleSheet.absoluteFill}
+        />
+        <BrandFill />
+        <View style={sc.searchArt} pointerEvents="none">
+          <Building2 size={40} color="rgba(255,255,255,0.12)" />
+        </View>
+        <Text style={sc.searchText}>SEARCH HOTELS</Text>
+        <ArrowRight size={17} color="#FFFFFF" strokeWidth={2.5} />
       </TouchableOpacity>
 
       <CityPicker
@@ -475,176 +602,410 @@ function SearchCard({ onSearch }: { onSearch: (params: HotelSearchParams) => voi
 }
 
 const make_sc = () => StyleSheet.create({
-  card: {
-    backgroundColor: T(C.white, 'bg'),
-    marginHorizontal: 14,
-    marginTop: dk(14, -34),
-    borderRadius: 18,
-    padding: 14,
+  wrap: { paddingHorizontal: 16, marginTop: 14 },
+  box: {
+    backgroundColor: T(P.lavender, 'bg'),
     borderWidth: 1,
-    borderColor: T(C.border, 'border'),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-    gap: 10,
-   ...glass(22), },
-  field: {
+    borderColor: T(P.lavenderBorder, 'border'),
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    ...glass(12),
+  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pairRow: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  half: { flex: 1 },
+  halfRight: { paddingLeft: 18 },
+  label: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: T(C.textLight, 'fg'), letterSpacing: 0.5 },
+  line: { marginTop: 3 },
+  big: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 3 },
+  medium: { fontSize: 14, fontFamily: 'Inter_400Regular', color: T(C.text, 'fg') },
+  light: { fontSize: 12, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  sub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
+  nightsPill: {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    marginLeft: -22,
+    marginTop: -12,
+    width: 44,
+    height: 24,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    backgroundColor: dk(N().surfaceHigh, C.white),
+    borderWidth: 1,
+    borderColor: T(P.lavenderBorder, 'border'),
+  },
+  nightsText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: T(P.purple, 'fg') },
+  sectionLabel: {
+    fontSize: 11,
+    fontFamily: 'Inter_600SemiBold',
+    color: T(C.textLight, 'fg'),
+    letterSpacing: 0.6,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  chipScroller: { marginHorizontal: -16 },
+  chips: { paddingHorizontal: 16, gap: 8 },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1,
+    borderColor: T(P.lavenderBorder, 'border'),
+    backgroundColor: T(P.lavender, 'bg'),
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  chipActive: { borderColor: T(P.purple, 'border'), borderWidth: 1.5 },
+  chipText: { fontSize: 12, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
+  chipTextActive: { color: T(P.purple, 'fg'), fontFamily: 'Inter_700Bold' },
+  option: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    borderWidth: 1,
-    borderColor: T(C.border, 'border'),
-    borderRadius: 14,
-    paddingHorizontal: 12,
+    marginTop: 14,
+    paddingLeft: 12,
+    paddingRight: 58,
     paddingVertical: 11,
-  },
-  label: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
-  value: { fontSize: 15, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 1 },
-  valueSm: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 1 },
-  datesRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  nightsPill: {
-    backgroundColor: T('#ECFDF5', 'bg'),
     borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
     borderWidth: 1,
-    borderColor: T('#A7F3D0', 'border'),
+    borderColor: T(P.lavenderBorder, 'border'),
+    backgroundColor: T(P.lavender, 'bg'),
+    ...glass(12),
   },
-  nightsText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: T(C.green, 'fg') },
+  optionArt: {
+    position: 'absolute',
+    right: 12,
+    top: '50%',
+    marginTop: -18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: T(P.lavenderIcon, 'bg'),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: T('#71717A', 'border'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: T(C.white, 'bg'),
+  },
+  checkboxOn: { backgroundColor: T(P.purple, 'bg'), borderColor: T(P.purple, 'border') },
+  optionTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  optionSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
+  consent: { flexDirection: 'row', gap: 8, marginTop: 14, paddingHorizontal: 4 },
+  consentText: { flex: 1, fontSize: 11, lineHeight: 16, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
   searchBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: T(C.orange, 'bg'),
-    borderRadius: 24,
-    paddingVertical: 14,
-    marginTop: 4,
-   overflow: 'hidden', },
-  searchText: { color: T(C.white, 'fg'), fontSize: 15, fontFamily: 'Inter_700Bold' },
+    marginTop: 14,
+    borderRadius: 12,
+    paddingVertical: 13,
+    overflow: 'hidden',
+    shadowColor: P.purple,
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  searchArt: { position: 'absolute', right: 16, top: 2 },
+  searchText: { color: '#FFFFFF', fontSize: 15, fontFamily: 'Inter_700Bold', letterSpacing: 0.6 },
 });
 const use_sc = () => useThemedStyles(make_sc);
 
-const POPULAR = [
-  { city: 'Goa', tag: 'Beaches', color: T(C.orange, 'fg'), bg: '#F5F0FF' },
-  { city: 'Manali', tag: 'Hills', color: '#1F7BFF', bg: '#EFF6FF' },
-  { city: 'Jaipur', tag: 'Heritage', color: '#DC2626', bg: '#FEE2E2' },
-  { city: 'Udaipur', tag: 'Lakes', color: T(C.green, 'fg'), bg: '#ECFDF5' },
-  { city: 'Mumbai', tag: 'City', color: T(C.purpleLight, 'fg'), bg: '#F5F3FF' },
+// ─── Popular destinations ────────────────────────────────────────────────────
+const DESTINATIONS = [
+  { city: 'Goa', tag: 'Beaches & resorts', photo: HOTEL_PHOTOS.beachResort },
+  { city: 'Udaipur', tag: 'Lake palaces', photo: HOTEL_PHOTOS.poolNight },
+  { city: 'Jaipur', tag: 'Heritage havelis', photo: HOTEL_PHOTOS.whiteResort },
+  { city: 'Manali', tag: 'Mountain stays', photo: HOTEL_PHOTOS.roomMountainView },
+  { city: 'Mumbai', tag: 'City hotels', photo: HOTEL_PHOTOS.cityPool },
+  { city: 'Delhi', tag: 'Business & budget', photo: HOTEL_PHOTOS.roomBusiness },
+];
+
+// ─── Stay types ──────────────────────────────────────────────────────────────
+const STAY_TILES: { type: StayType; title: string; sub: string; Icon: typeof Building2 }[] = [
+  { type: 'Resort', title: 'Resorts', sub: 'Pools, spas & beaches', Icon: TreePalm },
+  { type: 'Hotel', title: 'Hotels', sub: 'City & business stays', Icon: Building2 },
+  { type: 'Homestay', title: 'Homestays', sub: 'Local hosts, cosy rooms', Icon: House },
+  { type: 'Apartment', title: 'Apartments', sub: 'Space for families', Icon: Building },
+];
+
+// ─── Room styles (interiors) ─────────────────────────────────────────────────
+const ROOM_STYLES = [
+  { title: 'Deluxe King', sub: 'King bed · city view', photo: HOTEL_PHOTOS.roomDeluxe },
+  { title: 'Heritage Suite', sub: 'Carved wood · courtyard', photo: HOTEL_PHOTOS.roomHeritage },
+  { title: 'Luxury Loft', sub: 'Glass bath · lounge', photo: HOTEL_PHOTOS.roomLuxuryLoft },
+  { title: 'Family Twin', sub: 'Two beds · up to 4 guests', photo: HOTEL_PHOTOS.roomFamilyTwin },
+  { title: 'Valley View', sub: 'Open deck · mountain air', photo: HOTEL_PHOTOS.roomMountainView },
+  { title: 'Classic Room', sub: 'Sofa lounge · work desk', photo: HOTEL_PHOTOS.roomClassic },
+];
+
+const TRUST = [
+  { Icon: ShieldCheck, title: 'Verified stays', sub: 'Checked properties' },
+  { Icon: Zap, title: 'Instant confirm', sub: 'Voucher on booking' },
+  { Icon: Headphones, title: '24×7 support', sub: 'We are here to help' },
 ];
 
 export function HotelsScreen({
   onBack,
   onSearch,
+  onOpenHotel,
 }: {
   onBack: () => void;
   onSearch: (params: HotelSearchParams) => void;
+  /** Opens a featured hotel's page straight from this screen. */
+  onOpenHotel?: (hotel: Hotel) => void;
 }) {
-  const st = use_st(); const pop = use_pop(); const ofr = use_ofr(); const ts = use_ts();
+  const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
+  const [preset, setPreset] = useState<FormPreset | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  const putInForm = (p: Omit<FormPreset, 'n'>) => {
+    setPreset((prev) => ({ ...p, n: (prev?.n ?? 0) + 1 }));
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   return (
     <View style={st.root}>
-      <View style={[st.header, { paddingTop: topPad + 8 }]}>
-        <TouchableOpacity onPress={onBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-          <ArrowLeft size={24} color={T(C.text, 'fg')} />
+      {/* Top bar */}
+      <View style={[st.topBar, { paddingTop: topPad + 6 }]}>
+        <TouchableOpacity onPress={onBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} accessibilityLabel="Back">
+          <ChevronLeft size={24} color={T(C.text, 'fg')} />
         </TouchableOpacity>
-        <View>
-          <Text style={st.headerTitle}>Hotels</Text>
-          <Text style={st.headerSub}>Homes, resorts & stays across India</Text>
-        </View>
-        <View style={{ flex: 1 }} />
-        <View style={st.headerIcon}>
-          <Building2 size={18} color={T(C.green, 'fg')} />
-        </View>
+        <TouchableOpacity
+          onPress={() => router.push('/support')}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel="Help and support"
+        >
+          <CircleQuestionMark size={24} color={T(C.text, 'fg')} strokeWidth={1.8} />
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={st.content}>
-        <View style={st.bannerWrap}>
-          <Image
-            source={require('../../assets/images/travel-hotels.jpg')}
-            style={st.bannerImage}
-            resizeMode="cover"
-          />
-          <View style={st.bannerOverlay} />
-          <BannerScrim />
-          <View style={st.bannerCaption}>
-            <Text style={st.bannerTitle}>Book Hotels</Text>
-            <Text style={st.bannerSub}>Budget to 5-star · Free cancellation options</Text>
-          </View>
-        </View>
-
-        <SearchCard onSearch={onSearch} />
-
-        <View style={pop.section}>
-          <Text style={pop.heading}>Popular destinations</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={pop.row}>
-            {POPULAR.map((d) => (
-              <TouchableOpacity
-                key={d.city}
-                style={pop.card}
-                activeOpacity={0.85}
-                onPress={() =>
-                  onSearch({
-                    city: d.city,
-                    checkIn: formatDate(new Date()),
-                    checkOut: formatDate(
-                      (() => {
-                        const t = new Date();
-                        t.setDate(t.getDate() + 1);
-                        return t;
-                      })(),
-                    ),
-                    nights: 1,
-                    rooms: 1,
-                    adults: 2,
-                    children: 0,
-                  })
-                }
-              >
-                <View style={[pop.icon, { backgroundColor: T(d.bg, 'bg') }]}>
-                  <MapPin size={16} color={T(d.color, 'fg')} />
-                </View>
-                <Text style={pop.city}>{d.city}</Text>
-                <Text style={pop.tag}>{d.tag}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        <View style={ofr.container}><BrandFill />
-          <View style={ofr.iconBox}>
-            <Percent size={26} color={T('#FCD34D', 'fg')} />
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={st.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Title */}
+        <View style={st.hero}>
+          <View style={st.heroIcon}>
+            <LinearGradient
+              pointerEvents="none"
+              colors={['#8B5CF6', P.purpleDeep]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
+            <Building2 size={24} color="#FFFFFF" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={ofr.headline}>Save up to 40% on hotel stays</Text>
-            <View style={ofr.codePill}>
-              <Tag size={10} color={T(C.white, 'fg')} />
-              <Text style={ofr.codeText}> Use Code: STAY40</Text>
+            <Text style={st.heroTitle}>Hotels</Text>
+            <View style={st.poweredRow}>
+              <Text style={st.poweredBy}>Powered By</Text>
+              <Image source={WISHME_MARK} style={st.mark} resizeMode="contain" />
+              <Text style={st.brand}>WISHME</Text>
             </View>
           </View>
-          <TouchableOpacity style={ofr.btn}><BrandFill />
-            <Text style={ofr.btnText}>Claim</Text>
+        </View>
+
+        <SearchCard onSearch={onSearch} preset={preset} />
+
+        {/* Trust */}
+        <View style={st.trust}>
+          {TRUST.map(({ Icon, title, sub }, i) => (
+            <React.Fragment key={title}>
+              {i > 0 && <View style={st.trustDivider} />}
+              <View style={st.trustItem}>
+                <View style={st.trustIcon}>
+                  <Icon size={15} color={T(P.purple, 'fg')} />
+                </View>
+                <Text style={st.trustTitle}>{title}</Text>
+                <Text style={st.trustSub}>{sub}</Text>
+              </View>
+            </React.Fragment>
+          ))}
+        </View>
+
+        {/* Popular destinations */}
+        <Text style={st.heading}>Popular destinations</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.hRow}>
+          {DESTINATIONS.map((d) => (
+            <TouchableOpacity key={d.city} style={st.destCard} activeOpacity={0.88} onPress={() => putInForm({ city: d.city })}>
+              <Image source={d.photo} style={st.destImg} resizeMode="cover" />
+              <LinearGradient
+                pointerEvents="none"
+                colors={['transparent', 'rgba(0,0,0,0.78)']}
+                start={{ x: 0, y: 0.35 }}
+                end={{ x: 0, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={st.destCaption}>
+                <Text style={st.destCity}>{d.city}</Text>
+                <Text style={st.destTag} numberOfLines={1}>{d.tag}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Featured stays */}
+        <View style={st.headRow}>
+          <Text style={[st.heading, { marginTop: 0, paddingHorizontal: 0 }]}>Featured stays</Text>
+          <Text style={st.headHint}>Rooms & photos</Text>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.hRow}>
+          {HOTELS.map((h) => {
+            const gallery = hotelGallery(h);
+            const off = Math.round(((h.originalPrice - h.price) / h.originalPrice) * 100);
+            return (
+              <TouchableOpacity
+                key={h.id}
+                style={st.stayCard}
+                activeOpacity={0.9}
+                onPress={() => (onOpenHotel ? onOpenHotel(h) : putInForm({ city: h.city }))}
+              >
+                <View style={st.stayPhoto}>
+                  <Image source={gallery[0]} style={st.stayImg} resizeMode="cover" />
+                  <View style={st.typeTag}>
+                    <Text style={st.typeTagText}>{h.propertyType.toUpperCase()}</Text>
+                  </View>
+                  {off > 0 && (
+                    <View style={st.offTag}>
+                      <Text style={st.offTagText}>{off}% OFF</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={st.thumbRow}>
+                  {gallery.slice(1, 4).map((src, i) => (
+                    <Image key={i} source={src} style={st.thumb} resizeMode="cover" />
+                  ))}
+                  {gallery.length > 4 && (
+                    <View style={[st.thumb, st.thumbMore]}>
+                      <Text style={st.thumbMoreText}>+{gallery.length - 4}</Text>
+                    </View>
+                  )}
+                </View>
+                <View style={st.stayBody}>
+                  <View style={st.stayTop}>
+                    <Text style={st.stayName} numberOfLines={1}>{h.name}</Text>
+                    <View style={st.ratingPill}>
+                      <Star size={9} color="#FFFFFF" fill="#FFFFFF" />
+                      <Text style={st.ratingText}>{h.rating}</Text>
+                    </View>
+                  </View>
+                  <View style={st.locRow}>
+                    <MapPin size={11} color={T(C.textLight, 'fg')} />
+                    <Text style={st.loc} numberOfLines={1}>{h.area}, {h.city}</Text>
+                  </View>
+                  <View style={st.amenRow}>
+                    {h.amenities.slice(0, 3).map((a) => (
+                      <Text key={a} style={st.amen}>{a}</Text>
+                    ))}
+                  </View>
+                  <View style={st.priceRow}>
+                    <Text style={st.oldPrice}>₹{h.originalPrice.toLocaleString('en-IN')}</Text>
+                    <Text style={st.price}>₹{h.price.toLocaleString('en-IN')}</Text>
+                    <Text style={st.perNight}>/night</Text>
+                  </View>
+                  {h.freeCancel && <Text style={st.freeCancel}>Free cancellation</Text>}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+
+        {/* Stay types */}
+        <Text style={st.heading}>Browse by stay type</Text>
+        <View style={st.grid}>
+          {STAY_TILES.map((t) => (
+            <TouchableOpacity key={t.title} style={st.tile} activeOpacity={0.88} onPress={() => putInForm({ type: t.type })}>
+              <View style={st.tileIcon}>
+                <t.Icon size={18} color={T(P.purple, 'fg')} />
+              </View>
+              <View style={st.tileBody}>
+                <Text style={st.tileTitle}>{t.title}</Text>
+                <Text style={st.tileSub} numberOfLines={1}>{t.sub}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Room styles */}
+        <Text style={st.heading}>Rooms you'll love</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={st.hRow}>
+          {ROOM_STYLES.map((r) => (
+            <View key={r.title} style={st.roomCard}>
+              <Image source={r.photo} style={st.roomImg} resizeMode="cover" />
+              <Text style={st.roomTitle}>{r.title}</Text>
+              <Text style={st.roomSub} numberOfLines={1}>{r.sub}</Text>
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Offer */}
+        <Text style={st.heading}>Offers for you</Text>
+        <View style={st.offer}>
+          <View style={st.offerPhoto}>
+            <Image source={HOTEL_PHOTOS.infinityDeck} style={st.offerImg} resizeMode="cover" />
+            <LinearGradient
+              pointerEvents="none"
+              colors={['transparent', 'rgba(0,0,0,0.25)', 'rgba(0,0,0,0.82)']}
+              locations={[0.25, 0.5, 1]}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={st.offerPill}>
+              <Text style={st.offerPillText}>HOTELS</Text>
+            </View>
+            <View style={st.offerCaption}>
+              <View style={st.offerKicker}>
+                <Text style={st.offerKickerText}>ON HOTEL STAYS:</Text>
+              </View>
+              <Text style={st.offerTitle}>SAVE UP TO 40%*</Text>
+              <Text style={st.offerSub}>on resorts, villas and city hotels</Text>
+            </View>
+          </View>
+          <View style={st.offerTerms}>
+            <Tag size={14} color={T(C.textLight, 'fg')} />
+            <View style={st.offerDivider} />
+            <Text style={st.offerTermsText} numberOfLines={1}>Use code STAY40 at checkout · T&C apply</Text>
+          </View>
+          <TouchableOpacity
+            style={st.offerFooter}
+            activeOpacity={0.8}
+            onPress={() => scrollRef.current?.scrollTo({ y: 0, animated: true })}
+          >
+            <Text style={st.offerBook}>Book Now</Text>
+            <ChevronRight size={20} color={T(C.blue, 'fg')} strokeWidth={2.5} />
           </TouchableOpacity>
         </View>
 
-        <View style={ts.container}>
-          {[
-            { Icon: ShieldCheck, color: T(C.green, 'fg'), title: 'Best Price', sub: 'Deal promise' },
-            { Icon: Star, color: T('#FBBF24', 'fg'), title: 'Top Rated', sub: 'Verified stays' },
-            { Icon: Zap, color: T('#25DFFF', 'fg'), title: 'Instant Book', sub: 'Quick confirm' },
-            { Icon: Headphones, color: T(C.green, 'fg'), title: '24x7 Help', sub: 'Trip support' },
-          ].map((b, i, arr) => (
-            <View key={b.title} style={[ts.item, i < arr.length - 1 && ts.itemBorder]}>
-              <b.Icon size={20} color={T(b.color, 'fg')} />
-              <Text style={ts.title}>{b.title}</Text>
-              <Text style={ts.sub}>{b.sub}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Help */}
+        <TouchableOpacity style={st.helpRow} activeOpacity={0.8} onPress={() => router.push('/support')}>
+          <View style={st.trustIcon}>
+            <Headphones size={16} color={T(P.purple, 'fg')} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={st.helpTitle}>Need help with a stay?</Text>
+            <Text style={st.helpSub}>Changes, cancellations and refunds — we're here 24×7</Text>
+          </View>
+          <ChevronRight size={18} color={T(C.textLight, 'fg')} />
+        </TouchableOpacity>
 
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -652,145 +1013,246 @@ export function HotelsScreen({
   );
 }
 
-const make_pop = () => StyleSheet.create({
-  section: { marginTop: 20 },
-  heading: {
-    fontSize: 16,
-    fontFamily: 'Inter_700Bold',
-    color: T(C.text, 'fg'),
-    paddingHorizontal: 14,
-    marginBottom: 10,
-  },
-  row: { paddingHorizontal: 14, gap: 10 },
-  card: {
-    width: 92,
-    backgroundColor: T(C.white, 'bg'),
-    borderRadius: 14,
-    paddingVertical: 12,
+const WISHME_MARK = require('../../assets/images/wishme-mark.png');
+
+const TILE_W = (SCREEN_WIDTH - 32 - 10) / 2;
+
+const make_st = () => StyleSheet.create({
+  root: { flex: 1, backgroundColor: T(C.white, 'page') },
+  topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: T(C.border, 'border'),
-   ...glass(18), },
-  icon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingBottom: 6,
+  },
+  content: { paddingBottom: 40 },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, marginTop: 4 },
+  heroIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
   },
-  city: { fontSize: 12, fontFamily: 'Inter_600SemiBold', color: T(C.text, 'fg') },
-  tag: { fontSize: 9, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
-});
-const use_pop = () => useThemedStyles(make_pop);
-
-const make_ofr = () => StyleSheet.create({
-  container: {
-    backgroundColor: T(C.purple, 'bg'),
-    marginHorizontal: 14,
+  heroTitle: { fontSize: 22, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  poweredRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+  poweredBy: { fontSize: 12, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginRight: 6 },
+  mark: { width: 16, height: 16, marginRight: 3 },
+  brand: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(P.purple, 'fg'), letterSpacing: 0.5 },
+  trust: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: T(P.lavenderBorder, 'border'),
+    ...glass(12),
+  },
+  trustItem: { flex: 1, alignItems: 'center' },
+  trustDivider: { width: 1, backgroundColor: T(P.lavenderBorder, 'bg'), marginVertical: 4 },
+  trustIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: T(P.lavenderIcon, 'bg'),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  trustTitle: { fontSize: 11, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), textAlign: 'center' },
+  trustSub: { fontSize: 9.5, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), textAlign: 'center', marginTop: 1 },
+  heading: {
+    fontSize: 14,
+    fontFamily: 'Inter_700Bold',
+    color: T(C.text, 'fg'),
+    paddingHorizontal: 16,
     marginTop: 20,
-    borderRadius: 16,
-    padding: 14,
+    marginBottom: 10,
+  },
+  headRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  headHint: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  hRow: { paddingHorizontal: 16, gap: 10 },
+  destCard: {
+    width: 120,
+    height: 150,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: T(C.lightGray, 'bg'),
+  },
+  destImg: { position: 'absolute', top: 0, left: 0, width: 120, height: 150 },
+  destCaption: { position: 'absolute', left: 10, right: 8, bottom: 9 },
+  destCity: { fontSize: 14, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  destTag: { fontSize: 10, fontFamily: 'Inter_500Medium', color: 'rgba(255,255,255,0.88)', marginTop: 1 },
+  stayCard: {
+    width: 240,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: dk(N().cardBorder, P.lavenderBorder),
+    backgroundColor: dk(N().surface, C.white),
+  },
+  stayPhoto: { width: 240, height: 130, overflow: 'hidden', backgroundColor: T(C.lightGray, 'bg') },
+  stayImg: { position: 'absolute', top: 0, left: 0, width: 240, height: 130 },
+  typeTag: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  typeTagText: { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#111827', letterSpacing: 0.5 },
+  offTag: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#16A34A',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  offTagText: { fontSize: 9, fontFamily: 'Inter_700Bold', color: '#FFFFFF', letterSpacing: 0.3 },
+  thumbRow: { flexDirection: 'row', gap: 4, paddingHorizontal: 8, paddingTop: 8 },
+  thumb: { flex: 1, height: 44, borderRadius: 6, backgroundColor: T(C.lightGray, 'bg') },
+  thumbMore: { alignItems: 'center', justifyContent: 'center', backgroundColor: T(P.lavenderIcon, 'bg') },
+  thumbMoreText: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(P.purple, 'fg') },
+  stayBody: { padding: 10, backgroundColor: dk(N().surface, C.white) },
+  stayTop: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  stayName: { flex: 1, fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  ratingPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    backgroundColor: '#16A34A',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  ratingText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
+  locRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
+  loc: { flex: 1, fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  amenRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
+  amen: {
+    fontSize: 9.5,
+    fontFamily: 'Inter_500Medium',
+    color: dk(N().textHi, P.purple),
+    backgroundColor: dk(N().surfaceHigh, P.lavender),
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    overflow: 'hidden',
+  },
+  priceRow: { flexDirection: 'row', alignItems: 'baseline', gap: 5, marginTop: 8 },
+  oldPrice: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), textDecorationLine: 'line-through' },
+  price: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  perNight: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg') },
+  freeCancel: { fontSize: 10, fontFamily: 'Inter_600SemiBold', color: T(C.greenDark, 'fg'), marginTop: 3 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16 },
+  tile: {
+    width: TILE_W,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-   overflow: 'hidden', },
-  iconBox: {
-    width: 44,
-    height: 44,
+    padding: 10,
     borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    borderWidth: 1,
+    borderColor: dk(N().cardBorder, P.lavenderBorder),
+    backgroundColor: dk(N().surface, P.lavender),
+  },
+  tileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: T(P.lavenderIcon, 'bg'),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headline: { color: T(C.white, 'fg'), fontSize: 13, fontFamily: 'Inter_700Bold' },
-  codePill: {
+  tileBody: { flex: 1 },
+  tileTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  tileSub: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
+  roomCard: { width: 150 },
+  roomImg: { width: 150, height: 110, borderRadius: 12, backgroundColor: T(C.lightGray, 'bg') },
+  roomTitle: { fontSize: 12, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 6 },
+  roomSub: { fontSize: 10.5, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
+  offer: {
+    marginHorizontal: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: T(C.white, 'bg'),
+    borderWidth: 1,
+    borderColor: T(C.border, 'border'),
+    ...glass(16),
+  },
+  offerPhoto: { height: Math.round((SCREEN_WIDTH - 32) * 0.46), overflow: 'hidden', backgroundColor: T(C.dark, 'bg') },
+  offerImg: { position: 'absolute', top: 0, left: 0, width: SCREEN_WIDTH - 32, height: Math.round((SCREEN_WIDTH - 32) * 0.46) },
+  offerPill: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  offerPillText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#111827', letterSpacing: 0.6 },
+  offerCaption: { position: 'absolute', left: 0, right: 12, bottom: 10 },
+  offerKicker: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#FFFFFF',
+    paddingLeft: 12,
+    paddingRight: 14,
+    paddingVertical: 3,
+    marginBottom: 5,
+  },
+  offerKickerText: { fontSize: 11, fontFamily: 'Inter_700Bold', color: '#111827', letterSpacing: 0.2 },
+  offerTitle: { color: '#FFFFFF', fontSize: 24, fontFamily: 'Inter_700Bold', paddingLeft: 12, letterSpacing: 0.2 },
+  offerSub: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontFamily: 'Inter_500Medium', paddingLeft: 12, marginTop: 1 },
+  offerTerms: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    alignSelf: 'flex-start',
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-    borderStyle: 'dashed',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderBottomWidth: 1,
+    borderBottomColor: T(C.lightGray, 'border'),
   },
-  codeText: { color: T(C.white, 'fg'), fontSize: 10, fontFamily: 'Inter_600SemiBold' },
-  btn: {
-    backgroundColor: T(C.orange, 'bg'),
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-   overflow: 'hidden', },
-  btnText: { color: T(C.white, 'fg'), fontSize: 12, fontFamily: 'Inter_600SemiBold' },
-});
-const use_ofr = () => useThemedStyles(make_ofr);
-
-const make_ts = () => StyleSheet.create({
-  container: {
-    backgroundColor: T(C.darkBg, 'bg'),
-    marginTop: 20,
-    marginHorizontal: 14,
-    borderRadius: 16,
+  offerDivider: { width: 1, height: 18, backgroundColor: T(C.border, 'bg') },
+  offerTermsText: { flex: 1, fontSize: 11, fontFamily: 'Inter_500Medium', color: T(C.textLight, 'fg') },
+  offerFooter: {
     flexDirection: 'row',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
   },
-  item: { flex: 1, alignItems: 'center', gap: 5, paddingHorizontal: 4 },
-  itemBorder: { borderRightWidth: 1, borderRightColor: 'rgba(255,255,255,0.08)' },
-  title: { color: T(C.white, 'fg'), fontSize: 10.5, fontFamily: 'Inter_600SemiBold', textAlign: 'center' },
-  sub: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 8,
-    fontFamily: 'Inter_400Regular',
-    textAlign: 'center',
-  },
-});
-const use_ts = () => useThemedStyles(make_ts);
-
-const make_st = () => StyleSheet.create({
-  root: { flex: 1, backgroundColor: T(C.pageBg, 'page') },
-  header: {
+  offerBook: { fontSize: 16, fontFamily: 'Inter_700Bold', color: T(C.blue, 'fg') },
+  helpRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingHorizontal: 14,
-    paddingBottom: 12,
-    backgroundColor: T(C.white, 'page'),
-    borderBottomWidth: 1,
-    borderBottomColor: T(C.border, 'page'),
-  },
-  headerTitle: { fontSize: 18, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
-  headerSub: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
-  headerIcon: {
-    width: 36,
-    height: 36,
+    marginHorizontal: 16,
+    marginTop: 20,
+    padding: 12,
     borderRadius: 12,
-    backgroundColor: T('#ECFDF5', 'bg'),
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: T(P.lavenderBorder, 'border'),
+    backgroundColor: T(P.lavender, 'bg'),
+    ...glass(12),
   },
-  content: { paddingBottom: 40 },
-  bannerWrap: { height: 170, backgroundColor: T(C.lightGray, 'bg'), position: 'relative', ...{ marginHorizontal: dk(14, 0), marginTop: dk(10, 0), borderRadius: dk(22, 0), borderWidth: dk(1.5, 0), borderColor: N().cardBorder, overflow: 'hidden' } },
-  bannerImage: { width: '100%', height: '100%' },
-  bannerOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(17,24,39,0.40)' },
-  bannerCaption: { position: 'absolute', left: 16, top: 22 },
-  bannerTitle: {
-    color: T(C.white, 'fg'),
-    fontSize: 22,
-    fontFamily: 'Inter_700Bold',
-    textShadowColor: 'rgba(0,0,0,0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 4,
-  },
-  bannerSub: {
-    color: 'rgba(255,255,255,0.9)',
-    fontSize: 12,
-    fontFamily: 'Inter_500Medium',
-    marginTop: 3,
-  },
+  helpTitle: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg') },
+  helpSub: { fontSize: 11, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 2 },
 });
 const use_st = () => useThemedStyles(make_st);

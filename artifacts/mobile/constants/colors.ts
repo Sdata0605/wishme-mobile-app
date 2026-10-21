@@ -1,5 +1,13 @@
 import { buildNeon, type Neon } from '@/constants/neon';
 
+export const COLORS = {
+  background: '#1B0829',
+  surface: '#260D38',
+  primary: '#B42BFF',
+  text: '#FFFFFF',
+  secondaryText: '#D0C4DA',
+};
+
 /**
  * The app's colours now come from the MyAssistant "Daylight" design system (constants/neon.ts).
  * The names below are the app's existing ones, remapped, so every screen that already reads

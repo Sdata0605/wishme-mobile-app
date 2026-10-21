@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -38,6 +38,7 @@ import { T, useThemedStyles, glass } from './themed';
 import { BrandFill } from './BrandFill';
 import { DemoFareNotice } from './DemoFareNotice';
 import { isDemoTrace } from '@/services/tboDemo';
+import type { FlightLeg } from './FlightsScreen';
 
 export interface FlightSearchQuery {
   origin: string;
@@ -1316,6 +1317,7 @@ export function FlightResultsScreen({
   travellers,
   cabin,
   search,
+  legs,
   accessToken,
   onBack,
   onViewPrices,
@@ -1326,6 +1328,8 @@ export function FlightResultsScreen({
   travellers: string;
   cabin: string;
   search?: FlightSearchQuery;
+  /** Multi-city: every flight of the trip. Each gets a tab, and the results shown are for the selected one. */
+  legs?: FlightLeg[];
   accessToken?: string | null;
   onBack: () => void;
   onViewPrices: (flight: FlightResult) => void;
@@ -1343,9 +1347,20 @@ export function FlightResultsScreen({
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [reloadKey, setReloadKey] = useState(0);
+  const [legIdx, setLegIdx] = useState(0);
+  const multiCity = !!legs && legs.length > 1;
+  const leg = multiCity ? legs[Math.min(legIdx, legs.length - 1)] : undefined;
+  const shown = leg ?? { from, to, dateLabel };
+  const legSearch = useMemo<FlightSearchQuery | undefined>(
+    () =>
+      search && leg
+        ? { ...search, origin: leg.fromCode, destination: leg.toCode, departDate: leg.departDate, returnDate: undefined }
+        : search,
+    [search, leg],
+  );
 
   useEffect(() => {
-    if (!search) {
+    if (!legSearch) {
       setFlights([]);
       setLoading(false);
       setLoadError('Start a new search to see live fares.');
@@ -1356,7 +1371,7 @@ export function FlightResultsScreen({
     setLoading(true);
     setLoadError('');
 
-    tboSearchFlights(search, accessToken)
+    tboSearchFlights(legSearch, accessToken)
       .then((res) => {
         if (cancelled) return;
         setFlights(res.outbound as FlightResult[]);
@@ -1374,7 +1389,7 @@ export function FlightResultsScreen({
       });
 
     return () => { cancelled = true; };
-  }, [search, accessToken, reloadKey]);
+  }, [legSearch, accessToken, reloadKey]);
 
   const SORT_OPTIONS = [
     'Price: Low to High',
@@ -1423,12 +1438,13 @@ export function FlightResultsScreen({
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <View style={rs.routeRow}>
-            <Text style={rs.routeCity}>{from}</Text>
+            <Text style={rs.routeCity}>{shown.from}</Text>
             <Plane size={13} color={T(C.blue, 'fg')} style={{ marginHorizontal: 6 }} />
-            <Text style={rs.routeCity}>{to}</Text>
+            <Text style={rs.routeCity}>{shown.to}</Text>
           </View>
           <Text style={rs.routeMeta}>
-            {dateLabel} · {travellers} · {cabin}
+            {multiCity ? `Flight ${legIdx + 1} of ${legs!.length} · ` : ''}
+            {shown.dateLabel} · {travellers} · {cabin}
           </Text>
         </View>
         <TouchableOpacity
@@ -1445,6 +1461,36 @@ export function FlightResultsScreen({
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Multi-city: one tab per flight */}
+      {multiCity && (
+        <View style={rs.legBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={rs.legTabs}>
+            {legs!.map((l, i) => {
+              const active = i === legIdx;
+              return (
+                <TouchableOpacity
+                  key={i}
+                  style={[rs.legTab, active && rs.legTabActive]}
+                  activeOpacity={0.8}
+                  onPress={() => setLegIdx(i)}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                >
+                  <Text style={[rs.legTabNum, active && rs.legTabTextActive]}>FLIGHT {i + 1}</Text>
+                  <Text style={[rs.legTabRoute, active && rs.legTabTextActive]}>
+                    {l.fromCode} → {l.toCode}
+                  </Text>
+                  <Text style={[rs.legTabDate, active && rs.legTabTextActive]}>{l.dateLabel}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <Text style={rs.legNote}>
+            Each flight of a multi-city trip is booked on its own. Pick a flight for this leg, then come back for the next.
+          </Text>
+        </View>
+      )}
 
       {/* Fare type bar */}
       <FareTypeBar selected={selectedFare} onSelect={setSelectedFare} />
@@ -1618,6 +1664,34 @@ const make_rs = () => StyleSheet.create({
   sortOptionText: { fontSize: 13, fontFamily: 'Inter_500Medium', color: T(C.text, 'fg') },
   sortOptionTextActive: { color: T(C.blue, 'fg'), fontFamily: 'Inter_700Bold' },
   list: { paddingTop: 12 },
+  legBar: {
+    paddingTop: 10,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: T(C.border, 'border'),
+  },
+  legTabs: { paddingHorizontal: 14, gap: 8 },
+  legTab: {
+    borderWidth: 1,
+    borderColor: T(C.border, 'border'),
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    backgroundColor: T(C.white, 'bg'),
+  },
+  legTabActive: { backgroundColor: T('#7C3AED', 'bg'), borderColor: T('#7C3AED', 'border') },
+  legTabNum: { fontSize: 9, fontFamily: 'Inter_700Bold', color: T(C.textLight, 'fg'), letterSpacing: 0.5 },
+  legTabRoute: { fontSize: 13, fontFamily: 'Inter_700Bold', color: T(C.text, 'fg'), marginTop: 1 },
+  legTabDate: { fontSize: 10, fontFamily: 'Inter_400Regular', color: T(C.textLight, 'fg'), marginTop: 1 },
+  legTabTextActive: { color: '#FFFFFF' },
+  legNote: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontFamily: 'Inter_400Regular',
+    color: T(C.textLight, 'fg'),
+    paddingHorizontal: 14,
+    marginTop: 7,
+  },
   resultHead: {
     flexDirection: 'row',
     alignItems: 'center',

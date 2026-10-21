@@ -1,3 +1,4 @@
+import { SheetBackdrop } from '@/components/SheetBackdrop';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -262,7 +263,8 @@ export default function CelebritiesScreen() {
       )}
 
       <Modal visible={sortOpen} transparent animationType="fade" onRequestClose={() => setSortOpen(false)} statusBarTranslucent>
-        <Pressable style={s.backdrop} onPress={() => setSortOpen(false)}>
+        <View style={s.backdrop}>
+          <SheetBackdrop onPress={() => setSortOpen(false)} />
           <Pressable onPress={() => {}} style={[s.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 12 }]}>
             <Text style={[s.sheetTitle, { color: colors.foreground }]}>Sort by</Text>
             {SORTS.map(o => {
@@ -279,7 +281,7 @@ export default function CelebritiesScreen() {
               );
             })}
           </Pressable>
-        </Pressable>
+        </View>
       </Modal>
     </View></AmbientBackground>
   );
@@ -303,7 +305,7 @@ const s = StyleSheet.create({
   stateBody: { fontSize: 14, fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20 },
   stateBtn: { paddingHorizontal: 24, height: 46, borderRadius: 23, alignItems: 'center', justifyContent: 'center', marginTop: 8 },
   stateBtnText: { color: '#fff', fontSize: 14, fontFamily: 'Inter_700Bold' },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16, gap: 8 },
   sheetTitle: { fontSize: 17, fontFamily: 'Inter_700Bold', marginBottom: 6 },
   sortRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', height: 50, paddingHorizontal: 14, borderRadius: 14, borderWidth: 1.2 },

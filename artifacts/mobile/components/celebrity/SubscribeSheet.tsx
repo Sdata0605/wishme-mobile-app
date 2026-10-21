@@ -1,3 +1,4 @@
+import { SheetBackdrop } from '@/components/SheetBackdrop';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -113,7 +114,8 @@ export function SubscribeSheet({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <Pressable style={s.backdrop} onPress={onClose} accessibilityLabel="Close">
+      <View style={s.backdrop}>
+        <SheetBackdrop onPress={onClose} />
         <Animated.View style={{ transform: [{ translateY }] }}>
           <Pressable onPress={() => {}} style={[s.sheet, { backgroundColor: colors.background, paddingBottom: insets.bottom + 16 }]}>
             <View style={[s.handle, { backgroundColor: colors.border }]} />
@@ -216,13 +218,13 @@ export function SubscribeSheet({
             </Animated.View>
           </Pressable>
         </Animated.View>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
 
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 26, borderTopRightRadius: 26, paddingHorizontal: 18, paddingTop: 10, maxHeight: '88%' },
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: 12 },
   head: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14 },

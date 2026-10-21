@@ -487,19 +487,22 @@ export function BusResultsScreen({
   from,
   to,
   dateLabel,
+  busType,
   onBack,
   onSelectBus,
 }: {
   from: string;
   to: string;
   dateLabel: string;
+  /** The bus type picked on the search screen; it starts as the selected filter. */
+  busType?: 'ac' | 'sleeper' | 'seater' | 'luxury';
   onBack: () => void;
   onSelectBus: (bus: BusTicket) => void;
 }) {
   const st = use_st();
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
-  const [filter, setFilter] = useState<FilterKey>('all');
+  const [filter, setFilter] = useState<FilterKey>(busType ?? 'all');
 
   const buses = useMemo(() => BUSES.filter((b) => matchesFilter(b, filter)), [filter]);
 

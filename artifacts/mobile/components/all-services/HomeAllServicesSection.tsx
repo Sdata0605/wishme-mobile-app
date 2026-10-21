@@ -12,6 +12,7 @@ import {
   Bus,
   Car,
   ChevronRight,
+  Landmark,
   CreditCard,
   Droplet,
   Flame,
@@ -34,7 +35,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type HomeAction =
   | { type: 'bill'; kind: BillKind }
-  | { type: 'screen'; view: ServiceView };
+  | { type: 'screen'; view: ServiceView }
+  | { type: 'route'; href: string };
 
 interface ServiceItem {
   name: string;
@@ -57,12 +59,18 @@ const HOME_SERVICES: ServiceItem[] = [
   { name: 'Broadband', Icon: Wifi, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'bill', kind: 'broadband' } },
   { name: 'Credit Card', Icon: CreditCard, color: T(C.orange, 'fg'), bgColor: '#F5F0FF', action: { type: 'bill', kind: 'creditCard' } },
   { name: 'Loan EMI', Icon: Banknote, color: T(C.green, 'fg'), bgColor: '#ECFDF5', action: { type: 'bill', kind: 'loanEmi' } },
-  { name: 'Insurance', Icon: ShieldCheck, color: T(C.green, 'fg'), bgColor: '#ECFDF5', action: { type: 'bill', kind: 'insurance' } },
+  { name: 'Insurance', Icon: ShieldCheck, color: T(C.green, 'fg'), bgColor: '#ECFDF5', action: { type: 'route', href: '/insurance' } },
+  { name: 'Pay to Number', Icon: Smartphone, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'route', href: '/pay-mobile' } },
+  { name: 'UPI / Bank', Icon: Landmark, color: T(C.purple, 'fg'), bgColor: '#F5F3FF', action: { type: 'route', href: '/pay-upi' } },
 ];
 
 const COL_W = (SCREEN_WIDTH - 48) / 6;
 
 function pushService(action: HomeAction) {
+  if (action.type === 'route') {
+    router.push(action.href as Href);
+    return;
+  }
   if (action.type === 'bill') {
     router.push({
       pathname: '/services',

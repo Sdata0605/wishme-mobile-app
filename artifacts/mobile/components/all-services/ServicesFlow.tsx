@@ -11,7 +11,7 @@ import { FlightPassengerScreen, type FlightContactInfo, type FlightPassenger } f
 import { FlightAddonsScreen, type SelectedFlightAddons } from './FlightAddonsScreen';
 import { FlightReviewAndPayScreen } from './FlightReviewAndPayScreen';
 import { FlightSuccessScreen } from './FlightSuccessScreen';
-import { BusTicketsScreen } from './BusTicketsScreen';
+import { BusTicketsScreen, type BusType } from './BusTicketsScreen';
 import { BusResultsScreen, type BusTicket } from './BusResultsScreen';
 import { SeatSelectionScreen, type Seat } from './SeatSelectionScreen';
 import { BoardingPointsScreen, type StopPoint } from './BoardingPointsScreen';
@@ -89,7 +89,7 @@ const DEFAULT_BACK: Partial<Record<ServiceView, ServiceView | 'hub'>> = {
 
 const CABIN_CLASS = { economy: 2, premium_economy: 3, business: 4, first: 6 } as const;
 const CABIN_LABEL = {
-  economy: 'Economy / Premium Economy',
+  economy: 'Economy',
   premium_economy: 'Premium Economy',
   business: 'Business',
   first: 'First',
@@ -133,7 +133,7 @@ export function ServicesFlow({
     to: '',
     dateLabel: '',
     travellers: '1 Adult',
-    cabin: 'Economy / Premium Economy',
+    cabin: 'Economy',
     fromCode: '',
     toCode: '',
     departDate: '',
@@ -177,7 +177,11 @@ export function ServicesFlow({
   const [flightConfirmation, setFlightConfirmation] = useState<TBOBookingConfirmation | null>(null);
 
   // Bus states
-  const [busSearch, setBusSearch] = useState({ from: '', to: '', dateLabel: 'Today' });
+  const [busSearch, setBusSearch] = useState<{ from: string; to: string; dateLabel: string; busType?: BusType }>({
+    from: '',
+    to: '',
+    dateLabel: 'Today',
+  });
   const [selectedBus, setSelectedBus] = useState<BusTicket | null>(null);
   const [selectedSeats, setSelectedSeats] = useState<Seat[]>([]);
   const [busPoints, setBusPoints] = useState<{ boarding: StopPoint; dropping: StopPoint } | null>(null);
@@ -388,6 +392,7 @@ export function ServicesFlow({
             from={busSearch.from}
             to={busSearch.to}
             dateLabel={busSearch.dateLabel}
+            busType={busSearch.busType === 'any' ? undefined : busSearch.busType}
             onBack={() => setView('busTickets')}
             onSelectBus={(bus) => {
               setSelectedBus(bus);
@@ -411,8 +416,8 @@ export function ServicesFlow({
         <View style={rootStyle}>
           <BusTicketsScreen
             onBack={() => backFrom('busTickets')}
-            onSearch={(from, to, dateLabel) => {
-              setBusSearch({ from, to, dateLabel });
+            onSearch={(from, to, dateLabel, busType) => {
+              setBusSearch({ from, to, dateLabel, busType });
               setView('busResults');
             }}
             onOpenMyTickets={() => setView('myTickets')}
@@ -521,6 +526,7 @@ export function ServicesFlow({
             travellers={flightSearch.travellers}
             cabin={flightSearch.cabin}
             search={flightSearchQuery}
+            legs={flightSearch.legs}
             accessToken={session?.access_token}
             onBack={() => setView('flights')}
             onViewPrices={(flight) => {
@@ -634,6 +640,12 @@ export function ServicesFlow({
             onSearch={(params) => {
               setHotelSearch(params);
               setView('hotelResults');
+            }}
+            onOpenHotel={(hotel) => {
+              // A featured stay: open its page for that city, keeping the dates and guests already chosen.
+              setHotelSearch((prev) => ({ ...prev, city: hotel.city, propertyType: undefined, freeCancelOnly: undefined }));
+              setSelectedHotel(hotel);
+              setView('hotelDetail');
             }}
           />
         </View>

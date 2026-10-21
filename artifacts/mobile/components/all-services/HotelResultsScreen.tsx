@@ -24,8 +24,10 @@ import {
   Star,
   Wifi,
   X,
+  Camera,
 } from 'lucide-react-native';
 import { HOTELS, type Hotel, type HotelSearchParams } from './hotelData';
+import { hotelGallery } from './hotelImages';
 
 import { serviceColors as C } from './serviceColors';
 import { T, useThemedStyles, glass } from './themed';
@@ -429,12 +431,11 @@ function HotelCard({ hotel, nights, onPress }: { hotel: Hotel; nights: number; o
   return (
     <TouchableOpacity style={card.wrap} activeOpacity={0.88} onPress={onPress}>
       <View style={[card.image, { backgroundColor: T(hotel.tint, 'bg') }]}>
-        <Image
-          source={require('../../assets/images/travel-hotels.jpg')}
-          style={card.img}
-          resizeMode="cover"
-        />
-        <View style={[card.imgTint, { backgroundColor: `${hotel.tint}99` }]} />
+        <Image source={hotelGallery(hotel)[0]} style={card.img} resizeMode="cover" />
+        <View style={card.photoCount}>
+          <Camera size={11} color="#FFFFFF" />
+          <Text style={card.photoCountText}>{hotelGallery(hotel).length}</Text>
+        </View>
         <View style={card.starRow}>
           {Array.from({ length: hotel.stars }).map((_, i) => (
             <Star key={i} size={10} color={T('#FCD34D', 'fg')} fill={T('#FCD34D', 'fg')} />
@@ -511,7 +512,19 @@ const make_card = () => StyleSheet.create({
    ...glass(22), },
   image: { height: 140, position: 'relative' },
   img: { width: '100%', height: '100%' },
-  imgTint: { ...StyleSheet.absoluteFillObject },
+  photoCount: {
+    position: 'absolute',
+    right: 10,
+    bottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  photoCountText: { fontSize: 10, fontFamily: 'Inter_700Bold', color: '#FFFFFF' },
   starRow: { position: 'absolute', left: 10, top: 10, flexDirection: 'row', gap: 2 },
   badge: {
     position: 'absolute',
@@ -590,7 +603,12 @@ export function HotelResultsScreen({
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
   const [filtersVisible, setFiltersVisible] = useState(false);
-  const [filters, setFilters] = useState<HotelFilters>(DEFAULT_FILTERS);
+  // The stay type and free-cancellation choices from the search screen start as ordinary filters, so they show and clear like any other.
+  const [filters, setFilters] = useState<HotelFilters>(() => ({
+    ...DEFAULT_FILTERS,
+    freeCancel: !!search.freeCancelOnly,
+    types: search.propertyType ? [search.propertyType] : [],
+  }));
   const [sortOpen, setSortOpen] = useState(false);
   const [sort, setSort] = useState('Price: Low to High');
 

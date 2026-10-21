@@ -1,8 +1,10 @@
+import { SheetBackdrop } from '@/components/SheetBackdrop';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAgentPrefill } from '@/context/AgentStateContext';
 import {
   Modal,
   Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -27,7 +29,7 @@ import {
 } from './billData';
 
 import { serviceColors as C } from './serviceColors';
-import { T, useThemedStyles, glass, dockBar } from './themed';
+import { T, useThemedStyles, glass, dockBar, glassSheet } from './themed';
 import { BrandFill } from './BrandFill';
 
 function ProviderPicker({
@@ -52,8 +54,9 @@ function ProviderPicker({
   );
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <View style={md.backdrop}>
+        <SheetBackdrop onPress={onClose} />
         <View style={md.sheet}>
           <View style={md.head}>
             <Text style={md.title}>{title}</Text>
@@ -96,9 +99,9 @@ function ProviderPicker({
 }
 
 const make_md = () => StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, backgroundColor: 'transparent', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: T(C.white, 'bg'),
+    ...glassSheet(),
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingBottom: 20,

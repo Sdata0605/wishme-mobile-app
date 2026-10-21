@@ -1,9 +1,10 @@
+import { SheetBackdrop } from '@/components/SheetBackdrop';
 import React, { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronDown, ChevronUp, Plus, RotateCcw, X } from 'lucide-react-native';
 import { serviceColors as C } from './serviceColors';
-import { T, useThemedStyles, glass } from './themed';
+import { T, useThemedStyles, glass, glassSheet } from './themed';
 import {
   CATEGORY_LABEL,
   CATEGORY_ORDER,
@@ -62,8 +63,8 @@ function ShortcutSheet({
   }, [saved]);
 
   return (
-    <Modal visible={mode !== null} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={sh.backdrop} onPress={onClose} />
+    <Modal visible={mode !== null} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <SheetBackdrop onPress={onClose} />
       <View style={[sh.panel, { paddingBottom: insets.bottom + 14 }]}>
         <View style={sh.grab} />
         <View style={sh.head}>
@@ -236,12 +237,9 @@ const useShortcutStyles = () => useThemedStyles(make_sc);
 const make_sh = () => StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
   panel: {
-    backgroundColor: T(C.white, 'bg'),
+    ...glassSheet(),
     borderTopLeftRadius: 22,
     borderTopRightRadius: 22,
-    borderWidth: 1,
-    borderBottomWidth: 0,
-    borderColor: T(C.border, 'border'),
     paddingHorizontal: 16,
     paddingTop: 8,
     maxHeight: '78%',

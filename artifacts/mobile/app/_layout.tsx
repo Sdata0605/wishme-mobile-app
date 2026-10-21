@@ -9,6 +9,7 @@ import { SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router, Stack, useSegments } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
+import * as SystemUI from 'expo-system-ui';
 import { StatusBar } from 'expo-status-bar';
 import * as SplashScreen from 'expo-splash-screen';
 import React, { useEffect, useRef } from 'react';
@@ -150,8 +151,9 @@ function SessionEndedGate() {
 }
 
 function RootLayoutNav() {
+  const { neon } = useTheme();
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: neon.bg } }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="reset-password" />
@@ -166,6 +168,13 @@ function RootLayoutNav() {
       <Stack.Screen name="wish-orders" />
       <Stack.Screen name="messages" />
       <Stack.Screen name="loved-ones" />
+      <Stack.Screen name="pay-mobile" />
+      <Stack.Screen name="pay-upi" />
+      <Stack.Screen name="insurance" />
+      <Stack.Screen name="garages" />
+      <Stack.Screen name="vehicle-number" />
+      <Stack.Screen name="vehicle-quote" />
+      <Stack.Screen name="health-plan" />
       <Stack.Screen name="photo-wish" />
       <Stack.Screen name="wish-celebrity" />
       <Stack.Screen name="wish-celebrity-occasion/[id]" options={{ presentation: 'card' }} />
@@ -240,6 +249,10 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    SystemUI.setBackgroundColorAsync('#1B0829').catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (fontsLoaded || fontError) {
       bootLog('fonts ready: native splash hides, the first screen can draw. error =', !!fontError);
       SplashScreen.hideAsync();
@@ -264,7 +277,7 @@ export default function RootLayout() {
                       <DrawerProvider>
                       <OrderConfirmProvider>
                         {fontsReady ? (
-                        <View style={{ flex: 1 }} ref={adoptRootFromInstance}>
+                        <View style={{ flex: 1, backgroundColor: '#1B0829' }} ref={adoptRootFromInstance}>
                           <ThemedStatusBar />
                           <RootLayoutNav />
                           <FloatingButtons />

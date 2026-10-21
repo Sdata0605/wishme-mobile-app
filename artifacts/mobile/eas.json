@@ -7,6 +7,8 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "node": "20.19.4",
+      "pnpm": "10.14.0",
       "android": {
         "buildType": "apk"
       },

@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
@@ -19,9 +19,39 @@ const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 const PAD = 6;
 const GAP = 14;
-const MOVE = { duration: 320, easing: Easing.bezier(0.22, 1, 0.36, 1) };
+const MOVE = { duration: 200, easing: Easing.bezier(0.2, 0, 0, 1) };
 
 interface Box { x: number; y: number; w: number; h: number; r: number }
+
+function getTabBox(index: number, W: number, H: number, tabBarHeight: number): Box {
+  const top = H - tabBarHeight;
+  const tabW = (W - 84) / 4;
+  if (index === 2) {
+    const size = 70;
+    return {
+      x: W / 2 - size / 2,
+      y: top - size / 2,
+      w: size,
+      h: size,
+      r: size / 2,
+    };
+  }
+  let cx = 0;
+  if (index === 0) cx = tabW * 0.5;
+  else if (index === 1) cx = tabW * 1.5;
+  else if (index === 3) cx = tabW * 2 + 84 + tabW * 0.5;
+  else if (index === 4) cx = tabW * 3 + 84 + tabW * 0.5;
+
+  const pillW = 62;
+  const pillH = 38;
+  return {
+    x: cx - pillW / 2,
+    y: top + 28 - pillH / 2,
+    w: pillW,
+    h: pillH,
+    r: pillH / 2,
+  };
+}
 
 /**
  * First-run walkthrough: dims Home, cuts a spotlight around the current target and shows a floating
@@ -52,7 +82,7 @@ function TourLayer({
   const { getTarget } = useTour();
   const rootRef = useRef<View>(null);
   const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null);
-  const [box, setBox] = useState<Box | null>(null);
+  const [measuredBox, setMeasuredBox] = useState<Box | null>(null);
 
   // Spotlight — animated on the UI thread so it glides between steps.
   const sx = useSharedValue(0);
@@ -74,6 +104,14 @@ function TourLayer({
   const current: TourStep = TOUR_STEPS[step];
   const isLast = step === TOUR_STEPS.length - 1;
 
+  // Immediately compute tab coordinates synchronously so there is zero frame lag
+  const box = useMemo<Box | null>(() => {
+    if (current.target.kind === 'tab') {
+      return getTabBox(current.target.index, W, H, tabBarHeight);
+    }
+    return measuredBox;
+  }, [current, W, H, tabBarHeight, measuredBox]);
+
   const onLayout = useCallback(() => {
     try {
       rootRef.current?.measureInWindow((x, y) => setOrigin({ x, y }));
@@ -82,43 +120,18 @@ function TourLayer({
     }
   }, []);
 
+  // Measure ref targets when needed
   useEffect(() => {
-    if (!origin) return;
-    let cancelled = false;
-
-    const apply = (b: Box) => {
-      if (cancelled) return;
-      setBox(b);
-      if (!placed.current) {
-        placed.current = true;
-        sx.value = b.x; sy.value = b.y; sw.value = b.w; sh.value = b.h; sr.value = b.r;
-      } else {
-        sx.value = withTiming(b.x, MOVE);
-        sy.value = withTiming(b.y, MOVE);
-        sw.value = withTiming(b.w, MOVE);
-        sh.value = withTiming(b.h, MOVE);
-        sr.value = withTiming(b.r, MOVE);
-      }
-    };
-
-    const t = current.target;
-    if (t.kind === 'tab') {
-      const slot = W / 5;
-      const top = H - tabBarHeight;
-      if (t.index === 2) {
-        // The assistant orb stands taller than the other buttons.
-        apply({ x: t.index * slot + 4, y: top - 16, w: slot - 8, h: tabBarHeight + 8, r: 22 });
-      } else {
-        apply({ x: t.index * slot + 4, y: top + 2, w: slot - 8, h: tabBarHeight - 4, r: 18 });
-      }
-    } else {
-      const view = getTarget(t.id)?.current;
+    if (current.target.kind === 'ref') {
+      if (!origin) return;
+      let cancelled = false;
+      const view = getTarget(current.target.id)?.current;
       if (view) {
         try {
           view.measureInWindow((x, y, w, h) => {
             if (cancelled || !w || !h) return;
             const size = Math.max(w, h) + PAD * 2;
-            apply({
+            setMeasuredBox({
               x: x - origin.x - PAD,
               y: y - origin.y - PAD,
               w: w + PAD * 2,
@@ -127,12 +140,31 @@ function TourLayer({
             });
           });
         } catch {
-          /* the target was unmounted before it could be measured; the tour simply keeps its last spot */
+          /* the target was unmounted before it could be measured */
         }
       }
+      return () => { cancelled = true; };
     }
-    return () => { cancelled = true; };
-  }, [origin, current, W, H, tabBarHeight, getTarget, sx, sy, sw, sh, sr]);
+  }, [current, origin, getTarget]);
+
+  // Glide spotlight to the target box smoothly
+  useEffect(() => {
+    if (!box) return;
+    if (!placed.current) {
+      placed.current = true;
+      sx.value = box.x;
+      sy.value = box.y;
+      sw.value = box.w;
+      sh.value = box.h;
+      sr.value = box.r;
+    } else {
+      sx.value = withTiming(box.x, MOVE);
+      sy.value = withTiming(box.y, MOVE);
+      sw.value = withTiming(box.w, MOVE);
+      sh.value = withTiming(box.h, MOVE);
+      sr.value = withTiming(box.r, MOVE);
+    }
+  }, [box, sx, sy, sw, sh, sr]);
 
   // The system back button skips the tour instead of leaving Home.
   useEffect(() => {
@@ -152,7 +184,13 @@ function TourLayer({
       ? { top: box.y + box.h + GAP }
       : { bottom: H - box.y + GAP }
     : { top: H / 2 };
-  const arrowLeft = box ? Math.min(Math.max(box.x + box.w / 2 - 8, 28), W - 28 - 16) : 28;
+
+  // Calculate arrow position so the tip points directly at the target center (box.x + box.w / 2).
+  // Bubble has left: 16, right: 16 (width: W - 32) and borderRadius: 18.
+  // Rotated 16x16 arrow has center at left + 8.
+  // Target screen center = 16 (bubble left) + arrowLeft + 8  =>  arrowLeft = targetCx - 24.
+  const targetCx = box ? box.x + box.w / 2 : W / 2;
+  const arrowLeft = Math.min(Math.max(targetCx - 24, 12), W - 60);
 
   return (
     <Animated.View
@@ -179,13 +217,13 @@ function TourLayer({
       {box ? (
         <Animated.View
           key={current.id}
-          entering={FadeInDown.duration(260).delay(120)}
+          entering={FadeIn.duration(150)}
           style={[styles.bubble, bubblePos, { backgroundColor: colors.card }]}
         >
           <View
             style={[
               styles.arrow,
-              { left: arrowLeft - 16, backgroundColor: colors.card },
+              { left: arrowLeft, backgroundColor: colors.card },
               below ? { top: -7 } : { bottom: -7 },
             ]}
           />

@@ -8,13 +8,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { router } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   CheckCircle2,
+  ChevronRight,
+  Landmark,
+  Smartphone,
   Flashlight,
-  Keyboard,
   QrCode,
   Wallet,
   X,
@@ -95,10 +98,12 @@ export function ScanPayScreen({
   onClose,
   walletBalance = 0,
   onBalanceChange,
+  initialPayee,
 }: {
   onClose: () => void;
   walletBalance?: number;
   onBalanceChange?: (next: number) => void;
+  initialPayee?: { id: string; name: string };
 }) {
   const insets = useSafeAreaInsets();
   const topPad = Platform.OS === 'web' ? 67 : insets.top;
@@ -110,7 +115,7 @@ export function ScanPayScreen({
   const [scannedLock, setScannedLock] = useState(false);
   const [torch, setTorch] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
-  const [manualCode, setManualCode] = useState('');
+  const [manualView, setManualView] = useState<'menu' | 'balance'>('menu');
   const [toast, setToast] = useState('');
 
   const [step, setStep] = useState<Step>('scan');
@@ -152,16 +157,26 @@ export function ScanPayScreen({
     [scannedLock, step, openConfirm],
   );
 
-  const submitManual = () => {
-    const code = manualCode.trim();
-    if (!code) {
-      showToast('Enter a UPI ID or code');
-      return;
-    }
+  const startManualPay = (id: string, name: string) => {
+    setPayload({ raw: id, payeeId: id, payeeName: name, amount: null, note: '' });
+    setAmountText('');
+    setPayError('');
     setManualOpen(false);
-    setManualCode('');
-    openConfirm(code);
+    setManualView('menu');
+    setStep('confirm');
   };
+
+  useEffect(() => {
+    if (initialPayee?.id) startManualPay(initialPayee.id, initialPayee.name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPayee?.id]);
+
+  const setMode = (manual: boolean) => {
+    setManualOpen(manual);
+    setManualView('menu');
+    if (manual) setTorch(false);
+  };
+
 
   const amount = useMemo(() => {
     const n = Number(amountText.replace(/[^\d.]/g, ''));
@@ -371,7 +386,7 @@ export function ScanPayScreen({
 
   return (
     <View style={[st.root, { backgroundColor: '#0A0920' }]}>
-      {cameraReady ? (
+      {manualOpen ? null : cameraReady ? (
         <CameraView
           style={StyleSheet.absoluteFill}
           facing="back"
@@ -407,15 +422,55 @@ export function ScanPayScreen({
             <X size={22} color="#fff" />
           </TouchableOpacity>
           <Text style={st.topTitle}>Scan & Pay</Text>
-          <TouchableOpacity
-            style={st.roundBtn}
-            onPress={() => setTorch((v) => !v)}
-            disabled={!cameraReady}
-          >
-            <Flashlight size={20} color={torch ? T.orange : '#fff'} />
-          </TouchableOpacity>
+          {manualOpen ? (
+            <View style={[st.roundBtn, { backgroundColor: 'transparent' }]} />
+          ) : (
+            <TouchableOpacity
+              style={st.roundBtn}
+              onPress={() => setTorch((v) => !v)}
+              disabled={!cameraReady}
+            >
+              <Flashlight size={20} color={torch ? T.orange : '#fff'} />
+            </TouchableOpacity>
+          )}
         </View>
 
+        {manualOpen ? (
+          <View style={st.manualPanel}>
+            {manualView === 'menu' && (
+              <>
+                {[
+                  { k: 'mobile', label: 'Pay mobile number', sub: 'Send to any mobile number', Icon: Smartphone },
+                  { k: 'upi', label: 'Pay to UPI ID or bank', sub: 'UPI ID or account + IFSC', Icon: Landmark },
+                  { k: 'balance', label: 'Check balance', sub: 'See your wallet balance', Icon: Wallet },
+                ].map(({ k, label, sub, Icon }) => (
+                  <TouchableOpacity
+                    key={k}
+                    style={st.optionRow}
+                    activeOpacity={0.85}
+                    onPress={() =>
+                      k === 'mobile'
+                        ? router.push('/pay-mobile')
+                        : k === 'upi'
+                          ? router.push('/pay-upi')
+                          : router.push('/wallet')
+                    }
+                  >
+                    <View style={st.optionIcon}>
+                      <Icon size={20} color="#fff" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={st.optionTitle}>{label}</Text>
+                      <Text style={st.optionSub}>{sub}</Text>
+                    </View>
+                    <ChevronRight size={18} color="rgba(255,255,255,0.6)" />
+                  </TouchableOpacity>
+                ))}
+              </>
+            )}
+
+          </View>
+        ) : (
         <View style={st.frameWrap} pointerEvents="none">
           <View style={st.frame}>
             <View style={[st.corner, st.tl]} />
@@ -425,53 +480,36 @@ export function ScanPayScreen({
           </View>
           <Text style={st.hint}>Align QR code · pay from wallet</Text>
         </View>
+        )}
 
-        <View style={[st.bottom, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={[st.bottom, { paddingBottom: Math.max(insets.bottom, 16) + 20 }]}>
+          <View style={st.modeSwitch}>
+            {(['scan', 'manual'] as const).map((m) => {
+              const active = (m === 'manual') === manualOpen;
+              return (
+                <TouchableOpacity
+                  key={m}
+                  style={[st.modeTab, active && { backgroundColor: T.orange }]}
+                  onPress={() => setMode(m === 'manual')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={[st.modeTabText, active && { color: '#fff' }]}>
+                    {m === 'scan' ? 'Scan' : 'Manual'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {!manualOpen && (
           <View style={st.balanceChip}>
             <Wallet size={14} color="#fff" />
             <Text style={st.balanceChipText}>
               Wallet ₹{balance.toLocaleString('en-IN')}
             </Text>
           </View>
-
-          {manualOpen ? (
-            <View style={st.manualBox}>
-              <Text style={st.manualLabel}>Enter UPI ID or payment code</Text>
-              <TextInput
-                style={st.manualInput}
-                value={manualCode}
-                onChangeText={setManualCode}
-                placeholder="name@upi"
-                placeholderTextColor="rgba(255,255,255,0.4)"
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-              <View style={st.manualActions}>
-                <TouchableOpacity
-                  style={st.manualCancel}
-                  onPress={() => setManualOpen(false)}
-                >
-                  <Text style={st.manualCancelText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[st.manualPay, { backgroundColor: T.orange }]}
-                  onPress={submitManual}
-                >
-                  <Zap size={16} color="#fff" />
-                  <Text style={st.manualPayText}>Continue</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={st.manualBtn}
-              onPress={() => setManualOpen(true)}
-              activeOpacity={0.85}
-            >
-              <Keyboard size={18} color="#fff" />
-              <Text style={st.manualBtnText}>Enter code manually</Text>
-            </TouchableOpacity>
           )}
+
         </View>
       </View>
 
@@ -549,6 +587,17 @@ const st = StyleSheet.create({
     borderRadius: 999,
   },
   balanceChipText: { color: '#fff', fontSize: 13, fontFamily: 'Inter_600SemiBold' },
+  modeSwitch: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    padding: 4,
+    borderRadius: 999,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+  },
+  modeTab: { paddingHorizontal: 28, paddingVertical: 9, borderRadius: 999 },
+  modeTabText: { color: 'rgba(255,255,255,0.7)', fontSize: 14, fontFamily: 'Inter_700Bold' },
   manualBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -561,6 +610,27 @@ const st = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.2)',
   },
   manualBtnText: { color: '#fff', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  manualPanel: { flex: 1, paddingHorizontal: 20, paddingTop: 24, gap: 12 },
+  optionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+  },
+  optionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(176,38,255,0.35)',
+  },
+  optionTitle: { color: '#fff', fontSize: 15, fontFamily: 'Inter_700Bold' },
+  optionSub: { color: 'rgba(255,255,255,0.6)', fontSize: 12, fontFamily: 'Inter_400Regular', marginTop: 2 },
   manualBox: {
     backgroundColor: 'rgba(0,0,0,0.55)',
     borderRadius: 16,

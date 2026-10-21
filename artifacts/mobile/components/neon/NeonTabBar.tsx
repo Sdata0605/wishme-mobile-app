@@ -165,6 +165,9 @@ function DockShape({ width, height }: { width: number; height: number }) {
  * is docked in a round notch. Tapping the mic from another tab takes you to the AI home (where the app opens); on the
  * AI home it starts and stops the assistant. A long press starts or stops it from anywhere.
  */
+/** Routes that should be treated as full-screen modals — no bottom bar shown. */
+const HIDDEN_ROUTES = new Set(['scan-pay', 'wallet']);
+
 export function NeonTabBar({ state, navigation }: TabBarProps) {
   const insets = useSafeAreaInsets();
   const { open, toggle, close } = useVoiceAssistant();
@@ -173,6 +176,9 @@ export function NeonTabBar({ state, navigation }: TabBarProps) {
   // The live connection is warmed up in the background (state 'connecting'), so only an open assistant counts.
   const active = open;
   const height = BAR_H + insets.bottom;
+
+  // Hide the bar entirely on full-screen modal routes.
+  if (HIDDEN_ROUTES.has(current ?? '')) return null;
 
   const go = (route: string) => {
     Haptics.selectionAsync().catch(() => {});
