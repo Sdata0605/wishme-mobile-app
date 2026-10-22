@@ -6,7 +6,7 @@
     "node": ">=20",
     "pnpm": ">=9"
   },
-  "packageManager": "pnpm@10.14.0",
+  "packageManager": "pnpm@10.34.7",
   "pnpm": {
     "onlyBuiltDependencies": [
       "@swc/core",

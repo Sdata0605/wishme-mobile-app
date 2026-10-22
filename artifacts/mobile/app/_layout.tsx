@@ -163,6 +163,7 @@ function RootLayoutNav() {
       <Stack.Screen name="booking-summary" options={{ presentation: 'card' }} />
       <Stack.Screen name="chat/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="news-story" options={{ presentation: 'card' }} />
+      <Stack.Screen name="quote-cards" options={{ presentation: 'card' }} />
       <Stack.Screen name="bookings" />
       <Stack.Screen name="favorites" />
       <Stack.Screen name="wish-orders" />

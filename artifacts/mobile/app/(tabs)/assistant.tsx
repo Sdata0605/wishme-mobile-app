@@ -4,14 +4,13 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AddressCard, GetStartedCard, NewsCard, PlayMyDay, PromptChips, ToolChips, WeatherCard, type ToolChip } from '@/components/home/HomeBlocks';
+import { AddressCard, GetStartedCard, NewsCard, PlayMyDay, PromptChips, ToolChips, type ToolChip } from '@/components/home/HomeBlocks';
 import { CallLed } from '@/components/home/HomeSections';
+import { MusicPlayerCard } from '@/components/home/MusicPlayerCard';
 import { Icon } from '@/components/Icon';
 import { AmbientBackground } from '@/components/neon/AmbientBackground';
-import { GradientText } from '@/components/neon/GradientText';
 import { Reveal } from '@/components/neon/Motion';
 import { useAuth } from '@/context/AuthContext';
-import { useDrawer } from '@/context/DrawerContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useVoiceAssistant } from '@/context/VoiceAssistantContext';
 import { savedMessage } from '@/services/assistant/addressModes';
@@ -19,7 +18,6 @@ import { listAiCalls, whoLabel, type AiCall } from '@/services/assistant/aiCalls
 import { todaysQuote, tryAsking } from '@/services/home/dailyQuote';
 import { touchStreak } from '@/services/home/dayStreak';
 import { topStories, type Story } from '@/services/home/news';
-import { currentWeather, type Weather } from '@/services/home/weather';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -35,11 +33,6 @@ const TOOLS: ToolChip[] = [
   { label: 'Calls', icon: 'phone', route: '/call-logs' },
 ];
 
-function greeting(now: Date): string {
-  const h = now.getHours();
-  return h < 12 ? 'Good morning,' : h < 17 ? 'Good afternoon,' : 'Good evening,';
-}
-
 function callText(c: AiCall): string {
   const who = whoLabel(c);
   if (c.status === 'in-progress') return `Talking to ${who}`;
@@ -49,31 +42,26 @@ function callText(c: AiCall): string {
 const dayStamp = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 
 /**
- * THE AI HOME: where the app opens. Mirrors MyAssistant's Home: the greeting, the day's line, Play my day, the weather,
- * the news, ideas to say out loud and the tools. The assistant's mic is docked in the tab bar. The WishMe home is the
- * Home tab.
+ * THE AI HOME: where the app opens. The date, the day's line, Play my day, the news, ideas to say out loud and the
+ * tools. The assistant's mic is docked in the tab bar. The WishMe home is the Home tab.
  */
 export default function AssistantHome() {
   const { neon } = useTheme();
   const { user, getValidSession, setAddressMode } = useAuth();
   const insets = useSafeAreaInsets();
   const { ask, toggle } = useVoiceAssistant();
-  const drawer = useDrawer();
 
   const [now, setNow] = useState(() => new Date());
-  const [weather, setWeather] = useState<Weather | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
   const [newsHidden, setNewsHidden] = useState(false);
   const [showStart, setShowStart] = useState(false);
   const [call, setCall] = useState<AiCall | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const first = (user?.firstName ?? '').trim().split(/\s+/)[0];
   const quote = useMemo(() => todaysQuote(now), [now]);
   const ideas = useMemo(() => tryAsking(now), [now]);
   // The tab bar is absolute and the raised mic sits over the last row.
   const bottomPad = 66 + insets.bottom + 56;
-  const night = now.getHours() >= 19 || now.getHours() < 6;
 
   useEffect(() => {
     void AsyncStorage.multiGet([GS_KEY, NEWS_KEY]).then(([gs, nw]) => {
@@ -85,11 +73,10 @@ export default function AssistantHome() {
   const refresh = useCallback(async () => {
     setNow(new Date());
     void touchStreak();
-    void currentWeather().then(setWeather);
     void topStories(6).then(setStories);
   }, []);
 
-  // Refresh on focus (greeting, weather, news) and when the app comes back to the foreground.
+  // Refresh on focus (date, news) and when the app comes back to the foreground.
   useFocusEffect(
     useCallback(() => {
       void refresh();
@@ -120,7 +107,6 @@ export default function AssistantHome() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await AsyncStorage.removeItem('home_weather_v2');
     await refresh();
     setRefreshing(false);
   };
@@ -137,30 +123,13 @@ export default function AssistantHome() {
       >
         {call && <CallLed text={callText(call)} onPress={() => router.push('/call-logs' as never)} />}
 
-        {/* Greeting, date and the day's line */}
+        {/* Date, search and the day's line */}
         <View style={styles.header}>
           <Reveal>
-            <Pressable
-              onPress={drawer.toggle}
-              accessibilityRole="button"
-              accessibilityLabel="Open menu"
-              hitSlop={8}
-              style={[styles.menu, { backgroundColor: neon.glass, borderColor: neon.cardBorder }]}
-            >
-              <Icon name="menu" size={22} color={neon.textHi} />
-            </Pressable>
-            <View style={styles.greetRow}>
-              <View style={styles.sun}>
-                <Icon name={night ? 'moon' : 'sun'} size={38} color={night ? neon.cyan : '#FFC93C'} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.greeting, { color: neon.textHi }]} numberOfLines={1} maxFontSizeMultiplier={1.2}>{greeting(now)}</Text>
-                {first ? (
-                  <GradientText colors={neon.isDark ? ['#1F7BFF', '#D23FE0', '#7B5CFA'] : [neon.violet, neon.pink]} fontSize={44} fontFamily="PlayfairDisplay_700Bold" letterSpacing={-0.5}>
-                    {first}
-                  </GradientText>
-                ) : null}
-              </View>
+            <View style={styles.topRow}>
+              <Text style={[styles.date, { color: neon.textLo }]}>
+                {DAYS[now.getDay()]}, {now.getDate()} {MONTHS[now.getMonth()]}
+              </Text>
               <Pressable
                 onPress={() => router.push('/(tabs)/hub' as never)}
                 accessibilityRole="button"
@@ -170,14 +139,20 @@ export default function AssistantHome() {
                 <Icon name="search" size={22} color={neon.textHi} />
               </Pressable>
             </View>
-            <Text style={[styles.date, { color: neon.textLo }]}>
-              {DAYS[now.getDay()]}, {now.getDate()} {MONTHS[now.getMonth()]}
-            </Text>
 
-            <View style={styles.quoteRow}>
+            {/* The day's thought: tap it to get it as pictures to share. */}
+            <Pressable
+              onPress={() => router.push({ pathname: '/quote-cards', params: { q: quote } } as never)}
+              accessibilityRole="button"
+              accessibilityLabel="Share today's thought as a picture"
+              style={({ pressed }) => [styles.quoteRow, pressed && { opacity: 0.7 }]}
+            >
               <LinearGradient colors={[neon.blue, neon.pink]} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={styles.quoteBar} />
               <Text style={[styles.quote, { color: neon.textHi }]}>{quote}</Text>
-            </View>
+              <View style={[styles.quoteShare, { backgroundColor: neon.glass, borderColor: neon.cardBorder }]}>
+                <Icon name="share-2" size={16} color={neon.textLo} />
+              </View>
+            </Pressable>
           </Reveal>
         </View>
 
@@ -207,12 +182,6 @@ export default function AssistantHome() {
             </Reveal>
           ) : null}
 
-          {weather ? (
-            <Reveal delayMs={140} style={{ marginTop: 20 }}>
-              <WeatherCard w={weather} />
-            </Reveal>
-          ) : null}
-
           {stories.length > 0 && !newsHidden ? (
             <Reveal delayMs={190} style={{ marginTop: 20 }}>
               <NewsCard
@@ -233,6 +202,11 @@ export default function AssistantHome() {
           <Text style={[styles.toolsLabel, { color: neon.textLo }]}>Open a tool</Text>
           <ToolChips tools={TOOLS} onOpen={(r) => router.push(r as never)} />
         </Reveal>
+
+        {/* Music at the bottom: free and open tracks, or AI-made ones. Keeps playing when Home scrolls away. */}
+        <Reveal delayMs={340} style={{ marginTop: 26, paddingHorizontal: 20 }}>
+          <MusicPlayerCard />
+        </Reveal>
       </ScrollView>
     </AmbientBackground>
   );
@@ -240,15 +214,13 @@ export default function AssistantHome() {
 
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 22 },
-  menu: { width: 44, height: 44, borderRadius: 22, borderWidth: 1.4, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  greetRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  sun: { width: 50, height: 50, marginTop: 2, alignItems: 'center', justifyContent: 'center' },
-  greeting: { fontSize: 31, lineHeight: 40, fontFamily: 'PlayfairDisplay_700Bold', letterSpacing: -0.4 },
-  search: { width: 48, height: 48, borderRadius: 24, borderWidth: 1.4, alignItems: 'center', justifyContent: 'center', marginTop: 4 },
-  date: { fontSize: 16, fontFamily: 'Inter_400Regular', marginTop: 10 },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  search: { width: 48, height: 48, borderRadius: 24, borderWidth: 1.4, alignItems: 'center', justifyContent: 'center' },
+  date: { flex: 1, fontSize: 16, fontFamily: 'Inter_400Regular' },
   quoteRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginTop: 18 },
   quoteBar: { width: 3, borderRadius: 2 },
   quote: { flex: 1, fontSize: 17.5, lineHeight: 25, fontFamily: 'Inter_500Medium' },
+  quoteShare: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.2, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
   body: { paddingHorizontal: 20, paddingTop: 22 },
   toolsLabel: { fontSize: 16, fontFamily: 'Inter_500Medium', marginLeft: 20, marginBottom: 12 },
 });
