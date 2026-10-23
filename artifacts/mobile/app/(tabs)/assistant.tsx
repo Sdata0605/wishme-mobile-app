@@ -31,6 +31,7 @@ const TOOLS: ToolChip[] = [
   { label: 'Finance', icon: 'wallet', route: '/finance' },
   { label: 'News', icon: 'newspaper', route: '/news' },
   { label: 'Calls', icon: 'phone', route: '/call-logs' },
+  { label: 'Translate', icon: 'globe', route: '/translate-lens' },
 ];
 
 function callText(c: AiCall): string {
