@@ -165,6 +165,10 @@ function RootLayoutNav() {
       <Stack.Screen name="news-story" options={{ presentation: 'card' }} />
       <Stack.Screen name="quote-cards" options={{ presentation: 'card' }} />
       <Stack.Screen name="translate-lens" options={{ presentation: 'card' }} />
+      <Stack.Screen name="talk-translate" options={{ presentation: 'card' }} />
+      <Stack.Screen name="snap-action" options={{ presentation: 'card' }} />
+      <Stack.Screen name="scan-document" options={{ presentation: 'card' }} />
+      <Stack.Screen name="ask-photo" options={{ presentation: 'card' }} />
       <Stack.Screen name="bookings" />
       <Stack.Screen name="favorites" />
       <Stack.Screen name="wish-orders" />

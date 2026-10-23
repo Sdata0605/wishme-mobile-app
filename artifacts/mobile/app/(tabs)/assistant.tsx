@@ -32,6 +32,10 @@ const TOOLS: ToolChip[] = [
   { label: 'News', icon: 'newspaper', route: '/news' },
   { label: 'Calls', icon: 'phone', route: '/call-logs' },
   { label: 'Translate', icon: 'globe', route: '/translate-lens' },
+  { label: 'Talk', icon: 'users', route: '/talk-translate' },
+  { label: 'Snap', icon: 'camera', route: '/snap-action' },
+  { label: 'Scan', icon: 'layers', route: '/scan-document' },
+  { label: 'Ask photo', icon: 'sparkles', route: '/ask-photo' },
 ];
 
 function callText(c: AiCall): string {
