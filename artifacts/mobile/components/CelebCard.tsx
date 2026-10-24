@@ -23,8 +23,12 @@ export function CelebCard({
   const { colors } = useTheme();
   const showLock = false; // photos stay visible; subscribing is asked for when the user books
 
+  // Their best moment plays first, then the profile opens (see app/celebrity-moment.tsx).
   const handlePress = () => {
-    router.push({ pathname: '/celebrity/[id]', params: { id: celebrity.id } });
+    router.push({
+      pathname: '/celebrity-moment',
+      params: { id: celebrity.id, name: celebrity.name, category: celebrity.category, image: celebrity.imageUrl },
+    } as never);
   };
 
   return (
