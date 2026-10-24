@@ -4,7 +4,7 @@ import { router, useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AppState, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AddressCard, GetStartedCard, NewsCard, PlayMyDay, PromptChips, ToolChips, type ToolChip } from '@/components/home/HomeBlocks';
+import { AddressCard, GetStartedCard, NewsCard, PlayMyDay, PromptChips } from '@/components/home/HomeBlocks';
 import { CallLed } from '@/components/home/HomeSections';
 import { MusicPlayerCard } from '@/components/home/MusicPlayerCard';
 import { Icon } from '@/components/Icon';
@@ -23,20 +23,6 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const GS_KEY = 'home_get_started_dismissed_v1';
 const NEWS_KEY = 'home_news_hidden_on_v1';
-
-const TOOLS: ToolChip[] = [
-  { label: 'Calendar', icon: 'calendar', route: '/calendar' },
-  { label: 'Reminders', icon: 'bell', route: '/reminders' },
-  { label: 'Documents', icon: 'copy', route: '/documents' },
-  { label: 'Finance', icon: 'wallet', route: '/finance' },
-  { label: 'News', icon: 'newspaper', route: '/news' },
-  { label: 'Calls', icon: 'phone', route: '/call-logs' },
-  { label: 'Translate', icon: 'globe', route: '/translate-lens' },
-  { label: 'Talk', icon: 'users', route: '/talk-translate' },
-  { label: 'Snap', icon: 'camera', route: '/snap-action' },
-  { label: 'Scan', icon: 'layers', route: '/scan-document' },
-  { label: 'Ask photo', icon: 'sparkles', route: '/ask-photo' },
-];
 
 function callText(c: AiCall): string {
   const who = whoLabel(c);
@@ -135,13 +121,15 @@ export default function AssistantHome() {
               <Text style={[styles.date, { color: neon.textLo }]}>
                 {DAYS[now.getDay()]}, {now.getDate()} {MONTHS[now.getMonth()]}
               </Text>
+              {/* Every tool lives in the Hub; this is the way there from the top of Home. */}
               <Pressable
                 onPress={() => router.push('/(tabs)/hub' as never)}
                 accessibilityRole="button"
-                accessibilityLabel="Search features"
-                style={[styles.search, { backgroundColor: neon.glass, borderColor: neon.cardBorder }]}
+                accessibilityLabel="Open the tools"
+                style={[styles.tools, { backgroundColor: neon.glass, borderColor: neon.cardBorder }]}
               >
-                <Icon name="search" size={22} color={neon.textHi} />
+                <Icon name="grid" size={18} color={neon.textHi} />
+                <Text style={[styles.toolsText, { color: neon.textHi }]}>Tools</Text>
               </Pressable>
             </View>
 
@@ -203,11 +191,6 @@ export default function AssistantHome() {
           <PromptChips ideas={ideas} onAsk={(p) => void ask(p)} />
         </Reveal>
 
-        <Reveal delayMs={290} style={{ marginTop: 22 }}>
-          <Text style={[styles.toolsLabel, { color: neon.textLo }]}>Open a tool</Text>
-          <ToolChips tools={TOOLS} onOpen={(r) => router.push(r as never)} />
-        </Reveal>
-
         {/* Music at the bottom: free and open tracks, or AI-made ones. Keeps playing when Home scrolls away. */}
         <Reveal delayMs={340} style={{ marginTop: 26, paddingHorizontal: 20 }}>
           <MusicPlayerCard />
@@ -220,12 +203,12 @@ export default function AssistantHome() {
 const styles = StyleSheet.create({
   header: { paddingHorizontal: 20, paddingTop: 22 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  search: { width: 48, height: 48, borderRadius: 24, borderWidth: 1.4, alignItems: 'center', justifyContent: 'center' },
+  tools: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 44, paddingHorizontal: 16, borderRadius: 22, borderWidth: 1.4 },
+  toolsText: { fontSize: 15, fontFamily: 'Inter_600SemiBold' },
   date: { flex: 1, fontSize: 16, fontFamily: 'Inter_400Regular' },
   quoteRow: { flexDirection: 'row', alignItems: 'stretch', gap: 12, marginTop: 18 },
   quoteBar: { width: 3, borderRadius: 2 },
   quote: { flex: 1, fontSize: 17.5, lineHeight: 25, fontFamily: 'Inter_500Medium' },
   quoteShare: { width: 34, height: 34, borderRadius: 17, borderWidth: 1.2, alignItems: 'center', justifyContent: 'center', alignSelf: 'center' },
   body: { paddingHorizontal: 20, paddingTop: 22 },
-  toolsLabel: { fontSize: 16, fontFamily: 'Inter_500Medium', marginLeft: 20, marginBottom: 12 },
 });

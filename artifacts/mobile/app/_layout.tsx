@@ -158,6 +158,7 @@ function RootLayoutNav() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="reset-password" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="celebrity-moment" options={{ animation: 'fade', contentStyle: { backgroundColor: '#000' } }} />
       <Stack.Screen name="celebrity/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="booking/[id]" options={{ presentation: 'card' }} />
       <Stack.Screen name="booking-summary" options={{ presentation: 'card' }} />
@@ -169,6 +170,8 @@ function RootLayoutNav() {
       <Stack.Screen name="snap-action" options={{ presentation: 'card' }} />
       <Stack.Screen name="scan-document" options={{ presentation: 'card' }} />
       <Stack.Screen name="ask-photo" options={{ presentation: 'card' }} />
+      <Stack.Screen name="agent-room" options={{ presentation: 'card' }} />
+      <Stack.Screen name="agent-room-live" options={{ presentation: 'card', gestureEnabled: false }} />
       <Stack.Screen name="bookings" />
       <Stack.Screen name="favorites" />
       <Stack.Screen name="wish-orders" />

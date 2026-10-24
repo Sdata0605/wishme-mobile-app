@@ -159,6 +159,19 @@ export default function HubScreen() {
 
   const groups: { title: string; rows: HubRow[] }[] = [
     {
+      // The AI tools, first: this is where people come to find them (Home only points here).
+      title: 'Tools',
+      rows: [
+        { icon: 'message-circle', title: 'Agent room', blurb: 'Your assistant gathers AI agents to argue a case, discuss a patient or settle a decision. You listen in.', accent: neon.accentA, route: '/agent-room', live: false, context: null },
+        { icon: 'globe', title: 'Translate', blurb: 'Point the camera at any text and read it in your language.', accent: neon.accentC, route: '/translate-lens', live: false, context: null },
+        { icon: 'users', title: 'Talk', blurb: 'Two people, two languages, one phone: a live conversation translator.', accent: neon.accentB, route: '/talk-translate', live: false, context: null },
+        { icon: 'camera', title: 'Snap', blurb: 'Photograph a card, bill or note and turn it into a contact, expense or reminder.', accent: neon.accentD, route: '/snap-action', live: false, context: null },
+        { icon: 'layers', title: 'Scan', blurb: 'Scan pages into a searchable PDF in your documents.', accent: neon.accentF, route: '/scan-document', live: false, context: null },
+        { icon: 'sparkles', title: 'Ask photo', blurb: 'Take a picture and ask anything about it.', accent: neon.accentE, route: '/ask-photo', live: false, context: null },
+        { icon: 'newspaper', title: 'News', blurb: 'Today’s top stories, read out or read on screen.', accent: neon.accentA, route: '/news', live: false, context: null },
+      ],
+    },
+    {
       title: 'Your day',
       rows: [
         {
